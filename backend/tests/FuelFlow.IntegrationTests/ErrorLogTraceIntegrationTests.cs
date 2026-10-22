@@ -2,7 +2,11 @@ using System.Diagnostics;
 using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.ErrorLogs;
+using FuelFlow.Features.ErrorLogs.ClearErrorLogs;
+using FuelFlow.Features.ErrorLogs.GetErrorLogFacets;
+using FuelFlow.Features.ErrorLogs.GetErrorLogs;
 using FuelFlow.Features.ErrorLogs.Logging;
+using FuelFlow.Features.ErrorLogs.ResolveErrorLogs;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -91,7 +95,11 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
         }
 
         await using var context = CreateContext();
-        var controller = new ErrorLogsController(context, new AuditEventService(context));
+        var controller = new ErrorLogsController(
+            new GetErrorLogFacetsQueryHandler(context),
+            new GetErrorLogsQueryHandler(context),
+            new ResolveErrorLogsCommandHandler(context, new AuditEventService(context)),
+            new ClearErrorLogsCommandHandler(context));
 
         var incident = await ReadItemsAsync(controller.GetAll(traceId: traceId));
 

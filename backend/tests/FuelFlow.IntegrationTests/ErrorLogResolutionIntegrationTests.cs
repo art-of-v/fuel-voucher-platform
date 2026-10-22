@@ -2,6 +2,10 @@ using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.ErrorLogs;
+using FuelFlow.Features.ErrorLogs.ClearErrorLogs;
+using FuelFlow.Features.ErrorLogs.GetErrorLogFacets;
+using FuelFlow.Features.ErrorLogs.GetErrorLogs;
+using FuelFlow.Features.ErrorLogs.ResolveErrorLogs;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -39,9 +43,9 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
         var controller = NewController(context);
 
         (await ReadAsync(controller.GetAll())).Should().HaveCount(2);
-        (await ReadAsync(controller.GetAll(resolved: ErrorLogsController.ResolutionFilter.All))).Should().HaveCount(3);
+        (await ReadAsync(controller.GetAll(resolved: ResolutionFilter.All))).Should().HaveCount(3);
 
-        var handled = await ReadAsync(controller.GetAll(resolved: ErrorLogsController.ResolutionFilter.Resolved));
+        var handled = await ReadAsync(controller.GetAll(resolved: ResolutionFilter.Resolved));
         handled.Should().ContainSingle();
         handled[0].Message.Should().Be("already handled");
         handled[0].ResolvedByUserId.Should().Be(StaffId);
@@ -50,7 +54,7 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
 
         // A junk value must not silently reveal everything; anything unrecognised means
         // "outstanding", the same default a caller that knows nothing gets.
-        (await ReadAsync(controller.GetAll(resolved: (ErrorLogsController.ResolutionFilter)99))).Should().HaveCount(2);
+        (await ReadAsync(controller.GetAll(resolved: (ResolutionFilter)99))).Should().HaveCount(2);
     }
 
     [Fact]
@@ -144,7 +148,11 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
     private static readonly Guid StaffId = Guid.NewGuid();
 
     private ErrorLogsController NewController(ApplicationDbContext context)
-        => new(context, new AuditEventService(context))
+        => new(
+            new GetErrorLogFacetsQueryHandler(context),
+            new GetErrorLogsQueryHandler(context),
+            new ResolveErrorLogsCommandHandler(context, new AuditEventService(context)),
+            new ClearErrorLogsCommandHandler(context))
         {
             ControllerContext = new ControllerContext
             {
