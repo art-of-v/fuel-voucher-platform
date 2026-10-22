@@ -218,15 +218,15 @@ public sealed class SuppliersControllerTests : IDisposable
     }
 
     /// <summary>
-    /// Reads the <c>{ error }</c> body the controller returns. Serialised rather than cast: the value is
-    /// an anonymous object, and this project already reads those as JSON for the same reason - an
-    /// unserialised string in a jsonb column is a 22P02 at SaveChanges.
+    /// Reads the <c>detail</c> of the error envelope the controller returns. Serialised rather than
+    /// cast: the value is a <c>ProblemDetails</c>, and this project already reads those as JSON for
+    /// the same reason - an unserialised string in a jsonb column is a 22P02 at SaveChanges.
     /// </summary>
     private static string ErrorOf(ActionResult<SupplierDto> result)
     {
         var bad = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(bad.Value));
-        return doc.RootElement.GetProperty("error").GetString()!;
+        return doc.RootElement.GetProperty("detail").GetString()!;
     }
 
     [Fact]
@@ -446,7 +446,7 @@ public sealed class SuppliersControllerTests : IDisposable
         var conflict = result.Result.Should().BeOfType<ConflictObjectResult>().Subject;
         var body = JsonSerializer.SerializeToElement(conflict.Value);
         body.GetProperty("code").GetString().Should().Be(SupplierWriteResult.NameTakenCode);
-        body.GetProperty("message").GetString().Should().Contain("ФОП Стретович Микола");
+        body.GetProperty("detail").GetString().Should().Contain("ФОП Стретович Микола");
         (await _context.Suppliers.CountAsync()).Should().Be(1);
     }
 
@@ -577,7 +577,7 @@ public sealed class SuppliersControllerTests : IDisposable
     {
         var result = await _controller.Update(Guid.NewGuid(), new UpdateSupplierRequest { Name = "Хтось", EdrIpn = "1234567890" });
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -627,7 +627,7 @@ public sealed class SuppliersControllerTests : IDisposable
     {
         var result = await _controller.Deactivate(Guid.NewGuid());
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
@@ -647,7 +647,7 @@ public sealed class SuppliersControllerTests : IDisposable
     {
         var result = await _controller.Reactivate(Guid.NewGuid());
 
-        result.Result.Should().BeOfType<NotFoundResult>();
+        result.Result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]

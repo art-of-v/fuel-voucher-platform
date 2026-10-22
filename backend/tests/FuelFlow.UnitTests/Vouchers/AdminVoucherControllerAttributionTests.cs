@@ -124,29 +124,29 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
         // share state, and each asserts on the row it touched.
         var forDelete = await SeedStockVoucherAsync();
         (await ControllerFor(NoSubject).Delete(forDelete, default))
-            .Should().BeOfType<UnauthorizedResult>("Delete must refuse a write it cannot attribute");
+            .Should().BeOfType<UnauthorizedObjectResult>("Delete must refuse a write it cannot attribute");
         await AssertUntouched(forDelete, v => v.Status, VoucherStatus.Available, "Delete");
 
         var forUpdate = await SeedStockVoucherAsync();
         (await ControllerFor(NoSubject).Update(
                 forUpdate, new UpdateVoucherRequest { Status = nameof(VoucherStatus.Deactivated) }, default))
-            .Should().BeOfType<UnauthorizedResult>();
+            .Should().BeOfType<UnauthorizedObjectResult>();
         await AssertUntouched(forUpdate, v => v.Status, VoucherStatus.Available, "Update");
 
         var forUnblock = await SeedStockVoucherAsync();
         (await ControllerFor(NoSubject).Unblock(forUnblock, default))
-            .Should().BeOfType<UnauthorizedResult>();
+            .Should().BeOfType<UnauthorizedObjectResult>();
         await AssertUntouched(forUnblock, v => v.Status, VoucherStatus.Available, "Unblock");
 
         var forUnarchive = await SeedStockVoucherAsync();
         (await ControllerFor(NoSubject).Unarchive(forUnarchive, default))
-            .Should().BeOfType<UnauthorizedResult>();
+            .Should().BeOfType<UnauthorizedObjectResult>();
         await AssertUntouched(forUnarchive, v => v.IsDeleted, false, "Unarchive");
 
         var forBulk = await SeedStockVoucherAsync();
         (await ControllerFor(NoSubject).BulkAction(
                 new BulkActionRequest { Action = "deactivate", Ids = new List<Guid> { forBulk } }, default))
-            .Should().BeOfType<UnauthorizedResult>();
+            .Should().BeOfType<UnauthorizedObjectResult>();
         await AssertUntouched(forBulk, v => v.Status, VoucherStatus.Available, "BulkAction");
     }
 
@@ -177,7 +177,7 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
         var result = await ControllerFor(WithSubject(actor))
             .Update(voucherId, new UpdateVoucherRequest { Status = nameof(VoucherStatus.Deactivated) }, default);
 
-        result.Should().NotBeOfType<UnauthorizedResult>(
+        result.Should().NotBeOfType<UnauthorizedObjectResult>(
             "the guard must refuse a missing claim, not swallow a present one");
 
         var recorded = await _context.VoucherEvents.AsNoTracking()

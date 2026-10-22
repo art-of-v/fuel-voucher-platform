@@ -15,7 +15,7 @@ export async function registerDevice(
   );
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || 'Не вдалося зареєструвати пристрій');
+    throw new Error(error.detail || error.title || 'Не вдалося зареєструвати пристрій');
   }
 }
 
@@ -28,7 +28,7 @@ export async function getChallenge(deviceId: string, accessToken?: string): Prom
   );
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || 'Помилка отримання challenge');
+    throw new Error(error.detail || error.title || 'Помилка отримання challenge');
   }
   const data = await response.json();
   return data.challenge;
@@ -46,7 +46,7 @@ export async function verifyChallenge(
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error?.message || 'Помилка верифікації пристрою');
+    throw new Error(error.detail || error.title || 'Помилка верифікації пристрою');
   }
   return response.json();
 }

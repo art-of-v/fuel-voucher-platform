@@ -1,5 +1,6 @@
 using FuelFlow.Features.Brands.GetAdminFuelTypeById;
 using FuelFlow.Features.Brands.GetAdminFuelTypes;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -64,6 +65,6 @@ public sealed class AdminFuelTypeController : ControllerBase
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminFuelTypeByIdQuery(id), ct);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? ApiError.NotFound("Not found") : Ok(result);
     }
 }

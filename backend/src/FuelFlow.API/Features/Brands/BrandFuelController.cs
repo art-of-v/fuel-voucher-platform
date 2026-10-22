@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands.AdminUpdateNominals;
 using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Brands.GetFuelPriceHistory;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -98,17 +99,17 @@ public sealed class BrandFuelController : ControllerBase
             return Created($"/api/admin/brand-fuels/{result.CreatedFuelId}", new { id = result.CreatedFuelId });
 
         if (result.NotFound)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         // The refusal that names the fuel that already holds the name or the code carries its id, so
         // the operator is told which row to reprice. The refusal that names no fuel does not - its
         // body has never had the field, and growing a null one would change the answer.
         if (result.Conflict)
             return result.FuelTypeId is null
-                ? Conflict(new { message = result.Error, field = result.Field })
-                : Conflict(new { message = result.Error, fuelTypeId = result.FuelTypeId, field = result.Field });
+                ? ApiError.Conflict(result.Error, extra: Extensions(("field", result.Field)))
+                : ApiError.Conflict(result.Error, extra: Extensions(("fuelTypeId", result.FuelTypeId), ("field", result.Field)));
 
-        return BadRequest(new { message = result.Error, field = result.Field });
+        return ApiError.BadRequest(result.Error, extra: Extensions(("field", result.Field)));
     }
 
     [HttpPut("{fuelId}")]
@@ -122,17 +123,17 @@ public sealed class BrandFuelController : ControllerBase
             return Ok(new { success = true });
 
         if (result.NotFound)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         // The refusal that names the fuel that already holds the code carries its id. The refusal
         // that names no fuel - the one about the pool - does not, and its body has never had the
         // field, and growing a null one would change the answer.
         if (result.Conflict)
             return result.FuelTypeId is null
-                ? Conflict(new { message = result.Error, field = result.Field })
-                : Conflict(new { message = result.Error, fuelTypeId = result.FuelTypeId, field = result.Field });
+                ? ApiError.Conflict(result.Error, extra: Extensions(("field", result.Field)))
+                : ApiError.Conflict(result.Error, extra: Extensions(("fuelTypeId", result.FuelTypeId), ("field", result.Field)));
 
-        return BadRequest(new { message = result.Error, field = result.Field });
+        return ApiError.BadRequest(result.Error, extra: Extensions(("field", result.Field)));
     }
 
     [HttpDelete("{fuelId}")]
@@ -146,16 +147,15 @@ public sealed class BrandFuelController : ControllerBase
             return Ok(new { success = true });
 
         if (result.NotFound)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         // The refusal carries the count of the vouchers that block the archive and a few of them: the
         // operator needs the size of the problem and not only the first rows of it.
-        return Conflict(new
-        {
-            error = result.Error,
-            activeVoucherCount = result.ActiveVoucherCount,
-            examples = result.Examples.Select(v => new { v.VoucherNumber, status = v.Status, v.Liters })
-        });
+        return ApiError.Conflict(
+            result.Error,
+            extra: Extensions(
+                ("activeVoucherCount", result.ActiveVoucherCount),
+                ("examples", result.Examples.Select(v => new { v.VoucherNumber, status = v.Status, v.Liters }))));
     }
 
     [HttpPut("brands/{id}/nominals")]
@@ -169,9 +169,23 @@ public sealed class BrandFuelController : ControllerBase
             return Ok(new { success = true });
 
         if (result.NotFound)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
-        return BadRequest(new { message = result.Error, invalid = result.Invalid });
+        return ApiError.BadRequest(result.Error, extra: Extensions(("invalid", result.Invalid)));
+    }
+
+    /// <summary>
+    /// The machine-readable half of a refusal, as the extensions of the one error envelope. A null
+    /// value is left out: the answer that never carried the field must not grow one.
+    /// </summary>
+    private static IReadOnlyDictionary<string, object?> Extensions(params (string Key, object? Value)[] pairs)
+    {
+        var extensions = new Dictionary<string, object?>();
+        foreach (var (key, value) in pairs)
+        {
+            if (value is not null) extensions[key] = value;
+        }
+        return extensions;
     }
 
     private Guid GetUserId()

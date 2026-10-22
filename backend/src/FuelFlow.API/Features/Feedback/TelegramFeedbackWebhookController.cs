@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using FuelFlow.API.Extensions;
 using FuelFlow.Features.Feedback;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -58,7 +59,7 @@ public sealed class TelegramFeedbackWebhookController : ControllerBase
             _logger.LogWarning(
                 "Rejected a Telegram feedback webhook delivery for update {UpdateId}: bad or missing secret.",
                 update?.UpdateId);
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
         }
 
         if (update is null)

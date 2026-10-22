@@ -13,6 +13,7 @@ using FuelFlow.Features.Company.RecallVoucher;
 using FuelFlow.Features.Company.ReturnVoucherToPool;
 using FuelFlow.Features.Company.SendInvitation;
 using FuelFlow.Features.Company.UnblockWorkerVoucher;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -77,11 +78,11 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> SendInvitation([FromBody] SendInvitationRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         if (string.IsNullOrWhiteSpace(request.WorkerPhoneNumber))
         {
-            return BadRequest(new { error = "workerPhoneNumber is required." });
+            return ApiError.BadRequest("workerPhoneNumber is required.");
         }
 
         var result = await _sendInvitationHandler.HandleAsync(
@@ -91,14 +92,14 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
         return result.Status switch
         {
             "Success" => Ok(new { invitationId = result.InvitationId, status = "Pending" }),
-            "InvalidPhone" => BadRequest(new { error = result.ErrorMessage }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "WorkerNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CannotInviteSelf" => BadRequest(new { error = result.ErrorMessage }),
-            "WorkerAlreadyMember" => Conflict(new { error = result.ErrorMessage }),
-            "AlreadyPending" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to send invitation." })
+            "InvalidPhone" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "WorkerNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CannotInviteSelf" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "WorkerAlreadyMember" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            "AlreadyPending" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to send invitation.")
         };
     }
 
@@ -106,7 +107,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> GetOwnerInvitations([FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _getOwnerInvitationsHandler.HandleAsync(new GetOwnerInvitationsQuery(userId.Value, legalEntityId), cancellationToken);
         return Ok(result);
@@ -116,15 +117,15 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> CancelInvitation([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _cancelInvitationHandler.HandleAsync(new CancelInvitationCommand(id, userId.Value), cancellationToken);
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
-            "InvalidStatus" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to cancel invitation." })
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "InvalidStatus" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to cancel invitation.")
         };
     }
 
@@ -132,7 +133,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> GetMyInvitations(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _getMyInvitationsHandler.HandleAsync(new GetMyInvitationsQuery(userId.Value), cancellationToken);
         return Ok(result);
@@ -148,7 +149,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> GetMyMemberships(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _getMyMembershipsHandler.HandleAsync(new GetMyMembershipsQuery(userId.Value), cancellationToken);
         return Ok(result);
@@ -158,16 +159,16 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> AcceptInvitation([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _acceptInvitationHandler.HandleAsync(new AcceptInvitationCommand(id, userId.Value), cancellationToken);
         return result.Status switch
         {
             "Success" => Ok(new { success = true, memberId = result.MemberId }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
-            "InvalidStatus" => Conflict(new { error = result.ErrorMessage }),
-            "AlreadyMember" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to accept invitation." })
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "InvalidStatus" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            "AlreadyMember" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to accept invitation.")
         };
     }
 
@@ -175,15 +176,15 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> DeclineInvitation([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _declineInvitationHandler.HandleAsync(new DeclineInvitationCommand(id, userId.Value), cancellationToken);
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
-            "InvalidStatus" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to decline invitation." })
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "InvalidStatus" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to decline invitation.")
         };
     }
 
@@ -191,7 +192,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> GetMembers([FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _getMembersHandler.HandleAsync(new GetMembersQuery(userId.Value, legalEntityId), cancellationToken);
         return Ok(result);
@@ -201,16 +202,16 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> FireWorker([FromRoute] Guid id, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _fireWorkerHandler.HandleAsync(new FireWorkerCommand(userId.Value, id, legalEntityId), cancellationToken);
         return result.Status switch
         {
             "Success" => Ok(new { success = true, blockedVoucherCount = result.BlockedVoucherCount }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to fire worker." })
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to fire worker.")
         };
     }
 
@@ -218,16 +219,16 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> GiftVouchers([FromBody] GiftVouchersRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         if (request.WorkerUserId == Guid.Empty)
         {
-            return BadRequest(new { error = "workerUserId is required." });
+            return ApiError.BadRequest("workerUserId is required.");
         }
 
         if (request.VoucherIds is null || request.VoucherIds.Count == 0)
         {
-            return BadRequest(new { error = "voucherIds must contain at least one voucher id." });
+            return ApiError.BadRequest("voucherIds must contain at least one voucher id.");
         }
 
         var result = await _giftVouchersHandler.HandleAsync(
@@ -237,13 +238,13 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
         return result.Status switch
         {
             "Success" => Ok(new { success = true, giftedCount = result.GiftedCount, issuanceOrderId = result.IssuanceOrderId }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "WorkerNotMember" => BadRequest(new { error = result.ErrorMessage }),
-            "EmptyVoucherList" => BadRequest(new { error = result.ErrorMessage }),
-            "VoucherNotFound" => NotFound(new { error = result.ErrorMessage }),
-            "VoucherNotEligible" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to gift vouchers." })
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "WorkerNotMember" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "EmptyVoucherList" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "VoucherNotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "VoucherNotEligible" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to gift vouchers.")
         };
     }
 
@@ -251,19 +252,19 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> RecallVoucher([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _recallVoucherHandler.HandleAsync(new RecallVoucherCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
 
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
             "Forbidden" => Forbid(),
-            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to recall voucher." })
+            "InvalidState" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to recall voucher.")
         };
     }
 
@@ -271,19 +272,19 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> BlockWorkerVoucher([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _blockWorkerVoucherHandler.HandleAsync(new BlockWorkerVoucherCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
 
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
             "Forbidden" => Forbid(),
-            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to block voucher." })
+            "InvalidState" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to block voucher.")
         };
     }
 
@@ -291,19 +292,19 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> UnblockWorkerVoucher([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _unblockWorkerVoucherHandler.HandleAsync(new UnblockWorkerVoucherCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
 
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
             "Forbidden" => Forbid(),
-            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to unblock voucher." })
+            "InvalidState" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to unblock voucher.")
         };
     }
 
@@ -311,19 +312,19 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     public async Task<IActionResult> ReturnVoucherToPool([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _returnVoucherToPoolHandler.HandleAsync(new ReturnVoucherToPoolCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
 
         return result.Status switch
         {
             "Success" => Ok(new { success = true }),
-            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
-            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
-            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "OwnerCompanyNotFound" => ApiError.BadRequest(result.ErrorMessage, result.Status),
+            "CompanyNotOwned" => ApiError.NotFound(result.ErrorMessage, result.Status),
+            "NotFound" => ApiError.NotFound(result.ErrorMessage, result.Status),
             "Forbidden" => Forbid(),
-            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
-            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to return the voucher to the pool." })
+            "InvalidState" => ApiError.Conflict(result.ErrorMessage, result.Status),
+            _ => ApiError.BadRequest(result.ErrorMessage ?? "Failed to return the voucher to the pool.")
         };
     }
 

@@ -12,6 +12,6 @@ export async function sendVerificationCode(phoneNumber: string): Promise<void> {
       throw err;
     }
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || error.title || 'ПОМИЛКА МЕРЕЖІ');
+    throw new Error(error.detail || error.title || 'ПОМИЛКА МЕРЕЖІ');
   }
 }

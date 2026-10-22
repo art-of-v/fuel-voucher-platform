@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FuelFlow.Features.Orders.Receipt;
 using FuelFlow.Features.Orders.Receipt.GetOrderReceipt;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -43,14 +44,14 @@ public sealed class OrderReceiptController : ControllerBase
         var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (claim is null || !Guid.TryParse(claim, out var userId))
         {
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
         }
 
         var receipt = await _handler.HandleAsync(
             GetOrderReceiptQuery.ForCaller(id, userId), cancellationToken);
 
         // The same response for "not yours" and "not there", as above.
-        return receipt is null ? NotFound("Order not found") : Build(receipt);
+        return receipt is null ? ApiError.NotFound("Order not found") : Build(receipt);
     }
 
     /// <summary>Any order, for an operator.</summary>
@@ -63,7 +64,7 @@ public sealed class OrderReceiptController : ControllerBase
         var receipt = await _handler.HandleAsync(
             GetOrderReceiptQuery.ForAnyOrder(id), cancellationToken);
 
-        return receipt is null ? NotFound("Order not found") : Build(receipt);
+        return receipt is null ? ApiError.NotFound("Order not found") : Build(receipt);
     }
 
     private IActionResult Build(OrderReceiptData receipt)

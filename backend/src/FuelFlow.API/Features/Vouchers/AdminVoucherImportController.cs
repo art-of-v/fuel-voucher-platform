@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Vouchers.ParseInvoice;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -62,7 +63,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getByIdHandler.HandleAsync(new GetImportBatchByIdQuery(id), cancellationToken);
-        if (result == null) return NotFound();
+        if (result == null) return ApiError.NotFound("Not found");
         return Ok(result);
     }
 
@@ -108,7 +109,7 @@ public sealed class AdminVoucherImportController : ControllerBase
 
         if (!result.Success)
         {
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
         }
 
         return Ok(result);
@@ -156,8 +157,8 @@ public sealed class AdminVoucherImportController : ControllerBase
             new SetBatchCostCommand(id, fuelTypeId, request.CostPerLiter, GetUserId(), GetUserName()),
             cancellationToken);
 
-        if (result.NotFound) return NotFound(new { error = result.Error });
-        if (!result.Success) return BadRequest(new { error = result.Error });
+        if (result.NotFound) return ApiError.NotFound(result.Error);
+        if (!result.Success) return ApiError.BadRequest(result.Error);
         return Ok(new { success = true, blendedCostPerLiter = result.BlendedCostPerLiter, packagesRepriced = result.PackagesRepriced });
     }
 
@@ -172,7 +173,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     public async Task<IActionResult> ParseInvoice(Guid id, IFormFile file, CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(new { error = "A non-empty .xlsx file is required" });
+            return ApiError.BadRequest("A non-empty .xlsx file is required");
 
         InvoiceParseResult parsed;
         // ClosedXML needs a seekable stream; buffer the (≤20 MB) upload into memory first.
@@ -187,7 +188,7 @@ public sealed class AdminVoucherImportController : ControllerBase
         var result = await _parseInvoiceHandler.HandleAsync(
             new ParseInvoiceCommand(id, parsed.Lines, parsed.Errors), cancellationToken);
 
-        if (result.NotFound) return NotFound(new { error = "Import not found" });
+        if (result.NotFound) return ApiError.NotFound("Import not found");
         return Ok(result.Dto);
     }
 

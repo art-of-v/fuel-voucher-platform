@@ -47,7 +47,9 @@ describe('updateLegalProfile', () => {
   });
 
   it('surfaces the server sentence rather than a fixed string', async () => {
-    apiFetchMock.mockResolvedValue(fail(409, { error: 'EDRPOU already registered' }));
+    apiFetchMock.mockResolvedValue(
+      fail(409, { title: 'Conflict', status: 409, detail: 'EDRPOU already registered' }),
+    );
 
     const error = await updateLegalProfile({ edrpou: '38528147' }).catch((e) => e);
 

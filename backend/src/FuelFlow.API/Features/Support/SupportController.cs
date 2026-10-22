@@ -1,5 +1,6 @@
 using FuelFlow.API.Extensions;
 using FuelFlow.Features.Support.CreateSupportMessage;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -40,7 +41,7 @@ public sealed class SupportController : ControllerBase
         // the same one the filter gave - a 400 whose body names the fields that broke.
         var errors = CreateSupportMessageCommandValidator.Validate(command);
         if (errors.Count > 0)
-            return BadRequest(new ValidationProblemDetails(errors));
+            return ApiError.Validation(errors);
 
         // Honeypot: real users never see this field, so any value means a bot.
         if (!string.IsNullOrWhiteSpace(command.Website))

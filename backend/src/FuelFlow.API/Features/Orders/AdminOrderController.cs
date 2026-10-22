@@ -5,6 +5,7 @@ using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.UpdateOrderStatus;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -62,7 +63,7 @@ public sealed class AdminOrderController : ControllerBase
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var result = await _getByIdHandler.HandleAsync(new GetAdminOrderByIdQuery(id), cancellationToken);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? ApiError.NotFound("Not found") : Ok(result);
     }
 
     [HttpPut("{id}")]
@@ -73,10 +74,10 @@ public sealed class AdminOrderController : ControllerBase
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateOrderRequest request, CancellationToken cancellationToken)
     {
         var result = await _updateHandler.HandleAsync(new UpdateOrderStatusCommand(id, request.Status), cancellationToken);
-        if (!result.Found) return NotFound();
+        if (!result.Found) return ApiError.NotFound("Not found");
         // The refusal carries its reason: "the order's status did not change" is not something an
         // operator can act on, and the reason is usually about money.
-        if (!result.Success) return Conflict(new { success = false, error = result.Error });
+        if (!result.Success) return ApiError.Conflict(result.Error);
         return Ok(new { success = true });
     }
 
@@ -85,7 +86,7 @@ public sealed class AdminOrderController : ControllerBase
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var success = await _deleteHandler.HandleAsync(new DeleteOrderCommand(id), cancellationToken);
-        if (!success) return NotFound();
+        if (!success) return ApiError.NotFound("Not found");
         return Ok(new { success = true });
     }
 
@@ -107,10 +108,10 @@ public sealed class AdminOrderController : ControllerBase
 
         return result.Status switch
         {
-            "NotFound" => NotFound(new { success = false, error = result.ErrorMessage }),
-            "NotPayable" => BadRequest(new { success = false, error = result.ErrorMessage }),
-            "NothingToRefund" => BadRequest(new { success = false, error = result.ErrorMessage }),
-            "Failed" => StatusCode(StatusCodes.Status502BadGateway, new { success = false, error = result.ErrorMessage }),
+            "NotFound" => ApiError.NotFound(result.ErrorMessage),
+            "NotPayable" => ApiError.BadRequest(result.ErrorMessage),
+            "NothingToRefund" => ApiError.BadRequest(result.ErrorMessage),
+            "Failed" => ApiError.BadGateway(result.ErrorMessage),
             _ => Ok(new
             {
                 success = true,

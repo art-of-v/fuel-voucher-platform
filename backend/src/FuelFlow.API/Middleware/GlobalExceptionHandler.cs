@@ -1,6 +1,6 @@
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Middleware;
@@ -25,7 +25,7 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
     {
         _logger.LogError(exception, "Unhandled exception for {Method} {Path}", context.Request.Method, context.Request.Path);
 
-        var (statusCode, title) = exception switch
+        var (statusCode, detail) = exception switch
         {
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
 
@@ -66,15 +66,14 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
                 cancellationToken);
         }
 
-        await context.Response.WriteAsJsonAsync(
-            new ProblemDetails
-            {
-                Status = statusCode,
-                Title = title,
-                // Correlates the withheld detail with the logged exception without disclosing it.
-                Extensions = { ["traceId"] = context.TraceIdentifier }
-            },
-            cancellationToken);
+        // The same envelope every other failure uses: the status in `title`, the specific
+        // sentence in `detail`, and the trace id that ties the withheld detail to the logged
+        // exception without disclosing it.
+        await ApiErrorResponse.WriteAsync(
+            context,
+            statusCode,
+            detail,
+            cancellationToken: cancellationToken);
 
         return true;
     }

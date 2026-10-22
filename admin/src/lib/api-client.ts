@@ -100,13 +100,15 @@ export class ApiError extends Error {
   }
 }
 
-// Pulls the most specific reason out of a failure body. The API's GlobalExceptionHandler
-// deliberately withholds internals on a genuine fault and returns only the fixed title
-// "An unexpected error occurred" (500). That tells the operator nothing, so replace it —
-// and any 5xx we couldn't pull a specific reason from — with a plain, actionable sentence
-// plus the traceId that ties this toast to the full stack trace in the Error Logs tab.
-// Specific messages (any 4xx, or the 502 refund reason carried in `error`) are surfaced
-// unchanged.
+// Pulls the most specific reason out of a failure body. The API answers every failure in one
+// shape - an RFC 9457 problem document (backend/src/FuelFlow.API/SharedKernel/Errors/ApiError.cs)
+// - so there is nothing to sniff: the sentence is in `detail`, the status in `title`, the
+// machine code in `code` and the numbers beside it in `data`.
+//
+// A genuine server fault comes back with a fixed sentence ("An unexpected error occurred") and
+// the reason withheld, because the reason names tables and infrastructure. That tells the
+// operator nothing, so it is replaced with a plain, actionable sentence plus the traceId that
+// ties this toast to the full stack trace in the Error Logs tab.
 async function readErrorMessage(response: Response): Promise<string> {
   return (await readError(response)).message;
 }
@@ -116,6 +118,7 @@ async function readError(
 ): Promise<{ message: string; code?: string; data?: Record<string, number> }> {
   const errorText = await response.text();
   let extracted: string | undefined;
+  let title: string | undefined;
   let traceId: string | undefined;
   let code: string | undefined;
   let data: Record<string, number> | undefined;
@@ -123,15 +126,10 @@ async function readError(
   try {
     const errorData = JSON.parse(errorText);
     traceId = errorData?.traceId;
-    // Prefer a specific, caller-facing reason. `error` is the admin controllers'
-    // ad-hoc failure shape (e.g. the 502 refund reason); message/detail/title come
-    // from ASP.NET ProblemDetails. Without picking up `error`, an { error } body
-    // reached the toast as raw JSON.
-    extracted =
-      errorData?.error ??
-      errorData?.message ??
-      errorData?.detail ??
-      errorData?.title;
+    // The one envelope: `detail` is the sentence written for the caller, `title` is the status
+    // in words and is the fallback when the failure carries no sentence of its own.
+    extracted = errorData?.detail ?? errorData?.title;
+    title = typeof errorData?.title === "string" ? errorData.title : undefined;
     // Only a non-empty string: a structured body may legitimately carry `code: null`.
     code =
       typeof errorData?.code === "string" && errorData.code
@@ -152,10 +150,13 @@ async function readError(
     // read out of it, so the raw text below is the best reason the operator can be given.
   }
 
+  // A 5xx that says only the status in words ("Internal Server Error") is just as opaque as one
+  // that says "An unexpected error occurred", so both are replaced.
   const opaqueServerFault =
     extracted === undefined
       ? response.status >= 500
-      : extracted === "An unexpected error occurred";
+      : extracted === "An unexpected error occurred" ||
+        (response.status >= 500 && extracted === title);
 
   if (!opaqueServerFault)
     return { message: extracted ?? errorText, code, data };

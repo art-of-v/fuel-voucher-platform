@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -60,7 +61,7 @@ public sealed class VoucherController : ControllerBase
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -82,7 +83,7 @@ public sealed class VoucherController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting vouchers for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while retrieving vouchers");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
     [HttpGet("inventory")]
@@ -101,7 +102,7 @@ public sealed class VoucherController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting voucher inventory");
-            return StatusCode(500, "An error occurred while retrieving inventory");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
     [HttpPatch("{id}/mark-used")]
@@ -117,7 +118,7 @@ public sealed class VoucherController : ControllerBase
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -129,9 +130,9 @@ public sealed class VoucherController : ControllerBase
             {
                 return response.ErrorCode switch
                 {
-                    "NotFound" => NotFound(response.Message),
+                    "NotFound" => ApiError.NotFound(response.Message),
                     "Forbidden" => Forbid(),
-                    _ => BadRequest(response.Message)
+                    _ => ApiError.BadRequest(response.Message)
                 };
             }
 
@@ -140,7 +141,7 @@ public sealed class VoucherController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error marking voucher {VoucherId} as used for user {UserId}", id, userId);
-            return StatusCode(500, "An error occurred while marking the voucher as used");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -162,7 +163,7 @@ public sealed class VoucherController : ControllerBase
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -174,9 +175,9 @@ public sealed class VoucherController : ControllerBase
             {
                 return response.ErrorCode switch
                 {
-                    "NotFound" => NotFound(response.Message),
+                    "NotFound" => ApiError.NotFound(response.Message),
                     "Forbidden" => Forbid(),
-                    _ => BadRequest(response.Message)
+                    _ => ApiError.BadRequest(response.Message)
                 };
             }
 
@@ -185,7 +186,7 @@ public sealed class VoucherController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error restoring voucher {VoucherId}", id);
-            return StatusCode(500, "An error occurred while restoring the voucher");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 }

@@ -1,6 +1,7 @@
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -50,19 +51,19 @@ public sealed class VouchersController : ControllerBase
         if (file == null || file.Length == 0)
         {
             _logger.LogWarning("Voucher import rejected by {Admin}: no file uploaded", adminName);
-            return BadRequest("No file was uploaded.");
+            return ApiError.BadRequest("No file was uploaded.");
         }
 
         if (!Path.GetExtension(file.FileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Voucher import rejected by {Admin}: file '{FileName}' ({Size} bytes) is not a PDF", adminName, file.FileName, file.Length);
-            return BadRequest("Only PDF files are supported.");
+            return ApiError.BadRequest("Only PDF files are supported.");
         }
 
         if (!await HasPdfMagicBytesAsync(file, cancellationToken))
         {
             _logger.LogWarning("Voucher import rejected by {Admin}: file '{FileName}' ({Size} bytes) has no PDF magic bytes", adminName, file.FileName, file.Length);
-            return BadRequest("Only PDF files are supported.");
+            return ApiError.BadRequest("Only PDF files are supported.");
         }
 
         // Rendering happens in-request, so concurrent imports multiply peak memory. Refuse the
@@ -70,7 +71,7 @@ public sealed class VouchersController : ControllerBase
         if (!_importGuard.TryAcquire())
         {
             _logger.LogWarning("Voucher import rejected by {Admin}: another import is already running", adminName);
-            return Conflict("Another voucher import is already in progress. Wait for it to finish and retry.");
+            return ApiError.Conflict("Another voucher import is already in progress. Wait for it to finish and retry.");
         }
 
         try
@@ -88,7 +89,7 @@ public sealed class VouchersController : ControllerBase
         catch (InvalidDataException ex)
         {
             _logger.LogWarning(ex, "Voucher import rejected by {Admin}: {Message}", adminName, ex.Message);
-            return BadRequest(ex.Message);
+            return ApiError.BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -148,7 +149,7 @@ public sealed class VouchersController : ControllerBase
     {
         var voucher = await _getHandler.GetVoucherByIdAsync(id, cancellationToken);
         if (voucher == null)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         // Authorization must agree with MarkVoucherAsUsedCommandHandler, because both endpoints
         // hand out control of the same bearer instrument: the QR payload IS what a Brand scans.

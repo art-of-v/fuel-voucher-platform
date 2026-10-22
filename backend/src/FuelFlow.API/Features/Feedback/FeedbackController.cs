@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.Features.Settings;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
@@ -54,12 +55,12 @@ public sealed class FeedbackController : ControllerBase
         if (!await _settings.IsFeedbackBotEnabledAsync(ct) || !_options.IsConfigured)
         {
             _logger.LogInformation("Feedback deep link requested while the feature is disabled.");
-            return NotFound();
+            return ApiError.NotFound("Not found");
         }
 
         var userId = CurrentUserId();
         if (userId is null)
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
 
         var payload = FeedbackDeepLink.CreatePayload(
             userId.Value,
@@ -74,7 +75,7 @@ public sealed class FeedbackController : ControllerBase
         if (url is null)
         {
             _logger.LogError("Telegram:Feedback is enabled but Telegram:Feedback:BotUsername is empty.");
-            return NotFound();
+            return ApiError.NotFound("Not found");
         }
 
         return Ok(new FeedbackDeepLinkResponse(url));

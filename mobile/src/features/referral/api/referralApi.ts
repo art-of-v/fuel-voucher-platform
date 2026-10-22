@@ -89,17 +89,12 @@ async function readErrorMessage(response: Response): Promise<string | null> {
   return bodyText;
 }
 
-/** The message field of a JSON error body, whichever field the server used. */
+/** The sentence of the problem document the API answers a failure with. */
 function extractJsonMessage(body: unknown): string | null {
   if (typeof body !== 'object' || body === null) return null;
   const record = body as Record<string, unknown>;
-  const error = record.error;
 
-  const candidates: unknown[] = [record.message, record.detail, record.title];
-  if (typeof error === 'string') candidates.push(error);
-  if (typeof error === 'object' && error !== null) {
-    candidates.push((error as Record<string, unknown>).message);
-  }
+  const candidates: unknown[] = [record.detail, record.title];
 
   for (const candidate of candidates) {
     if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();

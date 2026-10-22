@@ -3,6 +3,7 @@ using FuelFlow.Features.Settings.GetAdminSettings;
 using FuelFlow.Features.Settings.RegisterFeedbackWebhook;
 using FuelFlow.Features.Settings.UpdateAdminSettings;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -43,7 +44,7 @@ public sealed class AdminSettingsController : ControllerBase
 
         if (!result.Success)
         {
-            return BadRequest(new { success = false, error = result.Error });
+            return ApiError.BadRequest(result.Error);
         }
 
         return Ok(new
@@ -78,7 +79,7 @@ public sealed class AdminSettingsController : ControllerBase
 
         if (!result.Success)
         {
-            return BadRequest(new { success = false, error = result.Error });
+            return ApiError.BadRequest(result.Error);
         }
 
         return Ok(new { success = true, url, webhook = result.Webhook });

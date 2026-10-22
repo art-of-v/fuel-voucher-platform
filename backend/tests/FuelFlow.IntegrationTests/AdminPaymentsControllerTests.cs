@@ -354,7 +354,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
             .Should().BeOfType<NotFoundObjectResult>().Subject;
 
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(result.Value));
-        var error = doc.RootElement.GetProperty("error").GetString();
+        var error = doc.RootElement.GetProperty("detail").GetString();
         error.Should().Contain("mistyped").And.Contain("not registered");
     }
 

@@ -7,6 +7,7 @@ using FuelFlow.Features.Contracts.GetMyLegalEntities;
 using FuelFlow.Features.Contracts.SignContract;
 using FuelFlow.Features.Contracts.UpdateLegalEntity;
 using FuelFlow.Features.Contracts.UpsertLegalEntityProfile;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -55,13 +56,13 @@ public sealed class LegalEntityController : ControllerBase
     public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var entity = await _getLegalEntityProfileHandler.HandleAsync(
             new GetLegalEntityProfileQuery(userId.Value),
             cancellationToken);
 
-        return entity is null ? NotFound() : Ok(entity);
+        return entity is null ? ApiError.NotFound("Not found") : Ok(entity);
     }
 
     [HttpPost("profile")]
@@ -76,10 +77,10 @@ public sealed class LegalEntityController : ControllerBase
 
         return result.Outcome switch
         {
-            LegalEntityWriteOutcome.Invalid => BadRequest(result.Error!),
-            LegalEntityWriteOutcome.Unauthenticated => Unauthorized(),
-            LegalEntityWriteOutcome.Conflict => Conflict(result.Error!),
-            LegalEntityWriteOutcome.NotFound => NotFound(result.Error!),
+            LegalEntityWriteOutcome.Invalid => ApiError.BadRequest(result.Error!),
+            LegalEntityWriteOutcome.Unauthenticated => ApiError.Unauthorized("Unauthorized"),
+            LegalEntityWriteOutcome.Conflict => ApiError.Conflict(result.Error!),
+            LegalEntityWriteOutcome.NotFound => ApiError.NotFound(result.Error!),
             _ => Ok(result.Entity)
         };
     }
@@ -92,7 +93,7 @@ public sealed class LegalEntityController : ControllerBase
     public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var entities = await _getMyLegalEntitiesHandler.HandleAsync(
             new GetMyLegalEntitiesQuery(userId.Value),
@@ -116,10 +117,10 @@ public sealed class LegalEntityController : ControllerBase
 
         return result.Outcome switch
         {
-            LegalEntityWriteOutcome.Invalid => BadRequest(result.Error!),
-            LegalEntityWriteOutcome.Unauthenticated => Unauthorized(),
-            LegalEntityWriteOutcome.Conflict => Conflict(result.Error!),
-            LegalEntityWriteOutcome.NotFound => NotFound(result.Error!),
+            LegalEntityWriteOutcome.Invalid => ApiError.BadRequest(result.Error!),
+            LegalEntityWriteOutcome.Unauthenticated => ApiError.Unauthorized("Unauthorized"),
+            LegalEntityWriteOutcome.Conflict => ApiError.Conflict(result.Error!),
+            LegalEntityWriteOutcome.NotFound => ApiError.NotFound(result.Error!),
             _ => Ok(result.Entity)
         };
     }
@@ -141,10 +142,10 @@ public sealed class LegalEntityController : ControllerBase
 
         return result.Outcome switch
         {
-            LegalEntityWriteOutcome.Invalid => BadRequest(result.Error!),
-            LegalEntityWriteOutcome.Unauthenticated => Unauthorized(),
-            LegalEntityWriteOutcome.Conflict => Conflict(result.Error!),
-            LegalEntityWriteOutcome.NotFound => NotFound(result.Error!),
+            LegalEntityWriteOutcome.Invalid => ApiError.BadRequest(result.Error!),
+            LegalEntityWriteOutcome.Unauthenticated => ApiError.Unauthorized("Unauthorized"),
+            LegalEntityWriteOutcome.Conflict => ApiError.Conflict(result.Error!),
+            LegalEntityWriteOutcome.NotFound => ApiError.NotFound(result.Error!),
             _ => Ok(result.Entity)
         };
     }
@@ -159,7 +160,7 @@ public sealed class LegalEntityController : ControllerBase
     public async Task<IActionResult> GetContracts(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var contracts = await _getCustomerContractsHandler.HandleAsync(
             new GetCustomerContractsQuery(userId.Value),
@@ -190,10 +191,10 @@ public sealed class LegalEntityController : ControllerBase
 
         return result.Outcome switch
         {
-            SignContractOutcome.Invalid => BadRequest(result.Error!),
-            SignContractOutcome.Unauthenticated => Unauthorized(),
-            SignContractOutcome.NotFound => NotFound(result.Error!),
-            SignContractOutcome.Conflict => Conflict(result.Error!),
+            SignContractOutcome.Invalid => ApiError.BadRequest(result.Error!),
+            SignContractOutcome.Unauthenticated => ApiError.Unauthorized("Unauthorized"),
+            SignContractOutcome.NotFound => ApiError.NotFound(result.Error!),
+            SignContractOutcome.Conflict => ApiError.Conflict(result.Error!),
             _ => Ok(result.Signature)
         };
     }
@@ -203,7 +204,7 @@ public sealed class LegalEntityController : ControllerBase
     public async Task<IActionResult> GetSignedContracts(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var signed = await _getCustomerSignedContractsHandler.HandleAsync(
             new GetCustomerSignedContractsQuery(userId.Value),

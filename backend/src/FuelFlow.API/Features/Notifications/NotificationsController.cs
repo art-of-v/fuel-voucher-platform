@@ -3,6 +3,7 @@ using FuelFlow.Features.Notifications.DeregisterPushToken;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
 using FuelFlow.Features.Notifications.RegisterPushToken;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,7 +37,7 @@ public sealed class NotificationsController : ControllerBase
     public async Task<IActionResult> GetNotifications(CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _getHandler.HandleAsync(new GetNotificationsQuery(userId.Value), cancellationToken);
         return Ok(result);
@@ -49,10 +50,10 @@ public sealed class NotificationsController : ControllerBase
     public async Task<IActionResult> MarkAsRead(Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _markReadHandler.HandleAsync(new MarkNotificationReadCommand(id, userId.Value), cancellationToken);
-        if (result == null) return NotFound();
+        if (result == null) return ApiError.NotFound("Not found");
 
         return Ok(result);
     }
@@ -66,11 +67,11 @@ public sealed class NotificationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var token = request?.Token?.Trim();
         if (string.IsNullOrEmpty(token) || !IsExpoPushToken(token))
-            return BadRequest(new { error = new { message = "Invalid Expo push token." } });
+            return ApiError.BadRequest("Invalid Expo push token.");
 
         var platform = string.IsNullOrWhiteSpace(request!.Platform)
             ? "unknown"
@@ -97,7 +98,7 @@ public sealed class NotificationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         var trimmedToken = token?.Trim();
 

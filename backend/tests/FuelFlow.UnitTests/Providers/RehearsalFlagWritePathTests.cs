@@ -314,12 +314,10 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         // The operator is told WHICH row won, and what to do about it - that is the part the issue
         // left open, and a refusal that names nothing is a refusal the operator cannot act on.
         conflict.Value.Should().NotBeNull("the refusal says something");
-        var payload = conflict.Value!;
-        var fuelTypeId = payload.GetType().GetProperty("fuelTypeId")?.GetValue(payload);
-        fuelTypeId.Should().Be(ToUuid("qa-a95"),
+        var payload = conflict.Value.Should().BeOfType<ProblemDetails>().Subject;
+        payload.Extensions["fuelTypeId"].Should().Be(ToUuid("qa-a95"),
             "the operator is told which fuel already holds the grade");
-        var message = payload.GetType().GetProperty("message")?.GetValue(payload) as string;
-        message.Should().Contain("А95 ЄВРО(QA)", "the refusal names the row that won");
+        payload.Detail.Should().Contain("А95 ЄВРО(QA)", "the refusal names the row that won");
     }
 
     [Fact]

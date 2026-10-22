@@ -31,7 +31,7 @@ function handleAccountInactiveError(
       const body = JSON.parse(errorText);
       if (body.code === 'account_inactive') {
         const error = new Error(
-          body.message ||
+          body.detail ||
             'Account is not activated. Please contact an administrator to activate your account.',
         ) as AccountInactiveError;
         error.code = 'account_inactive';
@@ -59,7 +59,7 @@ const GENERIC_CHECKOUT_ERROR =
   'Не вдалося створити платіж. Перевірте підключення до інтернету та спробуйте ще раз.';
 
 // Turns a failed purchase response into a clean Error. A JSON body carrying a
-// message/detail/title is our API's own error and is trusted verbatim; any
+// detail/title is our API's own error and is trusted verbatim; any
 // non-JSON body (HTML, plain text, empty) is suppressed in favour of the
 // generic message, with the raw body logged for diagnostics only.
 //
@@ -72,7 +72,7 @@ function buildPurchaseError(response: Response, bodyText: string): Error {
     try {
       const body = JSON.parse(trimmed);
       const code = typeof body?.code === 'string' && body.code ? body.code : undefined;
-      const message = body?.message ?? body?.detail ?? body?.title;
+      const message = body?.detail ?? body?.title;
       if (typeof message === 'string' && message.trim()) {
         return code
           ? (Object.assign(new Error(message.trim()), { code }) as Error & { code: string })

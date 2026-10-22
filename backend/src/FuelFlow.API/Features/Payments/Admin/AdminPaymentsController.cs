@@ -4,6 +4,7 @@ using FuelFlow.Features.Payments.Admin.GetCustomerByCode;
 using FuelFlow.Features.Payments.Admin.GetUnallocatedPayments;
 using FuelFlow.Features.Payments.Admin.SearchCustomers;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -113,14 +114,11 @@ public sealed class AdminPaymentsController : ControllerBase
         var result = await _customerByCodeHandler.HandleAsync(new GetCustomerByCodeQuery(code), ct);
 
         if (!result.CodeIsValid)
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         if (result.Customer is null)
         {
-            return NotFound(new
-            {
-                error = result.Error,
-            });
+            return ApiError.NotFound(result.Error);
         }
 
         var customer = result.Customer;
@@ -152,8 +150,8 @@ public sealed class AdminPaymentsController : ControllerBase
                 ActorName()),
             ct);
 
-        if (!result.Found) return NotFound();
-        if (!result.Success) return BadRequest(new { error = result.Error });
+        if (!result.Found) return ApiError.NotFound("Not found");
+        if (!result.Success) return ApiError.BadRequest(result.Error);
 
         return NoContent();
     }

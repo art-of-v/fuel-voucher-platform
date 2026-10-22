@@ -42,14 +42,17 @@ export async function shareOrderReceipt(orderId: string): Promise<void> {
   });
 }
 
-/** Prefers the structured message the API returns, falling back to the raw text body. */
+/** Prefers the structured sentence the API returns, falling back to the raw text body. */
 async function readErrorText(response: Response): Promise<string> {
   const text = await response.text();
 
   try {
     const body = JSON.parse(text);
-    if (body && typeof body.message === 'string' && body.message) {
-      return body.message;
+    if (body && typeof body.detail === 'string' && body.detail) {
+      return body.detail;
+    }
+    if (body && typeof body.title === 'string' && body.title) {
+      return body.title;
     }
   } catch {
     // Not JSON. The endpoint answers a 404 with a bare "Order not found", so this is the normal

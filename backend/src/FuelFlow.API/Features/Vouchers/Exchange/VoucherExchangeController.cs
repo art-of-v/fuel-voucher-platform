@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -56,7 +57,7 @@ public sealed class VoucherExchangeController : ControllerBase
     {
         var result = await _batchHandler.HandleAsync(
             new GetVoucherExchangeBatchQuery(exchangeBatchId), cancellationToken);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? ApiError.NotFound("Not found") : Ok(result);
     }
 
     /// <summary>Stock vouchers already expired or lapsing within the renewal threshold.</summary>
@@ -77,7 +78,7 @@ public sealed class VoucherExchangeController : ControllerBase
     public async Task<IActionResult> GetCostContext([FromQuery] Guid importId, CancellationToken cancellationToken)
     {
         if (importId == Guid.Empty)
-            return BadRequest(new { error = "importId is required." });
+            return ApiError.BadRequest("importId is required.");
         return Ok(await _costContextHandler.HandleAsync(importId, cancellationToken));
     }
 
@@ -91,7 +92,7 @@ public sealed class VoucherExchangeController : ControllerBase
         // With no id there is nothing to attribute it to, and the writers can only skip the record -
         // which would leave the settlement done and unexplained.
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         var command = new ConfirmVoucherExchangeCommand(
             request.OldVoucherIds ?? new List<Guid>(),
@@ -104,7 +105,7 @@ public sealed class VoucherExchangeController : ControllerBase
             GetUserName());
 
         var result = await _confirmHandler.HandleAsync(command, cancellationToken);
-        return result.Success ? Ok(result) : BadRequest(new { error = result.Error, result });
+        return result.Success ? Ok(result) : ApiError.BadRequest(result.Error);
     }
 
     /// <summary>

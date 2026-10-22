@@ -35,7 +35,7 @@ export async function updateUserProfile(
 
   if (!response.ok) {
     const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || errBody.title || `Error saving (${response.status})`);
+    throw new Error(errBody.detail || errBody.title || `Error saving (${response.status})`);
   }
   return response.json();
 }

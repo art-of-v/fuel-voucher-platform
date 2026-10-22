@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Suppliers.GetSuppliers;
 using FuelFlow.Features.Vouchers.Suppliers.ReactivateSupplier;
 using FuelFlow.Features.Vouchers.Suppliers.UpdateSupplier;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -67,10 +68,10 @@ public sealed class SuppliersController : ControllerBase
             new CreateSupplierCommand(request, GetUserId(), GetUserName()), ct);
 
         if (result.Outcome == SupplierCommandOutcome.Invalid)
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         if (result.Outcome == SupplierCommandOutcome.NameTaken)
-            return Conflict(new { code = result.ConflictCode, message = result.ConflictMessage });
+            return ApiError.Conflict(result.ConflictMessage, result.ConflictCode);
 
         return Ok(result.Supplier);
     }
@@ -83,13 +84,13 @@ public sealed class SuppliersController : ControllerBase
             new UpdateSupplierCommand(id, request, GetUserId(), GetUserName()), ct);
 
         if (result.Outcome == SupplierCommandOutcome.Invalid)
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         if (result.Outcome == SupplierCommandOutcome.NameTaken)
-            return Conflict(new { code = result.ConflictCode, message = result.ConflictMessage });
+            return ApiError.Conflict(result.ConflictMessage, result.ConflictCode);
 
         if (result.Outcome == SupplierCommandOutcome.NotFound)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         return Ok(result.Supplier);
     }
@@ -106,7 +107,7 @@ public sealed class SuppliersController : ControllerBase
         var result = await _deactivate.HandleAsync(
             new DeactivateSupplierCommand(id, GetUserId(), GetUserName()), ct);
 
-        return result.Outcome == SupplierCommandOutcome.NotFound ? NotFound() : NoContent();
+        return result.Outcome == SupplierCommandOutcome.NotFound ? ApiError.NotFound("Not found") : NoContent();
     }
 
     [HttpPost("{id:guid}/reactivate")]
@@ -117,7 +118,7 @@ public sealed class SuppliersController : ControllerBase
             new ReactivateSupplierCommand(id, GetUserId(), GetUserName()), ct);
 
         if (result.Outcome == SupplierCommandOutcome.NotFound)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         return Ok(result.Supplier);
     }

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -42,7 +43,7 @@ public sealed class GetWorkerUsageReportController : ControllerBase
     {
         if (legalEntityId == Guid.Empty)
         {
-            return BadRequest("legalEntityId is required");
+            return ApiError.BadRequest("legalEntityId is required");
         }
 
         // The page size is clamped by PagedRequest, so a client asking for
@@ -52,7 +53,7 @@ public sealed class GetWorkerUsageReportController : ControllerBase
         var userId = GetUserId();
         if (userId == Guid.Empty)
         {
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
         }
 
         var result = await _handler.HandleAsync(

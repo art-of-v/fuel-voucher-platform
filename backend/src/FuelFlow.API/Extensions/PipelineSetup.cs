@@ -49,7 +49,7 @@ internal static class PipelineSetup
 
         // Combined liveness + readiness for backwards compatibility with existing
         // probes (UptimeRobot). Probes both DB and Redis.
-        app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], async (ApplicationDbContext db, IConnectionMultiplexer redis, CancellationToken ct) =>
+        app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], async (ApplicationDbContext db, IConnectionMultiplexer redis, HttpContext http, CancellationToken ct) =>
         {
             var dbStatus = "connected";
             var redisStatus = "connected";
@@ -82,13 +82,17 @@ internal static class PipelineSetup
 
             return healthy
                 ? Results.Ok(new { status = "healthy", database = dbStatus, redis = redisStatus })
+                // The one error envelope, like every other failure: the status in `title`, the
+                // sentence in `detail`, the correlation id beside them.
                 : Results.Problem(
                     "One or more dependencies unreachable",
+                    instance: http.Request.Path.Value,
                     statusCode: 503,
                     extensions: new Dictionary<string, object?>
                     {
                         ["database"] = dbStatus,
-                        ["redis"] = redisStatus
+                        ["redis"] = redisStatus,
+                        ["traceId"] = http.TraceIdentifier
                     });
         }).AllowAnonymous();
 

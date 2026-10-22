@@ -84,7 +84,7 @@ export class RenewalApiError extends Error {
 }
 
 // Never surface a raw HTML/proxy body in an Alert (planning #32). A JSON body
-// carrying {code,message} is our API's own error; anything else collapses to a
+// carrying the problem document is our API's own error; anything else collapses to a
 // generic key the UI localises.
 async function buildError(response: Response): Promise<RenewalApiError> {
   const bodyText = await response.text();
@@ -92,7 +92,12 @@ async function buildError(response: Response): Promise<RenewalApiError> {
   if (trimmed.startsWith('{')) {
     try {
       const body = JSON.parse(trimmed);
-      const message = typeof body?.message === 'string' ? body.message : '';
+      const message =
+        typeof body?.detail === 'string'
+          ? body.detail
+          : typeof body?.title === 'string'
+            ? body.title
+            : '';
       const code = typeof body?.code === 'string' ? body.code : undefined;
       return new RenewalApiError(message, response.status, code);
     } catch {

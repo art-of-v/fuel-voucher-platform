@@ -47,8 +47,7 @@ export async function createLegalEntity(data: CreateLegalEntityInput): Promise<C
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}) as any);
-    const message =
-      body.error?.message || body.error || body.message || 'Failed to create legal entity';
+    const message = body.detail || body.title || 'Failed to create legal entity';
     throw new LegalEntityApiError(response.status, message);
   }
   return response.json();
@@ -68,8 +67,7 @@ export async function updateLegalEntity(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}) as any);
-    const message =
-      body.error?.message || body.error || body.message || 'Failed to update legal entity';
+    const message = body.detail || body.title || 'Failed to update legal entity';
     throw new LegalEntityApiError(response.status, message);
   }
   return response.json();
