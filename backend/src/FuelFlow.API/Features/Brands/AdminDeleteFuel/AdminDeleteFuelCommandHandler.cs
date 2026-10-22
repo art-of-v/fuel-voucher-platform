@@ -83,15 +83,17 @@ public sealed class AdminDeleteFuelCommandHandler
 
         fuel.IsDeleted = true;
         fuel.DeletedAtUtc = archivedAt;
-        await _context.SaveChangesAsync(ct);
 
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Fuel", command.FuelId.ToString(), "FuelRemoved",
             JsonSerializer.Serialize(new { fuelName, BrandName }), "{}",
             command.UserId, command.UserName,
             $"{BrandName} / {fuelName}: removed",
-            Brand!.Slug,
-            ct);
+            Brand!.Slug);
+
+        // One save for the archive and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminDeleteFuelResult { Success = true };
     }

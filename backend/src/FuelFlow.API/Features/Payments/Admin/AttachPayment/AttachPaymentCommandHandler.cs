@@ -118,28 +118,30 @@ public sealed class AttachPaymentCommandHandler
         payment.UserId = customerId;
         payment.UpdatedAtUtc = SystemClock.UtcNow;
 
+        // The audit row is tracked before the save, so the caller's own save commits it in the same
+        // transaction as the money it describes (planning #533).
+        Record(payment, before, after, command);
+
         await _context.SaveChangesAsync(cancellationToken);
-        await RecordAsync(payment, before, after, command, cancellationToken);
 
         return AttachPaymentResult.Done();
     }
 
-    private async Task RecordAsync(
+    private void Record(
         Payment payment,
         string before,
         string after,
-        AttachPaymentCommand command,
-        CancellationToken cancellationToken)
+        AttachPaymentCommand command)
     {
         // No actor, no record: an audit row that cannot name who placed money names nothing. Same
         // short-circuit SuppliersController uses.
         if (command.ActorId is null) return;
 
-        await _events.RecordEventAsync(
+        _events.RecordEvent(
             "Payment", payment.Id.ToString(),
             "PaymentPlaced", before, after,
             command.ActorId.Value, command.ActorName,
             $"Placed {payment.AmountUah:N2} {payment.Currency} declared on {payment.Provider}",
-            "all", cancellationToken);
+            "all");
     }
 }

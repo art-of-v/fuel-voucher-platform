@@ -66,6 +66,20 @@ public sealed class CreateSupplierCommandHandler
         };
 
         _context.Suppliers.Add(supplier);
+
+        // The audit row is tracked before the save, so this file's own save commits it in the same
+        // transaction as the supplier it describes (planning #533). Without a signed-in user there
+        // is nobody to attribute the change to, so nothing is recorded.
+        if (command.ActorUserId is { } actorId)
+        {
+            _events.RecordEvent(
+                "Supplier", supplier.Id.ToString(), "SupplierCreated",
+                null, SupplierAudit.Snapshot(supplier),
+                actorId, command.ActorUserName,
+                SupplierAudit.Summary("SupplierCreated", supplier),
+                "all");
+        }
+
         try
         {
             await _context.SaveChangesAsync(ct);
@@ -74,9 +88,6 @@ public sealed class CreateSupplierCommandHandler
         {
             return SupplierWriteResult.NameTaken(name);
         }
-
-        await SupplierAudit.RecordAsync(
-            _events, "SupplierCreated", supplier, command.ActorUserId, command.ActorUserName, ct);
 
         return SupplierWriteResult.Done(SupplierDto.From(supplier));
     }

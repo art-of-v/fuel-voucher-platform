@@ -103,15 +103,16 @@ public sealed class AdminUpdateNominalsCommandHandler
             }
         }
 
-        await _context.SaveChangesAsync(ct);
-
         var newValue = JsonSerializer.Serialize(nominals.OrderBy(n => n).ToList());
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Nominal", command.BrandId.ToString(), "NominalSetChanged",
             oldValue, newValue, command.UserId, command.UserName,
             $"{Brand.Name}: nominals changed [{string.Join(", ", nominals.OrderBy(n => n))}]",
-            Brand.Slug,
-            ct);
+            Brand.Slug);
+
+        // One save for the sizes and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminUpdateNominalsResult { Success = true };
     }
