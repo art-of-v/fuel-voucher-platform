@@ -63,7 +63,7 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
         try
         {
             await context.Database.ExecuteSqlRawAsync(
-                InsertUser, userId, phone, "Тест", "Гончар", (DateOnly?)new DateOnly(1990, 5, 1), null);
+                InsertUser, userId, phone, "Тест", "Гончар", new DateOnly(1990, 5, 1), null!);
 
             var partyId = await context.Database.SqlQuery<Guid?>($"""
                 SELECT u.party_id AS "Value" FROM users u WHERE u.id = {userId}
@@ -140,7 +140,7 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
                 INSERT INTO natural_persons (party_id, birthdate, tax_id) VALUES ({0}, NULL, NULL)
                 """, partyId);
             await context.Database.ExecuteSqlRawAsync(
-                InsertUser, userId, phone, "A", "B", (DateOnly?)null, partyId);
+                InsertUser, userId, phone, "A", "B", null!, partyId);
 
             var actual = await context.Database.SqlQuery<Guid?>($"""
                 SELECT party_id AS "Value" FROM users WHERE id = {userId}
@@ -170,7 +170,7 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
         try
         {
             await context.Database.ExecuteSqlRawAsync(
-                InsertUser, userId, phone, null, null, (DateOnly?)null, null);
+                InsertUser, userId, phone, null!, null!, null!, null!);
 
             var name = await context.Database.SqlQuery<string>($"""
                 SELECT p.display_name AS "Value" FROM users u JOIN parties p ON p.id = u.party_id

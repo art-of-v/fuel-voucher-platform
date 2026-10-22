@@ -39,7 +39,7 @@ export function useNotifications() {
     retry: false,
   });
 
-  const notifications = query.data ?? [];
+  const notifications = useMemo(() => query.data ?? [], [query.data]);
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });

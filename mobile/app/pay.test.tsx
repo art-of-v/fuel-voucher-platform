@@ -42,6 +42,7 @@ jest.mock('expo-constants', () => ({
 jest.mock('expo-linking', () => ({ openURL: (...a: unknown[]) => mockOpenURL(...a) }));
 
 jest.mock('react-native-webview', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const RN = require('react-native');
   return {
     WebView: (props: Record<string, unknown>) => {

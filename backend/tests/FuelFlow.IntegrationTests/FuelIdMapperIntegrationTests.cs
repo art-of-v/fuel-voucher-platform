@@ -76,7 +76,9 @@ public sealed class FuelIdMapperIntegrationTests : IClassFixture<TestDatabaseFix
 
         fromPostgres.Should().Be(
             ToUuid(naturalKey).ToString("N"),
-            "the migration maps a key with md5('fuelflow-fuel:' || id)::uuid and the runtime maps it with the same rule");
+            "the seed row '{0}' is the one the mapping has to agree with - the migration maps a key "
+            + "with md5('fuelflow-fuel:' || id)::uuid and the runtime maps it with the same rule",
+            name);
     }
 
     [Theory]

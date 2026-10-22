@@ -24,7 +24,6 @@ using FuelFlow.SharedKernel.Domain;
 
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.Testing;
-using FuelFlow.Testing;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 

@@ -175,7 +175,7 @@ namespace FuelFlow.API.Migrations
                 migrationBuilder.Sql($"DELETE FROM fuel_offers WHERE id = {Quote(historicalKey[offer.Id])};");
         }
 
-        private static string Quote(string? value)
+        private static string Quote(string value)
             => value is null ? "NULL" : $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
 
         private static string Num(decimal? value)

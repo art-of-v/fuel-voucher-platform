@@ -134,7 +134,9 @@ return refunds
 
         var pendingRefunds = await _context.Payments
             .AsTracking()
-            .Where(p => p.Kind == PaymentKind.Refund && p.Status == PaymentStatus.Pending)
+            .Where(p => p.Kind == PaymentKind.Refund
+                     && p.Status == PaymentStatus.Pending
+                     && p.ProviderInvoiceId != null)
             .OrderBy(p => p.CreatedAtUtc)
             .Take(100)
             .ToListAsync(cancellationToken);
@@ -191,7 +193,7 @@ return refunds
                     var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
                     var status = await monobankClient.GetInvoiceStatusAsync(
-                        refund.ProviderInvoiceId, cancellationToken);
+                        refund.ProviderInvoiceId!, cancellationToken);
 
                     if (extRefs.TryGetValue(refund.Id, out var extRef))
                     {

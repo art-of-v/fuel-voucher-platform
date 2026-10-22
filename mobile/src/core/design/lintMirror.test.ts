@@ -7,6 +7,7 @@ import { typeScale } from './typography';
 // developers to add a token for a font size that already had one.
 //
 // Nothing caught it because nothing compared the copy with the original. This does.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- the lint rule is CommonJS and must load as ESLint loads it
 const { SCALES } = require('../../../eslint-rules/use-design-tokens.js');
 
 type ScaleName = 'spacing' | 'radius' | 'fontSize' | 'zIndex';

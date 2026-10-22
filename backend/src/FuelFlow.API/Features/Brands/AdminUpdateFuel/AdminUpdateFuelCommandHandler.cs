@@ -136,6 +136,7 @@ public sealed class AdminUpdateFuelCommandHandler
 
         // Snapshot BEFORE anything is written below. The "before" is the fuel's own figures, which
         // is where every price figure lives now; there is no second copy to fall back to for the old one.
+        var oldFuelName = fuel.Name;
         var oldSupplierPrice = fuel.SupplierPricePerLiter;
         var oldMarginPrice = fuel.MarginUahPerLiter;
         // audit payload records what the customer paid per litre, and that number is still a fact even
@@ -173,7 +174,7 @@ public sealed class AdminUpdateFuelCommandHandler
 
         // The other pool has nothing to archive: the price used to live on a row of its own, and the
         // price is the fuel's. What separates the pools now is the size list, handled above.
-        fuel.Name = request.Name;
+        fuel.Name = request.Name ?? fuel.Name;
         // The price the customer pays is computed from the knobs above, so there is nothing to write
         // for it here: the fuel carries the cost, the margin and the column price, and every reader
         // derives the rest the same way.
@@ -224,9 +225,8 @@ public sealed class AdminUpdateFuelCommandHandler
         });
 
         var changes = new List<string>();
-        var oldFuelName = fuel.Name;
-        if (oldFuelName != request.Name)
-            changes.Add($"name {oldFuelName} → {request.Name}");
+        if (oldFuelName != fuel.Name)
+            changes.Add($"name {oldFuelName} → {fuel.Name}");
         if (oldSupplierPrice != request.SupplierPricePerLiter)
             changes.Add($"supplier {oldSupplierPrice:F2} → {request.SupplierPricePerLiter:F2}");
         if (oldMarginPrice != request.MarginUahPerLiter)

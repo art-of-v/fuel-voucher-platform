@@ -5,7 +5,6 @@ import {
   type CreateLegalEntityInput,
 } from '../api/legalEntityApi';
 import { useAuth } from '../../auth/hooks/useAuth';
-import { useStore } from '../../../core/state/appStore';
 
 export const LEGAL_ENTITIES_KEY = ['legal-entities', 'mine'] as const;
 

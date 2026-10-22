@@ -82,15 +82,17 @@ module.exports = [
   },
   {
     // eslint-plugin-react-hooks v6 (bundled by eslint-config-expo) ships the
-    // React Compiler readiness rules as errors. They're valuable as a migration
-    // signal but are not correctness bugs on a codebase that doesn't yet run the
-    // compiler, so surface them as warnings. The classic correctness rules
-    // (`rules-of-hooks`, `exhaustive-deps`) keep their default expo severities.
+    // React Compiler readiness rules as errors. They are a migration signal, not
+    // correctness bugs on a codebase that does not yet run the compiler, and the
+    // 2026-10-22 baseline is a backlog of 108. They are off here because the
+    // fatal `npm run lint` gate (`--max-warnings=0`) cannot absorb a migration
+    // backlog; `npm run lint:compiler` reports them on demand, without gating.
+    // The classic correctness rules and `exhaustive-deps` stay on.
     rules: {
-      'react-hooks/refs': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/purity': 'warn',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/purity': 'off',
     },
   },
   {

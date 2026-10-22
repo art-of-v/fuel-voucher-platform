@@ -122,7 +122,7 @@ export default function NotificationsScreen() {
           backgroundColor: tokens.colors.surface,
         }}
       >
-        {notifications.map((n, i) => {
+        {notifications.map((n) => {
           const unread = !n.isRead;
           // The order id rides inside the message text: the collapsed row drops the
           // whole fragment, the expanded one shows the message verbatim.

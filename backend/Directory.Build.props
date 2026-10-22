@@ -39,29 +39,22 @@
 
   <PropertyGroup>
     <!--
-      TreatWarningsAsErrors stays OFF, and that is a decision rather than an omission.
+      Every warning is an error. The build is clean as of 2026-10-22, so a warning
+      introduced by a change fails that change's pull request instead of becoming a fact
+      nobody reads. The 127 warnings the repository carried on 2026-10-21 were burned
+      down: 15 in the production projects and 32 in the test projects, and the remaining
+      test-only EF raw-SQL analysis is the one reviewed baseline (see the integration
+      test project).
 
-      Measured on 2026-10-21: the API project alone builds with 39 warnings - 10 of them
-      the NuGet advisories for SixLabors.ImageSharp 2.1.13, whose only fix is a major
-      version bump that the voucher-import path does not warrant (the accepted risk is
-      written down in .github/workflows/ci.yml), and the rest nullable and style
-      warnings spread over files this change does not touch. Flipping the flag on today
-      would turn every unrelated pull request red and hand the next session a build
-      repair instead of a feature.
-
-      What IS promoted are the warnings that mean a mistake rather than a preference:
-      an unreachable statement, a variable or field that is never used, a task that is
-      started and never awaited, and a NuGet graph that does not resolve to what was
-      asked for. The codebase satisfies all of them today, and they are the ones worth
-      never seeing again.
+      The NuGet advisories for the accepted ImageSharp 2.1.13 risk (NU1902/NU1903) are
+      suppressed by code rather than by package, and this is not a blanket suppression:
+      the same five advisories are listed with their reasons, and every other advisory is
+      refused, by the vulnerable-package gate in .github/workflows/ci.yml.
+      Owner: Artem. Removal date: 2027-01-31, or earlier once the voucher import moves
+      off ImageSharp 2.x - whichever comes first.
     -->
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <WarningsAsErrors>$(WarningsAsErrors);NU1605;CS0162;CS0168;CS0169;CS0219;CS4014</WarningsAsErrors>
-    <!--
-      The accepted risk above, named here so that turning TreatWarningsAsErrors on later
-      is a one-line change instead of a red build nobody can explain.
-    -->
-    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1902;NU1903</WarningsNotAsErrors>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>

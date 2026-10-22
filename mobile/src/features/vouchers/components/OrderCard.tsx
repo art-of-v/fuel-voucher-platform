@@ -160,7 +160,7 @@ export function OrderCard({
       friction: 11,
       useNativeDriver: false,
     }).start();
-  }, [isExpanded]);
+  }, [expandAnim, isExpanded]);
 
   const vouchersContentHeight = useMemo(() => {
     // The body scales with the order's vouchers.

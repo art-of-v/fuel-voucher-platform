@@ -50,7 +50,7 @@ const QrScannerOverlay = () => {
         }),
       ]),
     ).start();
-  }, []);
+  }, [scanAnim]);
 
   return (
     <Animated.View

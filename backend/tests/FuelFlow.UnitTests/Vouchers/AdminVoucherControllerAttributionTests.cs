@@ -184,4 +184,20 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
             .SingleAsync(e => e.VoucherId == voucherId);
         recorded.ActorUserId.Should().Be(actor);
     }
+
+    /// <summary>
+    /// The lifecycle action reads a handler the constructor takes; it used to keep the parameter only
+    /// in its signature, so every call dereferenced a null field. The compiler now refuses that, and
+    /// this test proves the wiring the warning was about.
+    /// </summary>
+    [Fact]
+    public async Task TheLifecycleEndpoint_ReachesTheHandlerItWasConstructedWith()
+    {
+        var voucherId = await SeedStockVoucherAsync();
+
+        var result = await ControllerFor(WithSubject(Guid.NewGuid())).GetLifecycle(voucherId, default);
+
+        result.Should().BeOfType<OkObjectResult>(
+            "the controller must keep the lifecycle handler its constructor was given");
+    }
 }

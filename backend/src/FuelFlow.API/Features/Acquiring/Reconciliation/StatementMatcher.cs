@@ -88,7 +88,7 @@ public static class StatementMatcher
         // A refund is identified by the invoice it reverses - the same invoice the order carries.
         var refundsByInvoice = refunds
             .Where(r => r.Kind == PaymentKind.Refund && !string.IsNullOrEmpty(r.ProviderInvoiceId))
-            .GroupBy(r => r.ProviderInvoiceId)
+            .GroupBy(r => r.ProviderInvoiceId!)
             .ToDictionary(g => g.Key, g => g.First());
 
         // For the human-readable note on a row that only a refund of ours carries.

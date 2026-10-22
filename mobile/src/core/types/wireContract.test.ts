@@ -1,5 +1,5 @@
 import { wireBrands, wireBrandStations, wireFuelTypes, wirePackages } from './wireFixtures';
-import type { FuelPackage, FuelType, Station, StationNode } from './api';
+import type { FuelPackage, Station, StationNode } from './api';
 
 /**
  * The wire contract between the API and this app, asserted against responses

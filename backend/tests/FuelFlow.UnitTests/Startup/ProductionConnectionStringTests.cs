@@ -135,7 +135,7 @@ public sealed class ProductionConnectionStringTests
     /// The role a shipped connection string connects as.
     /// </summary>
     private static string RoleOf(string connectionString) =>
-        new NpgsqlConnectionStringBuilder(connectionString).Username;
+        new NpgsqlConnectionStringBuilder(connectionString).Username ?? string.Empty;
 
     private static string RepositoryRoot()
     {

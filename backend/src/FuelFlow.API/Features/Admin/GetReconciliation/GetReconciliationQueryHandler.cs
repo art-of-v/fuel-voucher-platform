@@ -64,7 +64,7 @@ public sealed class GetReconciliationQueryHandler
                 })
             on o.Id equals lg.OrderId
             join d in _context.Fulfillments.AsNoTracking()
-                .Where(f => f.VoucherId != null && f.ReleasedAtUtc == null)
+                .Where(f => f.ReleasedAtUtc == null)
                 .Select(f => new { f.OrderId, f.Voucher!.Brand, f.Voucher.FuelTypeId, f.Voucher.Liters })
                 .GroupBy(x => new { x.OrderId, x.Brand, x.FuelTypeId, x.Liters })
                 .Select(g => new
@@ -245,7 +245,7 @@ public sealed class GetReconciliationQueryHandler
                 })
             on o.Id equals lg.OrderId
             join d in _context.Fulfillments.AsNoTracking()
-                .Where(f => f.VoucherId != null && f.ReleasedAtUtc == null)
+                .Where(f => f.ReleasedAtUtc == null)
                 .Select(f => new { f.OrderId, f.Voucher!.Brand, f.Voucher.FuelTypeId, f.Voucher.Liters })
                 .GroupBy(x => new { x.OrderId, x.Brand, x.FuelTypeId, x.Liters })
                 .Select(g => new
@@ -413,8 +413,7 @@ public sealed class GetReconciliationQueryHandler
                                 g.Key,
                                 Ordered = g.Sum(li => li.Quantity),
                                 Delivered = _context.Fulfillments.Count(f =>
-                                    f.VoucherId != null
-                                    && f.OrderId == o.Id
+                                    f.OrderId == o.Id
                                     && f.ReleasedAtUtc == null
                                     && f.Voucher!.Brand == g.Key.Brand
                                     && f.Voucher.FuelTypeId == g.Key.FuelTypeId

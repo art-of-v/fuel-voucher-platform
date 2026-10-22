@@ -15,7 +15,6 @@ import {
   CheckCircle,
   AlertTriangle,
   RefreshCw,
-  Users,
   Fuel,
   ChevronRight,
 } from 'lucide-react-native';
@@ -29,7 +28,11 @@ import {
   useContentInsets,
 } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import { VoucherCard, WalletSummaryBar } from '../src/features/vouchers/components';
+import {
+  VoucherCard,
+  VoucherListControlsBar,
+  WalletSummaryBar,
+} from '../src/features/vouchers/components';
 import {
   applyListControls,
   EMPTY_FILTERS,
@@ -39,7 +42,6 @@ import {
   collectWorkerListVouchers,
   narrowIssuanceOrders,
 } from '../src/features/vouchers/lib/workerList';
-import { VoucherListControlsBar } from '../src/features/vouchers/components';
 import { WorkerFuelHeader, WorkerUsageSection } from '../src/features/company/components';
 import { useWorkerUsage } from '../src/features/company/hooks/useWorkerUsage';
 
@@ -234,7 +236,7 @@ export default function MyCodesScreen() {
     // Stopped on unmount: an endless loop keeps its frame callback alive after the screen is gone,
     // so it burned frames in the app and left this file's Jest teardown hanging on an open handle.
     return () => loop.stop();
-  }, []);
+  }, [pulseAnim]);
 
   // The lock handles empty state now
 
@@ -410,10 +412,6 @@ export default function MyCodesScreen() {
   const workerUsedCount = countUsed(workerIssued);
   const workerLeftCount = workerIssued.length - workerUsedCount;
   const workerLitersLeft = unusedLitres(workerIssued);
-
-  // Fuel that belongs to no handover receipt: it predates issuance orders or came
-  // another way, and cannot honestly be filed under one.
-  const looseIssued = looseIssuanceVouchers;
 
   // Emptiness is context-dependent: a company context shows its receipts and any
   // in-flight purchases (#161 H4 — the hub owns the stock, so it is not counted here);

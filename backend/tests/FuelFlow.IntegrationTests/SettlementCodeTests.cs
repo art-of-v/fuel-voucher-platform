@@ -324,7 +324,7 @@ public class SettlementCodeTests : WebApplicationFactory<Program>, IClassFixture
             .GetTypes()
             .Where(t => t.IsClass && t.IsPublic && t.Namespace is not null)
             .Where(t => t.Name.EndsWith("Response") || t.Name.EndsWith("Dto"))
-            .Where(t => !t.Namespace.Contains("Admin", StringComparison.OrdinalIgnoreCase))
+            .Where(t => !t.Namespace!.Contains("Admin", StringComparison.OrdinalIgnoreCase))
             .Select(t => (Type: t, Name: t.Namespace + "." + t.Name))
             .ToList();
 

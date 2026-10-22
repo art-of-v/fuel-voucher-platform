@@ -112,11 +112,11 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
             Row(fuelTypeId, t3, 49m));
         await context.SaveChangesAsync();
 
-        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t1.AddSeconds(1))))
+        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t1.AddSeconds(1))))!
             .PumpPricePerLiter.Should().Be(50m);
-        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t2)))
+        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t2)))!
             .PumpPricePerLiter.Should().Be(51m, "a row is in effect from the instant it took effect, inclusive");
-        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t3.AddDays(30))))
+        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t3.AddDays(30))))!
             .PumpPricePerLiter.Should().Be(49m, "and keeps standing until the next one takes over");
     }
 

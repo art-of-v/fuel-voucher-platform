@@ -98,8 +98,9 @@ jest.mock('../src/features/stations/components/NavigatorPickerSheet', () => ({
 // `react-native-maps` is mocked rather than real: the suite asserts on which tile
 // overlay the screen chose, not on rendering thousands of pins.
 jest.mock('react-native-maps', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const React2 = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const { View, Text } = require('react-native');
 
   /**

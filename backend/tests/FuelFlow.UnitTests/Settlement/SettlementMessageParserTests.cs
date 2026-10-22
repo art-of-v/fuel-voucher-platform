@@ -56,7 +56,7 @@ public class SettlementMessageParserTests
         result.Code.Should().BeNull();
         // The refusal names the expected shape, because a finance team that agrees on one format is a
         // better outcome than a parser that guesses.
-        result.Rejection.Should().NotBeNullOrWhiteSpace();
+        result.Rejection.Should().NotBeNullOrWhiteSpace(why);
     }
 
     [Theory]

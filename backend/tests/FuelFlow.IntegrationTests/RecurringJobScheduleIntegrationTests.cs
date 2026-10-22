@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.SharedKernel.Observability;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Hangfire.PostgreSql.Factories;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
@@ -39,7 +40,7 @@ public sealed class RecurringJobScheduleIntegrationTests : IClassFixture<TestDat
     public void A_Job_The_Code_No_Longer_Registers_Is_Removed_From_The_Registry()
     {
         // Constructing the storage is what installs the schema, the same way a production boot does.
-        var storage = new PostgreSqlStorage(_fixture.ConnectionString);
+        var storage = CreateStorage();
         var manager = new RecurringJobManager(storage);
 
         // The registry is shared with the other tests in this class - and with whatever a previous
@@ -80,7 +81,7 @@ public sealed class RecurringJobScheduleIntegrationTests : IClassFixture<TestDat
     [Fact]
     public void The_Registry_The_Reconciliation_Reads_Is_The_One_Hangfire_Writes()
     {
-        var storage = new PostgreSqlStorage(_fixture.ConnectionString);
+        var storage = CreateStorage();
         var manager = new RecurringJobManager(storage);
 
         ClearRegistry(storage, manager);
@@ -95,6 +96,13 @@ public sealed class RecurringJobScheduleIntegrationTests : IClassFixture<TestDat
         storage.GetConnection()
             .GetAllItemsFromSet("recurring-jobs")
             .Should().Contain("set-membership-probe");
+    }
+
+    private PostgreSqlStorage CreateStorage()
+    {
+        var options = new PostgreSqlStorageOptions();
+        return new PostgreSqlStorage(
+            new NpgsqlConnectionFactory(_fixture.ConnectionString, options), options);
     }
 
     /// <summary>
