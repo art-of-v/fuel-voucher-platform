@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.Features.Referral.CreateReferralCode;
 using FuelFlow.Features.Referral.RedeemReferralCode;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -32,10 +33,10 @@ public sealed class ReferralController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateReferralCodeRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Code))
-            return BadRequest("Code is required");
+            return ApiError.BadRequest("Code is required");
 
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         try
         {
@@ -44,11 +45,11 @@ public sealed class ReferralController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(ex.Message);
+            return ApiError.Conflict(ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return ApiError.BadRequest(ex.Message);
         }
     }
 
@@ -60,10 +61,10 @@ public sealed class ReferralController : ControllerBase
     public async Task<IActionResult> Redeem([FromBody] RedeemReferralCodeRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Code))
-            return BadRequest("Code is required");
+            return ApiError.BadRequest("Code is required");
 
         var userId = GetUserId();
-        if (userId == null) return Unauthorized();
+        if (userId == null) return ApiError.Unauthorized("Unauthorized");
 
         try
         {
@@ -72,11 +73,11 @@ public sealed class ReferralController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return Conflict(ex.Message);
+            return ApiError.Conflict(ex.Message);
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return ApiError.BadRequest(ex.Message);
         }
     }
 

@@ -138,7 +138,12 @@ describe("apiBlob", () => {
   it("preserves the error code for a JSON error body", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
-        JSON.stringify({ code: "forbidden", message: "Not allowed" }),
+        JSON.stringify({
+          title: "Forbidden",
+          status: 403,
+          detail: "Not allowed",
+          code: "forbidden",
+        }),
         {
           status: 403,
           headers: { "Content-Type": "application/json" },

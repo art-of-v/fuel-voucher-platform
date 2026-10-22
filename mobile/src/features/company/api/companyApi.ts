@@ -6,10 +6,11 @@ import type {
   MyCompanyMembershipDto,
 } from '../types';
 
-// Backend company endpoints return camelCase `{ error: "<Code>" }` on failure,
-// bare arrays on list success, and some 4xx (e.g. recall 403) with an empty
-// body. This error type preserves both the HTTP status and the backend code so
-// the UI can map them to friendly, localized copy.
+// Backend company endpoints answer a failure with the one error envelope: the machine
+// code ("WorkerNotFound") in `code`, the sentence in `detail`, bare arrays on list
+// success, and some 4xx (e.g. recall 403) with an empty body. This error type preserves
+// both the HTTP status and the backend code so the UI can map them to friendly,
+// localized copy.
 export class CompanyApiError extends Error {
   status: number;
   code: string;
@@ -25,7 +26,9 @@ async function parseError(response: Response): Promise<CompanyApiError> {
   let code = '';
   try {
     const data = await response.json();
-    code = data?.error ?? data?.message ?? '';
+    // The code is what the UI localises from; the sentence is the fallback for a failure
+    // that carries no code.
+    code = data?.code ?? data?.detail ?? data?.title ?? '';
   } catch {
     // Empty body (e.g. 403 on recall) — fall back to a status-based code.
   }

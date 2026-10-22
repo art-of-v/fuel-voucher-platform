@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using FuelFlow.Features.Pricing.ImportUpgWogPrices;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -44,10 +45,10 @@ public sealed class AdminUpgWogPriceController : ControllerBase
         CancellationToken ct = default)
     {
         if (!SupportedBrands.Contains(brand.Trim().ToLowerInvariant()))
-            return BadRequest($"Unsupported brand '{brand}'. Supported: {string.Join(", ", SupportedBrands)}");
+            return ApiError.BadRequest($"Unsupported brand '{brand}'. Supported: {string.Join(", ", SupportedBrands)}");
 
         if (file is null || file.Length == 0)
-            return BadRequest("A non-empty file is required");
+            return ApiError.BadRequest("A non-empty file is required");
 
         string content;
         using (var reader = new StreamReader(file.OpenReadStream(), Encoding.UTF8))

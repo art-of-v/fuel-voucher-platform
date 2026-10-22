@@ -5,6 +5,7 @@ using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.VerifyChallenge;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -54,21 +55,21 @@ public sealed class DeviceAuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.DeviceId))
-            return BadRequest(new { error = new { message = "DeviceId is required" } });
+            return ApiError.BadRequest("DeviceId is required");
 
         if (string.IsNullOrWhiteSpace(command.PublicKey))
-            return BadRequest(new { error = new { message = "PublicKey is required" } });
+            return ApiError.BadRequest("PublicKey is required");
 
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized(new { error = new { message = "Invalid user token" } });
+            return ApiError.Unauthorized("Invalid user token");
 
         command.UserId = userId;
 
         var result = await _registerDeviceHandler.HandleAsync(command, cancellationToken);
 
         if (result.Error is not null)
-            return Conflict(new { error = new { message = result.Error } });
+            return ApiError.Conflict(result.Error);
 
         return Ok(result);
     }
@@ -83,7 +84,7 @@ public sealed class DeviceAuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.DeviceId))
-            return BadRequest(new { error = new { message = "DeviceId is required" } });
+            return ApiError.BadRequest("DeviceId is required");
 
         var result = await _generateChallengeHandler.HandleAsync(command, cancellationToken);
         return Ok(result);
@@ -100,18 +101,18 @@ public sealed class DeviceAuthController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.DeviceId))
-            return BadRequest(new { error = new { message = "DeviceId is required" } });
+            return ApiError.BadRequest("DeviceId is required");
 
         if (string.IsNullOrWhiteSpace(command.Challenge))
-            return BadRequest(new { error = new { message = "Challenge is required" } });
+            return ApiError.BadRequest("Challenge is required");
 
         if (string.IsNullOrWhiteSpace(command.Signature))
-            return BadRequest(new { error = new { message = "Signature is required" } });
+            return ApiError.BadRequest("Signature is required");
 
         var result = await _verifyChallengeHandler.HandleAsync(command, cancellationToken);
 
         if (!result.IsValid)
-            return Unauthorized(new { error = new { message = result.Error } });
+            return ApiError.Unauthorized(result.Error);
 
         // The device flow is the native app's, but the rule is the rule everywhere: the refresh
         // token travels in the body only for a client that says it is native and has no cookie
@@ -136,19 +137,19 @@ public sealed class DeviceAuthController : ControllerBase
         [FromBody] VerifyRawRequest request)
     {
         if (!_authOptions.DevBypass)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         if (string.IsNullOrWhiteSpace(request.Challenge))
-            return BadRequest(new { error = "Challenge is required" });
+            return ApiError.BadRequest("Challenge is required");
         if (string.IsNullOrWhiteSpace(request.Signature))
-            return BadRequest(new { error = "Signature is required" });
+            return ApiError.BadRequest("Signature is required");
         if (string.IsNullOrWhiteSpace(request.PublicKey))
-            return BadRequest(new { error = "PublicKey is required" });
+            return ApiError.BadRequest("PublicKey is required");
 
         var challengeBytes = Encoding.UTF8.GetBytes(request.Challenge);
         byte[] signatureBytes;
         try { signatureBytes = Convert.FromBase64String(request.Signature); }
-        catch { return BadRequest(new { error = "Invalid base64 signature" }); }
+        catch { return ApiError.BadRequest("Invalid base64 signature"); }
 
         // Normalize PEM
         string rawKey = request.PublicKey.Trim();
@@ -244,7 +245,7 @@ public sealed class DeviceAuthController : ControllerBase
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized("Invalid user token");
+            return ApiError.Unauthorized("Invalid user token");
 
         var deviceId = Request.Headers["x-device-id"].FirstOrDefault() ?? string.Empty;
 

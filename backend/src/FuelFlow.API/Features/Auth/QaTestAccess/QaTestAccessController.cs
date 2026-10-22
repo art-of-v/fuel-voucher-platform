@@ -1,6 +1,7 @@
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -60,7 +61,7 @@ public sealed class QaTestAccessController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (request is null)
-            return BadRequest(new { success = false, error = "No value supplied" });
+            return ApiError.BadRequest("No value supplied");
 
         var result = await _setHandler.HandleAsync(
             new SetQaTestAccessCommand(request.Enabled, GetUserId(), GetUserName(), GetRole()),

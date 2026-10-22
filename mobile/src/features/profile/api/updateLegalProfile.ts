@@ -11,12 +11,7 @@ export async function getLegalProfile(): Promise<Company | null> {
   if (!response.ok) {
     if (response.status === 401) return null;
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.error?.message ||
-        errorData.error ||
-        errorData.message ||
-        'Failed to fetch legal profile',
-    );
+    throw new Error(errorData.detail || errorData.title || 'Failed to fetch legal profile');
   }
   return response.json();
 }
@@ -33,8 +28,7 @@ export async function updateLegalProfile(data: Partial<Company>): Promise<Compan
     // shipped the user's typo to Sentry as an incident. Same error type as the scoped
     // PUT /api/legal-entity/{id} path so one mapper handles both.
     const body = await response.json().catch(() => ({}) as any);
-    const message =
-      body.error?.message || body.error || body.message || 'Failed to update legal profile';
+    const message = body.detail || body.title || 'Failed to update legal profile';
     throw new LegalEntityApiError(response.status, message);
   }
   return response.json();

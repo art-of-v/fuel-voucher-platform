@@ -1,4 +1,5 @@
 using System.Text;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -48,7 +49,7 @@ public sealed class UpdatesController : ControllerBase
             _logger.LogWarning(
                 "Manifest request missing required header(s): platform={HasPlatform}, runtimeVersion={HasRuntimeVersion}",
                 !string.IsNullOrWhiteSpace(platform), !string.IsNullOrWhiteSpace(runtimeVersion));
-            return BadRequest("expo-platform and expo-runtime-version headers are required.");
+            return ApiError.BadRequest("expo-platform and expo-runtime-version headers are required.");
         }
 
         // What runtime versions are actually out there is otherwise unanswerable. The endpoint matches

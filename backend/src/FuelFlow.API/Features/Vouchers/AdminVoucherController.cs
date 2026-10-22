@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -78,7 +79,7 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var result = await _getByIdHandler.HandleAsync(new GetAdminVoucherByIdQuery(id), cancellationToken);
-        if (result is null) return NotFound();
+        if (result is null) return ApiError.NotFound("Not found");
 
         // The redeemable payload leaves the process only for the roles that hold the capability
         // (AuthPolicies.VoucherPayload). It is a bearer instrument: whoever holds it can spend
@@ -99,13 +100,13 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateVoucherRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _updateHandler.HandleAsync(
             new UpdateVoucherCommand(id, request.Status, request.AssignedToUserId, userId, GetUserName()), cancellationToken);
-        if (result is null) return NotFound();
+        if (result is null) return ApiError.NotFound("Not found");
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
         return Ok(new { success = true });
     }
 
@@ -114,12 +115,12 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _deleteHandler.HandleAsync(
             new DeleteVoucherCommand(id, userId, GetUserName()), cancellationToken);
-        if (result is null) return NotFound();
-        if (!result.Success) return BadRequest(new { error = result.Error });
+        if (result is null) return ApiError.NotFound("Not found");
+        if (!result.Success) return ApiError.BadRequest(result.Error);
         return Ok(new { success = true });
     }
 
@@ -128,13 +129,13 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _bulkActionHandler.HandleAsync(
             new BulkActionVouchersCommand(request.Action, request.Ids, request.TargetUserId, userId, GetUserName()), cancellationToken);
 
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return Ok(new { success = result.Success, count = result.Count });
     }
@@ -144,15 +145,15 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> Unblock(Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _unblockHandler.HandleAsync(
             new UnblockVoucherCommand(id, userId, GetUserName()),
             cancellationToken);
 
-        if (result is null) return NotFound();
+        if (result is null) return ApiError.NotFound("Not found");
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return Ok(new { success = true });
     }
@@ -167,15 +168,15 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> Unarchive(Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         var result = await _unarchiveHandler.HandleAsync(
             new UnarchiveVoucherCommand(id, userId, GetUserName()),
             cancellationToken);
 
-        if (result is null) return NotFound();
+        if (result is null) return ApiError.NotFound("Not found");
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-            return BadRequest(new { error = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return Ok(new { success = true });
     }
@@ -188,7 +189,7 @@ public sealed class AdminVoucherController : ControllerBase
     {
         var result = await _getVerificationHandler.HandleAsync(new GetVoucherVerificationQuery(id), cancellationToken);
         if (result == null)
-            return NotFound();
+            return ApiError.NotFound("Not found");
 
         // The verification's image IS the voucher's redeemable code, so it leaves the process
         // only for the roles that hold the capability. The numbers stay: the mismatch percent
@@ -221,7 +222,7 @@ public sealed class AdminVoucherController : ControllerBase
     public async Task<IActionResult> GetLifecycle(Guid id, CancellationToken cancellationToken)
     {
         var result = await _lifecycleHandler.HandleAsync(new GetAdminVoucherLifecycleQuery(id), cancellationToken);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? ApiError.NotFound("Not found") : Ok(result);
     }
 
     /// <summary>

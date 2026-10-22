@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands.GetAdminBrandStationById;
 using FuelFlow.Features.Brands.GetAdminBrandStations;
 using FuelFlow.Features.Brands.ImportBrandStations;
 using FuelFlow.Features.Brands.UpdateBrandStation;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -52,7 +53,7 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminBrandStationByIdQuery(id), ct);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? ApiError.NotFound("Not found") : Ok(result);
     }
 
     [HttpPost]
@@ -61,9 +62,9 @@ public sealed class AdminBrandStationController : ControllerBase
     {
         var result = await _create.HandleAsync(new CreateBrandStationCommand(request), ct);
         if (result.Error != null && !result.Conflict)
-            return BadRequest(result.Error);
+            return ApiError.BadRequest(result.Error);
         if (result.Conflict)
-            return Conflict(result.Error);
+            return ApiError.Conflict(result.Error);
         return CreatedAtAction(nameof(GetById), new { id = result.Node!.Id }, result.Node);
     }
 
@@ -72,8 +73,8 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] BrandStation request, CancellationToken ct)
     {
         var result = await _update.HandleAsync(new UpdateBrandStationCommand(id, request), ct);
-        if (result.NotFound) return NotFound();
-        if (result.Error != null) return BadRequest(result.Error);
+        if (result.NotFound) return ApiError.NotFound("Not found");
+        if (result.Error != null) return ApiError.BadRequest(result.Error);
         return Ok(new { success = true });
     }
 
@@ -82,7 +83,7 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeleteBrandStationCommand(id), ct);
-        return success ? Ok(new { success = true }) : NotFound();
+        return success ? Ok(new { success = true }) : ApiError.NotFound("Not found");
     }
 
     [HttpPost("import")]
@@ -91,7 +92,7 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> Import(IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
-            return BadRequest("A non-empty file is required");
+            return ApiError.BadRequest("A non-empty file is required");
 
         var format = (Path.GetExtension(file.FileName) ?? string.Empty).Equals(".json", StringComparison.OrdinalIgnoreCase)
             ? BrandStationImportFormat.Json

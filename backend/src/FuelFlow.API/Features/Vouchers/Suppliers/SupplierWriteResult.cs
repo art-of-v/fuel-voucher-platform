@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Errors;
 namespace FuelFlow.Features.Vouchers.Suppliers;
 
 /// <summary>What a supplier write did.</summary>

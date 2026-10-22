@@ -1,4 +1,5 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -84,7 +85,7 @@ public sealed class MonobankWebhookController : ControllerBase
             if (webhookData == null)
             {
                 _logger.LogError("Failed to deserialize Monobank webhook payload");
-                return BadRequest("Invalid payload");
+                return ApiError.BadRequest("Invalid payload");
             }
 
             var command = new ProcessMonobankWebhookCommand
@@ -126,7 +127,7 @@ public sealed class MonobankWebhookController : ControllerBase
                 // A 404 here is a genuine race: the invoice exists at the acquirer while its order is
                 // still committing. Retrying is the correct answer, and Monobank does it.
                 _logger.LogWarning("Webhook processing failed: {Message}", response.Message);
-                return NotFound(response.Message);
+                return ApiError.NotFound(response.Message);
             }
 
             _logger.LogInformation(
@@ -140,7 +141,7 @@ public sealed class MonobankWebhookController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing Monobank webhook");
-            return StatusCode(500, "Internal server error");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -149,7 +150,7 @@ public sealed class MonobankWebhookController : ControllerBase
         if (string.IsNullOrWhiteSpace(signature))
         {
             _logger.LogWarning("Monobank webhook rejected: missing X-Sign header");
-            return Unauthorized(new { error = "Missing signature" });
+            return ApiError.Unauthorized("Missing signature");
         }
 
         // One key for both merchants. Monobank signs webhooks with a key that belongs to the
@@ -171,7 +172,7 @@ public sealed class MonobankWebhookController : ControllerBase
             "Monobank webhook rejected: invalid signature (fingerprint {Fingerprint}, key id {KeyId})",
             Fingerprint(signature),
             string.IsNullOrWhiteSpace(keyId) ? "(default)" : keyId);
-        return Unauthorized(new { error = "Invalid signature" });
+        return ApiError.Unauthorized("Invalid signature");
     }
 
     private string? ResolveLivePublicKey(string? keyId)

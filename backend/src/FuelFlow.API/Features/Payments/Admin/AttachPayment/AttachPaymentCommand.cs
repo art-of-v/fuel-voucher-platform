@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Errors;
 namespace FuelFlow.Features.Payments.Admin.AttachPayment;
 
 /// <summary>

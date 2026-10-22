@@ -5,6 +5,7 @@ using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -120,7 +121,7 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> SendCode([FromBody] SendCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
-            return BadRequest(new { message = "Phone number is required" });
+            return ApiError.BadRequest("Phone number is required");
 
         try
         {
@@ -131,8 +132,7 @@ public sealed class AuthController : ControllerBase
         {
             // The daily spend ceiling tripped. Answer 503 rather than 500 so the client backs
             // off instead of retrying, and so this is distinguishable in logs from a brand fault.
-            return StatusCode(StatusCodes.Status503ServiceUnavailable,
-                new { message = "SMS delivery is temporarily unavailable. Please try again later." });
+            return ApiError.ServiceUnavailable("SMS delivery is temporarily unavailable. Please try again later.");
         }
     }
 
@@ -145,10 +145,10 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Verify([FromBody] VerifyCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
-            return BadRequest(new { message = "Phone number is required" });
+            return ApiError.BadRequest("Phone number is required");
 
         if (string.IsNullOrWhiteSpace(command.Code))
-            return BadRequest(new { message = "Verification code is required" });
+            return ApiError.BadRequest("Verification code is required");
 
         try
         {
@@ -160,7 +160,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new { message = ex.Message });
+            return ApiError.Unauthorized(ex.Message);
         }
     }
 
@@ -178,7 +178,7 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> AdminSendCode([FromBody] AdminSendCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
-            return BadRequest(new { message = "Phone number is required" });
+            return ApiError.BadRequest("Phone number is required");
 
         try
         {
@@ -205,10 +205,10 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> AdminVerify([FromBody] AdminVerifyCodeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.PhoneNumber))
-            return BadRequest(new { message = "Phone number is required" });
+            return ApiError.BadRequest("Phone number is required");
 
         if (string.IsNullOrWhiteSpace(command.Code))
-            return BadRequest(new { message = "Verification code is required" });
+            return ApiError.BadRequest("Verification code is required");
 
         try
         {
@@ -220,7 +220,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new { message = ex.Message });
+            return ApiError.Unauthorized(ex.Message);
         }
     }
 
@@ -238,7 +238,7 @@ public sealed class AuthController : ControllerBase
         // on such requests — reject any Origin that isn't explicitly allow-listed.
         // Requests without an Origin (native app, curl) are unaffected.
         if (!IsAllowedOrigin(Request))
-            return Unauthorized(new { message = "Origin not allowed" });
+            return ApiError.Unauthorized("Origin not allowed");
 
         var refreshToken = command?.RefreshToken;
 
@@ -246,7 +246,7 @@ public sealed class AuthController : ControllerBase
             refreshToken = Request.Cookies[RefreshTokenCookieName];
 
         if (string.IsNullOrWhiteSpace(refreshToken))
-            return BadRequest(new { message = "Refresh token is required" });
+            return ApiError.BadRequest("Refresh token is required");
 
         try
         {
@@ -258,7 +258,7 @@ public sealed class AuthController : ControllerBase
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Unauthorized(new { message = ex.Message });
+            return ApiError.Unauthorized(ex.Message);
         }
     }
 
@@ -275,7 +275,7 @@ public sealed class AuthController : ControllerBase
         // log them out (annoying, not dangerous), but the origin allow-list is cheap
         // and keeps this route consistent with /refresh.
         if (!IsAllowedOrigin(Request))
-            return Unauthorized(new { message = "Origin not allowed" });
+            return ApiError.Unauthorized("Origin not allowed");
 
         var refreshToken = command?.RefreshToken;
 
@@ -300,12 +300,12 @@ public sealed class AuthController : ControllerBase
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
 
         var user = await _getCurrentUserHandler.HandleAsync(
             new GetCurrentUserQuery(userId), cancellationToken);
 
-        if (user == null) return Unauthorized();
+        if (user == null) return ApiError.Unauthorized("Unauthorized");
 
         return Ok(user);
     }

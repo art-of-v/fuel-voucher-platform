@@ -6,6 +6,7 @@ using FuelFlow.Features.Feedback.GetAdminFeedbackFacets;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Feedback.UpdateFeedbackStatus;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -95,7 +96,7 @@ public sealed class AdminFeedbackController : ControllerBase
     {
         var detail = await _getByIdHandler.HandleAsync(new GetAdminFeedbackByIdQuery(id), ct);
 
-        return detail is null ? NotFound() : Ok(detail);
+        return detail is null ? ApiError.NotFound("Not found") : Ok(detail);
     }
 
     /// <summary>Moves rows between review states. Re-posting an id that is already in the
@@ -113,9 +114,9 @@ public sealed class AdminFeedbackController : ControllerBase
 
         return result.Status switch
         {
-            "NoIds" => BadRequest(new { error = result.Error }),
-            "UnknownStatus" => BadRequest(new { error = result.Error }),
-            "Unauthenticated" => Unauthorized(),
+            "NoIds" => ApiError.BadRequest(result.Error),
+            "UnknownStatus" => ApiError.BadRequest(result.Error),
+            "Unauthenticated" => ApiError.Unauthorized("Unauthorized"),
             _ => Ok(new FeedbackMutationResponse(true, result.Affected))
         };
     }
@@ -135,7 +136,7 @@ public sealed class AdminFeedbackController : ControllerBase
 
         return result.Status switch
         {
-            "Refused" => BadRequest(new { error = result.Error }),
+            "Refused" => ApiError.BadRequest(result.Error),
             _ => Ok(new FeedbackMutationResponse(true, result.Affected))
         };
     }

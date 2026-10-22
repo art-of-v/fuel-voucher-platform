@@ -33,5 +33,5 @@ export async function requestEmailChange(email: string, code: string): Promise<v
   }
 
   const error = await response.json().catch(() => ({}));
-  throw new Error(error.message || error.title || `Error (${response.status})`);
+  throw new Error(error.detail || error.title || `Error (${response.status})`);
 }

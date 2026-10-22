@@ -42,10 +42,11 @@ describe("apiRequest response parsing", () => {
     vi.unstubAllGlobals();
   });
 
-  // Regression: the API answers a business rejection with { code, message }, but readErrorMessage
-  // dropped `code` and every caller rendered `message` — an English sentence, authored for whoever
-  // debugs it, shown verbatim to a Ukrainian-speaking operator. The code is what a screen needs in
-  // order to localise, so it has to survive the throw.
+  // Regression: the API answers a business rejection with the one error envelope, whose machine
+  // code travels in `code`, but readErrorMessage dropped it and every caller rendered the
+  // sentence — an English message, authored for whoever debugs it, shown verbatim to a
+  // Ukrainian-speaking operator. The code is what a screen needs in order to localise, so it has
+  // to survive the throw.
   describe("error code preservation", () => {
     it("keeps the code from a 409 so the caller can localise", async () => {
       vi.mocked(fetch).mockResolvedValue(
@@ -68,7 +69,11 @@ describe("apiRequest response parsing", () => {
 
     it("leaves code undefined when the body carries none", async () => {
       vi.mocked(fetch).mockResolvedValue(
-        jsonResponse(400, { error: "Something was wrong" }),
+        jsonResponse(400, {
+          title: "Bad Request",
+          status: 400,
+          detail: "Something was wrong",
+        }),
       );
 
       const err = await apiRequest("POST", "/api/admin/whatever", {}).catch(
@@ -84,7 +89,12 @@ describe("apiRequest response parsing", () => {
     // would send a screen looking up a translation for a code called "null".
     it("ignores a non-string code", async () => {
       vi.mocked(fetch).mockResolvedValue(
-        jsonResponse(400, { code: null, message: "Bad request" }),
+        jsonResponse(400, {
+          title: "Bad Request",
+          status: 400,
+          detail: "Bad request",
+          code: null,
+        }),
       );
 
       const err = await apiRequest("POST", "/api/admin/whatever", {}).catch(
@@ -99,8 +109,10 @@ describe("apiRequest response parsing", () => {
     it("keeps the code on an opaque 500", async () => {
       vi.mocked(fetch).mockResolvedValue(
         jsonResponse(500, {
+          title: "Internal Server Error",
+          status: 500,
+          detail: "An unexpected error occurred",
           code: "internal",
-          message: "An unexpected error occurred",
         }),
       );
 
@@ -123,9 +135,11 @@ describe("apiRequest response parsing", () => {
     it("carries the numbers the backend attached to a code", async () => {
       vi.mocked(fetch).mockResolvedValue(
         jsonResponse(400, {
-          code: "below_cost",
-          message:
+          title: "Bad Request",
+          status: 400,
+          detail:
             "Renewal surcharge is below the replacement voucher's cost by 200.00 UAH.",
+          code: "below_cost",
           data: { shortfallUah: 200 },
         }),
       );
@@ -142,7 +156,12 @@ describe("apiRequest response parsing", () => {
 
     it("leaves data undefined when the body carries none", async () => {
       vi.mocked(fetch).mockResolvedValue(
-        jsonResponse(409, { code: "no_stock", message: "No stock" }),
+        jsonResponse(409, {
+          title: "Conflict",
+          status: 409,
+          detail: "No stock",
+          code: "no_stock",
+        }),
       );
 
       const err = await apiRequest(
@@ -160,8 +179,10 @@ describe("apiRequest response parsing", () => {
     it("drops entries that are not finite numbers", async () => {
       vi.mocked(fetch).mockResolvedValue(
         jsonResponse(400, {
+          title: "Bad Request",
+          status: 400,
+          detail: "nope",
           code: "below_cost",
-          message: "nope",
           data: { shortfallUah: "200", liters: 10, ratio: null },
         }),
       );
@@ -178,8 +199,10 @@ describe("apiRequest response parsing", () => {
     it("leaves data undefined when every entry was dropped", async () => {
       vi.mocked(fetch).mockResolvedValue(
         jsonResponse(400, {
+          title: "Bad Request",
+          status: 400,
+          detail: "nope",
           code: "below_cost",
-          message: "nope",
           data: { shortfallUah: null },
         }),
       );
@@ -229,7 +252,11 @@ describe("apiRequest response parsing", () => {
 
   it("throws with the server message on a non-ok response", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      jsonResponse(404, { message: "User not found" }),
+      jsonResponse(404, {
+        title: "Not Found",
+        status: 404,
+        detail: "User not found",
+      }),
     );
 
     await expect(
@@ -237,14 +264,16 @@ describe("apiRequest response parsing", () => {
     ).rejects.toThrow("User not found");
   });
 
-  it("surfaces the `error` field an admin endpoint returns instead of raw JSON", async () => {
-    // The refund controller returns { success: false, error: "..." } on a handled
-    // failure. The old extraction only looked at message/detail/title, so the operator
-    // saw the raw JSON blob; now the reason is shown directly.
+  it("reads the sentence of the one error envelope", async () => {
+    // The API answers every failure in one shape (RFC 9457): the sentence is in `detail`, the
+    // status in `title`. A body that still carried `error` or `message` would be a second
+    // envelope, and the operator would be shown the raw JSON.
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(502, {
-        success: false,
-        error: "Monobank rejected the cancellation",
+        type: "https://tools.ietf.org/html/rfc9110#section-15.6.3",
+        title: "Bad Gateway",
+        status: 502,
+        detail: "Monobank rejected the cancellation",
       }),
     );
 
@@ -261,13 +290,15 @@ describe("apiRequest response parsing", () => {
   });
 
   it("turns the opaque 500 fault into an actionable message carrying the traceId", async () => {
-    // A genuine server fault comes back only as the fixed ProblemDetails title, which is
-    // useless to the operator. It must be replaced with a plain sentence plus the traceId
+    // A genuine server fault comes back with a fixed sentence and the reason withheld, which
+    // is useless to the operator. It must be replaced with a plain sentence plus the traceId
     // that links to the Error Logs tab — not shown verbatim.
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(500, {
+        type: "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+        title: "Internal Server Error",
         status: 500,
-        title: "An unexpected error occurred",
+        detail: "An unexpected error occurred",
         traceId: "trace-abc",
       }),
     );

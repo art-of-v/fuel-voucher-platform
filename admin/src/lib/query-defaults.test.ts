@@ -92,7 +92,11 @@ describe("defaultQueryFn", () => {
   // body; ApiError keeps that text in a field the UI does not print by accident.
   it("surfaces a failure as an ApiError rather than a raw body dump", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-      jsonResponse(403, { message: "Not allowed" }),
+      jsonResponse(403, {
+        title: "Forbidden",
+        status: 403,
+        detail: "Not allowed",
+      }),
     );
 
     await expect(run("/api/admin/vouchers")).rejects.toMatchObject({

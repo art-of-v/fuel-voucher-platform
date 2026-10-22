@@ -1,4 +1,5 @@
 using FuelFlow.Features.Report.GetReport;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -39,7 +40,7 @@ public sealed class AdminReportController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating admin report for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while generating report");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 }

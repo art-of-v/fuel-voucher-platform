@@ -4,6 +4,7 @@ using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -45,7 +46,7 @@ public sealed class UserController : ControllerBase
                      ?? User.FindFirst("sub")?.Value;
 
         if (string.IsNullOrEmpty(userId))
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
 
         var command = new UpdateUserCommand(
             userId,
@@ -81,7 +82,7 @@ public sealed class UserController : ControllerBase
                      ?? User.FindFirst("sub")?.Value;
 
         if (string.IsNullOrEmpty(userId))
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
 
         // Confirmation link uses the configured canonical public API origin (falls back to the
         // request origin when unset); see AuthOptions.EmailConfirmBaseUrl. This path already works
@@ -108,9 +109,7 @@ public sealed class UserController : ControllerBase
             // code so the mobile client shows "invalid code" and lets the user retry — a 401 here
             // trips the API client's refresh-then-clear-tokens path and logs them out for a typo.
             // Mirrors PurchaseController's AccountInactiveException → 403 handling.
-            return StatusCode(
-                StatusCodes.Status403Forbidden,
-                new { code = StepUpChallengeFailedException.Code, message = ex.Message });
+            return ApiError.Forbidden(ex.Message, StepUpChallengeFailedException.Code);
         }
     }
 
@@ -124,7 +123,7 @@ public sealed class UserController : ControllerBase
                      ?? User.FindFirst("sub")?.Value;
 
         if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var parsedUserId))
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
 
         // The acting id travels with the command: a user closing their own account is not a staff
         // action, and the handler has to be able to tell it from one (planning #455).
@@ -132,7 +131,7 @@ public sealed class UserController : ControllerBase
             new DeleteUserCommand(parsedUserId, parsedUserId), cancellationToken);
 
         if (!result.Success)
-            return NotFound(new { message = result.Error });
+            return ApiError.NotFound(result.Error);
 
         return NoContent();
     }

@@ -1,5 +1,6 @@
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Time;
@@ -79,16 +80,14 @@ public sealed class DeviceSignatureMiddleware
                 "Missing device signature headers for {Path}",
                 context.Request.Path);
 
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Device signature required" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Device signature required");
             return;
         }
 
         if (!long.TryParse(timestamp, out var timestampMs))
         {
             _logger.LogWarning("Invalid timestamp format: {Timestamp}", timestamp);
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Invalid timestamp" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Invalid timestamp");
             return;
         }
 
@@ -102,8 +101,7 @@ public sealed class DeviceSignatureMiddleware
                 "Request timestamp outside tolerance window: {TimeDiff}ms",
                 timeDiff);
 
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Request expired" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Request expired");
             return;
         }
         var nonce = $"nonce:{deviceId}:{timestamp}";
@@ -116,8 +114,7 @@ public sealed class DeviceSignatureMiddleware
                 deviceId,
                 timestamp);
 
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Request already processed" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Request already processed");
             return;
         }
 
@@ -127,8 +124,7 @@ public sealed class DeviceSignatureMiddleware
         if (device == null)
         {
             _logger.LogWarning("Device {DeviceId} not found or revoked", deviceId);
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Device not registered or revoked" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Device not registered or revoked");
             return;
         }
 
@@ -145,8 +141,7 @@ public sealed class DeviceSignatureMiddleware
             _logger.LogWarning(
                 "Device {DeviceId} is not bound to the authenticated user; rejecting",
                 deviceId);
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Device is not bound to this user" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Device is not bound to this user");
             return;
         }
 
@@ -165,8 +160,7 @@ public sealed class DeviceSignatureMiddleware
                 "Invalid signature for device {DeviceId}",
                 deviceId);
 
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            await context.Response.WriteAsJsonAsync(new { error = "Invalid signature" });
+            await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Invalid signature");
             return;
         }
 

@@ -7,6 +7,7 @@ using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
 using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -109,20 +110,23 @@ public sealed class AdminUserController : ControllerBase
     public async Task<IActionResult> SetRole(string id, [FromBody] SetUserRoleRequest request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(id, out var userId))
-            return BadRequest(new { message = "Invalid user id" });
+            return ApiError.BadRequest("Invalid user id");
         var (actingId, actingRole, actingName) = GetActor();
         if (!actingId.HasValue)
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
         var result = await _setRoleHandler.HandleAsync(
             new SetUserRoleCommand(userId, request.Role, actingId.Value, actingName, actingRole),
             cancellationToken);
 
         if (result.NotFound)
-            return NotFound(new { message = result.Error });
+            return ApiError.NotFound(result.Error);
+        // A 403 that says why: ControllerBase.Forbid() writes an empty body, so the operator saw
+        // a toast with nothing after the colon and had to guess what had been refused
+        // (planning #299). The admin SPA reads the `detail` of the error envelope unchanged.
         if (result.Forbidden)
-            return Forbidden(result.Error);
+            return ApiError.Forbidden(result.Error);
         if (!result.Success)
-            return BadRequest(new { message = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return NoContent();
     }
@@ -136,10 +140,10 @@ public sealed class AdminUserController : ControllerBase
     public async Task<IActionResult> SetEmail(string id, [FromBody] SetUserEmailRequest request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(id, out var userId))
-            return BadRequest(new { message = "Invalid user id" });
+            return ApiError.BadRequest("Invalid user id");
         var (actingId, actingRole, actingName) = GetActor();
         if (!actingId.HasValue)
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
 
         // Build the confirmation link from the configured canonical public API origin. The admin
         // dashboard origin only proxies an allow-list of /api/* paths (not the confirm landing), so
@@ -152,11 +156,11 @@ public sealed class AdminUserController : ControllerBase
             cancellationToken);
 
         if (result.NotFound)
-            return NotFound(new { message = result.Error });
+            return ApiError.NotFound(result.Error);
         if (result.Forbidden)
-            return Forbidden(result.Error);
+            return ApiError.Forbidden(result.Error);
         if (!result.Success)
-            return BadRequest(new { message = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return Ok(new { pendingConfirmation = result.PendingConfirmation });
     }
@@ -187,7 +191,7 @@ public sealed class AdminUserController : ControllerBase
     public async Task<IActionResult> Delete(string id, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(id, out var userId))
-            return BadRequest(new { message = "Invalid user id" });
+            return ApiError.BadRequest("Invalid user id");
 
         var (actingId, actingRole, actingName) = GetActor();
 
@@ -196,9 +200,9 @@ public sealed class AdminUserController : ControllerBase
             cancellationToken);
 
         if (result.Forbidden)
-            return Forbidden(result.Error);
+            return ApiError.Forbidden(result.Error);
         if (!result.Success)
-            return NotFound(new { message = result.Error });
+            return ApiError.NotFound(result.Error);
 
         return NoContent();
     }
@@ -206,22 +210,22 @@ public sealed class AdminUserController : ControllerBase
     private async Task<IActionResult> SetActiveInternal(string id, bool isActive, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(id, out var userId))
-            return BadRequest(new { message = "Invalid user id" });
+            return ApiError.BadRequest("Invalid user id");
 
         var (actingId, actingRole, actingName) = GetActor();
         if (!actingId.HasValue)
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
 
         var result = await _setActiveHandler.HandleAsync(
             new SetUserActiveCommand(userId, isActive, actingId.Value, actingName, actingRole),
             cancellationToken);
 
         if (result.NotFound)
-            return NotFound(new { message = result.Error });
+            return ApiError.NotFound(result.Error);
         if (result.Forbidden)
-            return Forbidden(result.Error);
+            return ApiError.Forbidden(result.Error);
         if (!result.Success)
-            return BadRequest(new { message = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return NoContent();
     }
@@ -229,22 +233,22 @@ public sealed class AdminUserController : ControllerBase
     private async Task<IActionResult> SetBannedInternal(string id, bool isBanned, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(id, out var userId))
-            return BadRequest(new { message = "Invalid user id" });
+            return ApiError.BadRequest("Invalid user id");
 
         var (actingId, actingRole, actingName) = GetActor();
         if (!actingId.HasValue)
-            return Unauthorized();
+            return ApiError.Unauthorized("Unauthorized");
 
         var result = await _setBannedHandler.HandleAsync(
             new SetUserBannedCommand(userId, isBanned, actingId.Value, actingName, actingRole),
             cancellationToken);
 
         if (result.NotFound)
-            return NotFound(new { message = result.Error });
+            return ApiError.NotFound(result.Error);
         if (result.Forbidden)
-            return Forbidden(result.Error);
+            return ApiError.Forbidden(result.Error);
         if (!result.Success)
-            return BadRequest(new { message = result.Error });
+            return ApiError.BadRequest(result.Error);
 
         return NoContent();
     }
@@ -255,14 +259,6 @@ public sealed class AdminUserController : ControllerBase
     /// </summary>
     private bool CanSeeSettlementCode()
         => SeedRoles.SettlementCodeRoleNames.Any(role => User.IsInRole(role));
-
-    /// <summary>
-    /// A 403 that says why. <see cref="ControllerBase.Forbid()"/> writes an empty body, so the
-    /// operator saw a toast with nothing after the colon and had to guess what had been refused
-    /// (planning #299). The admin SPA reads the <c>message</c> field and shows it unchanged.
-    /// </summary>
-    private IActionResult Forbidden(string? reason) =>
-        StatusCode(StatusCodes.Status403Forbidden, new { message = reason });
 
     private (Guid? ActingUserId, string? ActingRole, string? ActingName) GetActor()
     {

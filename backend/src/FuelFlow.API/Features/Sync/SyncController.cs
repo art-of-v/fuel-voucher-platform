@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Sync.GetSync;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,7 +37,7 @@ public sealed class SyncController : ControllerBase
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -48,7 +49,7 @@ public sealed class SyncController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error syncing data for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while syncing data");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -63,7 +64,7 @@ public sealed class SyncController : ControllerBase
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -75,7 +76,7 @@ public sealed class SyncController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting orders for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while retrieving orders");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 }

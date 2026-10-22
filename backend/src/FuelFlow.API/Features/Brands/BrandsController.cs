@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands.GetProviderById;
 using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -60,7 +61,7 @@ public sealed class BrandsController : ControllerBase
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetBrandByIdQuery(id), ct);
-        return result is null ? NotFound() : Ok(result);
+        return result is null ? ApiError.NotFound("Not found") : Ok(result);
     }
 
     /// <summary>
@@ -81,7 +82,7 @@ public sealed class BrandsController : ControllerBase
         CancellationToken ct = default)
     {
         var slug = await _brands.SlugOfAsync(id, ct);
-        if (slug is null) return NotFound();
+        if (slug is null) return ApiError.NotFound("Not found");
 
         return Ok(await _getHistory.HandleAsync(new GetBrandHistoryQuery(slug, limit), ct));
     }
@@ -99,8 +100,8 @@ public sealed class BrandsController : ControllerBase
         // A slug that is taken is a clash with a row that already exists; a slug that is not there
         // at all is a request that never had a chance. The bodies differ, so the answers do too.
         return result.Conflict
-            ? Conflict(new { error = result.Error })
-            : BadRequest(new { error = result.Error });
+            ? ApiError.Conflict(result.Error)
+            : ApiError.BadRequest(result.Error);
     }
 
     [HttpPut("{id}")]
@@ -110,7 +111,7 @@ public sealed class BrandsController : ControllerBase
         var result = await _update.HandleAsync(
             new AdminUpdateBrandCommand(id, request, GetUserId(), GetUserName()), ct);
 
-        return result.Found ? Ok(new { success = true }) : NotFound();
+        return result.Found ? Ok(new { success = true }) : ApiError.NotFound("Not found");
     }
 
     [HttpDelete("{id}")]
@@ -120,7 +121,7 @@ public sealed class BrandsController : ControllerBase
         var result = await _delete.HandleAsync(
             new AdminDeleteBrandCommand(id, GetUserId(), GetUserName()), ct);
 
-        return result.Found ? Ok(new { success = true }) : NotFound();
+        return result.Found ? Ok(new { success = true }) : ApiError.NotFound("Not found");
     }
 
     private Guid GetUserId()

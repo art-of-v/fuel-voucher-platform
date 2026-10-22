@@ -23,9 +23,7 @@ export async function signContract(
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.error?.message || errorData.error || errorData.message || 'Failed to sign contract',
-    );
+    throw new Error(errorData.detail || errorData.title || 'Failed to sign contract');
   }
   return response.json();
 }

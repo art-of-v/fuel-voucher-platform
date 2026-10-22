@@ -48,6 +48,17 @@ status. Orders are gated on voucher availability, a voucher in somebody's hands 
 the order that delivered it, background jobs run in-process through Hangfire, domain events
 travel over a transactional outbox, and every domain/admin change is audited.
 
+The layering is a gate, not a convention. `backend/tests/FuelFlow.UnitTests/Architecture/DependencyRules/`
+reads the **compiled** API assembly and fails the build when a controller reaches the database,
+when a handler reaches for the HTTP context, or when a feature uses another feature's internal
+types — and a source scan fails it when a failure leaves the API in any shape but the one below.
+
+Every failure — a controller's rejection, the exception handler's answer, a middleware that
+refuses a request — leaves as one RFC 9457 problem document served as `application/problem+json`:
+the status in `title`, the sentence for the caller in `detail`, the request path in `instance`,
+the correlation id in `traceId`, and the machine code (with its numbers) in `code` and `data`.
+Both frontends read that one shape; neither of them guesses which one it got.
+
 ---
 
 ## Repository structure

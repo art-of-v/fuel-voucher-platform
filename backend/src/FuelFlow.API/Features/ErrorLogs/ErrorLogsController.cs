@@ -4,6 +4,7 @@ using FuelFlow.Features.ErrorLogs.GetErrorLogFacets;
 using FuelFlow.Features.ErrorLogs.GetErrorLogs;
 using FuelFlow.Features.ErrorLogs.ResolveErrorLogs;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -100,8 +101,8 @@ public sealed class ErrorLogsController : ControllerBase
 
         return result.Status switch
         {
-            "NoIds" => BadRequest(new { error = result.Error }),
-            "Unauthenticated" => Unauthorized(),
+            "NoIds" => ApiError.BadRequest(result.Error),
+            "Unauthenticated" => ApiError.Unauthorized("Unauthorized"),
             _ => Ok(new { success = true, changed = result.Changed })
         };
     }

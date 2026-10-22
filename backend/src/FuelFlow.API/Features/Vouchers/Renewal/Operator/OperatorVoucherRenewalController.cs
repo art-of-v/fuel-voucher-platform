@@ -3,6 +3,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -79,17 +80,17 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (command.VoucherId == Guid.Empty)
-            return BadRequest(new { code = "voucher_required", message = "VoucherId is required." });
+            return ApiError.BadRequest("VoucherId is required.", "voucher_required");
 
         if (string.IsNullOrWhiteSpace(command.TermCode))
-            return BadRequest(new { code = "term_required", message = "TermCode is required." });
+            return ApiError.BadRequest("TermCode is required.", "term_required");
 
         // Refused rather than performed anonymously. The command's ActingUserId is overwritten here
         // rather than trusted from the body, and it is the author on every event and movement this
         // path writes - an operator renewal with no operator behind it would be a paid term push that
         // nobody can be shown to have authorised.
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null) return ApiError.Unauthorized("Unauthorized");
 
         command.ActingUserId = userId.Value;
         command.ActingUserName = GetUserName();
@@ -104,24 +105,21 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
             // `data` is what lets a localised client render the numbers in its own words. It is null
             // rather than an empty object for the codes that carry nothing, so a client can tell
             // "no data" from "an empty bag".
-            var body = new
-            {
-                code = ex.Code,
-                message = ex.Message,
-                data = ex.Data.Count == 0 ? null : ex.Data
-            };
+            IReadOnlyDictionary<string, object?>? data = ex.Data.Count == 0
+                ? null
+                : ex.Data.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
 
             return ex.Code switch
             {
-                "not_found" => NotFound(body),
-                "no_stock" => Conflict(body),
-                _ => BadRequest(body)
+                "not_found" => ApiError.NotFound(ex.Message, ex.Code, data),
+                "no_stock" => ApiError.Conflict(ex.Message, ex.Code, data),
+                _ => ApiError.BadRequest(ex.Message, ex.Code, data)
             };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error confirming operator renewal for voucher {VoucherId}", command.VoucherId);
-            return StatusCode(500, "An error occurred while confirming the renewal");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 

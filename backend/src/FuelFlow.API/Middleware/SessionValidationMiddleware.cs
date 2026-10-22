@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Middleware;
@@ -74,7 +75,6 @@ public sealed class SessionValidationMiddleware
 
     private static async Task Reject(HttpContext context)
     {
-        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        await context.Response.WriteAsJsonAsync(new { error = "Unauthorized" });
+        await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Unauthorized");
     }
 }

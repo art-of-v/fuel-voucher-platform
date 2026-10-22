@@ -11,6 +11,7 @@ using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
 using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Settings;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -78,10 +79,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     public async Task<IActionResult> CreateBulkPurchase([FromBody] BulkCheckoutCommand command, CancellationToken cancellationToken)
     {
         if (command.Items == null || command.Items.Count == 0)
-            return BadRequest("At least one item is required");
+            return ApiError.BadRequest("At least one item is required");
 
         if (command.Items.Count > MaxBulkItems)
-            return BadRequest($"A bulk purchase may contain at most {MaxBulkItems} items");
+            return ApiError.BadRequest($"A bulk purchase may contain at most {MaxBulkItems} items");
 
         // Every item must be validated the same way the single-item path validates its body.
         // A negative Quantity here subtracts from the invoice total while fulfilment still
@@ -93,19 +94,19 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             // the handler actually reads is what keeps a blank Brand a 400 instead of the 500 the
             // handler's own guard would raise.
             if (item.BrandId is null || item.BrandId == Guid.Empty)
-                return BadRequest("BrandId is required for every item");
+                return ApiError.BadRequest("BrandId is required for every item");
 
             if (item.FuelTypeId == Guid.Empty)
-                return BadRequest("FuelTypeId is required for every item");
+                return ApiError.BadRequest("FuelTypeId is required for every item");
 
             if (item.Liters <= 0)
-                return BadRequest("Liters must be greater than 0 for every item");
+                return ApiError.BadRequest("Liters must be greater than 0 for every item");
 
             if (item.Quantity <= 0)
-                return BadRequest("Quantity must be greater than 0 for every item");
+                return ApiError.BadRequest("Quantity must be greater than 0 for every item");
 
             if (item.Quantity > MaxBulkQuantityPerItem)
-                return BadRequest($"Quantity must not exceed {MaxBulkQuantityPerItem} per item");
+                return ApiError.BadRequest($"Quantity must not exceed {MaxBulkQuantityPerItem} per item");
         }
 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -115,7 +116,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         command.UserId = Guid.Parse(userId);
@@ -130,28 +131,28 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             // The fuel is in stock and nobody has recorded what we paid for it, so the price cannot
             // be checked against a cost. A distinct code, because "we do not know" is not "below
             // cost" - the first needs a cost recorded, the second a price raised.
-            return Conflict(new { code = UnknownCostSaleBlockedException.Code, message = ex.Message });
+            return ApiError.Conflict(ex.Message, UnknownCostSaleBlockedException.Code);
         }
         catch (BelowCostSaleBlockedException ex)
         {
-            return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });
+            return ApiError.Conflict(ex.Message, BelowCostSaleBlockedException.Code);
         }
         catch (TermStockUnavailableException ex)
         {
-            return Conflict(new { code = TermStockUnavailableException.Code, message = ex.Message });
+            return ApiError.Conflict(ex.Message, TermStockUnavailableException.Code);
         }
         catch (PackageOutOfStockException ex)
         {
-            return Conflict(new { code = PackageOutOfStockException.Code, message = ex.Message });
+            return ApiError.Conflict(ex.Message, PackageOutOfStockException.Code);
         }
         catch (AccountInactiveException ex)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
+            return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating bulk purchase for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while creating the purchase");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -190,7 +191,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         CancellationToken cancellationToken)
     {
         if (BrandId == Guid.Empty || fuelTypeId == Guid.Empty || liters <= 0m)
-            return BadRequest("BrandId, fuelTypeId and a positive liters are required.");
+            return ApiError.BadRequest("BrandId, fuelTypeId and a positive liters are required.");
 
         // The ladder is priced off a catalogue package, so the quote has to be priced off the SAME
         // pool the checkout will sell from. This endpoint used to resolve its package without a pool
@@ -226,7 +227,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         command.UserId = Guid.Parse(userId);
@@ -238,12 +239,12 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         }
         catch (VoucherRenewalException ex)
         {
-            return BadRequest(new { code = ex.Code, message = ex.Message });
+            return ApiError.BadRequest(ex.Message, ex.Code);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error quoting renewal for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while quoting the renewal");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -262,18 +263,18 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     public async Task<IActionResult> RenewVouchers([FromBody] RenewalCheckoutCommand command, CancellationToken cancellationToken)
     {
         if (command.Items == null || command.Items.Count == 0)
-            return BadRequest("At least one voucher is required");
+            return ApiError.BadRequest("At least one voucher is required");
 
         if (command.Items.Count > MaxBulkItems)
-            return BadRequest($"A renewal batch may contain at most {MaxBulkItems} vouchers");
+            return ApiError.BadRequest($"A renewal batch may contain at most {MaxBulkItems} vouchers");
 
         foreach (var item in command.Items)
         {
             if (item.VoucherId == Guid.Empty)
-                return BadRequest("VoucherId is required for every item");
+                return ApiError.BadRequest("VoucherId is required for every item");
 
             if (string.IsNullOrWhiteSpace(item.TermCode))
-                return BadRequest("TermCode is required for every item");
+                return ApiError.BadRequest("TermCode is required for every item");
         }
 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -283,7 +284,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         command.UserId = Guid.Parse(userId);
@@ -295,16 +296,16 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         }
         catch (VoucherRenewalException ex)
         {
-            return BadRequest(new { code = ex.Code, message = ex.Message });
+            return ApiError.BadRequest(ex.Message, ex.Code);
         }
         catch (AccountInactiveException ex)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
+            return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating renewal checkout for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while creating the renewal");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -318,22 +319,22 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     {
         // The brand is BrandId - see the note on the bulk path above.
         if (command.BrandId is null || command.BrandId == Guid.Empty)
-            return BadRequest("BrandId is required");
+            return ApiError.BadRequest("BrandId is required");
 
         if (command.FuelTypeId == Guid.Empty)
-            return BadRequest("FuelTypeId is required");
+            return ApiError.BadRequest("FuelTypeId is required");
 
         if (command.Liters <= 0)
-            return BadRequest("Liters must be greater than 0");
+            return ApiError.BadRequest("Liters must be greater than 0");
 
         if (command.Quantity <= 0)
-            return BadRequest("Quantity must be greater than 0");
+            return ApiError.BadRequest("Quantity must be greater than 0");
 
         if (command.Quantity > MaxBulkQuantityPerItem)
-            return BadRequest($"Quantity must not exceed {MaxBulkQuantityPerItem}");
+            return ApiError.BadRequest($"Quantity must not exceed {MaxBulkQuantityPerItem}");
 
         if (command.Price <= 0)
-            return BadRequest("Price must be greater than 0");
+            return ApiError.BadRequest("Price must be greater than 0");
 
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                      ?? User.FindFirst("sub")?.Value
@@ -342,7 +343,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         command.UserId = Guid.Parse(userId);
@@ -354,20 +355,20 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         }
         catch (BelowCostSaleBlockedException ex)
         {
-            return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });
+            return ApiError.Conflict(ex.Message, BelowCostSaleBlockedException.Code);
         }
         catch (PackageOutOfStockException ex)
         {
-            return Conflict(new { code = PackageOutOfStockException.Code, message = ex.Message });
+            return ApiError.Conflict(ex.Message, PackageOutOfStockException.Code);
         }
         catch (AccountInactiveException ex)
         {
-            return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
+            return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating purchase for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while creating the purchase");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -383,7 +384,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -395,7 +396,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving purchases for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while retrieving purchases");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
     /// <summary>
@@ -419,7 +420,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         try
@@ -431,7 +432,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving savings report for user {UserId}", userId);
-            return StatusCode(500, "An error occurred while retrieving the savings report");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 
@@ -455,12 +456,12 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("User ID not found in claims");
-            return Unauthorized("User ID not found");
+            return ApiError.Unauthorized("User ID not found");
         }
 
         var deleted = await _deleteMyOrderHandler.HandleAsync(
             new DeleteMyOrderCommand(id, Guid.Parse(userId)), cancellationToken);
-        return deleted ? NoContent() : NotFound();
+        return deleted ? NoContent() : ApiError.NotFound("Not found");
     }
 
     /// <summary>
@@ -483,14 +484,14 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             _logger.LogWarning(
                 "Payment simulation attempted outside Development for order {OrderId}",
                 command.OrderId);
-            return NotFound();
+            return ApiError.NotFound("Not found");
         }
 
         if (command.OrderId == Guid.Empty)
-            return BadRequest("OrderId is required");
+            return ApiError.BadRequest("OrderId is required");
 
         if (command.Scenario != "success" && command.Scenario != "failure")
-            return BadRequest("Scenario must be 'success' or 'failure'");
+            return ApiError.BadRequest("Scenario must be 'success' or 'failure'");
 
         try
         {
@@ -499,17 +500,17 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         }
         catch (InvalidOrderStateException)
         {
-            return Conflict("Order is not in a state that can accept this payment result");
+            return ApiError.Conflict("Order is not in a state that can accept this payment result");
         }
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Order not found: {OrderId}", command.OrderId);
-            return NotFound();
+            return ApiError.NotFound("Not found");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error simulating payment for order {OrderId}", command.OrderId);
-            return StatusCode(500, "An error occurred while simulating payment");
+            return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
 }

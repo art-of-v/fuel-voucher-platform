@@ -58,7 +58,10 @@ describe('createReferralCode', () => {
 
   it('reads a JSON error body too, in case the server ever grows one', async () => {
     apiFetchMock.mockResolvedValue(
-      response(409, JSON.stringify({ message: 'Referral code already set' })),
+      response(
+        409,
+        JSON.stringify({ title: 'Conflict', status: 409, detail: 'Referral code already set' }),
+      ),
     );
 
     await expect(createReferralCode('ABC')).rejects.toMatchObject({ code: 'already_set' });

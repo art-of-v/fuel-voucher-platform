@@ -70,7 +70,7 @@ describe('shareOrderReceipt', () => {
 
   it('prefers the structured message from a JSON error body', async () => {
     mockedApiFetch.mockResolvedValue(
-      pdfResponse(403, JSON.stringify({ code: 'forbidden', message: 'Not your order' })),
+      pdfResponse(403, JSON.stringify({ code: 'forbidden', detail: 'Not your order' })),
     );
 
     await expect(shareOrderReceipt('order-123')).rejects.toThrow('Not your order');
