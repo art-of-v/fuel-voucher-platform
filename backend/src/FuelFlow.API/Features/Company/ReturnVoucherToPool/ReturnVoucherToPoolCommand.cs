@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.ReturnVoucherToPool;
@@ -112,7 +113,7 @@ public sealed class ReturnVoucherToPoolCommandHandler
         // Repeat the status predicate in the UPDATE so the return cannot race a thaw: exactly one
         // of a concurrent thaw / return wins. A redemption cannot race it at all - it wants an
         // Assigned voucher, and this one is Blocked until this statement lands.
-        var returnedAtUtc = DateTime.UtcNow;
+        var returnedAtUtc = SystemClock.UtcNow;
         var affected = await _context.FuelVouchers
             .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Blocked)
             .ExecuteUpdateAsync(
