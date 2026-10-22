@@ -57,8 +57,8 @@ public static class StatementReconciliationCsv
                 Q(row.InvoiceId),
                 Q(row.Reference),
                 Q(row.Destination),
-                Q(A(row.AcquirerAmount)),
-                Q(A(row.LocalAmount)),
+                N(row.AcquirerAmount),
+                N(row.LocalAmount),
                 Q(row.OrderReference),
                 Q(row.OrderStatus?.ToString()),
                 Q(row.AcquirerCreatedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
@@ -78,7 +78,7 @@ public static class StatementReconciliationCsv
                     Q(refund.RefundId.ToString()),
                     Q(refund.InvoiceId),
                     Q(refund.OrderId?.ToString()),
-                    Q(A(refund.Amount)),
+                    N(refund.Amount),
                     Q(refund.IssuedAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
                     Q(refund.ReversedPaymentAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
                     Q(refund.Note)
@@ -97,7 +97,7 @@ public static class StatementReconciliationCsv
                 {
                     Q(missing.OrderId.ToString()),
                     Q(missing.InvoiceId),
-                    Q(A(missing.Amount)),
+                    N(missing.Amount),
                     Q(missing.Status.ToString()),
                     Q(missing.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))
                 }));
@@ -123,7 +123,7 @@ public static class StatementReconciliationCsv
         => value is null ? string.Empty : value.Value.ToString("0.00", CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// One cell, quoted for RFC 4180 and defused for a spreadsheet.
+    /// One cell of TEXT, quoted for RFC 4180 and defused for a spreadsheet.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -134,9 +134,11 @@ public static class StatementReconciliationCsv
     /// </para>
     /// <para>
     /// The apostrophe is Excel's own "this is text" marker: the cell shows what the payer typed,
-    /// and the spreadsheet drops the marker when it reads the value back. The numbers are not
-    /// touched — they are written by <see cref="A"/> and a negative amount is a number, not a
-    /// formula.
+    /// and the spreadsheet drops the marker when it reads the value back.
+    /// </para>
+    /// <para>
+    /// The money does not come through here - <see cref="N"/> writes it - because a negative amount
+    /// is a number and not a formula, and the marker would turn the cell into text.
     /// </para>
     /// </remarks>
     private static string Q(string? value)
@@ -148,4 +150,14 @@ public static class StatementReconciliationCsv
 
         return "\"" + text.Replace("\"", "\"\"") + "\"";
     }
+
+    /// <summary>
+    /// One cell of money, quoted like any other cell and never defused.
+    /// </summary>
+    /// <remarks>
+    /// A spreadsheet reads a quoted number as a number - but only for as long as nothing says it is
+    /// text. The marker would make the cell text, and a money column the accountant cannot sum is
+    /// a money column that gets added up by hand.
+    /// </remarks>
+    private static string N(decimal? value) => "\"" + A(value) + "\"";
 }
