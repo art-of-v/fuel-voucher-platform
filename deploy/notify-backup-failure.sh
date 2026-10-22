@@ -22,6 +22,26 @@ HOST="$(hostname 2>/dev/null || echo unknown-host)"
 # cause (missing age key, postgres down, disk full) without SSHing in first.
 CONTEXT="$(journalctl -u "$FAILED_UNIT" -n 12 --no-pager -o cat 2>/dev/null || true)"
 
+# Whether tonight's dump actually made it off the box. The log says so: the backup
+# prints "Off-host copy done" after the encrypted dump and the base backup are on the
+# remote, and everything that can fail after that is the point-in-time history.
+#
+# Without this, the alert tells the reader "there is no fresh off-site copy of the
+# database" about a run that shipped one - which is what it said on 2026-10-22, when
+# the run failed over a quiet database and the dump was on the remote all along. The
+# reader is sent to the wrong place.
+SHIPPED="no"
+if journalctl -u "$FAILED_UNIT" -n 80 --no-pager -o cat 2>/dev/null \
+     | grep -q "Off-host copy done"; then
+  SHIPPED="yes"
+fi
+
+if [[ "$SHIPPED" == "yes" ]]; then
+  FOOTER="The dump itself was made and shipped off-box - the log above says so. The failure is in the steps after that (the point-in-time history)."
+else
+  FOOTER="Until this is fixed there is no fresh off-site copy of the database."
+fi
+
 MESSAGE="🔴 FuelFlow backup FAILED on ${HOST}
 unit: ${FAILED_UNIT}
 time: $(date -Is)
@@ -31,7 +51,7 @@ ${CONTEXT:-<no journal output>}
 
 The nightly encrypted DB backup did not complete. Check:
   journalctl -u ${FAILED_UNIT} -n 50 --no-pager
-Until this is fixed there is no fresh off-site copy of the database."
+${FOOTER}"
 
 # Always record it in the journal — this is the fallback when Telegram is not configured
 # or the API call fails.
