@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
 
 namespace FuelFlow.Features.Monobank.ProcessWebhook;
@@ -41,6 +42,21 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         _journal = journal;
     }
 
+    /// <summary>
+    /// What the processing step decided: the answer the acquirer gets, and what still has to
+    /// happen once the money step is committed.
+    /// </summary>
+    /// <param name="Response">What the webhook answers the acquirer.</param>
+    /// <param name="Order">The order the delivery concerned, when there was one.</param>
+    /// <param name="TransitionedTo">
+    /// The status the order was moved to, or null when no transition happened. Null is what keeps a
+    /// replayed or a refused delivery from announcing a payment and from queueing a fulfilment.
+    /// </param>
+    private sealed record ProcessingOutcome(
+        ProcessMonobankWebhookResponse Response,
+        Order? Order,
+        OrderStatus? TransitionedTo);
+
     public async Task<ProcessMonobankWebhookResponse> HandleAsync(
         ProcessMonobankWebhookCommand command,
         CancellationToken cancellationToken = default)
@@ -55,6 +71,9 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         // Stored before anything acts on it. Until this existed the delivery existed only for the
         // duration of the request: the body was read in the controller, handed over, and never
         // written anywhere. A customer disputing a charge had nothing to show.
+        //
+        // In its own commit, deliberately: the delivery has to survive a business failure, because
+        // "we received it and could not act on it" is a state an operator can find.
         var outcome = await WebhookEventRecorder.RecordAsync(_context, command, _logger, cancellationToken);
 
         if (outcome.IsRedelivery)
@@ -70,10 +89,10 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
 
         var stored = outcome.Stored!;
 
-        ProcessMonobankWebhookResponse response;
+        ProcessingOutcome processed;
         try
         {
-            response = await ProcessAsync(command, cancellationToken);
+            processed = await RunMoneyStepAsync(command, stored, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -85,12 +104,137 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
             throw;
         }
 
+        // Only after the money step is committed. A notification that announces a payment the
+        // transaction rolled back is a lie an operator has to disprove, and a fulfilment queued
+        // before the commit can start before there is anything to fulfil.
+        await AnnounceAsync(command, processed, cancellationToken);
+
         await WebhookEventRecorder.CompleteAsync(
-            _context, stored, ReceiptStatusFor(response), ErrorFor(response), _logger, cancellationToken);
+            _context, stored, ReceiptStatusFor(processed.Response), ErrorFor(processed.Response), _logger, cancellationToken);
 
-        await SyncPaymentAsync(command, response, stored.Id, cancellationToken);
+        return processed.Response;
+    }
 
-        return response;
+    /// <summary>
+    /// The money step: the order's transition, the outbox event that hands it to fulfilment, the
+    /// journal entries that book the money and the payment row that records it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Those four are ONE unit of work, and the transaction is what makes them one. EF opens a
+    /// transaction per <c>SaveChanges</c> and nothing else did, so the order was committed
+    /// <c>PendingFulfillment</c> - with its outbox event queued - <em>before</em> the receipt was
+    /// posted to the journal. A journal failure (a closed accounting period, an unmapped event, the
+    /// balance trigger refusing the entry) therefore left an order waiting for fuel, a queued
+    /// fulfilment and no entry in the books: the fulfilment job then issued fuel for money the
+    /// books had never recorded, and the hole was found at month end.
+    /// </para>
+    /// <para>
+    /// The refund sync runs before the transaction opens, in its own commit. It asks the acquirer
+    /// what happened to a refund, and holding a transaction open across an HTTP call to Monobank is
+    /// how a webhook ends up holding locks on the orders table while the acquirer takes its time.
+    /// </para>
+    /// </remarks>
+    private async Task<ProcessingOutcome> RunMoneyStepAsync(
+        ProcessMonobankWebhookCommand command,
+        WebhookEvent stored,
+        CancellationToken cancellationToken)
+    {
+        await _refundStatusSyncService.SyncRefundForInvoiceAsync(
+            command.InvoiceId,
+            command.CancelList,
+            cancellationToken);
+
+        // Not on the in-memory provider: it has no transactions at all, and the unit tests are
+        // about the logic rather than about the atomicity - the integration test is.
+        await using var transaction = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+            : (IDbContextTransaction?)null;
+
+        try
+        {
+            var processed = await ProcessAsync(command, cancellationToken);
+            await SyncPaymentAsync(command, processed.Response, stored.Id, cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            return processed;
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            // The rollback undid the DATABASE; the change tracker still holds what it was about to
+            // write. The next save - the one that records the delivery's failure - would re-apply
+            // the order's status change and re-insert the outbox event and the journal entries,
+            // which is the very thing the rollback was for. The tracker is emptied, and the delivery
+            // row is attached again, so what remains to be written is exactly what still has to be
+            // written: the outcome of the delivery.
+            _context.ChangeTracker.Clear();
+            _context.WebhookEvents.Attach(stored);
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// What happens once the money step is committed: the alert, and the handover to fulfilment.
+    /// </summary>
+    /// <remarks>
+    /// Both are side effects that must not run before the commit. A fulfilment queued inside the
+    /// transaction can start before the order is committed and find nothing to fulfil; an alert
+    /// that says "paid" for a transaction that was rolled back is a lie an operator has to disprove.
+    /// </remarks>
+    private async Task AnnounceAsync(
+        ProcessMonobankWebhookCommand command,
+        ProcessingOutcome processed,
+        CancellationToken cancellationToken)
+    {
+        if (processed.TransitionedTo is null || processed.Order is null)
+        {
+            return;
+        }
+
+        var order = processed.Order;
+
+        if (processed.TransitionedTo == OrderStatus.PendingFulfillment)
+        {
+            await _notifications.PaymentSucceededAsync(order.Id, order.Price, cancellationToken);
+        }
+        else if (processed.TransitionedTo == OrderStatus.Cancelled)
+        {
+            await _notifications.PaymentFailedAsync(order.Id, command.Status, cancellationToken);
+        }
+
+        if (processed.TransitionedTo == OrderStatus.PendingFulfillment)
+        {
+            // A renewal order (its lines name the vouchers they renew) fulfils on a different path
+            // than a buy-fuel order: it is handed to ProcessRenewalOrderAsync instead of the
+            // generic ProcessPendingOrdersAsync sweep.
+            if (order.Kind == OrderKind.Renewal)
+            {
+                _backgroundJobClient.Enqueue<FulfillmentService>(
+                    s => s.ProcessRenewalOrderAsync(order.Id, CancellationToken.None));
+            }
+            else
+            {
+                _backgroundJobClient.Enqueue<FulfillmentService>(
+                    s => s.ProcessPendingOrdersAsync(CancellationToken.None));
+            }
+        }
+
+        // After the commit, so a message can never describe a transition that was not persisted.
+        _logger.LogInformation(
+            "Order {OrderId} status updated from {PreviousStatus} to {NewStatus}",
+            order.Id,
+            processed.Response.PreviousStatus,
+            processed.Response.NewStatus);
     }
 
     /// <summary>
@@ -200,7 +344,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<ProcessMonobankWebhookResponse> ProcessAsync(
+    private async Task<ProcessingOutcome> ProcessAsync(
         ProcessMonobankWebhookCommand command,
         CancellationToken cancellationToken)
     {
@@ -210,11 +354,6 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
             "Processing Monobank webhook for invoice {InvoiceId}, status: {Status}",
             command.InvoiceId,
             command.Status);
-
-        await _refundStatusSyncService.SyncRefundForInvoiceAsync(
-            command.InvoiceId,
-            command.CancelList,
-            cancellationToken);
 
         // IgnoreQueryFilters: an invoice can outlive its order becoming hidden. A customer can
         // swipe-delete an unpaid checkout (soft delete, IsDeleted=true) while its Monobank invoice
@@ -230,12 +369,15 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         {
             _metrics.MonobankWebhookFailed("order_not_found");
             _logger.LogWarning("Order not found for Monobank invoice {InvoiceId}", command.InvoiceId);
-            return new ProcessMonobankWebhookResponse
-            {
-                Success = false,
-                ErrorCode = "NOT_FOUND",
-                Message = $"Order not found for invoice {command.InvoiceId}"
-            };
+            return new ProcessingOutcome(
+                new ProcessMonobankWebhookResponse
+                {
+                    Success = false,
+                    ErrorCode = "NOT_FOUND",
+                    Message = $"Order not found for invoice {command.InvoiceId}"
+                },
+                Order: null,
+                TransitionedTo: null);
         }
 
         // Reject stale callbacks: a webhook whose ModifiedDate is not newer than the
@@ -247,14 +389,17 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
                 "Stale Monobank webhook for order {OrderId}: modified {ModifiedDate} not newer than last accepted {LastAccepted}",
                 order.Id, command.ModifiedDate, order.LastWebhookModifiedDateUtc.Value);
 
-            return new ProcessMonobankWebhookResponse
-            {
-                Success = true,
-                OrderId = order.Id.ToString(),
-                PreviousStatus = order.Status.ToString(),
-                NewStatus = order.Status.ToString(),
-                Message = "Stale webhook acknowledged, no transition"
-            };
+            return new ProcessingOutcome(
+                new ProcessMonobankWebhookResponse
+                {
+                    Success = true,
+                    OrderId = order.Id.ToString(),
+                    PreviousStatus = order.Status.ToString(),
+                    NewStatus = order.Status.ToString(),
+                    Message = "Stale webhook acknowledged, no transition"
+                },
+                order,
+                TransitionedTo: null);
         }
 
         // For "success" callbacks the charged amount must match our server-side order price.
@@ -266,13 +411,16 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
                 "Monobank amount mismatch for order {OrderId}: expected {ExpectedKopecks}, got {ActualKopecks}",
                 order.Id, Money.ForMonobank(order.Price), command.Amount);
 
-            return new ProcessMonobankWebhookResponse
-            {
-                Success = false,
-                ErrorCode = "AMOUNT_MISMATCH",
-                OrderId = order.Id.ToString(),
-                Message = $"Amount {command.Amount} does not match order price {order.Price}"
-            };
+            return new ProcessingOutcome(
+                new ProcessMonobankWebhookResponse
+                {
+                    Success = false,
+                    ErrorCode = "AMOUNT_MISMATCH",
+                    OrderId = order.Id.ToString(),
+                    Message = $"Amount {command.Amount} does not match order price {order.Price}"
+                },
+                order,
+                TransitionedTo: null);
         }
 
         var targetStatus = command.Status.ToLowerInvariant() switch
@@ -299,7 +447,6 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
 
             return Ack(order, "Duplicate webhook acknowledged");
         }
-
         if (!OrderStateMachine.CanTransition(order.Status, targetStatus.Value))
         {
             _logger.LogWarning(
@@ -407,47 +554,26 @@ var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
         _context.Orders.Update(order);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // After SaveChanges, so a message can never describe a transition that was not
-        // persisted. Only real transitions reach here - duplicates, stale replays and
-        // illegal transitions all returned earlier, so each payment is reported once.
-if (targetStatus == OrderStatus.PendingFulfillment)
-    {
-        await PostReceiptToJournalAsync(order, cancellationToken);
-        await _notifications.PaymentSucceededAsync(order.Id, order.Price, cancellationToken);
-    }
-        else if (targetStatus == OrderStatus.Cancelled)
+        // The receipt is posted INSIDE the transaction, before the commit. That is the whole point:
+        // a journal failure has to leave the order where it was, not half-way to being fulfilled.
+        // Only real transitions reach here - duplicates, stale replays and illegal transitions all
+        // returned earlier, so each payment is reported once.
+        if (targetStatus == OrderStatus.PendingFulfillment)
         {
-            await _notifications.PaymentFailedAsync(order.Id, command.Status, cancellationToken);
+            await PostReceiptToJournalAsync(order, cancellationToken);
         }
 
-        if (order.Status == OrderStatus.PendingFulfillment)
-        {
-            if (isRenewalOrder)
+        return new ProcessingOutcome(
+            new ProcessMonobankWebhookResponse
             {
-                _backgroundJobClient.Enqueue<FulfillmentService>(
-                    s => s.ProcessRenewalOrderAsync(order.Id, CancellationToken.None));
-            }
-            else
-            {
-                _backgroundJobClient.Enqueue<FulfillmentService>(
-                    s => s.ProcessPendingOrdersAsync(CancellationToken.None));
-            }
-        }
-
-        _logger.LogInformation(
-            "Order {OrderId} status updated from {PreviousStatus} to {NewStatus}",
-            order.Id,
-            previousStatus,
-            order.Status);
-
-        return new ProcessMonobankWebhookResponse
-        {
-            Success = true,
-            OrderId = order.Id.ToString(),
-            PreviousStatus = previousStatus.ToString(),
-            NewStatus = order.Status.ToString(),
-            Message = $"Order {order.Id} updated to {order.Status}"
-        };
+                Success = true,
+                OrderId = order.Id.ToString(),
+                PreviousStatus = previousStatus.ToString(),
+                NewStatus = order.Status.ToString(),
+                Message = $"Order {order.Id} updated to {order.Status}"
+            },
+            order,
+            targetStatus);
     }
 
     /// <summary>
@@ -506,12 +632,19 @@ if (targetStatus == OrderStatus.PendingFulfillment)
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    private static ProcessMonobankWebhookResponse Ack(Order order, string message) => new()
-    {
-        Success = true,
-        OrderId = order.Id.ToString(),
-        PreviousStatus = order.Status.ToString(),
-        NewStatus = order.Status.ToString(),
-        Message = message
-    };
+    /// <summary>
+    /// Acknowledges a delivery that moved nothing: the order is where it was, and no payment is
+    /// announced and no fulfilment is queued for it.
+    /// </summary>
+    private static ProcessingOutcome Ack(Order order, string message) => new(
+        new ProcessMonobankWebhookResponse
+        {
+            Success = true,
+            OrderId = order.Id.ToString(),
+            PreviousStatus = order.Status.ToString(),
+            NewStatus = order.Status.ToString(),
+            Message = message
+        },
+        order,
+        TransitionedTo: null);
 }

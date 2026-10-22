@@ -20,16 +20,19 @@ namespace FuelFlow.IntegrationTests.Payments;
 /// </summary>
 /// <remarks>
 /// <para>
-/// These run on the in-memory provider, which does <b>not</b> enforce unique indexes or CHECK
-/// constraints. Everything asserted here is therefore behaviour of the code rather than of the
-/// database; the database's half of the same claims is proven in
-/// <c>PaymentLedgerIntegrationTests</c> against a real PostgreSQL.
+/// These run against a real PostgreSQL, so the database's half of the claims is enforced too: the
+/// unique index that refuses a redelivery, the CHECK constraints on the money columns, and the
+/// transaction the money step runs in. What is asserted here is what the <em>code</em> does with
+/// the delivery it is handed and with the money behind it; the schema's own guarantees are proven
+/// in <c>PaymentLedgerIntegrationTests</c>.
 /// </para>
 /// <para>
-/// The reason the in-memory provider is enough for this half is that these tests are about
-/// <em>sequencing</em>: that a delivery is on file before the order moves, that a mismatch leaves
-/// the order untouched, and that the payment follows what the acquirer said rather than what the
-/// order did.
+/// The reason they live here rather than in the unit suite is the ledger: a settled payment posts
+/// to the double-entry journal, and the journal takes its entry number with
+/// <c>INSERT ... ON CONFLICT DO UPDATE ... RETURNING</c> over <c>gen_random_uuid()</c> - neither of
+/// which the EF in-memory provider runs. What is asserted is <em>sequencing</em>: that a delivery is
+/// on file before the order moves, that a mismatch leaves the order untouched, and that the payment
+/// follows what the acquirer said rather than what the order did.
 /// </para>
 /// </remarks>
 [Collection("Integration Tests")]

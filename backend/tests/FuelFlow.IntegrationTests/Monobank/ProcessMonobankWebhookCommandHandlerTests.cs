@@ -3,11 +3,15 @@ using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
 using FuelFlow.API.Features.Orders.RefundOrder;
+using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
@@ -468,5 +472,165 @@ LineItems =
 
         var count = await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id);
         count.Should().Be(2, "a replay returns the existing entries rather than adding more");
+    }
+
+    // ---------------------------------------------------------------- the money step is one unit of work
+
+    [Fact]
+    public async Task AJournalFailure_LeavesTheOrderWhereItWas_AndQueuesNoFulfilment()
+    {
+        // C-13. The order's status, the outbox event that hands it to fulfilment, the journal
+        // entries and the payment row are ONE unit of work. A closed accounting period is how the
+        // ledger refuses a posting, and the refusal has to undo the whole step: an order that is
+        // PendingFulfillment with a queued outbox event and no entry in the books is fuel issued
+        // for money nobody recorded - which is the hole that is found at month end.
+        var order = BuildOrder("INV-ATOMIC", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await SeedPaymentAsync(order);
+        CloseTheAccountingPeriod(order.UserId);
+
+        var act = async () => await _handler.HandleAsync(WebhookCommand("INV-ATOMIC", "success"));
+
+        await act.Should().ThrowAsync<LedgerPeriodClosedException>(
+            "a closed month refuses the posting, and the refusal is what the transaction is for");
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment, "the order goes back to where it was");
+        updated.MonobankStatus.Should().BeNull("and it does not claim the money either");
+        updated.LastWebhookModifiedDateUtc.Should().BeNull();
+
+        (await _context.OutboxEvents.CountAsync()).Should().Be(0,
+            "no event hands a rolled-back order to fulfilment");
+        (await _context.JournalEntries.CountAsync()).Should().Be(0, "nothing was booked");
+        (await _context.Fulfillments.CountAsync()).Should().Be(0, "no fuel was issued");
+
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task AJournalFailure_LeavesThePaymentAndTheOrderAgreeing()
+    {
+        // The other half of the same promise: the payment record and the order must not disagree.
+        // "The money was taken and the order did not advance" is money without fuel; "the order
+        // advanced and the money was not recorded" is fuel without money. Both are what a
+        // half-applied money step looks like, and both are refused by the same transaction.
+        var order = BuildOrder("INV-AGREE", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await SeedPaymentAsync(order);
+        CloseTheAccountingPeriod(order.UserId);
+
+        var act = async () => await _handler.HandleAsync(WebhookCommand("INV-AGREE", "success"));
+        await act.Should().ThrowAsync<LedgerPeriodClosedException>();
+
+        var payment = await _context.Payments.SingleAsync();
+        payment.Status.Should().Be(PaymentStatus.Pending,
+            "the books refused the money, so nothing records it as taken");
+        payment.PaidAtUtc.Should().BeNull();
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment);
+        updated.MonobankStatus.Should().BeNull("the order does not claim the money either");
+
+        // The delivery is on file as failed, with the amount the acquirer charged, so the retry -
+        // Monobank's or the reconciliation poller's - has the evidence it needs.
+        var delivery = await _context.WebhookEvents.SingleAsync();
+        delivery.Status.Should().Be(WebhookReceiptStatus.Failed);
+        delivery.Error.Should().Contain("closed");
+    }
+
+    [Fact]
+    public async Task ARetriedDelivery_AfterAJournalFailure_BooksTheMoneyAndIssuesTheFuel()
+    {
+        // The point of rolling back rather than half-applying: the delivery is retried, and the retry
+        // finds an order that is still waiting for its fuel. Nothing was written the first time, so
+        // the second time there is nothing to undo and nothing to double.
+        var order = BuildOrder("INV-RETRY", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await SeedPaymentAsync(order);
+        CloseTheAccountingPeriod(order.UserId);
+
+        var act = async () => await _handler.HandleAsync(WebhookCommand("INV-RETRY", "success"));
+        await act.Should().ThrowAsync<LedgerPeriodClosedException>();
+
+        // The accountant opens the month again.
+        var period = await _context.AccountingPeriods.SingleAsync();
+        period.Status = PeriodStatus.Open;
+        period.ClosedAtUtc = null;
+        period.ClosedByUserId = null;
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-RETRY", "success"));
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingFulfillment);
+
+        (await _context.OutboxEvents.CountAsync()).Should().Be(1, "the handover to fulfilment happens once");
+        (await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id)).Should().Be(2,
+            "the gross and the VAT are posted once, not twice");
+
+        var payment = await _context.Payments.SingleAsync();
+        payment.Status.Should().Be(PaymentStatus.Succeeded);
+
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Once);
+    }
+
+    // ---------------------------------------------------------------- fixtures
+
+    /// <summary>
+    /// The capture the checkout wrote for the invoice: the row the webhook moves to "succeeded".
+    /// </summary>
+    private async Task SeedPaymentAsync(Order order)
+    {
+        _context.Payments.Add(new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = WebhookEventIdentity.Monobank,
+            ProviderInvoiceId = order.MonobankInvoiceId,
+            AmountUah = order.Price,
+            AmountKopecks = Money.ToKopecks(order.Price),
+            Currency = "UAH",
+            Status = PaymentStatus.Pending,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Closes the accounting period the receipt would be posted into. A closed month is finished:
+    /// nothing may be added to it, and that is how the ledger refuses a posting.
+    /// </summary>
+    private void CloseTheAccountingPeriod(Guid closedByUserId)
+    {
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
+        var start = new DateOnly(today.Year, today.Month, 1);
+
+        _context.AccountingPeriods.Add(new AccountingPeriod
+        {
+            Id = Guid.CreateVersion7(),
+            PeriodStart = start,
+            PeriodEnd = start.AddMonths(1).AddDays(-1),
+            Status = PeriodStatus.Closed,
+            ClosedAtUtc = TestClock.UtcNow,
+            ClosedByUserId = closedByUserId
+        });
+
+        _context.SaveChanges();
     }
 }
