@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +22,7 @@ public sealed class GetAdminVoucherByIdQueryHandler
         CancellationToken cancellationToken = default)
     {
         var item = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .AsSplitQuery()
             .Include(v => v.FuelType)

@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -24,7 +25,7 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         // fuel_vouchers.fuel_type_id cascades from here, so archiving rather than removing is what
         // keeps paid-for vouchers in existence (#217).
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         // Restrict, for the same reason brand_stations carries one: a fuel is archived through
         // IsDeleted, and a DELETE arriving from anywhere else - including a hand-written psql

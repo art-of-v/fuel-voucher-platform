@@ -94,7 +94,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
         // Load the OLD vouchers tracked — we flip them to Expired (NoTracking would silently no-op).
         var olds = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsTracking()
             .Where(v => oldIds.Contains(v.Id))
             .ToListAsync(ct);
@@ -143,7 +143,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // Load the NEW vouchers as a NoTracking projection only — BulkAction loads+tracks them itself
         // during activation, so tracking them here would double-track the same keys and throw.
         var news = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .AsTracking()
             .Where(v => v.ImportJobId == command.NewImportId
                 && !v.IsDeleted
@@ -234,7 +233,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         {
             var ids = group.Select(kv => kv.Key).ToList();
             await _context.FuelVouchers
-                .IgnoreQueryFilters()
                 .Where(v => ids.Contains(v.Id))
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(v => v.CostPerLiter, group.Key)

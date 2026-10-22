@@ -1,6 +1,7 @@
 using FuelFlow.API.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
@@ -71,7 +72,7 @@ public sealed class RegisterDeviceCommandHandler
                 // owner. A missing owner row (orphan device data) or any other gap is
                 // treated as a live binding and refused - fail closed.
                 //
-                // IgnoreQueryFilters is mandatory here: User carries a global !IsDeleted
+                // IncludingSoftDeleted is mandatory here: User carries a global !IsDeleted
                 // filter, and this is the one query whose whole purpose is to TELL a
                 // soft-deleted owner apart from a live one. Under the filter the row is
                 // invisible, currentOwner comes back null, and every reclaim-after-delete
@@ -79,7 +80,7 @@ public sealed class RegisterDeviceCommandHandler
                 // physical device of the account that deleted itself. AsNoTracking: we only
                 // read IsDeleted, never mutate the owner.
                 var currentOwner = await _context.Users
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .AsNoTracking()
                     .FirstOrDefaultAsync(u => u.Id == existingDevice.UserId, cancellationToken);
                 var previousOwnerGone = currentOwner is { IsDeleted: true };

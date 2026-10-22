@@ -84,7 +84,6 @@ public sealed class RenewalCheckoutCommandHandler
 
         // Inactive accounts keep a read-only session but cannot pay.
         var user = await _context.Users
-            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();

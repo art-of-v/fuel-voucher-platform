@@ -38,7 +38,7 @@ public partial class FulfillmentService
                          && _context.OrderLineItems
                              .Where(l => l.OrderId == o.Id && l.SourceVoucherId != null)
                              .Any(l => !_context.Fulfillments
-                                 .IgnoreQueryFilters()
+                                 .IncludingReleasedFulfilments()
                                  .Any(f => f.LineItemId == l.Id)))
             .OrderBy(o => o.CreatedAtUtc)
             .Select(o => o.Id)

@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,7 @@ public sealed class GetAdminVouchersQueryHandler
         CancellationToken cancellationToken = default)
     {
         var q = _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .Include(v => v.FuelType)
             .Include(v => v.WorkerUser)
@@ -112,7 +113,7 @@ public sealed class GetAdminVouchersQueryHandler
         // cold) - a seventh of what the three facets cost - and a count OF the table cannot be out
         // of step with the table. The facets were 164 ms warm and 430 ms cold, which is why they
         // moved.
-        var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
+        var globalTotal = await _context.FuelVouchers.IncludingSoftDeleted().CountAsync(cancellationToken);
         var total = hasFilter
             ? await q.CountAsync(cancellationToken)
             : globalTotal;
@@ -215,7 +216,7 @@ public sealed class GetAdminVouchersQueryHandler
         // fuel_vouchers, so these three read a few dozen rows instead of half a million.
         //
         // The scope is the SAME as the list's, deliberately: the list counts with
-        // IgnoreQueryFilters, so the soft-deleted rows are in it, and a dropdown that hid a fuel
+        // With the soft-delete scope, the soft-deleted rows are in the list, and a dropdown that hid a fuel
         // the list can still show would be a filter the operator could not undo.
         var fuelTypeOptions = await (
             from summary in _context.StockSummary.AsNoTracking()

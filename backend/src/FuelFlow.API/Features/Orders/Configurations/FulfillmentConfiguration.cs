@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -54,7 +55,7 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
         // that count or it would "correct" the same order forever. A global filter rather than a
         // `.Where` at each of the five read sites, because forgetting one would either re-release an
         // already-released voucher or leave a stock voucher looking delivered.
-        builder.HasQueryFilter(e => e.ReleasedAtUtc == null);
+        builder.HasQueryFilter(QueryFilterKeys.ReleasedFulfilment, e => e.ReleasedAtUtc == null);
         builder.HasIndex(e => e.OrderId)
             .HasFilter("released_at_utc IS NULL");
 

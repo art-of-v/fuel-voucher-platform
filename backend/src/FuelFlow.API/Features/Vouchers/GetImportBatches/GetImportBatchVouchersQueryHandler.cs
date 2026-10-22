@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.GetImportBatches;
@@ -35,7 +36,7 @@ public sealed class GetImportBatchVouchersQueryHandler
         var pageSize = PageLimits.ClampPageSize(query.PageSize);
 
         var batch = _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Where(v => v.ImportJobId == query.ImportId);
 
         var totalCount = await batch.CountAsync(cancellationToken);

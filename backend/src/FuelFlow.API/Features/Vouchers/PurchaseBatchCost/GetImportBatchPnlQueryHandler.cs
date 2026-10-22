@@ -1,6 +1,7 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,7 +29,6 @@ public sealed class GetImportBatchPnlQueryHandler
     public async Task<List<ImportBatchPnlDto>> HandleAsync(GetImportBatchPnlQuery query, CancellationToken cancellationToken = default)
     {
         var vouchers = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == query.ImportId && !v.IsDeleted)
             .Select(v => new { v.Id, v.FuelTypeId, v.Brand, v.Liters, v.Status, v.CostPerLiter })
@@ -49,7 +49,7 @@ public sealed class GetImportBatchPnlQueryHandler
         var orderIds = fulfillments.Select(f => f.OrderId).Distinct().ToList();
 
         var orderStatus = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .Where(o => orderIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => (Status: o.Status, Kind: o.Kind), cancellationToken);

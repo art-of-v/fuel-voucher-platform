@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -19,7 +20,7 @@ public sealed class GetImportBatchCostsQueryHandler
 
     public async Task<List<ImportBatchCostDto>> HandleAsync(GetImportBatchCostsQuery query, CancellationToken cancellationToken = default)
     {
-        // Roll the import's vouchers up per fuel (mirrors the vouchers tab: IgnoreQueryFilters).
+        // Roll the import's vouchers up per fuel (mirrors the vouchers tab: archived rows included).
         //
         // !IsDeleted matters here, and it was missing until #980: the batch P&L filters it, so a
         // soft-deleted voucher left this panel averaging in a cost the P&L no longer counted - one
@@ -31,7 +32,6 @@ public sealed class GetImportBatchCostsQueryHandler
         // retiring the old vouchers is how an exchange is recorded. Filtering there would erase the
         // audit trail the timeline exists to provide.
         var groups = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == query.ImportId && !v.IsDeleted)
             .GroupBy(v => new { v.FuelTypeId, v.Brand })

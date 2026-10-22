@@ -1,4 +1,5 @@
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -183,7 +184,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         builder.HasIndex(e => e.PhoneNumber)
             .IsUnique()

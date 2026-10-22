@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.DTOs;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +20,7 @@ public sealed class GetAdminOrderByIdQueryHandler
         CancellationToken cancellationToken = default)
     {
         var item = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeletedAndReleasedFulfilments()
             .AsNoTracking()
             .AsSplitQuery()
             .Include(o => o.Fulfillments)

@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,11 +53,11 @@ public sealed class GetAdminVoucherLifecycleQueryHandler
         if (query.Id == Guid.Empty)
             return null;
 
-        // IgnoreQueryFilters: an archived voucher is still a voucher with a history, and the one thing
+        // IncludingSoftDeleted: an archived voucher is still a voucher with a history, and the one thing
         // an operator most wants to look up is the one somebody archived. The global filter is a read
         // policy for lists, not for the audit.
         var voucher = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .AsSplitQuery()
             .Include(v => v.Supplier)
@@ -241,11 +242,11 @@ public sealed class GetAdminVoucherLifecycleQueryHandler
             {
                 var lineIds = lines.Select(l => l.Id).ToList();
 
-                // IgnoreQueryFilters: the global filter hides RELEASED deliveries, and a renewal whose
+                // IncludingReleasedFulfilments: the global filter hides RELEASED deliveries, and a renewal whose
                 // voucher was later handed back is still part of this fuel's history — it moved no
                 // paper, but the customer paid and the term moved.
                 var delivered = await _context.Fulfillments
-                    .IgnoreQueryFilters()
+                    .IncludingReleasedFulfilments()
                     .AsNoTracking()
                     .Where(f => f.LineItemId != null && lineIds.Contains(f.LineItemId.Value))
                     .ToListAsync(cancellationToken);
@@ -259,7 +260,7 @@ public sealed class GetAdminVoucherLifecycleQueryHandler
 
             // ---- Backwards: whatever DELIVERED anything we know, and the voucher it replaced. ----
             var producingLineIds = await _context.Fulfillments
-                .IgnoreQueryFilters()
+                .IncludingReleasedFulfilments()
                 .AsNoTracking()
                 .Where(f => lineageIds.Contains(f.VoucherId) && f.LineItemId != null)
                 .Select(f => f.LineItemId!.Value)
@@ -299,7 +300,7 @@ public sealed class GetAdminVoucherLifecycleQueryHandler
 
         var deliveredByLine = new Dictionary<Guid, Fulfillment>();
         foreach (var f in await _context.Fulfillments
-                     .IgnoreQueryFilters()
+                     .IncludingReleasedFulfilments()
                      .AsNoTracking()
                      .Where(f => f.LineItemId != null && renewalLineIds.Contains(f.LineItemId.Value))
                      .OrderBy(f => f.FulfilledAtUtc)

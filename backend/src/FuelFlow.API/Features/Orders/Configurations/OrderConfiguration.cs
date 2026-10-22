@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -158,7 +159,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .IsRequired().HasComment("Soft delete. The row is hidden, not erased: the orders, the money and the vouchers behind" +
                     "it have to stay readable.");
 
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         builder.HasOne<FuelFlow.Features.Contracts.SharedModels.LegalEntity>()
             .WithMany()

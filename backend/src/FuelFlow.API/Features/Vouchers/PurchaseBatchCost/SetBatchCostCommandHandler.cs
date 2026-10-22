@@ -83,14 +83,12 @@ public sealed class SetBatchCostCommandHandler
         // !IsDeleted for the same reason the readers filter it (#980): a deleted voucher is not
         // stock, so it cannot be the only thing that proves the fuel is in this import.
         var brand = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .Select(v => v.Brand)
             .FirstOrDefaultAsync(cancellationToken);
         // The brand's key beside its name. The batch is about the fuel the vouchers name, so the
         // key is the fuel's own brand - the same fact the name carries.
         var brandId = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .Select(v => v.BrandId)
             .FirstOrDefaultAsync(cancellationToken);
@@ -108,7 +106,6 @@ public sealed class SetBatchCostCommandHandler
         // operator typing a cost writes it onto vouchers that do not exist, which then sit in the
         // pricing pool carrying a cost nobody should be paying.
         var vouchers = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .ToListAsync(cancellationToken);
 
@@ -128,7 +125,7 @@ public sealed class SetBatchCostCommandHandler
         }
 
         var oldCostText = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
             .Select(v => v.CostPerLiter)
             .FirstOrDefaultAsync(cancellationToken);
@@ -147,7 +144,7 @@ public sealed class SetBatchCostCommandHandler
             // Import predates the supplier picker (or was created without one); borrow it from the vouchers
             // so the batch is never left without the counterparty we settle with.
             var supplierId = await _context.FuelVouchers
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId)
                 .Select(v => v.SupplierId)
                 .FirstOrDefaultAsync(cancellationToken);

@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -79,7 +80,7 @@ internal sealed class BrandStationConfiguration : IEntityTypeConfiguration<Brand
         builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
         builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
 
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         // Restrict: deleting a brand must never delete every physical location that belonged to
         // it. The catalog is archived via IsDeleted instead; this is the seatbelt for a DELETE

@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -282,7 +283,7 @@ public class DataRetentionService
                 "voucher_imports",
                 _context.VoucherImports.Where(i =>
                     i.CompletedAtUtc != null && i.CompletedAtUtc < voucherImportCutoff &&
-                    !_context.PurchaseBatches.IgnoreQueryFilters()
+                    !_context.PurchaseBatches
                         .Any(b => b.ImportJobId == i.Id)),
                 dryRun, cancellationToken)),
 
@@ -292,7 +293,7 @@ public class DataRetentionService
             ("qr_parameters", await PurgeAsync("qr_parameters", 
                 _context.QrParameters.Where(q =>
                     q.CreatedAtUtc < qrParametersCutoff &&
-                    !_context.FuelVouchers.IgnoreQueryFilters()
+                    !_context.FuelVouchers.IncludingSoftDeleted()
                         .Any(v => v.QrParametersId == q.Id)),
                 dryRun, cancellationToken)),
 

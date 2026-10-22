@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -82,7 +83,7 @@ internal sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
 
         // Archived entries leave the catalog but stay reachable for anything historical that points
         // at them - a voucher, a contract, a report.
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         builder.HasIndex(e => e.Name);
         // The natural key is a column of bounded length rather than a type of its own: it is what an

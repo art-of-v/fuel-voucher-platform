@@ -1,5 +1,6 @@
 using System.Globalization;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,7 +32,7 @@ public sealed class ParseInvoiceCommandHandler
 
         // Roll the import's vouchers up per fuel — same shape as the batch-costs tab.
         var groups = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .Where(v => v.ImportJobId == command.ImportId)
             .GroupBy(v => new { v.FuelTypeId, v.Brand })

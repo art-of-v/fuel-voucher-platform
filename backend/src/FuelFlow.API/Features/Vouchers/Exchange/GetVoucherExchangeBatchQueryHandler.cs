@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Exchange;
@@ -19,7 +20,7 @@ public sealed record GetVoucherExchangeBatchQuery(Guid ExchangeBatchId);
 /// model's global <c>!IsDeleted</c> filter, and an audit row has to outlive the stock it is about: the
 /// replacements are routinely soft-deleted once they are sold or retired, and an exchange that
 /// vanishes from the history because its stock was cleaned up is precisely the quiet history loss
-/// the audit exists to prevent. The by-id lookups keep <c>IgnoreQueryFilters</c> in reach for that.
+/// the audit exists to prevent. The by-id lookups keep the soft-delete scope in reach for that.
 ///
 /// The pairs are the ledger's rows (planning #319): the row of the retired paper names the
 /// replacement, the pair's share of the doplata and the cost stamped on the replacement.
@@ -49,12 +50,12 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                 OldVoucherId = m.VoucherId,
                 NewVoucherId = m.ReplacedByVoucherId,
                 FuelTypeId = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => v.FuelTypeId)
                     .FirstOrDefault(),
                 Brand = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => v.Brand)
                     .FirstOrDefault(),
@@ -62,24 +63,24 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                 CostPerLiterApplied = m.AppliedCostPerLiter,
                 CreatedAtUtc = m.OccurredAtUtc,
                 OldNumber = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => v.VoucherNumber)
                     .FirstOrDefault(),
                 OldLiters = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.Liters)
                     .FirstOrDefault(),
                 OldCostPerLiter = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.CostPerLiter)
                     .FirstOrDefault(),
                 NewNumber = m.ReplacedByVoucherId == null
                     ? null
                     : _context.FuelVouchers
-                        .IgnoreQueryFilters()
+                        .IncludingSoftDeleted()
                         .Where(v => v.Id == m.ReplacedByVoucherId.Value)
                         .Select(v => v.VoucherNumber)
                         .FirstOrDefault()

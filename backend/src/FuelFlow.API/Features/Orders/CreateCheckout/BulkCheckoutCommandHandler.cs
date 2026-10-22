@@ -106,7 +106,6 @@ private readonly RuntimeSettingsService _runtimeSettings;
 
 // Inactive accounts keep a read-only session but cannot pay.
         var user = await _context.Users
-            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == command.UserId.Value, cancellationToken);
 
         if (user == null || !user.IsActive || user.IsDeleted)
