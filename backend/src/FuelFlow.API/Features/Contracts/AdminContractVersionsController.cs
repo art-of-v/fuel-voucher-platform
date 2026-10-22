@@ -188,9 +188,21 @@ public sealed class AdminContractVersionsController : ControllerBase
             return NotFound("Provider not found");
 
         string? body;
-        await using (var content = file.OpenReadStream())
+        try
         {
-            body = await _textExtractor.ExtractAsync(content, file.FileName, cancellationToken);
+            await using (var content = file.OpenReadStream())
+            {
+                body = await _textExtractor.ExtractAsync(content, file.FileName, cancellationToken);
+            }
+        }
+        catch (ContractDocumentTooLargeException ex)
+        {
+            // A small upload that expands into gigabytes: the read is refused rather than
+            // allowed to ask the process for the memory.
+            return BadRequest(
+                $"The document is too large to read: it expands to {ex.SizeBytes} bytes, and this "
+                + $"reader opens up to {ContractTextExtractor.MaxDocumentBytes}. If it is a real "
+                + "document, ask the provider for a shorter one.");
         }
 
         if (string.IsNullOrWhiteSpace(body))
