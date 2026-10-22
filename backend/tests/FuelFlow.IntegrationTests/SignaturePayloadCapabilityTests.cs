@@ -207,7 +207,10 @@ public sealed class SignaturePayloadCapabilityTests : IClassFixture<TestDatabase
         var customer = new User
         {
             Id = Guid.NewGuid(),
-            PhoneNumber = $"+3800000{context.UserContracts.Count() + 1000:D4}",
+            // The phone number and the EDRPOU are both unique columns, and this fixture is
+            // shared with the other integration test classes - so the values are drawn rather
+            // than fixed, or the second seeded company collides with the first.
+            PhoneNumber = $"+3809{Random.Shared.Next(10_000_000, 99_999_999)}",
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
             IsActive = true,
@@ -220,7 +223,7 @@ public sealed class SignaturePayloadCapabilityTests : IClassFixture<TestDatabase
             Id = Guid.NewGuid(),
             UserId = customer.Id,
             Name = "ACME LLC",
-            Edrpou = "12345678",
+            Edrpou = Random.Shared.Next(10_000_000, 99_999_999).ToString(),
             CreatedAtUtc = now
         };
         context.LegalEntities.Add(legalEntity);
