@@ -172,7 +172,11 @@ public sealed class GetAdminVouchersQueryHandler
         var data = items.Select(v => new AdminVoucherListItemDto
         {
             Id = v.Id,
-            QrPayload = v.QrPayload,
+            // No QrPayload here, and that is the point: the list used to carry the redeemable
+            // payload of every row, so ONE staff call handed out every live voucher's code - the
+            // same code the customer redeems at the pump, to whoever asked. The operator needs the
+            // number, the status and the expiry; the code is for the one voucher they are about
+            // to act on, and it has its own capability (AuthPolicies.VoucherPayload).
             Liters = v.Liters,
             FuelTypeId = v.FuelTypeId,
             FuelType = v.FuelType == null ? null : new FuelTypeRefDto { Id = v.FuelType.Id.ToString(), Name = v.FuelType.Name },

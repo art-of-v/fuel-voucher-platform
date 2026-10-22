@@ -345,7 +345,8 @@ export default function AdminScreen() {
 
   interface VoucherType {
     id: string;
-    qrPayload: string;
+    // No qrPayload: the list does not carry the redeemable code any more. The code comes from
+    // the single-voucher endpoint, and only for the roles that hold that capability.
     status: string;
     liters: number;
     fuelType: { name: string } | null;
@@ -612,6 +613,14 @@ export default function AdminScreen() {
   // hide the role control on the actor's own row (the backend also rejects self-role-change).
   const actorRole = user?.role ?? "";
   const currentUserId = user?.id ?? "";
+
+  // Whether this actor may open a voucher's redeemable code. The payload is a bearer
+  // instrument: whoever holds it can spend the customer's fuel, and nothing records that they
+  // did. The server holds that capability too (AuthPolicies.VoucherPayload) and hides the code
+  // from anyone outside it - so the button is hidden as well, rather than opening a modal with
+  // nothing in it.
+  const canSeeVoucherPayload =
+    actorRole === "Admin" || actorRole === "ProductOwner";
 
   // The purchases list is a PAGE, not the whole table. The endpoint used to answer with every
   // order the shop had ever taken, and the table grew with it: the screen got slower as the
@@ -2605,11 +2614,17 @@ export default function AdminScreen() {
                           </td>
                           <td
                             className="p-4"
-                            onClick={() => setSelectedQrId(v.id)}
+                            onClick={
+                              canSeeVoucherPayload
+                                ? () => setSelectedQrId(v.id)
+                                : undefined
+                            }
                           >
-                            <div className="cursor-pointer hover:scale-105 transition-transform bg-muted p-1 rounded-md w-fit border border-border">
-                              <QrCode className="w-6 h-6 text-muted-foreground" />
-                            </div>
+                            {canSeeVoucherPayload && (
+                              <div className="cursor-pointer hover:scale-105 transition-transform bg-muted p-1 rounded-md w-fit border border-border">
+                                <QrCode className="w-6 h-6 text-muted-foreground" />
+                              </div>
+                            )}
                           </td>
                           <td className="p-4 font-bold text-foreground">
                             {v.liters} L
