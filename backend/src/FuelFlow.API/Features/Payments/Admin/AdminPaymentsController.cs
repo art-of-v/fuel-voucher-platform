@@ -1,14 +1,11 @@
 using System.Security.Claims;
-using System.Text.Json;
-using FuelFlow.Features.Brands;
-using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Payments.SharedModels;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Payments.Admin.AttachPayment;
+using FuelFlow.Features.Payments.Admin.GetCustomerByCode;
+using FuelFlow.Features.Payments.Admin.GetUnallocatedPayments;
+using FuelFlow.Features.Payments.Admin.SearchCustomers;
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Payments.Admin;
 
@@ -40,13 +37,21 @@ namespace FuelFlow.Features.Payments.Admin;
 [Route("api/admin/payments")]
 public sealed class AdminPaymentsController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    private readonly AuditEventService _events;
+    private readonly GetUnallocatedPaymentsQueryHandler _unallocatedHandler;
+    private readonly SearchCustomersQueryHandler _customersHandler;
+    private readonly GetCustomerByCodeQueryHandler _customerByCodeHandler;
+    private readonly AttachPaymentCommandHandler _attachHandler;
 
-    public AdminPaymentsController(ApplicationDbContext context, AuditEventService events)
+    public AdminPaymentsController(
+        GetUnallocatedPaymentsQueryHandler unallocatedHandler,
+        SearchCustomersQueryHandler customersHandler,
+        GetCustomerByCodeQueryHandler customerByCodeHandler,
+        AttachPaymentCommandHandler attachHandler)
     {
-        _context = context;
-        _events = events;
+        _unallocatedHandler = unallocatedHandler;
+        _customersHandler = customersHandler;
+        _customerByCodeHandler = customerByCodeHandler;
+        _attachHandler = attachHandler;
     }
 
     /// <summary>
@@ -60,47 +65,10 @@ public sealed class AdminPaymentsController : ControllerBase
         [FromQuery] int limit = 50,
         CancellationToken ct = default)
     {
-        var query = _context.Payments
-            .AsNoTracking()
-            .Where(p => p.OrderId == null && p.Status == PaymentStatus.Succeeded);
+        var response = await _unallocatedHandler.HandleAsync(
+            new GetUnallocatedPaymentsQuery(page, limit), ct);
 
-        var total = await query.CountAsync(ct);
-
-        var items = await query
-            .OrderByDescending(p => p.PaidAtUtc)
-            .ThenByDescending(p => p.Id)
-            .Skip(Math.Max(0, page - 1) * Math.Clamp(limit, 1, 200))
-            .Take(Math.Clamp(limit, 1, 200))
-            .Select(p => new UnallocatedPaymentDto(
-                p.Id,
-                p.AmountUah,
-                p.Currency,
-                p.PaidAtUtc,
-                p.Provider,
-                p.UserId,
-                p.User == null ? null : p.User.PhoneNumber,
-                p.User != null && !string.IsNullOrEmpty(p.User.FirstName)
-                    ? (p.User.FirstName + " " + p.User.LastName).Trim()
-                    : null,
-                p.SettlementMessages.OrderBy(m => m.MessageId).Select(m => m.Code).FirstOrDefault(),
-                p.SettlementMessages.OrderBy(m => m.MessageId).Select(m => m.Text).FirstOrDefault(),
-                p.SettlementMessages.OrderBy(m => m.MessageId).Select(m => m.TelegramDisplayName).FirstOrDefault()))
-            .ToListAsync(ct);
-
-        // One extra query for the whole page, not one per row. The alternative is an operator pasting
-        // an order id, which is not placing money — it is asking them to trust a UUID.
-        var customerIds = items.Select(i => i.UserId).Where(id => id is not null).Select(id => id!.Value).Distinct().ToList();
-
-        var openOrders = customerIds.Count == 0
-            ? []
-            : await _context.Orders
-                .AsNoTracking()
-                .Where(o => customerIds.Contains(o.UserId) && o.Status == OrderStatus.PendingPayment)
-                .OrderByDescending(o => o.CreatedAtUtc)
-                .Select(o => new OpenOrderRefDto(o.Id, o.UserId, o.Price, o.CreatedAtUtc))
-                .ToListAsync(ct);
-
-        return Ok(new UnallocatedPaymentsResponse(items, total, openOrders));
+        return Ok(response);
     }
 
     /// <summary>
@@ -123,36 +91,7 @@ public sealed class AdminPaymentsController : ControllerBase
         [FromQuery] int limit = 20,
         CancellationToken ct = default)
     {
-        var term = (search ?? string.Empty).Trim().ToLowerInvariant();
-        if (term.Length < 2)
-        {
-            // Two characters minimum. A one-character search matches most of the table, and the
-            // point of a bounded query is defeated the moment the bound is the result set.
-            return Ok(Array.Empty<CustomerSearchHit>());
-        }
-
-        var capped = Math.Clamp(limit, 1, 50);
-
-        var hits = await _context.Users
-            .AsNoTracking()
-            .Where(u =>
-                (u.PhoneNumber != null && u.PhoneNumber.ToLower().Contains(term)) ||
-                (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
-                (u.LastName != null && u.LastName.ToLower().Contains(term)) ||
-                (u.SettlementCode != null && u.SettlementCode.ToLower().Contains(term)))
-            // Settlement code first, then a name, then the phone: an exact code is the most certain
-            // match a person can type, and an exact match should not sit below a lucky substring.
-            .OrderByDescending(u => u.SettlementCode == term.ToUpperInvariant())
-            .ThenBy(u => u.FirstName).ThenBy(u => u.LastName)
-            .Take(capped)
-            .Select(u => new CustomerSearchHit(
-                u.Id,
-                u.PhoneNumber,
-                u.SettlementCode,
-                string.IsNullOrEmpty(u.FirstName) && string.IsNullOrEmpty(u.LastName)
-                    ? null
-                    : (u.FirstName + " " + u.LastName).Trim()))
-            .ToListAsync(ct);
+        var hits = await _customersHandler.HandleAsync(new SearchCustomersQuery(search, limit), ct);
 
         return Ok(hits);
     }
@@ -171,32 +110,27 @@ public sealed class AdminPaymentsController : ControllerBase
     [Authorize(Policy = AuthPolicies.SettlementCode)]
     public async Task<ActionResult> CustomerByCode([FromQuery] string code, CancellationToken ct)
     {
-        var normalised = (code ?? string.Empty).Trim().ToUpperInvariant();
-        if (normalised.Length != 8)
-            return BadRequest(new { error = "A settlement code is eight characters." });
+        var result = await _customerByCodeHandler.HandleAsync(new GetCustomerByCodeQuery(code), ct);
 
-        var customer = await _context.Users
-            .AsNoTracking()
-            .Where(u => u.SettlementCode == normalised)
-            .Select(u => new { u.Id, u.PhoneNumber, u.FirstName, u.LastName, u.SettlementCode })
-            .FirstOrDefaultAsync(ct);
+        if (!result.CodeIsValid)
+            return BadRequest(new { error = result.Error });
 
-        if (customer is null)
+        if (result.Customer is null)
         {
             return NotFound(new
             {
-                error = $"No customer has the code {normalised}. It was either mistyped, or it belongs to a customer who has not registered yet.",
+                error = result.Error,
             });
         }
+
+        var customer = result.Customer;
 
         return Ok(new
         {
             customer.Id,
             customer.PhoneNumber,
             customer.SettlementCode,
-            Name = string.IsNullOrEmpty(customer.FirstName) && string.IsNullOrEmpty(customer.LastName)
-                ? null
-                : (customer.FirstName + " " + customer.LastName).Trim(),
+            Name = customer.Name,
         });
     }
 
@@ -209,116 +143,35 @@ public sealed class AdminPaymentsController : ControllerBase
     [Authorize(Policy = AuthPolicies.MoneyMovement)]
     public async Task<ActionResult> Attach(Guid id, AttachPaymentRequest request, CancellationToken ct)
     {
-        if (request.OrderId is null && request.UserId is null)
-            return BadRequest(new { error = "Name the customer, the order, or both." });
+        var result = await _attachHandler.HandleAsync(
+            new AttachPaymentCommand(
+                id,
+                request.OrderId,
+                request.UserId,
+                ActorId(),
+                ActorName()),
+            ct);
 
-        // AsTracking, stated rather than inherited. This mutates the entity and saves, so under a default of
-        // NoTracking it would be a silent no-op that still returned 204 - the caller told the money was
-        // placed and nothing changed. The guard that enforces this is NoTrackingMutationGuardTests.
-        var payment = await _context.Payments
-            .AsTracking()
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
-        if (payment is null) return NotFound();
-
-        if (payment.Status != PaymentStatus.Succeeded)
-        {
-            // Only real money is placed. Moving a pending or failed row would attach a promise to an
-            // order, which is how an order comes to be marked paid by something never collected.
-            return BadRequest(new { error = $"Only a succeeded payment can be placed. This one is {payment.Status}." });
-        }
-
-        Guid? customerId = payment.UserId;
-
-        if (request.UserId is { } requestedUserId)
-        {
-            var exists = await _context.Users.AsNoTracking().AnyAsync(u => u.Id == requestedUserId, ct);
-            if (!exists) return BadRequest(new { error = "No such customer." });
-
-            if (customerId is not null && customerId != requestedUserId)
-            {
-                // Reassigning a payment that already names its owner is a different act from placing
-                // an anonymous one, and the kind of correction that should be deliberate.
-                return BadRequest(new { error = "This payment already belongs to another customer. Refusing to move it." });
-            }
-
-            customerId = requestedUserId;
-        }
-
-        Guid? orderId = payment.OrderId;
-
-        if (request.OrderId is { } requestedOrderId)
-        {
-            var order = await _context.Orders
-                .AsNoTracking()
-                .FirstOrDefaultAsync(o => o.Id == requestedOrderId, ct);
-            if (order is null) return BadRequest(new { error = "No such order." });
-
-            if (customerId is { } owner && order.UserId != owner)
-                return BadRequest(new { error = "That order belongs to a different customer." });
-
-            if (order.Status != OrderStatus.PendingPayment)
-            {
-                // Attaching to a paid, fulfilled or cancelled order would mean this money settled
-                // something that is already settled.
-                return BadRequest(new { error = $"That order is {order.Status} and is not waiting for payment." });
-            }
-
-            orderId = requestedOrderId;
-        }
-
-        if (orderId == payment.OrderId && customerId == payment.UserId)
-        {
-            // Nothing to do. Answered rather than refused, because a double-click should not look
-            // like a failure.
-            return NoContent();
-        }
-
-        var before = JsonSerializer.Serialize(new
-        {
-            order_id = payment.OrderId?.ToString(),
-            user_id = payment.UserId?.ToString(),
-        });
-        var after = JsonSerializer.Serialize(new
-        {
-            order_id = orderId?.ToString(),
-            user_id = customerId?.ToString(),
-        });
-        payment.OrderId = orderId;
-        payment.UserId = customerId;
-        payment.UpdatedAtUtc = SystemClock.UtcNow;
-
-        // Tracked before the save: the row and the payment it describes commit together, or neither
-        // does (planning #533).
-        Record(payment, before, after);
-
-        await _context.SaveChangesAsync(ct);
+        if (!result.Found) return NotFound();
+        if (!result.Success) return BadRequest(new { error = result.Error });
 
         return NoContent();
     }
 
     /// <summary>
-    /// Tracks the audit row for a payment placed by hand. Committed by the caller's own save, so the
-    /// row and the change it describes land together (planning #533).
+    /// Who is placing the money. The claims are the controller's to read — a handler is told who,
+    /// not how to find out.
     /// </summary>
-    private void Record(Payment payment, string before, string after)
-    {
-        var actorId = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id)
+    private Guid? ActorId() =>
+        Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id)
             ? id
             : (Guid?)null;
 
-        // No actor, no record: an audit row that cannot name who placed money names nothing. Same
-        // short-circuit SuppliersController uses.
-        if (actorId is null) return;
-
-        var actorName = User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value;
-
-        _events.RecordEvent(
-            "Payment", payment.Id.ToString(),
-            "PaymentPlaced", before, after,
-            actorId.Value, actorName,
-            $"Placed {payment.AmountUah:N2} {payment.Currency} declared on {payment.Provider}",
-            "all");
-    }
+    /// <summary>
+    /// The name the audit row carries: the operator's first name, or their login.
+    /// </summary>
+    private string? ActorName() =>
+        User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value;
 }
 
 /// <summary>
