@@ -337,6 +337,22 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
             .Should().Be(0);
     }
 
+    [Fact]
+    public async Task An_unmatched_code_is_not_quoted_into_the_reason()
+    {
+        // The reason is written to the log as well as to the row, and the settlement code is
+        // staff-only data that must not leave the process through a log line. The row carries the
+        // code in its own column, so the reason has nothing to quote it for.
+        using var context = CreateContext();
+
+        await CreateHandler(Configured(), context).HandleAsync(Message(1011, "1511 ZZZZZZZZ"), default);
+
+        var row = await TheMessage(context, 1011);
+        row.Outcome.Should().Be(SettlementOutcomes.Unallocated);
+        row.Code.Should().Be("ZZZZZZZZ", "the code is kept - in the column that holds it");
+        row.RejectionReason.Should().NotContain("ZZZZZZZZ", "a staff-only identifier does not belong in a log line");
+    }
+
     // --------------------------------------------------------------------------------------------
     // Idempotency
     // --------------------------------------------------------------------------------------------

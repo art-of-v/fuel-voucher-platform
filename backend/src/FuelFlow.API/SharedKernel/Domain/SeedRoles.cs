@@ -121,6 +121,25 @@ internal static class SeedRoles
     /// </summary>
     public static readonly string[] VoucherPayloadRoleNames = { ProductOwnerName, AdminName };
 
+    /// <summary>
+    /// The roles that may see a customer's settlement code - the identifier the settlement channel
+    /// resolves money to.
+    /// <para>
+    /// <b>Why this is the money tier.</b> The code is not a profile field: it is what a message on
+    /// the settlement channel is resolved BY, and it is what an operator quotes when they place a
+    /// customer's payment. The owner decided on 2026-10-21 that placing a payment for a customer
+    /// belongs to Admin, ProductOwner and Manager (planning #521, §7.1), and the settlement code is
+    /// the identifier that placement is written against.
+    /// </para>
+    /// <para>
+    /// <b>Why it is a list of its own.</b> It is listed here rather than riding on the staff read
+    /// surface, so that a role joining the LISTS does not inherit every customer's code: reading
+    /// the staff surface and being trusted with money are two separate decisions, and the second one
+    /// is the one this list records.
+    /// </para>
+    /// </summary>
+    public static readonly string[] SettlementCodeRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
     // Fixed, deterministic GUIDs matching the seeded database rows.
     // Admin and User IDs must match existing seeded data (migrations 20260619000001, 20260915121550).
     // ProductOwner, Manager and QA are new roles; use stable random UUIDs.

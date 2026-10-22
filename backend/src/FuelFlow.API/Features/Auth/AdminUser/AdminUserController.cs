@@ -58,8 +58,25 @@ public sealed class AdminUserController : ControllerBase
         [FromQuery] string? q,
         [FromQuery] int page = 1,
         [FromQuery] int limit = 50,
-        CancellationToken ct = default) =>
-        Ok(await _handler.HandleAsync(new GetAdminUsersQuery(role, isActive, q, page, limit), ct));
+        CancellationToken ct = default)
+    {
+        var result = await _handler.HandleAsync(new GetAdminUsersQuery(role, isActive, q, page, limit), ct);
+
+        // The settlement code is money data, not a field of the staff read surface: it is the
+        // identifier the settlement channel resolves money to, so the roles that may read it are the
+        // money tier (AuthPolicies.SettlementCode). A caller without that capability gets the
+        // customer list without the code - the list is the read surface's, the code is not.
+        //
+        // Empty rather than null: the column is NOT NULL, so an empty value never means "this
+        // customer has no code" - it means "not yours to read".
+        if (!CanSeeSettlementCode())
+        {
+            foreach (var user in result.Items)
+                user.SettlementCode = string.Empty;
+        }
+
+        return Ok(result);
+    }
 
     [HttpGet("options")]
     [Authorize(Policy = AuthPolicies.Staff)]
@@ -231,6 +248,13 @@ public sealed class AdminUserController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Whether the actor may read a customer's settlement code. The membership is the policy's own
+    /// list, read from one place, so the attribute and this check cannot disagree.
+    /// </summary>
+    private bool CanSeeSettlementCode()
+        => SeedRoles.SettlementCodeRoleNames.Any(role => User.IsInRole(role));
 
     /// <summary>
     /// A 403 that says why. <see cref="ControllerBase.Forbid()"/> writes an empty body, so the

@@ -74,8 +74,10 @@ public static class SettlementMessageParser
                 out var amount))
         {
             // Unreachable given the regex, and asserted rather than assumed: a silent zero here would
-            // write a payment of 0.00 UAH into the ledger.
-            return SettlementMessageParse.NotParsed($"'{text}' did not parse as an amount.");
+            // write a payment of 0.00 UAH into the ledger. The text is NOT quoted back: it carries the
+            // customer's settlement code, the row stores it in its own column, and this reason is
+            // written to the log as well.
+            return SettlementMessageParse.NotParsed("The amount could not be read.");
         }
 
         if (amount <= 0m)

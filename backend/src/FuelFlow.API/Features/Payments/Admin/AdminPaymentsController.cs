@@ -28,6 +28,13 @@ namespace FuelFlow.Features.Payments.Admin;
 /// which. Guessing is not offered anywhere — no "best match", no default — because a wrong answer
 /// here moves one real person's money to another.
 /// </para>
+/// <para>
+/// <b>These endpoints carry the settlement capability, not the read surface.</b> Their rows carry a
+/// customer's settlement code — the code a message declared, the code of a customer offered to the
+/// picker — and that code is what the settlement channel resolves money by. It is money data, so the
+/// roles that may see it are the money tier (<c>AuthPolicies.SettlementCode</c>), and the endpoints
+/// that serve it say so rather than borrowing the blanket read policy.
+/// </para>
 /// </remarks>
 [ApiController]
 [Route("api/admin/payments")]
@@ -47,7 +54,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// nobody" is the hardest case and the one an operator arrives to solve.
     /// </summary>
     [HttpGet("unallocated")]
-    [Authorize(Policy = AuthPolicies.Staff)]
+    [Authorize(Policy = AuthPolicies.SettlementCode)]
     public async Task<ActionResult<UnallocatedPaymentsResponse>> Unallocated(
         [FromQuery] int page = 1,
         [FromQuery] int limit = 50,
@@ -110,7 +117,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// </para>
     /// </remarks>
     [HttpGet("customers")]
-    [Authorize(Policy = AuthPolicies.Staff)]
+    [Authorize(Policy = AuthPolicies.SettlementCode)]
     public async Task<ActionResult<IReadOnlyList<CustomerSearchHit>>> Customers(
         [FromQuery] string search,
         [FromQuery] int limit = 20,
@@ -161,7 +168,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// and a partial version of it here would be a worse version of one that already exists.
     /// </remarks>
     [HttpGet("customers/by-code")]
-    [Authorize(Policy = AuthPolicies.Staff)]
+    [Authorize(Policy = AuthPolicies.SettlementCode)]
     public async Task<ActionResult> CustomerByCode([FromQuery] string code, CancellationToken ct)
     {
         var normalised = (code ?? string.Empty).Trim().ToUpperInvariant();

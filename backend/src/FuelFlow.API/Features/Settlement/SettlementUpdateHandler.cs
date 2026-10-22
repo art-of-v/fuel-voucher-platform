@@ -121,7 +121,10 @@ public sealed class SettlementUpdateHandler
             var paymentId = await WriteAsync(payment, orderId: null, ct);
             await RecordAsync(
                 update, SettlementOutcomes.Unallocated,
-                $"No customer has the code {code}. The money is recorded and left for an operator.",
+                // No customer has that code. The reason does not quote it: the row carries the code
+                // in its own column, and this text is written to the log as well - and the code is
+                // staff-only data that must not leave the process through a log line.
+                "No customer has that code. The money is recorded and left for an operator.",
                 amount, code, userId, ct, paymentId);
             return;
         }
