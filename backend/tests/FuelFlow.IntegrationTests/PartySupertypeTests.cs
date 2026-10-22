@@ -112,7 +112,7 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
                 SELECT party_id AS "Value" FROM users WHERE id = {userId}
                 """).FirstAsync();
             await context.Database.ExecuteSqlRawAsync("DELETE FROM users WHERE id = {0}", userId);
-            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id = {0}", party);
+            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id = {0}", party!);
         }
     }
 
@@ -189,7 +189,7 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
                 SELECT party_id AS "Value" FROM users WHERE id = {userId}
                 """).FirstAsync();
             await context.Database.ExecuteSqlRawAsync("DELETE FROM users WHERE id = {0}", userId);
-            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id = {0}", party);
+            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id = {0}", party!);
         }
     }
 
