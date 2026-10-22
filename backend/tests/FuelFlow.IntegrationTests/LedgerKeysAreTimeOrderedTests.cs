@@ -223,6 +223,12 @@ public sealed class LedgerKeysAreTimeOrderedTests : IClassFixture<TestDatabaseFi
             (await CountAsync(context,
                 $"SELECT count(*) FROM document_sequences s JOIN accounting_periods p ON s.name = 'journal:' || p.id::text WHERE p.period_start = '{written.PeriodStart}'"))
                 .Should().Be(1, "the name points at the period's new key");
+
+            // The sequence's OWN key moves too, so that the table holds one shape of key: the
+            // rows that are there were written with a random one, and the application writes a
+            // time-ordered one for every row it adds from now on.
+            (await CountAsync(context, "SELECT count(*) FROM document_sequences WHERE substring(id::text, 15, 1) <> '7'"))
+                .Should().Be(0);
         });
     }
 
