@@ -36,6 +36,12 @@ public sealed class DatabaseTransportGuardTests
         ["DeviceAuth:Enabled"] = "true",
         ["Database:ConnectionString"] =
             "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;Password=secret;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
+        // The schema migration has its own connection now, and it carries the money and the
+        // personal data exactly like the traffic connection does - so it is held to the same
+        // transport. The two roles are different on purpose: the traffic may not change the
+        // schema, and the migration may not do the traffic's work.
+        ["Database:MigrationConnectionString"] =
+            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_migrator;Password=secret;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
     };
 
     private static IConfiguration Config(Dictionary<string, string?> settings) =>

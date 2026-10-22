@@ -594,6 +594,16 @@ jobs:
       - name: Test the collation assertion
         run: bash deploy/assert-collation.test.sh
 
+      # The database roles. The application's traffic runs as a role that may do the
+      # application's work and nothing else, and the schema migration runs as another
+      # one - because one role used to do both, and it was the cluster's SUPERUSER, so a
+      # defect that reached the database owned the cluster instead of leaking a table.
+      #
+      # This test asks a real database, as each role, what that role may do. A script
+      # that printed what it intended to do proves nothing.
+      - name: Test the database roles
+        run: bash deploy/ensure-database-roles.test.sh
+
       # The executable bit on the scripts in deploy/. Three of them are documented as
       # being run - `./rebuild-collation.sh`, `./drill-restore.sh`, `./dev-admin.sh` -
       # and all three were 100644 in git, so the documented command failed with
@@ -1648,6 +1658,19 @@ jobs:
 
       - name: Ensure the database certificate exists
         run: bash /root/FuelFlow/deploy/ensure-postgres-tls.sh --dir /root/FuelFlow/deploy/certs/postgres
+
+      # The three database roles, before the application is recreated with the new
+      # connection strings. The application's traffic runs as `fuelflow_app` (read and
+      # write on the application's own tables, and nothing else) and the schema
+      # migration as `fuelflow_migrator` (the schema, and nothing else) - neither of
+      # them the cluster's superuser, which is what the application used to connect as.
+      #
+      # It runs BEFORE the preflight because it also generates the two role passwords
+      # and writes them into .env: the compose file names them, and a preflight that
+      # could not resolve them would stop the deploy over a value nobody has typed yet.
+      # The script is idempotent, so it is safe on every deploy.
+      - name: Ensure the database roles exist
+        run: bash /root/FuelFlow/deploy/ensure-database-roles.sh
 
       # ...and then run the whole preflight against the live box, so a bad .env, a bad
       # Caddyfile, an ambiguous upstream or a stale :main tag stops THIS deploy rather

@@ -171,6 +171,7 @@ try
     var app = builder.Build();
 
     SecurityConfigurationValidator.Validate(builder.Configuration, builder.Environment);
+    await app.ValidateDatabaseRoleAsync();
 
     app.UseSwaggerDocs();
     app.UseAppPipeline();

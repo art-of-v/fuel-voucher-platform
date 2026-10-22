@@ -1,6 +1,7 @@
 using FuelFlow.API.BackgroundJobs;
 using Hangfire;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.Security;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -128,7 +129,6 @@ internal static class DatabaseSetup
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         try
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var runMigrations = app.Configuration.GetValue<bool?>("RunMigrationsOnBoot") ?? true;
 
             if (!runMigrations)
@@ -138,7 +138,42 @@ internal static class DatabaseSetup
             }
 
             logger.LogInformation("Applying pending migrations...");
-            dbContext.Database.Migrate();
+
+            // The migration runs as its OWN role, through its own connection, with its own
+            // credential - and it is the only thing in the process that ever does. The
+            // application's traffic connects as a role that may do the application's work
+            // and nothing else (DatabaseRoleValidator), so the schema cannot be changed
+            // through the connection the traffic uses.
+            //
+            // With no migration connection string configured - development and staging,
+            // where the one role IS the cluster's own - the application's own connection
+            // migrates, exactly as it always has.
+            var migrationConnectionString = app.Configuration["Database:MigrationConnectionString"];
+            if (string.IsNullOrWhiteSpace(migrationConnectionString))
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                dbContext.Database.Migrate();
+            }
+            else
+            {
+                var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                    .UseNpgsql(migrationConnectionString,
+                        b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
+                    .Options;
+
+                var cipher = scope.ServiceProvider.GetRequiredService<IQrCipher>();
+                using var migrationContext = new ApplicationDbContext(
+                    options,
+                    cipher,
+                    scope.ServiceProvider.GetService<ILogger<ApplicationDbContext>>());
+                migrationContext.Database.Migrate();
+
+                // The DDL credential leaves the configuration the moment it has done its
+                // work. The application keeps serving on a connection that cannot change
+                // the schema, and the process no longer holds the credential that could.
+                app.Configuration["Database:MigrationConnectionString"] = null;
+            }
+
             logger.LogInformation("Database migrated successfully.");
         }
         catch (Exception ex)
