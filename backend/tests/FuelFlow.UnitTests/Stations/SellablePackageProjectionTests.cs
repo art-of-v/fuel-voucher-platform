@@ -48,8 +48,6 @@ public sealed class SellablePackageProjectionTests : IDisposable
             Id = ToUuid("projection-fuel"),
             Name = "А-95 (projection fixture)",
             BrandId = BrandIds.Okko,
-            BasePrice = 0m,
-            DiscountPrice = null,
 MarginUahPerLiter = 2m,
         // Every pricing figure lives on the fuel since 2026-10-19. The projection and
         // SellablePackage.From must read the same columns, or one of them is pricing off a row

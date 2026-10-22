@@ -228,8 +228,6 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
             Id = Guid.NewGuid(),
             BrandId = brand.Id,
             Name = slug + " fuel",
-            BasePrice = 50m,
-            DiscountPrice = 50m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         };

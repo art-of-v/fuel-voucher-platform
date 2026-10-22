@@ -640,9 +640,7 @@ result.Should().HaveCount(2);
         {
             Id = ToUuid(id),
             Name = name,
-            BrandId = BrandId,
-            BasePrice = 50,
-            DiscountPrice = 45
+            BrandId = BrandId
         };
     }
 

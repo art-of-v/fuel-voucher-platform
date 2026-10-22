@@ -110,8 +110,6 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
                 Id =   ToUuid(fuelTypeId),
                 Name = fuelTypeId,
                 BrandId = BrandId,
-                BasePrice = 50,
-                DiscountPrice = 47,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             });

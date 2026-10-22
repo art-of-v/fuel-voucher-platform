@@ -24,7 +24,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         // Fuel priced at 22 UAH/L (cost 20 + margin 2, no pump). The P&L reads its "current sale price"
         // off the offer, so the per-litre figures are seeded there and the volume carries only the
         // package total.

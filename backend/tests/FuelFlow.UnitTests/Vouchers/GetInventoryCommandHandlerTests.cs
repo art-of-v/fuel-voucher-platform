@@ -47,7 +47,6 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
             Id = fuelTypeId,
             Name = "Diesel",
             BrandId = Guid.NewGuid(),
-            BasePrice = 50m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
@@ -85,7 +84,6 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
                 Id = firstFuel,
                 Name = "Diesel",
                 BrandId = Guid.NewGuid(),
-                BasePrice = 50m,
                 CreatedAtUtc = TestClock.UtcNow,
                 UpdatedAtUtc = TestClock.UtcNow
             },
@@ -94,7 +92,6 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
                 Id = secondFuel,
                 Name = "Petrol",
                 BrandId = Guid.NewGuid(),
-                BasePrice = 60m,
                 CreatedAtUtc = TestClock.UtcNow,
                 UpdatedAtUtc = TestClock.UtcNow
             });

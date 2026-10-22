@@ -68,7 +68,6 @@ public sealed class BrandKeyBackfillTests : IClassFixture<TestDatabaseFixture>
                 Id = fuelTypeId,
                 Name = "Diesel " + Guid.NewGuid().ToString("N")[..8],
                 BrandId = brandId,
-                BasePrice = 50m,
                 CreatedAtUtc = TestClock.UtcNow,
                 UpdatedAtUtc = TestClock.UtcNow
             });

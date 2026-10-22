@@ -48,8 +48,6 @@ public sealed class AdminVoucherListSortTests : IDisposable
             Id = ToUuid("okko-95"),
             Name = "A-95",
             BrandId = BrandIds.Okko,
-            BasePrice = 55,
-            DiscountPrice = 52,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

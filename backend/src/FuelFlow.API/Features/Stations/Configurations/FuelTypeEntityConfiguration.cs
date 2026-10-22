@@ -108,24 +108,6 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("price_updated_by_user_id")
             .HasColumnType("uuid");
 
-        builder.Property(e => e.BasePrice)
-            .HasColumnName("base_price")
-            .HasColumnType("numeric(12,2)")
-            .IsRequired(false)
-            .HasComment("The list price of the fuel per litre - the price before our discount. It "
-                + "is the reference the customer's saving is measured against. RETIRED: the "
-                + "reference is the COLUMN price next door, and the saving is computed from it. "
-                + "The column stays until the migration that drops it.");
-
-        builder.Property(e => e.DiscountPrice)
-            .HasColumnName("discount_price")
-            .HasColumnType("numeric(12,2)")
-            .IsRequired(false)
-            .HasComment("What the customer pays per litre. NULL means it is not set: the grade is "
-                + "in the catalogue and nobody has priced it yet. A price of zero is a price, and "
-                + "a price of zero means the customer takes the fuel for nothing - so the unset "
-                + "state is NULL and never 0.");
-
         builder.Property(e => e.AllowBelowCost)
             .HasColumnName("allow_below_cost")
             .HasDefaultValue(false)
@@ -234,17 +216,13 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             // code. Generous for what it is, bounded because it is indexed and unique per Brand.
             t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
 
-            // A price of zero is a price, and a price of zero means the customer takes the fuel
-            // for nothing. So the unset state is NULL - which is what the cost beside it says - and
-            // zero is not a price anybody may write.
-            //
-            // This is the business's call (2026-10-21): a grade the network lists but nobody has
-            // priced yet has NO customer price, and the column says so by being empty. The
-            // catalogue import leaves exactly that behind - the pump is published, no cost and no
-            // margin are set - and a grade with no price is not on the shelf: its computed price
-            // is null and the storefront does not list a package with no price.
-            t.HasCheckConstraint("ck_fuel_types_prices_non_negative",
-                "base_price >= 0 AND (discount_price IS NULL OR discount_price > 0)");
+            // The price the customer pays is COMPUTED, so there is no column to guard here any more.
+            // The constraint that used to sit in this place guarded two stored copies - the list
+            // price and the price we charge - and both copies are gone with their columns
+            // (planning slice 2 of docs/PLAN_PRICING_MODEL.md). What it said survives in the two
+            // constraints below: a knob that is stated is not negative, and the cost the below-cost
+            // guard compares against is a number the operator wrote rather than a zero that stood
+            // for "not set".
 
             // The knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
             // carried. A negative cost makes every price computed from it negative as well, and a

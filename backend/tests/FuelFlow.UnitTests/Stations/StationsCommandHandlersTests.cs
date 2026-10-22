@@ -187,15 +187,13 @@ var persisted = await _context.Brands.FindAsync(TestBrand);
         };
     }
 
-    private static FuelTypeEntity CreateFuelType(string id, string name, Guid BrandId, int basePrice = 50, int discountPrice = 45)
+    private static FuelTypeEntity CreateFuelType(string id, string name, Guid BrandId)
     {
         return new FuelTypeEntity
         {
             Id = ToUuid(id),
             Name = name,
-            BrandId = BrandId,
-            BasePrice = basePrice,
-            DiscountPrice = discountPrice
+            BrandId = BrandId
         };
     }
 

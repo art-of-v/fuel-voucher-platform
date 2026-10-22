@@ -40,11 +40,11 @@ public class ParserTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95-euro"), Name = "A 95 EURO", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95-euro"), Name = "A 95 EURO", BrandId = BrandIds.Wog, CreatedAtUtc = TestClock.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -367,9 +367,9 @@ public class ParserTests : IDisposable
         // against the drifted standard-95 row ("А-95 ЄВРО") — and to the standard (EURO) grade,
         // not the "A-95 Mustang" premium row, since the voucher carries no Mustang marker.
         using var context = CreateContextWith(
-            new FuelTypeEntity { Id = ToUuid("wog-95-euro"), Name = "А-95 ЄВРО", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("wog-95-euro"), Name = "А-95 ЄВРО", BrandId = BrandIds.Wog, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, CreatedAtUtc = TestClock.UtcNow });
 
         var parser = new WogVoucherParser(context, new BrandSlugResolver(context), NullLogger<WogVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
@@ -425,8 +425,8 @@ public class ParserTests : IDisposable
         // no hyphen, EURO suffix). The QR product code 9015 (A-95) must resolve it, whereas
         // the old hardcoded-string match against "A-95" (Latin) rejected every such voucher.
         using var context = CreateContextWith(
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow });
 
         var parser = new OkkoVoucherParser(context, new BrandSlugResolver(context), NullLogger<OkkoVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))

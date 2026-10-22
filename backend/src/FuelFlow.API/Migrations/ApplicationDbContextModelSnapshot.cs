@@ -4182,11 +4182,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("allow_below_cost")
                         .HasComment("Whether this fuel may be sold below what we pay. A manager's opt-in, per fuel, for a deliberate loss leader - the write path refuses such a sale without it.");
 
-                    b.Property<decimal?>("BasePrice")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("base_price")
-                        .HasComment("The list price of the fuel per litre - the price before our discount. It is the reference the customer's saving is measured against. RETIRED: the reference is the COLUMN price next door, and the saving is computed from it. The column stays until the migration that drops it.");
-
                     b.Property<string>("BrandFuelCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -4203,11 +4198,6 @@ namespace FuelFlow.API.Migrations
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at_utc");
-
-                    b.Property<decimal?>("DiscountPrice")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("discount_price")
-                        .HasComment("What the customer pays per litre. NULL means it is not set: the grade is in the catalogue and nobody has priced it yet. A price of zero is a price, and a price of zero means the customer takes the fuel for nothing - so the unset state is NULL and never 0.");
 
                     b.Property<string>("GradeKey")
                         .ValueGeneratedOnAddOrUpdate()
@@ -4292,8 +4282,6 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
 
-                            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND (discount_price IS NULL OR discount_price > 0)");
-
                             t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0)");
                         });
 
@@ -4302,11 +4290,9 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("6cef5b9f-5255-7686-6ac8-bc808a3c4280"),
                             AllowBelowCost = false,
-                            BasePrice = 55m,
                             BrandFuelCode = "DP",
                             BrandId = new Guid("89a11944-bdb3-5ed4-b55c-edae31335a6e"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 52m,
                             IsDeleted = false,
                             Name = "ДП ЄВРО",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4315,11 +4301,9 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("cc5d2c86-bebf-f77e-e793-118285578549"),
                             AllowBelowCost = false,
-                            BasePrice = 54m,
                             BrandFuelCode = "A-95",
                             BrandId = new Guid("89a11944-bdb3-5ed4-b55c-edae31335a6e"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 51m,
                             IsDeleted = false,
                             Name = "A-95",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4328,11 +4312,9 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("fa9f1398-0165-d599-8dfb-7880f4d3a479"),
                             AllowBelowCost = false,
-                            BasePrice = 60m,
                             BrandFuelCode = "Pulls 95",
                             BrandId = new Guid("89a11944-bdb3-5ed4-b55c-edae31335a6e"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 56m,
                             IsDeleted = false,
                             Name = "Pulls 95",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4341,11 +4323,9 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("74165925-2a26-19d3-3065-50beac6c2aa0"),
                             AllowBelowCost = false,
-                            BasePrice = 58m,
                             BrandFuelCode = "Pulls Diesel",
                             BrandId = new Guid("89a11944-bdb3-5ed4-b55c-edae31335a6e"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 55m,
                             IsDeleted = false,
                             Name = "ДП PULLS",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4354,11 +4334,9 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("79ce59bb-c52a-1a47-3586-f58ea92a376b"),
                             AllowBelowCost = false,
-                            BasePrice = 29m,
                             BrandFuelCode = "SPBT",
                             BrandId = new Guid("89a11944-bdb3-5ed4-b55c-edae31335a6e"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 27m,
                             IsDeleted = false,
                             Name = "ГАЗ",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4367,10 +4345,8 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("0110fe73-be2f-3fcf-2918-0f12dbee1632"),
                             AllowBelowCost = false,
-                            BasePrice = 56m,
                             BrandId = new Guid("0b9d7319-8ce3-50c9-a6e0-58e850217ffa"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 53m,
                             IsDeleted = false,
                             Name = "ДП Mustang",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4379,10 +4355,8 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("054c76e9-40d0-2e6e-4c3c-d0a0d7f7ee93"),
                             AllowBelowCost = false,
-                            BasePrice = 55m,
                             BrandId = new Guid("0b9d7319-8ce3-50c9-a6e0-58e850217ffa"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 52m,
                             IsDeleted = false,
                             Name = "A-95 Mustang",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4391,10 +4365,8 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("7051b2a3-249e-7e2e-3e8a-048e9916b799"),
                             AllowBelowCost = false,
-                            BasePrice = 56m,
                             BrandId = new Guid("0b9d7319-8ce3-50c9-a6e0-58e850217ffa"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 53m,
                             IsDeleted = false,
                             Name = "A 95 EURO",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4403,10 +4375,8 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("cfa77d27-5856-6281-d1af-51fa8c83c913"),
                             AllowBelowCost = false,
-                            BasePrice = 65m,
                             BrandId = new Guid("0b9d7319-8ce3-50c9-a6e0-58e850217ffa"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 61m,
                             IsDeleted = false,
                             Name = "Mustang 100",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -4415,10 +4385,8 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = new Guid("cb73475d-196b-5682-0376-1916b4bc0bb9"),
                             AllowBelowCost = false,
-                            BasePrice = 29m,
                             BrandId = new Guid("0b9d7319-8ce3-50c9-a6e0-58e850217ffa"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 27m,
                             IsDeleted = false,
                             Name = "ГАЗ",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)

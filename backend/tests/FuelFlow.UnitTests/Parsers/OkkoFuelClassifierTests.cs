@@ -12,18 +12,18 @@ public class OkkoFuelClassifierTests
     // and "ДП ЄВРО" — the exact rows that caused every non-diesel voucher to be rejected.
     private static readonly FuelTypeEntity[] ProductionOkkoFuelTypes =
     [
-        new() { Id = ToUuid("okko-95"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 },
-        new() { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52 }
+        new() { Id = ToUuid("okko-95"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko },
+        new() { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko }
     ];
 
     // Full seed catalog, to prove premium (PULLS) variants stay distinct from their base grades.
     private static readonly FuelTypeEntity[] SeedOkkoFuelTypes =
     [
-        new() { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52 },
-        new() { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 },
-        new() { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 60, DiscountPrice = 56 },
-        new() { Id = ToUuid("okko-pulls-dp"), Name = "ДП PULLS", BrandId = BrandIds.Okko, BasePrice = 58, DiscountPrice = 55 },
-        new() { Id = ToUuid("okko-gas"), Name = "ГАЗ", BrandId = BrandIds.Okko, BasePrice = 29, DiscountPrice = 27 }
+        new() { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko },
+        new() { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko },
+        new() { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko },
+        new() { Id = ToUuid("okko-pulls-dp"), Name = "ДП PULLS", BrandId = BrandIds.Okko },
+        new() { Id = ToUuid("okko-gas"), Name = "ГАЗ", BrandId = BrandIds.Okko }
     ];
 
     [Theory]
@@ -227,8 +227,8 @@ public class OkkoFuelClassifierTests
         // still decides, because a code cannot be spelled wrong.
         var fuels = new[]
         {
-            new FuelTypeEntity { Id = ToUuid("okko-95-euro"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko, BasePrice = 56, DiscountPrice = 53 },
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "А-95", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 }
+            new FuelTypeEntity { Id = ToUuid("okko-95-euro"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "А-95", BrandId = BrandIds.Okko }
         };
         var byCode = new Dictionary<string, FuelTypeEntity> { ["9015"] = fuels[0] };
 
@@ -332,12 +332,12 @@ public class OkkoFuelClassifierTests
         {
             var resolved = OkkoFuelClassifier.ResolveFuelType(
                 rawText: null,
-                qrPayload: $"{code}$2000$;99999600000020368126=4507101299?",
+                qrPayload: $"{code }$2000$;99999600000020368126=4507101299?",
                 catalogue);
 
-            resolved.Should().NotBeNull($"a voucher carrying the product code {code} names a grade the catalogue holds");
+            resolved.Should().NotBeNull($"a voucher carrying the product code {code } names a grade the catalogue holds");
             resolved!.Id.Should().Be(ToUuid(expected),
-                $"the voucher carrying {code} must land on the fuel the catalogue wrote for that grade");
+                $"the voucher carrying {code } must land on the fuel the catalogue wrote for that grade");
         }
     }
 }

@@ -38,7 +38,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         // okko-dp fuel with two nominals; margin 2 UAH/L, no pump (so final = blended cost + 2).
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         _context.FuelNominals.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
@@ -195,9 +195,11 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         // Nothing per size any more: the cost moved the fuel's rate, and every nominal follows it.
         sizes.Should().HaveCount(2);
         // The price the customer pays is COMPUTED from the knobs, so the recalculator writes the
-        // cost and the margin and leaves the stored copies alone - they are not what it reads.
+        // cost and the margin and the price follows them - there is no stored copy left to keep in
+        // step with anything.
         fuel.SupplierPricePerLiter.Should().Be(25);
-        fuel.DiscountPrice.Should().Be(52, "the copy is not what the price is computed from any more");
+        fuel.MarginUahPerLiter.Should().Be(2);
+        fuel.FinalPerLiter().Should().Be(27);
         _context.AuditEventOutbox.Should().ContainSingle(e => e.EventType == "BatchCostEntered");
     }
 

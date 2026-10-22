@@ -78,7 +78,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
     }
 
     private static FuelTypeEntity Fuel(string id, string name, string? code = null)
-        => new() { Id = ToUuid(id), Name = name, BrandId = BrandIds.Okko, BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
+        => new() { Id = ToUuid(id), Name = name, BrandId = BrandIds.Okko, BrandFuelCode = code };
 
     [Fact]
     public async Task AHandTypedFuel_GetsTheCodeTheBrandPublishesForItsGrade()

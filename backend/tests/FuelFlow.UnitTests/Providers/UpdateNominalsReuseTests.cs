@@ -126,8 +126,6 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             Id = ToUuid("okko-a95"),
             Name = "А95",
             BrandId = BrandIds.Okko,
-            BasePrice = 50m,
-            DiscountPrice = 45m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow,
         });

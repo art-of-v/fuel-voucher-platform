@@ -179,8 +179,6 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             BrandId = BrandIds.Okko,
             Name = "А-95 (renamed by hand)",
             BrandFuelCode = "A-95",
-            BasePrice = 54m,
-            DiscountPrice = 51m,
             // The price is the fuel's: the pump the operator set and the margin he set with it.
             PumpPricePerLiter = 60m,
             SupplierPricePerLiter = 49m,
@@ -200,7 +198,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
 
         var reloaded = await _context.FuelTypes.SingleAsync(f => f.Id == existing.Id);
         reloaded.Name.Should().Be("А-95 (renamed by hand)");
-        reloaded.DiscountPrice.Should().Be(51m);
+        reloaded.FinalPerLiter().Should().Be(51m, "the price the customer pays is the computed one");
         reloaded.AllowBelowCost.Should().BeTrue();
 
         // The pump price the operator set is still the operator's: the pump sync owns the pump,
@@ -223,8 +221,6 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             BrandId = BrandIds.Okko,
             Name = "ДП Застарілий",
             BrandFuelCode = "DP-OLD",
-            BasePrice = 50m,
-            DiscountPrice = 48m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

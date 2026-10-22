@@ -89,8 +89,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "ДП", BrandId = TestOkko, BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "ДП", BrandId = TestOkko, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m);
         _context.SeedPackage("test-fuel-a-20", TestOkko, "test-fuel-a", 20m, 1020m,
@@ -147,8 +147,6 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Id = ToUuid("test-fuel-zero-priced"),
             Name = "А-95",
             BrandId = TestOkko,
-            BasePrice = 92.90m,
-            DiscountPrice = 0m,
             PumpPricePerLiter = 92.90m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
@@ -185,8 +183,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("test-coded"), Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("test-uncoded"), Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("test-coded"), Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("test-uncoded"), Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
@@ -220,8 +218,6 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Id = ToUuid("test-dp"),
             Name = "ДП ЄВРО",
             BrandId = TestOkko,
-            BasePrice = 110,
-            DiscountPrice = 100,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
@@ -280,8 +276,6 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Id = ToUuid("test-dp"),
             Name = "ДП ЄВРО",
             BrandId = TestOkko,
-            BasePrice = 110,
-            DiscountPrice = 100,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
@@ -325,8 +319,6 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Id = ToUuid("test-dp"),
             Name = "ДП ЄВРО",
             BrandId = TestOkko,
-            BasePrice = 110,
-            DiscountPrice = 100,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

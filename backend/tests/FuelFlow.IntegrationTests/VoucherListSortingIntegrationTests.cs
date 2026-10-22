@@ -120,8 +120,6 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
             Id =   ToUuid(fuelTypeId),
             Name = $"A-95 {tag}",
             BrandId = brandId,
-            BasePrice = 55,
-            DiscountPrice = 52,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

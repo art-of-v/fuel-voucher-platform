@@ -52,8 +52,6 @@ public sealed class SchemaCommentTests
         nameof(FuelTypeEntity.MarginUahPerLiter),
         nameof(FuelTypeEntity.MarginPercent),
         nameof(FuelTypeEntity.PumpPricePerLiter),
-        nameof(FuelTypeEntity.BasePrice),
-        nameof(FuelTypeEntity.DiscountPrice),
         nameof(FuelTypeEntity.AllowBelowCost)
     ];
 

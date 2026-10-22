@@ -121,13 +121,11 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             new FuelTypeEntity
             {
                 Id = ToUuid("prod-gas"), Name = "ГАЗ", BrandId =  OkkoBrandId,
-                BasePrice = 45.50m, DiscountPrice = 44.50m,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             },
             new FuelTypeEntity
             {
                 Id = ToUuid("prod-a95"), Name = "А95 ЄВРО", BrandId =  OkkoBrandId,
-                BasePrice = 51.00m, DiscountPrice = 50.00m,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             });
 
@@ -200,7 +198,6 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = ToUuid("prod-pulls-diesel"), Name = "ДП PULLS", BrandId =  OkkoBrandId,
-            BasePrice = 105.90m, DiscountPrice = 102.90m,
             CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();

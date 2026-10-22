@@ -144,8 +144,6 @@ public sealed class BrandFuelControllerTests : IDisposable
             Id = ToUuid(id),
             BrandId = BrandId,
             Name = name,
-            BasePrice = 100,
-            DiscountPrice = 100,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
@@ -283,8 +281,8 @@ public sealed class BrandFuelControllerTests : IDisposable
         // The price the customer pays is computed from the knobs, so the kopecks are in the
         // computation and not in a stored copy of it.
         fuel.FinalPerLiter().Should().Be(97.86m);
-        fuel.BasePrice.Should().BeNull("the reference is the column price, and it is not stored twice");
-        fuel.DiscountPrice.Should().BeNull("the price is computed, and it is not stored");
+        fuel.SupplierPricePerLiter.Should().Be(95m);
+        fuel.MarginUahPerLiter.Should().Be(2.86m);
 
         var volume = await _context.FuelNominals.SingleAsync(n => n.FuelTypeId == fuel.Id);
     }

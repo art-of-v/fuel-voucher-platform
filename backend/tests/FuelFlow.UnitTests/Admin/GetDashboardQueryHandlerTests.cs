@@ -112,7 +112,6 @@ public sealed class GetDashboardQueryHandlerTests : IDisposable
             Id = fuelTypeId,
             Name = "Diesel",
             BrandId = brandId,
-            BasePrice = 50m,
             MarginUahPerLiter = marginPerLiter,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow

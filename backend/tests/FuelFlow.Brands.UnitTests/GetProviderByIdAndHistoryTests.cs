@@ -54,8 +54,8 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             UpdatedAtUtc = now
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "DP", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "DP", BrandId = TestOkko, CreatedAtUtc = now, UpdatedAtUtc = now });
         _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
             createdAtUtc: now, updatedAtUtc: now);

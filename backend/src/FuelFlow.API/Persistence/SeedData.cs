@@ -33,14 +33,19 @@ internal static class SeedData
     /// <see cref="Catalogue"/> and writes the fuel's key into a text column that, at that point in
     /// history, still holds keys. A uuid there would be a key the rows around it do not have.
     /// </para>
+    /// <para>
+    /// The price is the price the CUSTOMER pays, and it is the only number the seed states: the cost
+    /// is derived from it and the margin (see <see cref="Catalogue"/>). The list price the seed used to
+    /// state beside it is gone with its column - the reference the customer's saving is measured
+    /// against is the COLUMN price, and the seed states no pump price on purpose.
+    /// </para>
     /// </remarks>
     private sealed record SeedFuel(
         string Key,
         string Name,
         Guid BrandId,
         string? BrandFuelCode,
-        decimal BasePrice,
-        decimal DiscountPrice);
+        decimal CustomerPricePerLiter);
 
     // Only the OKKO fuels carry a brand fuel code, and that is a fact about evidence rather than a
     // preference. OKKO publishes a machine-readable list (`scripts/fetch-okko-prices.mjs`,
@@ -54,16 +59,16 @@ internal static class SeedData
     // name against real rows in every environment.
     private static readonly SeedFuel[] SeedFuels =
     [
-        new("okko-dp", "ДП ЄВРО", BrandIds.Okko, "DP", 55, 52),
-        new("okko-95", "A-95", BrandIds.Okko, "A-95", 54, 51),
-        new("okko-p95", "Pulls 95", BrandIds.Okko, "Pulls 95", 60, 56),
-        new("okko-pulls-dp", "ДП PULLS", BrandIds.Okko, "Pulls Diesel", 58, 55),
-        new("okko-gas", "ГАЗ", BrandIds.Okko, "SPBT", 29, 27),
-        new("wog-dp", "ДП Mustang", BrandIds.Wog, null, 56, 53),
-        new("wog-95", "A-95 Mustang", BrandIds.Wog, null, 55, 52),
-        new("wog-95-euro", "A 95 EURO", BrandIds.Wog, null, 56, 53),
-        new("wog-100", "Mustang 100", BrandIds.Wog, null, 65, 61),
-        new("wog-gas", "ГАЗ", BrandIds.Wog, null, 29, 27)
+        new("okko-dp", "ДП ЄВРО", BrandIds.Okko, "DP", 52),
+        new("okko-95", "A-95", BrandIds.Okko, "A-95", 51),
+        new("okko-p95", "Pulls 95", BrandIds.Okko, "Pulls 95", 56),
+        new("okko-pulls-dp", "ДП PULLS", BrandIds.Okko, "Pulls Diesel", 55),
+        new("okko-gas", "ГАЗ", BrandIds.Okko, "SPBT", 27),
+        new("wog-dp", "ДП Mustang", BrandIds.Wog, null, 53),
+        new("wog-95", "A-95 Mustang", BrandIds.Wog, null, 52),
+        new("wog-95-euro", "A 95 EURO", BrandIds.Wog, null, 53),
+        new("wog-100", "Mustang 100", BrandIds.Wog, null, 61),
+        new("wog-gas", "ГАЗ", BrandIds.Wog, null, 27)
     ];
 
     /// <summary>
@@ -81,8 +86,6 @@ internal static class SeedData
             Name = fuel.Name,
             BrandId = fuel.BrandId,
             BrandFuelCode = fuel.BrandFuelCode,
-            BasePrice = fuel.BasePrice,
-            DiscountPrice = fuel.DiscountPrice,
             CreatedAtUtc = CreatedAtUtc,
             UpdatedAtUtc = CreatedAtUtc
         }).ToArray();
@@ -136,7 +139,7 @@ internal static class SeedData
             foreach (var fuel in SeedFuels)
             {
                 var margin = fuelPricing.TryGetValue(fuel.Key, out var p) ? p.margin : 2.0m;
-                var finalPrice = fuel.DiscountPrice;
+                var finalPrice = fuel.CustomerPricePerLiter;
                 var supplierPrice = finalPrice - margin;
 
                 var offer = new FuelOffer

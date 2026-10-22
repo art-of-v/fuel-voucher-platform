@@ -77,7 +77,6 @@ public sealed class TermStockCoverageIntegrationTests : IClassFixture<TestDataba
         Id = id,
         Name = name,
         BrandId = brandId,
-        BasePrice = 50m,
         CreatedAtUtc = TestClock.UtcNow,
         UpdatedAtUtc = TestClock.UtcNow
     };

@@ -60,8 +60,6 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
             BrandId = brandId,
             Name = name,
             BrandFuelCode = code,
-            BasePrice = 50m,
-            DiscountPrice = 48m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         };
@@ -226,8 +224,8 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var now = TestClock.UtcNow;
 
         context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("wog-dp-e5"), Name = "ДП Євро5", BrandId = BrandIds.Wog, BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = ToUuid("wog-95-e5-e10"), Name = "95 Євро5-Е10", BrandId = BrandIds.Wog, BasePrice = 92.9m, DiscountPrice = 90m, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = ToUuid("wog-dp-e5"), Name = "ДП Євро5", BrandId = BrandIds.Wog, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = ToUuid("wog-95-e5-e10"), Name = "95 Євро5-Е10", BrandId = BrandIds.Wog, CreatedAtUtc = now, UpdatedAtUtc = now });
         await context.SaveChangesAsync();
 
         await context.Database.ExecuteSqlRawAsync(

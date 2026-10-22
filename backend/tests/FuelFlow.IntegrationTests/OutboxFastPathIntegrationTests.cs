@@ -213,8 +213,6 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
                 Id =   ToUuid(fuelTypeId),
                 Name = fuelTypeId,
                 BrandId = brandId,
-                BasePrice = 50m,
-                DiscountPrice = 50m,
                 CreatedAtUtc = TestClock.UtcNow,
                 UpdatedAtUtc = TestClock.UtcNow
             });

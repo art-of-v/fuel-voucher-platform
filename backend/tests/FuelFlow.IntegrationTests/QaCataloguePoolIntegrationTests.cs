@@ -107,8 +107,6 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
                 Id =   ToUuid(FuelType),
                 Name = RealName,
                 BrandId = Brand,
-                BasePrice = 50,
-                DiscountPrice = 47,
                 SupplierPricePerLiter = CostPerLiter,
                 MarginUahPerLiter = 2m,
                 CreatedAtUtc = now,

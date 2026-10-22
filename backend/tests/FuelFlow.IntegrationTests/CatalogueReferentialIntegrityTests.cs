@@ -100,23 +100,26 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         await AssertRefusedAsync(act, PostgresErrorCodes.ForeignKeyViolation);
     }
 
+    /// <summary>
+    /// "Not priced yet" is an absent price, and that is what the cost and the margin beside it have
+    /// always said. A grade the network lists but nobody has priced yet has a published pump price,
+    /// no cost and no margin - and no customer price, because the customer price is computed from
+    /// the two.
+    /// </summary>
+    /// <remarks>
+    /// The customer price used to be a stored column with a constraint of its own: the price the
+    /// customer pays could not be a zero, and the unset state was an empty column. The column is
+    /// gone with the copies (planning slice 2 of <c>docs/PLAN_PRICING_MODEL.md</c>), so the state
+    /// the column carried is carried by the knobs now: a fuel with no cost and no margin has no
+    /// customer price at all - and a grade with no price is not on the shelf.
+    /// </remarks>
     [Fact]
-    public async Task An_Unset_Discount_Price_Is_Null_And_Is_Allowed()
+    public async Task An_Unpriced_Fuel_Is_Allowed_And_Has_No_Customer_Price()
     {
-        // "Not priced yet" is an empty column, and that is what the cost beside it has always
-        // said. A grade the network lists but nobody has priced yet has a published pump price, no
-        // cost and no margin - and no customer price, because the customer price is what an
-        // operator sets when they set a margin. The OKKO catalogue import leaves exactly that
-        // behind, and UnpricedPackageIntegrationTests.A_Nominal_With_Neither_Rate_Nor_Margin_Is_Not_Charged
-        // builds it.
-        //
-        // A grade with no price is not on the shelf: its price computes to null, and the
-        // storefront does not list a package with no price.
         await using var context = CreateContext();
         var brandId = await SeededBrand(context);
 
         var fuel = NewFuel("catalogue-unpriced", brandId);
-        fuel.DiscountPrice = null;
         fuel.PumpPricePerLiter = 92.90m;
 
         await context.Set<FuelTypeEntity>().AddAsync(fuel);
@@ -124,54 +127,40 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
 
         await act.Should().NotThrowAsync();
 
-        (await context.Set<FuelTypeEntity>()
+        var reloaded = await context.Set<FuelTypeEntity>()
             .IgnoreQueryFilters()
-            .SingleAsync(f => f.Id == ToUuid("catalogue-unpriced"))).DiscountPrice
-            .Should().BeNull("an unset price stays unset");
+            .SingleAsync(f => f.Id == ToUuid("catalogue-unpriced"));
+        reloaded.SupplierPricePerLiter.Should().BeNull("nobody has costed this fuel");
+        reloaded.MarginUahPerLiter.Should().BeNull("nobody has set a margin");
+        reloaded.FinalPerLiter().Should().BeNull("a fuel nobody has priced has no price, not a price of zero");
 
         await context.Set<FuelTypeEntity>().Where(f => f.Id == ToUuid("catalogue-unpriced")).ExecuteDeleteAsync();
     }
 
+    /// <summary>
+    /// A priced fuel is accepted, and the price it carries is the computed one: the cost plus the
+    /// margin, never a stored copy that can disagree with them.
+    /// </summary>
     [Fact]
-    public async Task A_Zero_Discount_Price_Is_Refused()
-    {
-        // A price of zero is a price, and a price of zero means the customer takes the fuel for
-        // nothing. The unset state is NULL, so a zero is a mistake and the database says so.
-        //
-        // This is the business's call (2026-10-21). It reverses what this file used to say: the
-        // zero was the catalogue import's placeholder for "not priced yet", and the column now
-        // carries that state as an empty column instead - which is what its neighbour, the cost,
-        // has always done.
-        await using var context = CreateContext();
-        var brandId = await SeededBrand(context);
-
-        var fuel = NewFuel("catalogue-zero-price", brandId);
-        fuel.DiscountPrice = 0m;
-        fuel.PumpPricePerLiter = 92.90m;
-
-        var act = async () => { context.Set<FuelTypeEntity>().Add(fuel); await context.SaveChangesAsync(); };
-
-        await AssertRefusedAsync(act, PostgresErrorCodes.CheckViolation);
-    }
-
-    [Fact]
-    public async Task A_Positive_Discount_Price_Is_Accepted()
+    public async Task A_Priced_Fuel_Is_Accepted_And_Its_Price_Is_Computed()
     {
         await using var context = CreateContext();
         var brandId = await SeededBrand(context);
 
-        var fuel = NewFuel("catalogue-positive-price", brandId);
-        fuel.DiscountPrice = 1m;
+        var fuel = NewFuel("catalogue-priced", brandId);
+        fuel.SupplierPricePerLiter = 45m;
+        fuel.MarginUahPerLiter = 2m;
 
         context.Set<FuelTypeEntity>().Add(fuel);
         await context.SaveChangesAsync();
 
         (await context.Set<FuelTypeEntity>()
             .IgnoreQueryFilters()
-            .SingleAsync(f => f.Id == ToUuid("catalogue-positive-price"))).DiscountPrice
-            .Should().Be(1m);
+            .SingleAsync(f => f.Id == ToUuid("catalogue-priced")))
+            .FinalPerLiter()
+            .Should().Be(47m, "the customer price is the cost plus the margin");
 
-        await context.Set<FuelTypeEntity>().Where(f => f.Id == ToUuid("catalogue-positive-price")).ExecuteDeleteAsync();
+        await context.Set<FuelTypeEntity>().Where(f => f.Id == ToUuid("catalogue-priced")).ExecuteDeleteAsync();
     }
 
     // ---- helpers ---------------------------------------------------------------------------
@@ -258,8 +247,6 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         Id =   ToUuid(id),
         BrandId = brandId,
         Name = id,
-        BasePrice = 50m,
-        DiscountPrice = 50m,
         CreatedAtUtc = TestClock.UtcNow,
         UpdatedAtUtc = TestClock.UtcNow,
     };

@@ -262,23 +262,32 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     }
 
     /// <summary>
-    /// A negative discount price means the customer is paid to take the fuel. The only guard was
-    /// the application-level below-cost opt-in, which is a business decision rather than a
-    /// constraint - so a hand-written PUT or a future code path could still land one.
+    /// A negative price knob means we pay the customer for the fuel, or the customer is paid to
+    /// take it. The only guard is in the schema: the cost, the column price and the margin are
+    /// numbers a person wrote, and a negative one of them is a mistake the database refuses.
     /// </summary>
+    /// <remarks>
+    /// The stored copies of the price used to be guarded here as well
+    /// (<c>ck_fuel_types_prices_non_negative</c>). They are gone with their columns - the price is
+    /// computed from the knobs now (planning slice 2 of <c>docs/PLAN_PRICING_MODEL.md</c>) - so the
+    /// guard follows the knobs, which are what the price is made of.
+    /// </remarks>
     [Theory]
-    [InlineData(-1, 10)]
-    [InlineData(10, -1)]
-    public async Task A_Negative_Fuel_Type_Price_Is_Refused(double basePrice, double discountPrice)
+    [InlineData(-1, null, null)]   // the cost we pay is negative
+    [InlineData(null, -1, null)]   // the margin is negative: we pay the customer for the fuel
+    [InlineData(null, null, -1)]   // the column price is negative
+    public async Task A_Negative_Fuel_Type_Price_Is_Refused(
+        double? cost, double? margin, double? pumpPrice)
     {
         await using var context = CreateContext();
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = ToUuid( $"ft-neg-{basePrice}-{discountPrice}"),
+            Id = ToUuid($"ft-neg-{cost}-{margin}-{pumpPrice}"),
             BrandId = BrandIds.Okko,
-            Name = $"Negative {basePrice}/{discountPrice}",
-            BasePrice = (decimal)basePrice,
-            DiscountPrice = (decimal)discountPrice,
+            Name = $"Negative {cost}/{margin}/{pumpPrice}",
+            SupplierPricePerLiter = cost is null ? null : (decimal)cost.Value,
+            MarginUahPerLiter = margin is null ? null : (decimal)margin.Value,
+            PumpPricePerLiter = pumpPrice is null ? null : (decimal)pumpPrice.Value,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
@@ -333,8 +342,6 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         Id = ToUuid( $"{id}-fuel"),
         Name = $"Test fuel for {id}",
         BrandId = BrandIds.Okko,
-        BasePrice = 0m,
-        DiscountPrice = null,
         SupplierPricePerLiter = supplierPricePerLiter,
         MarginUahPerLiter = 1m,
         CreatedAtUtc = TestClock.UtcNow,
