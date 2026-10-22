@@ -687,7 +687,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         // and that also switches off Fulfillment's global `ReleasedAtUtc == null` filter. Counting
         // released rows as delivered made fulfilledUnits (2) meet OrderedUnits (2), the unfulfilled
         // value collapse to zero, and the customer was told "no unfulfilled value remains" while
-        // half their money stayed with us. The admin dialog showed it as "0.00 ╨│╤Ç╨╜".
+        // half their money stayed with us. The admin dialog showed it as "0.00 грн".
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {

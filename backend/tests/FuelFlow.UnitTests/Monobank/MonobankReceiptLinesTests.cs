@@ -71,18 +71,18 @@ public sealed class MonobankReceiptLinesTests
         {
             Amount = 20000,
             MerchantPaymentInfo = "FuelFlow Order 7258a522",
-            Destination = "╨ƒ╨░╨╗╨╕╨▓╨╛",
+            Destination = "Паливо",
             Items =
             [
                 new MonobankBasketItem
                 {
-                    Name = "╨É-95", Qty = 10m, Sum = 9500, Total = 95000,
-                    Unit = "╨╗", Code = "okko-a95",
+                    Name = "А-95", Qty = 10m, Sum = 9500, Total = 95000,
+                    Unit = "л", Code = "okko-a95",
                 },
                 new MonobankBasketItem
                 {
-                    Name = "╨ö╨ƒ ╨ä╨Æ╨á╨₧", Qty = 2m, Sum = 10000, Total = 20000,
-                    Unit = "╨╗", Code = "okko-diesel",
+                    Name = "ДП ЄВРО", Qty = 2m, Sum = 10000, Total = 20000,
+                    Unit = "л", Code = "okko-diesel",
                 },
             ],
         });
@@ -94,17 +94,17 @@ public sealed class MonobankReceiptLinesTests
 
         // The purchase description used to be a copy of the reference, so the receipt read
         // "FuelFlow Order 7258a522-d402-..." instead of what the customer bought.
-        info.GetProperty("destination").GetString().Should().Be("╨ƒ╨░╨╗╨╕╨▓╨╛");
+        info.GetProperty("destination").GetString().Should().Be("Паливо");
 
         var basket = info.GetProperty("basketOrder");
         basket.GetArrayLength().Should().Be(2);
 
         var first = basket[0];
-        first.GetProperty("name").GetString().Should().Be("╨É-95");
+        first.GetProperty("name").GetString().Should().Be("А-95");
         first.GetProperty("qty").GetDecimal().Should().Be(10m);
         first.GetProperty("sum").GetInt64().Should().Be(9500, "the price of ONE litre");
         first.GetProperty("total").GetInt64().Should().Be(95000);
-        first.GetProperty("unit").GetString().Should().Be("╨╗");
+        first.GetProperty("unit").GetString().Should().Be("л");
         first.GetProperty("code").GetString().Should().Be("okko-a95");
     }
 
@@ -125,6 +125,29 @@ public sealed class MonobankReceiptLinesTests
     }
 
     [Fact]
+    public async Task CreateInvoice_FallsBackToTheFuel_WhenTheCallerDeclaresNoDestination()
+    {
+        var (client, handler) = Build();
+
+        await client.CreateInvoiceAsync(new MonobankInvoiceRequest
+        {
+            Amount = 20000,
+            MerchantPaymentInfo = "FuelFlow Voucher Renewal",
+        });
+
+        // The acquirer prints what we declare it, so the fallback is on a fiscal receipt. It used
+        // to be the CP437 twin of "Паливо" - box-drawing characters in place of the letters - and
+        // two checkout paths reach it: a voucher renewal and a multi-item basket, neither of which
+        // declares a destination of its own. A single checkout declared "Паливо" and hid the
+        // damage, which is why the garbled string survived in the source.
+        MerchantPaymInfo(handler.Body)
+            .GetProperty("destination")
+            .GetString()
+            .Should()
+            .Be("Паливо");
+    }
+
+    [Fact]
     public async Task CancelInvoice_SendsTheReturnedGoods()
     {
         var (client, handler) = Build();
@@ -136,8 +159,8 @@ public sealed class MonobankReceiptLinesTests
             [
                 new MonobankBasketItem
                 {
-                    Name = "╨É-95", Qty = 5m, Sum = 9500, Total = 47500,
-                    Unit = "╨╗", Code = "okko-a95",
+                    Name = "А-95", Qty = 5m, Sum = 9500, Total = 47500,
+                    Unit = "л", Code = "okko-a95",
                 },
             ]);
 
@@ -149,7 +172,7 @@ public sealed class MonobankReceiptLinesTests
         doc.RootElement.GetProperty("extRef").GetString().Should().Be("idem-1");
 
         var item = doc.RootElement.GetProperty("items")[0];
-        item.GetProperty("name").GetString().Should().Be("╨É-95");
+        item.GetProperty("name").GetString().Should().Be("А-95");
         item.GetProperty("qty").GetDecimal().Should().Be(5m);
     }
 
