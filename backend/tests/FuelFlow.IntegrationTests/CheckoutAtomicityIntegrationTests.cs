@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -166,7 +167,7 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var user = await context.Users.FirstAsync(u => u.PhoneNumber == phoneNumber);
             user.IsActive = true;
-            user.UpdatedAtUtc = DateTime.UtcNow;
+            user.UpdatedAtUtc = TestClock.UtcNow;
             context.Update(user);
             await context.SaveChangesAsync();
             _userId = user.Id;
@@ -183,7 +184,7 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6));
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6));
 
         for (var i = 0; i < count; i++)
         {
@@ -199,8 +200,8 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
                 VoucherNumber = $"ATOMIC-{brandId}-{fuelTypeId}-{Guid.NewGuid().ToString()[..8]}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
