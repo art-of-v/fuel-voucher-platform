@@ -145,6 +145,10 @@ cp "$PREFLIGHT" "$FIXTURE/preflight.sh"
 # ones rather than writing a stub makes every fixture run an actual assertion that the
 # repo's compose files parse - which is the defect this suite exists to catch.
 cp "$SCRIPT_DIR/docker-compose.prod.yml" "$SCRIPT_DIR/docker-compose.staging.yml" "$FIXTURE/"
+# The env templates come along too, so the preflight's verbatim template check - the one that
+# compares a deployed value against the template's own - is exercised by every run below rather
+# than skipped for want of a file.
+cp "$SCRIPT_DIR/.env.production.example" "$SCRIPT_DIR/.env.staging.example" "$FIXTURE/"
 # Compose exits non-zero BOTH for an unparseable file and for an unset ${VAR:?}, so a
 # non-zero exit only means "did not load" once every required variable is satisfied.
 # Derive them from the files themselves so this cannot drift as compose grows. Matching only the
@@ -235,6 +239,62 @@ check "different QR cipher keys pass" 0 "$rc"
 [[ "$out" == *"the QR cipher keys differ"* ]] \
   && { echo "  PASS  it says the keys were compared"; pass=$((pass+1)); } \
   || { echo "  FAIL  it does not say the keys were compared: $out"; fail=$((fail+1)); }
+
+# ------------------------------------------------------------------------------
+# The four secrets the env templates ship must not survive into the deployed file.
+#
+# The repository is public until 2026-11-01, so the template's values are on the internet. An
+# operator who copies the template and misses a line deploys a platform whose access tokens are
+# signed with a string anybody can read - and an HS256 token signed with a known string is a
+# staff token anybody can forge. The application refuses the same placeholders at boot; this is
+# the half that runs BEFORE the deploy.
+# ------------------------------------------------------------------------------
+for var in JWT_SECRET QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
+  template_value="$(grep -E "^${var}=" "$SCRIPT_DIR/.env.production.example" | head -1 | cut -d= -f2-)"
+  cp "$GOOD_ENV" "$FIXTURE/.env"
+  sed -i "s|^${var}=.*|${var}=${template_value}|" "$FIXTURE/.env"
+  out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+  check "a $var that still holds the template's value is refused" 1 "$rc"
+  [[ "$out" == *"$var"* ]] \
+    && { echo "  PASS  the refusal names $var"; pass=$((pass+1)); } \
+    || { echo "  FAIL  the refusal does not name $var: $out"; fail=$((fail+1)); }
+  # The value is a placeholder, so printing it would leak nothing - but the check fires on a
+  # value that merely READS like one, and the day it misfires on a real secret, printing it
+  # would put that secret in the deploy log.
+  [[ "$out" != *"$template_value"* ]] \
+    && { echo "  PASS  the refusal does not print the value"; pass=$((pass+1)); } \
+    || { echo "  FAIL  the refusal printed the value: $out"; fail=$((fail+1)); }
+  cp "$GOOD_ENV" "$FIXTURE/.env"
+done
+
+# ------------------------------------------------------------------------------
+# The pattern alone can be defeated by editing the template to hide the placeholder.
+#
+# "CHANGE_ME" is a word: a template that says something else sails past the pattern check. The
+# verbatim comparison cannot be defeated that way, because the template's own values are what it
+# compares against. So the check has to survive a template whose placeholder does not read like
+# one - and the deployed value that came from it must still be refused.
+# ------------------------------------------------------------------------------
+sed -i 's|^JWT_SECRET=.*|JWT_SECRET=dummy-value-from-the-template|' \
+  "$FIXTURE/.env.production.example"
+cp "$GOOD_ENV" "$FIXTURE/.env"
+sed -i 's|^JWT_SECRET=.*|JWT_SECRET=dummy-value-from-the-template|' "$FIXTURE/.env"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a value taken verbatim from an edited template is refused" 1 "$rc"
+[[ "$out" == *"still holds the value from"* ]] \
+  && { echo "  PASS  the refusal says the value came from the template"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the refusal does not name the template: $out"; fail=$((fail+1)); }
+cp "$GOOD_ENV" "$FIXTURE/.env"
+cp "$SCRIPT_DIR/.env.production.example" "$FIXTURE/.env.production.example"
+
+# And a value that is neither a placeholder nor a template value passes - the check that refuses
+# everything is not a check, it is an outage.
+cp "$GOOD_ENV" "$FIXTURE/.env"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "real secrets pass the placeholder check" 0 "$rc"
+[[ "$out" == *"no env template is available here"* ]] \
+  && { echo "  FAIL  the template was not found in the fixture"; fail=$((fail+1)); } \
+  || { echo "  PASS  the template was found, so the verbatim check really ran"; pass=$((pass+1)); }
 
 # ------------------------------------------------------------------------------
 # The wording of the failure must not assert a cause that measurement disproved.
