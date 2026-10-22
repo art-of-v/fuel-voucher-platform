@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Feedback.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -58,38 +59,38 @@ public sealed class UpdateFeedbackStatusCommandHandler
         // One transaction for the status change and the audit row. ExecuteUpdateAsync commits on its
         // own, so without the transaction a message could move states with no row naming who moved
         // it - and the audit row would be a separate write that can fail on its own (planning #533).
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(ct)
-            : null;
-
-        var changed = await _context.FeedbackMessages
-            .Where(m => ids.Contains(m.Id) && m.Status != status)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(m => m.Status, status),
-                ct);
-
-        if (changed > 0)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the audit row once.
+        var changed = await _context.ExecuteReplaySafeAsync(async ct =>
         {
-            // The row is tracked, not written: the caller's own save commits it, in the same
-            // transaction as the change it describes (planning #533, C-3).
-            _eventService.RecordEvent(
-                "FeedbackMessage",
-                ids.Count == 1 ? ids[0].ToString() : $"bulk:{changed}",
-                "FeedbackStatusChanged",
-                null,
-                JsonSerializer.Serialize(new { count = changed, status = status.ToString() }),
-                actingId,
-                command.ActingUserName,
-                $"Marked {changed} feedback message(s) as {status}",
-                actingId.ToString());
+            var updated = await _context.FeedbackMessages
+                .Where(m => ids.Contains(m.Id) && m.Status != status)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(m => m.Status, status),
+                    ct);
 
-            await _context.SaveChangesAsync(ct);
-        }
+            if (updated > 0)
+            {
+                // The row is tracked, not written: the caller's own save commits it, in the same
+                // transaction as the change it describes (planning #533, C-3).
+                _eventService.RecordEvent(
+                    "FeedbackMessage",
+                    ids.Count == 1 ? ids[0].ToString() : $"bulk:{updated}",
+                    "FeedbackStatusChanged",
+                    null,
+                    JsonSerializer.Serialize(new { count = updated, status = status.ToString() }),
+                    actingId,
+                    command.ActingUserName,
+                    $"Marked {updated} feedback message(s) as {status}",
+                    actingId.ToString());
 
-        if (tx is not null)
-        {
-            await tx.CommitAsync(ct);
-        }
+                await _context.SaveChangesAsync(ct);
+            }
+
+            return updated;
+        }, ct);
 
         return UpdateFeedbackStatusResult.Done(changed);
     }

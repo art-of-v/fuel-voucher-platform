@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -63,44 +64,44 @@ public sealed class ResolveErrorLogsCommandHandler
         // One transaction for the flip and the audit row. ExecuteUpdateAsync commits on its own, so
         // without the transaction a resolved error log could exist with no row naming who resolved
         // it - and the audit row would be a separate write that can fail on its own (planning #533).
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(ct)
-            : null;
-
-        var changed = await query.ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.ResolvedAtUtc,
-                    command.Resolved ? SystemClock.UtcNow : (DateTime?)null)
-                .SetProperty(e => e.ResolvedByUserId,
-                    command.Resolved ? actingId : (Guid?)null)
-                .SetProperty(e => e.ResolvedByUserName,
-                    command.Resolved ? actingName : null),
-            ct);
-
-        if (changed > 0)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the audit row once.
+        var changed = await _context.ExecuteReplaySafeAsync(async ct =>
         {
-            // ScopeId is required and an error record has none, so the acting user stands in -
-            // the same workaround the user and QA-access aggregates already use.
-            //
-            // The row is tracked, not written: the caller's own save commits it, in the same
-            // transaction as the change it describes (planning #533, C-3).
-            _eventService.RecordEvent(
-                "ErrorLog",
-                ids.Count == 1 ? ids[0].ToString() : $"bulk:{changed}",
-                command.Resolved ? "ErrorLogsResolved" : "ErrorLogsReopened",
-                null,
-                JsonSerializer.Serialize(new { count = changed, resolved = command.Resolved }),
-                actingId,
-                actingName,
-                $"{(command.Resolved ? "Resolved" : "Reopened")} {changed} error log record(s)",
-                actingId.ToString());
+            var updated = await query.ExecuteUpdateAsync(setters => setters
+                    .SetProperty(e => e.ResolvedAtUtc,
+                        command.Resolved ? SystemClock.UtcNow : (DateTime?)null)
+                    .SetProperty(e => e.ResolvedByUserId,
+                        command.Resolved ? actingId : (Guid?)null)
+                    .SetProperty(e => e.ResolvedByUserName,
+                        command.Resolved ? actingName : null),
+                ct);
 
-            await _context.SaveChangesAsync(ct);
-        }
+            if (updated > 0)
+            {
+                // ScopeId is required and an error record has none, so the acting user stands in -
+                // the same workaround the user and QA-access aggregates already use.
+                //
+                // The row is tracked, not written: the caller's own save commits it, in the same
+                // transaction as the change it describes (planning #533, C-3).
+                _eventService.RecordEvent(
+                    "ErrorLog",
+                    ids.Count == 1 ? ids[0].ToString() : $"bulk:{updated}",
+                    command.Resolved ? "ErrorLogsResolved" : "ErrorLogsReopened",
+                    null,
+                    JsonSerializer.Serialize(new { count = updated, resolved = command.Resolved }),
+                    actingId,
+                    actingName,
+                    $"{(command.Resolved ? "Resolved" : "Reopened")} {updated} error log record(s)",
+                    actingId.ToString());
 
-        if (tx is not null)
-        {
-            await tx.CommitAsync(ct);
-        }
+                await _context.SaveChangesAsync(ct);
+            }
+
+            return updated;
+        }, ct);
 
         return ResolveErrorLogsResult.Done(changed);
     }

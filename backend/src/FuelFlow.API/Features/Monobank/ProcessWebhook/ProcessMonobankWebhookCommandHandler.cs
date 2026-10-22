@@ -2,6 +2,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Ledger;
 using FuelFlow.Payments;
 using FuelFlow.Payments.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
@@ -145,31 +146,33 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
             command.CancelList,
             cancellationToken);
 
-        // Not on the in-memory provider: it has no transactions at all, and the unit tests are
-        // about the logic rather than about the atomicity - the integration test is.
-        await using var transaction = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : (IDbContextTransaction?)null;
-
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the money step rather than failing the delivery, and the
+        // retry writes the order's transition, the outbox event and the journal entries once.
+        //
+        // The order's own state is the answer to "did it land?": the money step exists to move the
+        // order past the payment gate, so an order that is no longer waiting for its payment has
+        // been through it - whether this attempt wrote that or an earlier delivery did.
         try
         {
-            var processed = await ProcessAsync(command, cancellationToken);
-            await SyncPaymentAsync(command, processed.Response, stored.Id, cancellationToken);
+            return await _context.ExecuteReplaySafeAsync<ProcessingOutcome>(
+                async ct =>
+                {
+                    var processed = await ProcessAsync(command, ct);
+                    await SyncPaymentAsync(command, processed.Response, stored.Id, ct);
 
-            if (transaction is not null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-
-            return processed;
+                    return processed;
+                },
+                cancellationToken,
+                verifySucceeded: async ct => await _context.Orders
+                    .AsNoTracking()
+                    .AnyAsync(
+                        o => o.MonobankInvoiceId == command.InvoiceId
+                            && o.Status != OrderStatus.PendingPayment,
+                        ct));
         }
         catch
         {
-            if (transaction is not null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-
             // The rollback undid the DATABASE; the change tracker still holds what it was about to
             // write. The next save - the one that records the delivery's failure - would re-apply
             // the order's status change and re-insert the outbox event and the journal entries,

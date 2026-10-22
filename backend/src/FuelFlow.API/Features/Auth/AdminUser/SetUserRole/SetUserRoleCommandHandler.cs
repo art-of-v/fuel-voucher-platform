@@ -1,6 +1,7 @@
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -101,36 +102,43 @@ public sealed class SetUserRoleCommandHandler
         // retry saw oldRole == newRole (isDemotion=false), so it skipped revocation entirely and
         // left the demoted user with live old-role sessions. One transaction closes that trap:
         // any failure rolls the role change back, so the retry is a real demotion again.
-        // (No EnableRetryOnFailure is configured on the context, so a manual transaction is safe.)
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the audit row once.
+        await _context.ExecuteReplaySafeAsync(async ct =>
+        {
+            // Tracked inside this transaction, not saved: the row and the role change it describes
+            // commit together, or the transaction rolls both back (planning #533).
+            _eventService.RecordEvent(
+                "User",
+                target.Id.ToString(),
+                "RoleChanged",
+                JsonSerializer.Serialize(new { role = oldRoleName }),
+                JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion }),
+                command.ActingUserId,
+                command.ActingUserName,
+                "Role of " + target.PhoneNumber + " changed to " + command.RoleName,
+                command.ActingUserId.ToString());
 
-        // Tracked inside this transaction, not saved: the row and the role change it describes
-        // commit together, or the transaction rolls both back (planning #533).
-        _eventService.RecordEvent(
-            "User",
-            target.Id.ToString(),
-            "RoleChanged",
-            JsonSerializer.Serialize(new { role = oldRoleName }),
-            JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion }),
-            command.ActingUserId,
-            command.ActingUserName,
-            "Role of " + target.PhoneNumber + " changed to " + command.RoleName,
-            command.ActingUserId.ToString());
+            await _context.SaveChangesAsync(ct);
 
-        await _context.SaveChangesAsync(cancellationToken);
+            if (isDemotion)
+            {
+                // Bumps TokenVersion (kills all access tokens within one request) and revokes every
+                // refresh token + active device, on the same DbContext and transaction.
+                await _logoutEverywhere.HandleAsync(new LogoutEverywhereCommand(target.Id), ct);
+            }
+        }, cancellationToken: cancellationToken);
 
+        // Logged after the commit, so a transaction that never landed does not leave a line saying
+        // the sessions were revoked.
         if (isDemotion)
         {
-            // Bumps TokenVersion (kills all access tokens within one request) and revokes every
-            // refresh token + active device, on the same DbContext and transaction.
-            await _logoutEverywhere.HandleAsync(new LogoutEverywhereCommand(target.Id), cancellationToken);
-
             _logger.LogWarning(
                 "User {TargetId} demoted from {OldRole} to {NewRole} by {ActingUserId}; all sessions revoked",
                 command.UserId, oldRoleName, command.RoleName, command.ActingUserId);
         }
-
-        await transaction.CommitAsync(cancellationToken);
 
         if (!isDemotion)
         {

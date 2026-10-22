@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
@@ -181,72 +182,72 @@ public sealed class SetBatchCostCommandHandler
         // it. What we paid, what the pool now costs and who typed it are one fact: a crash between
         // them would leave the money recorded with no row explaining it - and this is the only trace
         // of what a lot cost, there is no supplier invoice to fall back on (planning #533).
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-
-        // Persist FIRST: production runs NoTracking, so the blended recompute below (a fresh query)
-        // would not see the unsaved voucher costs otherwise.
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // The arrival, so the recompute here is the operator's rule and not a side effect: the moving
-        // average changes when a lot arrives and at no other time.
-        var blended = await _recalculator.ComputeBlendedAsync(command.FuelTypeId, cancellationToken);
-        var repriced = 0;
-        if (blended is { } b)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the cost, the repricing and the audit row once.
+        var (blended, repriced) = await _context.ExecuteReplaySafeAsync<(decimal? Blended, int Repriced)>(async ct =>
         {
-            repriced = await _recalculator.RepriceAsync(
-                command.FuelTypeId, b, command.ActingUserId, PriceHistoryReasons.BatchCost, cancellationToken);
-            await _context.SaveChangesAsync(cancellationToken);
+            // Persist FIRST: production runs NoTracking, so the blended recompute below (a fresh query)
+            // would not see the unsaved voucher costs otherwise.
+            await _context.SaveChangesAsync(ct);
 
-            // Slice-3 proactive alert: a rising blended cost may have pushed this supplier+fuel's
-            // price below cost. If it did and no manager has opted it in, the hard block now refuses
-            // every sale/activation — surface that immediately so pricing can be fixed.
-            var fuelType = await _context.FuelTypes.AsNoTracking()
-                .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, cancellationToken);
-            // Our price is the cost plus the margin, and the margin is not negative, so a new cost
-            // cannot make the price fall under it. There is nothing to alert about here any more: the
-            // below-cost guard that is left is the one that judges the price the customer is
-            // actually charged, which a term discount can take under the cost.
-        }
+            // The arrival, so the recompute here is the operator's rule and not a side effect: the moving
+            // average changes when a lot arrives and at no other time.
+            var blendedCost = await _recalculator.ComputeBlendedAsync(command.FuelTypeId, ct);
+            var repricedCount = 0;
+            if (blendedCost is { } b)
+            {
+                repricedCount = await _recalculator.RepriceAsync(
+                    command.FuelTypeId, b, command.ActingUserId, PriceHistoryReasons.BatchCost, ct);
+                await _context.SaveChangesAsync(ct);
 
-        if (actingUser is { } userId)
-        {
-            var oldText = oldCostText.HasValue ? oldCostText.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
-            var newText = command.CostPerLiter.ToString("F2", CultureInfo.InvariantCulture);
-            var blendedText = blended.HasValue ? blended.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
-            // old_value/new_value are jsonb and every other audit event stores an OBJECT. Handing them a
-            // bare decimal stores a JSON scalar instead: Postgres accepts it, so nothing fails loudly,
-            // but the before/after is no longer machine-readable and the brand history has nothing
-            // to render. This row is the only trace of what we paid — there is no supplier invoice to
-            // fall back on — so it has to be as readable as the rest of the audit log.
-            _eventService.RecordEvent(
-                "Batch",
-                $"{command.ImportJobId}:{command.FuelTypeId}",
-                "BatchCostEntered",
-                oldCostText is { } previous
-                    ? JsonSerializer.Serialize(new { FuelTypeId = command.FuelTypeId, CostPerLiter = previous })
-                    : null,
-                JsonSerializer.Serialize(new
-                {
-                    command.FuelTypeId,
-                    command.CostPerLiter,
-                    BlendedCostPerLiter = blended,
-                    VouchersCosted = targets.Count,
-                }),
-                userId,
-                command.ActingUserName,
-                $"{brand} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
-                brand);
-        }
+                // Slice-3 proactive alert: a rising blended cost may have pushed this supplier+fuel's
+                // price below cost. If it did and no manager has opted it in, the hard block now refuses
+                // every sale/activation — surface that immediately so pricing can be fixed.
+                var fuelType = await _context.FuelTypes.AsNoTracking()
+                    .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, ct);
+                // Our price is the cost plus the margin, and the margin is not negative, so a new cost
+                // cannot make the price fall under it. There is nothing to alert about here any more: the
+                // below-cost guard that is left is the one that judges the price the customer is
+                // actually charged, which a term discount can take under the cost.
+            }
 
-        // The audit row, committed in the transaction with the cost entry it describes.
-        await _context.SaveChangesAsync(cancellationToken);
+            if (actingUser is { } userId)
+            {
+                var oldText = oldCostText.HasValue ? oldCostText.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
+                var newText = command.CostPerLiter.ToString("F2", CultureInfo.InvariantCulture);
+                var blendedText = blendedCost.HasValue ? blendedCost.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
+                // old_value/new_value are jsonb and every other audit event stores an OBJECT. Handing them a
+                // bare decimal stores a JSON scalar instead: Postgres accepts it, so nothing fails loudly,
+                // but the before/after is no longer machine-readable and the brand history has nothing
+                // to render. This row is the only trace of what we paid — there is no supplier invoice to
+                // fall back on — so it has to be as readable as the rest of the audit log.
+                _eventService.RecordEvent(
+                    "Batch",
+                    $"{command.ImportJobId}:{command.FuelTypeId}",
+                    "BatchCostEntered",
+                    oldCostText is { } previous
+                        ? JsonSerializer.Serialize(new { FuelTypeId = command.FuelTypeId, CostPerLiter = previous })
+                        : null,
+                    JsonSerializer.Serialize(new
+                    {
+                        command.FuelTypeId,
+                        command.CostPerLiter,
+                        BlendedCostPerLiter = blendedCost,
+                        VouchersCosted = targets.Count,
+                    }),
+                    userId,
+                    command.ActingUserName,
+                    $"{brand} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
+                    brand);
+            }
 
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
-        }
+            // The audit row, committed in the transaction with the cost entry it describes.
+            await _context.SaveChangesAsync(ct);
+
+            return (blendedCost, repricedCount);
+        }, cancellationToken: cancellationToken);
 
         return new SetBatchCostResult(true, false, null, blended, repriced, targets.Count);
     }

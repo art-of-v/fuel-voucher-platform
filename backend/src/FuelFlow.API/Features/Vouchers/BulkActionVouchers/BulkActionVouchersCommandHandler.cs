@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -89,41 +90,39 @@ public sealed class BulkActionVouchersCommandHandler
                 // fact, and a batch that committed its flips without its events would archive vouchers
                 // with no record of who did it - the gap `ck_voucher_events_actor_named` exists to
                 // close, reachable through a 500 rather than a bad write.
-                await using var batchTx = _context.Database.IsRelational()
-                    ? await _context.Database.BeginTransactionAsync(cancellationToken)
-                    : null;
-
-                var archivedAtUtc = SystemClock.UtcNow;
-                await _context.FuelVouchers
-                    .Where(v => batchIds.Contains(v.Id))
-                    .ExecuteUpdateAsync(
-                        setters => setters
-                            .SetProperty(v => v.IsDeleted, true)
-                            .SetProperty(v => v.UpdatedAtUtc, archivedAtUtc),
-                        cancellationToken);
-
-                if (batchActor is { } archiveActor)
+                //
+                // The transaction runs through ReplaySafeTransaction, so the execution strategy may
+                // replay it: a transient failure retries the batch rather than failing the request,
+                // and the retry writes the flags and the events once.
+                await _context.ExecuteReplaySafeAsync(async ct =>
                 {
-                    // `Archived`, not `StatusChanged`: is_deleted is a separate column and a ticket can
-                    // be archived while sitting in any state, so from/to would be invented. The handler
-                    // never reads a status here, and must not need to.
-                    _context.VoucherEvents.AddRange(batchIds.Select(id => new VoucherEvent
+                    var archivedAtUtc = SystemClock.UtcNow;
+                    await _context.FuelVouchers
+                        .Where(v => batchIds.Contains(v.Id))
+                        .ExecuteUpdateAsync(
+                            setters => setters
+                                .SetProperty(v => v.IsDeleted, true)
+                                .SetProperty(v => v.UpdatedAtUtc, archivedAtUtc),
+                            ct);
+
+                    if (batchActor is { } archiveActor)
                     {
-                        Id = Guid.CreateVersion7(),
-                        VoucherId = id,
-                        EventType = VoucherEventTypes.Archived,
-                        ActorKind = VoucherActorKinds.User,
-                        ActorUserId = archiveActor,
-                        OccurredAtUtc = archivedAtUtc
-                    }));
+                        // `Archived`, not `StatusChanged`: is_deleted is a separate column and a ticket can
+                        // be archived while sitting in any state, so from/to would be invented. The handler
+                        // never reads a status here, and must not need to.
+                        _context.VoucherEvents.AddRange(batchIds.Select(id => new VoucherEvent
+                        {
+                            Id = Guid.CreateVersion7(),
+                            VoucherId = id,
+                            EventType = VoucherEventTypes.Archived,
+                            ActorKind = VoucherActorKinds.User,
+                            ActorUserId = archiveActor,
+                            OccurredAtUtc = archivedAtUtc
+                        }));
 
-                    await _context.SaveChangesAsync(cancellationToken);
-                }
-
-                if (batchTx is not null)
-                {
-                    await batchTx.CommitAsync(cancellationToken);
-                }
+                        await _context.SaveChangesAsync(ct);
+                    }
+                }, cancellationToken: cancellationToken);
 
                 removedCount += batchIds.Count;
             }

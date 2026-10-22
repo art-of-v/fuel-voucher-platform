@@ -111,7 +111,29 @@ internal static class DatabaseSetup
             // quietly reinstated.
             options.UseLoggerFactory(loggerFactory)
                    .UseNpgsql(dataSource,
-                       b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName));
+                       b =>
+                       {
+                           b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+
+                           // EF's retrying execution strategy: a transient failure (a dropped
+                           // connection, a deadlock, a serialization failure) is retried instead of
+                           // failing the request. Three attempts, at most five seconds apart.
+                           //
+                           // It has one consequence that is not optional: the strategy refuses a
+                           // transaction opened by hand, so every explicit transaction in this app
+                           // runs inside it, through ReplaySafeTransaction. A transaction opened
+                           // outside the strategy throws at its first save - at runtime, on the
+                           // money paths, not at compile time.
+                           //
+                           // The deploy path is retrying too, and that is deliberate: EF's migrator
+                           // runs its commands through the same strategy, each migration in its own
+                           // transaction, so a blip while the box boots does not need a human to
+                           // restart the deploy.
+                           b.EnableRetryOnFailure(
+                               maxRetryCount: 3,
+                               maxRetryDelay: TimeSpan.FromSeconds(5),
+                               errorCodesToAdd: null);
+                       });
 
             // Parameter values may contain phone numbers, tokens, and voucher identifiers.
             // They are useful while debugging locally but must never enter production logs.

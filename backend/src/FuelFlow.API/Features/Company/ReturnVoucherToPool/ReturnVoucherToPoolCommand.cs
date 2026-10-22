@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -106,79 +107,81 @@ public sealed class ReturnVoucherToPoolCommandHandler
         // The return and the record of it commit together - see the same note in
         // BlockWorkerVoucherCommand. Without it a failed SaveChanges leaves an Assigned voucher
         // with nothing saying who released it.
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-
-        // Repeat the status predicate in the UPDATE so the return cannot race a thaw: exactly one
-        // of a concurrent thaw / return wins. A redemption cannot race it at all - it wants an
-        // Assigned voucher, and this one is Blocked until this statement lands.
-        var returnedAtUtc = SystemClock.UtcNow;
-        var affected = await _context.FuelVouchers
-            .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Blocked)
-            .ExecuteUpdateAsync(
-                s => s
-                    .SetProperty(v => v.Status, VoucherStatus.Assigned)
-                    .SetProperty(v => v.WorkerUserId, (Guid?)null)
-                    .SetProperty(v => v.OrderId, purchaseOrderId)
-                    .SetProperty(v => v.UpdatedAtUtc, returnedAtUtc),
-                cancellationToken);
-
-        if (affected == 0)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the movement and the event once.
+        ReturnVoucherToPoolResult? lostRace = await _context.ExecuteReplaySafeAsync<ReturnVoucherToPoolResult?>(async ct =>
         {
-            if (tx is not null)
+            // Repeat the status predicate in the UPDATE so the return cannot race a thaw: exactly one
+            // of a concurrent thaw / return wins. A redemption cannot race it at all - it wants an
+            // Assigned voucher, and this one is Blocked until this statement lands.
+            var returnedAtUtc = SystemClock.UtcNow;
+            var affected = await _context.FuelVouchers
+                .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Blocked)
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(v => v.Status, VoucherStatus.Assigned)
+                        .SetProperty(v => v.WorkerUserId, (Guid?)null)
+                        .SetProperty(v => v.OrderId, purchaseOrderId)
+                        .SetProperty(v => v.UpdatedAtUtc, returnedAtUtc),
+                    ct);
+
+            if (affected == 0)
             {
-                await tx.RollbackAsync(cancellationToken);
+                // Nothing was written, so there is nothing to roll back: the empty transaction
+                // commits as it stands and the caller is told the voucher was not returned.
+                return new ReturnVoucherToPoolResult("InvalidState", "Only a frozen voucher can be returned to the company pool.");
             }
 
-            return new ReturnVoucherToPoolResult("InvalidState", "Only a frozen voucher can be returned to the company pool.");
-        }
+            // D-13. Two facts, and neither derives from the other.
+            //
+            // The movement - the paper goes from a worker's hands back to the company - is owed only
+            // when there WAS a worker to take it from. A voucher the firing had already taken back is
+            // already at the company, and a movement that says "company -> company" is not a movement
+            // (ck_voucher_movements_distinct_locations). It is the same split the thaw makes: the thaw
+            // writes an event and no movement, because a thaw moves no paper.
+            if (voucher.WorkerUserId is not null)
+            {
+                _context.VoucherMovements.Add(new VoucherMovement
+                {
+                    Id = Guid.CreateVersion7(),
+                    Kind = VoucherMovementKinds.Recall,
+                    VoucherId = voucher.Id,
+                    FromLocation = VoucherLocations.Worker,
+                    ToLocation = VoucherLocations.Company,
+                    OrderId = issuanceOrderId,
+                    ActorKind = VoucherActorKinds.User,
+                    ActorUserId = command.OwnerUserId,
+                    ActorPartyId = legalEntityId,
+                    OccurredAtUtc = returnedAtUtc
+                });
+            }
 
-        // D-13. Two facts, and neither derives from the other.
-        //
-        // The movement - the paper goes from a worker's hands back to the company - is owed only
-        // when there WAS a worker to take it from. A voucher the firing had already taken back is
-        // already at the company, and a movement that says "company -> company" is not a movement
-        // (ck_voucher_movements_distinct_locations). It is the same split the thaw makes: the thaw
-        // writes an event and no movement, because a thaw moves no paper.
-        if (voucher.WorkerUserId is not null)
-        {
-            _context.VoucherMovements.Add(new VoucherMovement
+            // The event - the voucher stops being frozen and becomes spendable company stock. That is a
+            // change of what a ticket IS, not of where it is, which is what a voucher_events row is for.
+            // The recall writes no event because a recall changes nothing about the voucher's kind.
+            _context.VoucherEvents.Add(new VoucherEvent
             {
                 Id = Guid.CreateVersion7(),
-                Kind = VoucherMovementKinds.Recall,
                 VoucherId = voucher.Id,
-                FromLocation = VoucherLocations.Worker,
-                ToLocation = VoucherLocations.Company,
-                OrderId = issuanceOrderId,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = nameof(VoucherStatus.Blocked),
+                ToStatus = nameof(VoucherStatus.Assigned),
                 ActorKind = VoucherActorKinds.User,
                 ActorUserId = command.OwnerUserId,
                 ActorPartyId = legalEntityId,
                 OccurredAtUtc = returnedAtUtc
             });
-        }
 
-        // The event - the voucher stops being frozen and becomes spendable company stock. That is a
-        // change of what a ticket IS, not of where it is, which is what a voucher_events row is for.
-        // The recall writes no event because a recall changes nothing about the voucher's kind.
-        _context.VoucherEvents.Add(new VoucherEvent
+            await _context.SaveChangesAsync(ct);
+
+            return null;
+        }, cancellationToken: cancellationToken);
+
+        if (lostRace is not null)
         {
-            Id = Guid.CreateVersion7(),
-            VoucherId = voucher.Id,
-            EventType = VoucherEventTypes.StatusChanged,
-            FromStatus = nameof(VoucherStatus.Blocked),
-            ToStatus = nameof(VoucherStatus.Assigned),
-            ActorKind = VoucherActorKinds.User,
-            ActorUserId = command.OwnerUserId,
-            ActorPartyId = legalEntityId,
-            OccurredAtUtc = returnedAtUtc
-        });
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
+            return lostRace;
         }
 
         _metrics.VoucherReturnedToPool();
