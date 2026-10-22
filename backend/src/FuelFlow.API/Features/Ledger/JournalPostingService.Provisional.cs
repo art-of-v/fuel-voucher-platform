@@ -115,12 +115,6 @@ public sealed partial class JournalPostingService
         var reposted = new List<JournalEntry>(stranded.Count);
         if (stranded.Count > 0)
         {
-            // Free the idempotency key and the entry numbers first: the reposted entry carries the
-            // same (source_event, source_type, source_id), and the unique index refuses it while the
-            // discarded draft still holds the triple.
-            _db.JournalEntries.RemoveRange(stranded);
-            await _db.SaveChangesAsync(cancellationToken);
-
             var today = DateOnly.FromDateTime(now);
             var period = await ResolvePeriodAsync(today, cancellationToken);
             var firstNo = await NextEntryNosAsync(period.Id, stranded.Count, cancellationToken);
@@ -129,6 +123,13 @@ public sealed partial class JournalPostingService
             {
                 reposted.Add(CloneAsRepost(stranded[index], today, period.Id, firstNo + index, now));
             }
+
+            // journal_lines is RESTRICT, so EF cannot sever the association by nulling the key: the
+            // lines go explicitly, before their entry. Deleting the entry also frees the
+            // (source_event, source_type, source_id) triple the repost needs back.
+            _db.JournalLines.RemoveRange(stranded.SelectMany(e => e.Lines));
+            _db.JournalEntries.RemoveRange(stranded);
+            await _db.SaveChangesAsync(cancellationToken);
 
             _db.JournalEntries.AddRange(reposted);
             await _db.SaveChangesAsync(cancellationToken);
@@ -172,6 +173,9 @@ public sealed partial class JournalPostingService
             return 0;
         }
 
+        // The lines first: their foreign key is RESTRICT, and EF treats a tracked line of a deleted
+        // draft as an association it cannot sever.
+        _db.JournalLines.RemoveRange(drafts.SelectMany(e => e.Lines));
         _db.JournalEntries.RemoveRange(drafts);
         await _db.SaveChangesAsync(cancellationToken);
 
