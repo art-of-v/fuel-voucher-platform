@@ -1,11 +1,9 @@
-using System.Data.Common;
 using System.Text.RegularExpressions;
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Persistence;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -98,18 +96,14 @@ public sealed class TheRetentionPurgeReadsThroughAnIndex : IClassFixture<TestDat
         await using var explainContext = CreateContext();
         await explainContext.Database.OpenConnectionAsync();
 
-        // The COUNT is the query that runs every night BY DEFAULT: the retention job is a dry run
-        // until somebody turns it on, so this is the statement the box executes tonight. It is
-        // captured rather than re-written, so what is explained is the statement the job really
-        // sends and not a copy of it that can drift.
-        var counter = new CommandTextCapture();
-        await using (var counting = CreateContext(counter))
-        {
-            await DataRetentionService.UnconsumedOutboxEventsToPurge(counting.OutboxEvents, cutoff)
-                .CountAsync();
-        }
-
-        var countPlan = await ExplainAsync(explainContext, counter.CommandText!, cutoff);
+        // The count the dry run sends every night BY DEFAULT: the retention job does not delete
+        // until somebody turns it on, so this is the statement the box executes tonight. The count
+        // carries the same predicate as the select and no LIMIT, so the plan of this one is the
+        // plan of the count.
+        var countPlan = await ExplainAsync(explainContext,
+            DataRetentionService.UnconsumedOutboxEventsToPurge(explainContext.OutboxEvents, cutoff)
+                .ToQueryString(),
+            cutoff);
 
         _output.WriteLine(countPlan);
 
@@ -226,31 +220,10 @@ public sealed class TheRetentionPurgeReadsThroughAnIndex : IClassFixture<TestDat
         => Regex.Matches(sql, @"@(\w+)").Select(m => m.Groups[1].Value);
 
     /// <summary>
-    /// Keeps the statement the query really sent, so the plan is explained for the job's own SQL
-    /// and not for a copy of it.
+    /// A context on this class's own database.
     /// </summary>
-    private sealed class CommandTextCapture : DbCommandInterceptor
-    {
-        public string? CommandText { get; private set; }
-
-        public override InterceptionResult<DbDataReader> ReaderExecuting(
-            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
-        {
-            CommandText = command.CommandText;
-            return result;
-        }
-    }
-
-    private ApplicationDbContext CreateContext(IInterceptor? interceptor = null)
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.ConnectionString);
-
-        if (interceptor is not null)
-        {
-            options.AddInterceptors(interceptor);
-        }
-
-        return new ApplicationDbContext(options.Options, TestQrCipher.Instance);
-    }
+    private ApplicationDbContext CreateContext()
+        => new(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(_fixture.ConnectionString)
+            .Options, TestQrCipher.Instance);
 }
