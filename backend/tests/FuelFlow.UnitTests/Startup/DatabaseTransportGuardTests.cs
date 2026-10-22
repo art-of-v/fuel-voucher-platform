@@ -34,6 +34,7 @@ public sealed class DatabaseTransportGuardTests
         ["SmsClub:Token"] = "sms-token",
         ["SmsClub:SenderName"] = "FuelFlow",
         ["DeviceAuth:Enabled"] = "true",
+        ["Attestation:AcknowledgeDisabledInProduction"] = "true",
         ["Database:ConnectionString"] =
             "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;Password=secret;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
         // The schema migration has its own connection now, and it carries the money and the

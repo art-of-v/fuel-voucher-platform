@@ -91,6 +91,7 @@ public sealed class PlaceholderSecretGuardTests
         ["SmsClub:Token"] = "sms-token",
         ["SmsClub:SenderName"] = "FuelFlow",
         ["DeviceAuth:Enabled"] = "true",
+        ["Attestation:AcknowledgeDisabledInProduction"] = "true",
     };
 
     private static IConfiguration Config(Dictionary<string, string?> settings) =>
