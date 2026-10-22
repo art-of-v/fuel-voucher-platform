@@ -139,7 +139,30 @@ services:
       # The startup guard refuses to boot a production build whose connection string says
       # otherwise (SecurityConfigurationValidator), so a managed database cannot inherit the
       # old default by accident.
-      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
+      #
+      # The ROLE is not the cluster's superuser any more. `fuelflow_app` may do the
+      # application's own work - read and write the application's tables - and nothing else:
+      # it cannot change the schema, cannot create a role, cannot create a database, and it
+      # is not a superuser. The schema is changed through the connection below, as a
+      # different role. One role used to do both, and it owned the cluster, so a defect that
+      # reached the database owned the cluster too.
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=fuelflow_app;Password=${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
+
+      # --- The migration connection: a different role, on purpose ---
+      #
+      # `fuelflow_migrator` may change the schema and nothing else. It owns the tables (the
+      # migration alters them), and it is not a superuser: it cannot read the roles' password
+      # hashes, cannot create a role, and cannot drop the database.
+      #
+      # The application applies the pending migrations at boot through this connection, so
+      # the manual restart path keeps working exactly as it did before. Two startup guards
+      # keep the separation honest: SecurityConfigurationValidator refuses to boot when the
+      # two strings name the same role, and DatabaseRoleValidator asks the live catalogue
+      # whether the role the traffic connects as is a superuser.
+      #
+      # deploy/ensure-database-roles.sh creates the three roles and applies the grants; the
+      # deploy job runs it before this container is recreated.
+      Database__MigrationConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=fuelflow_migrator;Password=${POSTGRES_MIGRATOR_PASSWORD:?set POSTGRES_MIGRATOR_PASSWORD in .env};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
 
       # --- The connection-pool cap ---
       # One process opens SEVERAL pools against this database: the application's data source, the
