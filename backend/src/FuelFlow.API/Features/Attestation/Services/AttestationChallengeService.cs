@@ -168,10 +168,7 @@ public sealed class AttestationChallengeService
 
         if (!string.Equals(entry.Action, expectedAction, StringComparison.Ordinal))
         {
-            _logger.LogWarning(
-                "Attestation challenge action {ActualAction} did not match {ExpectedAction}",
-                entry.Action,
-                expectedAction);
+            _logger.LogWarning("Attestation challenge action did not match the expected action");
             return new ChallengeValidation(ChallengeStatus.ActionMismatch);
         }
 
