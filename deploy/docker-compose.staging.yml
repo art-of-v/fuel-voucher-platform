@@ -22,7 +22,7 @@
 # NO caddy service: the prod Caddy (docker-compose.prod.yml) terminates TLS and reverse-
 # proxies the staging.* domains too — only one process can own :443. The prod Caddy
 # reaches these containers over the shared external network `fuelflow_shared`, where they
-# are published under the aliases staging-backend / staging-admin / staging-website. HTTP
+# are published under the aliases fuelflow-staging-backend / staging-admin / staging-website. HTTP
 # Basic auth at that Caddy gates every staging domain, which is what makes it safe to run
 # the auth surface here with the prod-only guards relaxed (see ASPNETCORE_ENVIRONMENT).
 #
@@ -153,7 +153,7 @@ services:
       default: {}
       shared:
         aliases:
-          - staging-backend
+          - fuelflow-staging-backend
     depends_on:
       postgres:
         condition: service_healthy

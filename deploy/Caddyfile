@@ -190,7 +190,7 @@ palne.shop, www.palne.shop {
 # disabled on staging.
 #
 # Upstreams are the staging containers, reached over the shared `fuelflow_shared`
-# network under the aliases staging-admin / staging-backend / staging-website
+# network under the aliases staging-admin / fuelflow-staging-backend / staging-website
 # (the prod caddy service joins that network in docker-compose.prod.yml).
 #
 # Routing MIRRORS the three prod blocks above on purpose, so staging exercises the
@@ -254,7 +254,7 @@ palne.shop, www.palne.shop {
 
 	import internal_only
 
-	reverse_proxy staging-backend:8080
+	reverse_proxy fuelflow-staging-backend:8080
 }
 
 # --- Staging marketing site ---
@@ -279,7 +279,7 @@ palne.shop, www.palne.shop {
 	@any_api path /api /api/*
 
 	route {
-		reverse_proxy @support_api staging-backend:8080
+		reverse_proxy @support_api fuelflow-staging-backend:8080
 		respond @any_api 404
 		reverse_proxy staging-website:5001
 	}
