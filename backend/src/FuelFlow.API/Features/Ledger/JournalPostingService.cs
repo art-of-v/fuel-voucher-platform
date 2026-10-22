@@ -33,7 +33,7 @@ namespace FuelFlow.Features.Ledger;
 /// edge. The platform made that choice everywhere else; this is where it was missed.
 /// </para>
 /// </summary>
-public sealed class JournalPostingService
+public sealed partial class JournalPostingService
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<JournalPostingService> _logger;
@@ -68,43 +68,12 @@ public sealed class JournalPostingService
             return existing;
         }
 
-        var (debit, credit) = await ResolveAccountsAsync(request.SourceEvent, cancellationToken);
-        var period = await ResolvePeriodAsync(request.EntryDate, cancellationToken);
-        var entryNo = await NextEntryNoAsync(period.Id, cancellationToken);
         var now = SystemClock.UtcNow;
-
-        var entry = new JournalEntry
-        {
-            Id = Guid.CreateVersion7(),
-            EntryNo = entryNo,
-            EntryDate = request.EntryDate,
-            PeriodId = period.Id,
-            SourceType = request.SourceType,
-            SourceEvent = request.SourceEvent,
-            SourceId = request.SourceId,
-            Description = request.Description,
-            // Draft first. trg_journal_lines_posted_is_immutable refuses a line added to an entry
-            // that is already posted, so the entry and its lines cannot be written in one INSERT -
-            // the entry has to exist and be composable before it is posted.
-            Status = JournalEntryStatus.Draft,
-            CreatedAtUtc = now,
-            CreatedByUserId = request.PostedByUserId,
-            Lines =
-            [
-                NewLine(1, debit, request),
-                NewLine(2, credit, request),
-            ],
-        };
-
-        _db.JournalEntries.Add(entry);
-        await _db.SaveChangesAsync(cancellationToken);
+        var entry = await ComposeDraftAsync(request, now, cancellationToken);
 
         try
         {
-            entry.Status = JournalEntryStatus.Posted;
-            entry.PostedAtUtc = now;
-            entry.PostedByUserId = request.PostedByUserId;
-            entry.TamperHash = ComputeTamperHash(entry);
+            MarkPosted(entry, request.PostedByUserId, now);
 
             await _db.SaveChangesAsync(cancellationToken);
         }
@@ -123,6 +92,60 @@ public sealed class JournalPostingService
             entry.EntryNo, request.SourceEvent, request.AmountUah);
 
         return entry;
+    }
+
+    /// <summary>
+    /// Composes the entry and its two lines as a draft - which is how every posting starts.
+    /// <c>trg_journal_lines_posted_is_immutable</c> refuses a line added to an entry that is already
+    /// posted, so the entry and its lines cannot be written in one INSERT; the entry has to exist
+    /// and be composable before it is posted. A caller that stops here has a provisional entry: it
+    /// is numbered and balanced, and it is not in the books.
+    /// </summary>
+    private async Task<JournalEntry> ComposeDraftAsync(
+        PostJournalEntryRequest request,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var (debit, credit) = await ResolveAccountsAsync(request.SourceEvent, cancellationToken);
+        var period = await ResolvePeriodAsync(request.EntryDate, cancellationToken);
+        var entryNo = await NextEntryNoAsync(period.Id, cancellationToken);
+
+        var entry = new JournalEntry
+        {
+            Id = Guid.CreateVersion7(),
+            EntryNo = entryNo,
+            EntryDate = request.EntryDate,
+            PeriodId = period.Id,
+            SourceType = request.SourceType,
+            SourceEvent = request.SourceEvent,
+            SourceId = request.SourceId,
+            Description = request.Description,
+            Status = JournalEntryStatus.Draft,
+            CreatedAtUtc = now,
+            CreatedByUserId = request.PostedByUserId,
+            Lines =
+            [
+                NewLine(1, debit, request),
+                NewLine(2, credit, request),
+            ],
+        };
+
+        _db.JournalEntries.Add(entry);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return entry;
+    }
+
+    /// <summary>
+    /// Turns a composed draft into a posted entry. The hash is computed here and not at composition,
+    /// because this is the moment the entry becomes a fact - and the one the trigger checks.
+    /// </summary>
+    private static void MarkPosted(JournalEntry entry, Guid postedByUserId, DateTime now)
+    {
+        entry.Status = JournalEntryStatus.Posted;
+        entry.PostedAtUtc = now;
+        entry.PostedByUserId = postedByUserId;
+        entry.TamperHash = ComputeTamperHash(entry);
     }
 
     private async Task<JournalEntry?> FindExistingAsync(
@@ -351,10 +374,7 @@ public sealed class JournalPostingService
         {
             foreach (var entry in entries)
             {
-                entry.Status = JournalEntryStatus.Posted;
-                entry.PostedAtUtc = now;
-                entry.PostedByUserId = first.PostedByUserId;
-                entry.TamperHash = ComputeTamperHash(entry);
+                MarkPosted(entry, first.PostedByUserId, now);
             }
 
             await _db.SaveChangesAsync(cancellationToken);
