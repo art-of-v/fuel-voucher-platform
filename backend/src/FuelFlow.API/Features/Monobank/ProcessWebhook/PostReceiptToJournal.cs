@@ -23,9 +23,11 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
     /// confirmed choice on 2026-10-19 was to trust the settled state rather than the announcement.
     /// </para>
     /// <para>
-    /// A failure here rolls the whole webhook back, and that is deliberate. Money that is taken and
-    /// not in the books is worse than a payment that is retried: the customer can pay twice, but a
-    /// book that is silently short is discovered at month end.
+    /// A failure here rolls the whole money step back, and that is deliberate. The order's status,
+    /// the outbox event that hands it to fulfilment, the payment row that records the money and
+    /// these entries are ONE transaction: the order is not committed before the receipt is booked.
+    /// Money that is taken and not in the books is worse than a payment that is retried: the
+    /// customer can pay twice, but a book that is silently short is discovered at month end.
     /// </para>
     /// </summary>
     private async Task PostReceiptToJournalAsync(Order order, CancellationToken cancellationToken)
