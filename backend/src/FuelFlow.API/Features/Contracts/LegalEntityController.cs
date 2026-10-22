@@ -1,12 +1,14 @@
-using FuelFlow.Features.Contracts.SharedModels;
-using FuelFlow.Persistence;
-using FuelFlow.SharedKernel.Observability;
-using FuelFlow.SharedKernel.Time;
+using System.Security.Claims;
+using FuelFlow.Features.Contracts.CreateLegalEntity;
+using FuelFlow.Features.Contracts.GetCustomerContracts;
+using FuelFlow.Features.Contracts.GetCustomerSignedContracts;
+using FuelFlow.Features.Contracts.GetLegalEntityProfile;
+using FuelFlow.Features.Contracts.GetMyLegalEntities;
+using FuelFlow.Features.Contracts.SignContract;
+using FuelFlow.Features.Contracts.UpdateLegalEntity;
+using FuelFlow.Features.Contracts.UpsertLegalEntityProfile;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Npgsql;
-using System.Security.Claims;
 
 namespace FuelFlow.Features.Contracts;
 
@@ -15,21 +17,36 @@ namespace FuelFlow.Features.Contracts;
 [Authorize]
 public sealed class LegalEntityController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<LegalEntityController> _logger;
-    private readonly NotificationDispatcher _notifications;
-    private readonly ContractWriter _contractWriter;
+    private readonly GetLegalEntityProfileQueryHandler _getLegalEntityProfileHandler;
+    private readonly UpsertLegalEntityProfileCommandHandler _upsertLegalEntityProfileHandler;
+    private readonly GetMyLegalEntitiesQueryHandler _getMyLegalEntitiesHandler;
+    private readonly CreateLegalEntityCommandHandler _createLegalEntityHandler;
+    private readonly UpdateLegalEntityCommandHandler _updateLegalEntityHandler;
+    private readonly GetCustomerContractsQueryHandler _getCustomerContractsHandler;
+    private readonly SignContractCommandHandler _signContractHandler;
+    private readonly GetCustomerSignedContractsQueryHandler _getCustomerSignedContractsHandler;
 
     public LegalEntityController(
-        ApplicationDbContext dbContext,
         ILogger<LegalEntityController> logger,
-        NotificationDispatcher notifications,
-        ContractWriter contractWriter)
+        GetLegalEntityProfileQueryHandler getLegalEntityProfileHandler,
+        UpsertLegalEntityProfileCommandHandler upsertLegalEntityProfileHandler,
+        GetMyLegalEntitiesQueryHandler getMyLegalEntitiesHandler,
+        CreateLegalEntityCommandHandler createLegalEntityHandler,
+        UpdateLegalEntityCommandHandler updateLegalEntityHandler,
+        GetCustomerContractsQueryHandler getCustomerContractsHandler,
+        SignContractCommandHandler signContractHandler,
+        GetCustomerSignedContractsQueryHandler getCustomerSignedContractsHandler)
     {
-        _dbContext = dbContext;
         _logger = logger;
-        _notifications = notifications;
-        _contractWriter = contractWriter;
+        _getLegalEntityProfileHandler = getLegalEntityProfileHandler;
+        _upsertLegalEntityProfileHandler = upsertLegalEntityProfileHandler;
+        _getMyLegalEntitiesHandler = getMyLegalEntitiesHandler;
+        _createLegalEntityHandler = createLegalEntityHandler;
+        _updateLegalEntityHandler = updateLegalEntityHandler;
+        _getCustomerContractsHandler = getCustomerContractsHandler;
+        _signContractHandler = signContractHandler;
+        _getCustomerSignedContractsHandler = getCustomerSignedContractsHandler;
     }
 
     [HttpGet("profile")]
@@ -40,11 +57,11 @@ public sealed class LegalEntityController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var entity = await _dbContext.LegalEntities
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.UserId == userId.Value, cancellationToken);
+        var entity = await _getLegalEntityProfileHandler.HandleAsync(
+            new GetLegalEntityProfileQuery(userId.Value),
+            cancellationToken);
 
-        return entity is null ? NotFound() : Ok(MapToDto(entity));
+        return entity is null ? NotFound() : Ok(entity);
     }
 
     [HttpPost("profile")]
@@ -53,82 +70,18 @@ public sealed class LegalEntityController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpsertProfile([FromBody] UpsertLegalEntityRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Name is required");
+        var result = await _upsertLegalEntityProfileHandler.HandleAsync(
+            new UpsertLegalEntityProfileCommand(GetUserId(), DetailsOf(request)),
+            cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(request.Edrpou))
-            return BadRequest("EDRPOU is required");
-
-        // Format gate, not just non-empty: a 16-digit typo is not an EDRPOU (#128).
-        var edrpouProblem = LegalEntityIdentifier.DescribeEdrpouProblem(request.Edrpou);
-        if (edrpouProblem != null)
-            return BadRequest(edrpouProblem);
-
-        var vatProblem = LegalEntityIdentifier.DescribeVatProblem(request.VatNumber);
-        if (vatProblem != null)
-            return BadRequest(vatProblem);
-
-        var userId = GetUserId();
-        if (userId == null) return Unauthorized();
-
-        var entity = await _dbContext.LegalEntities
-            .FirstOrDefaultAsync(e => e.UserId == userId.Value, cancellationToken);
-
-        bool isNewEntity = false;
-        if (entity is null)
+        return result.Outcome switch
         {
-            entity = new LegalEntity
-            {
-                Id = Guid.CreateVersion7(),
-                UserId = userId.Value,
-                CreatedAtUtc = SystemClock.UtcNow
-            };
-            _dbContext.LegalEntities.Add(entity);
-            isNewEntity = true;
-        }
-
-        entity.Name = request.Name;
-        entity.Edrpou = request.Edrpou;
-        entity.VatNumber = request.VatNumber;
-        entity.Address = request.Address;
-        entity.DirectorName = request.DirectorName;
-        entity.Phone = request.Phone;
-        entity.Email = request.Email;
-        entity.UpdatedAtUtc = SystemClock.UtcNow;
-
-        if (!isNewEntity)
-        {
-            _dbContext.LegalEntities.Update(entity);
-        }
-
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            // The EDRPOU is already registered to a different user. This endpoint upserts by
-            // UserId, so the unique index that trips here is the one on legal_entities.edrpou —
-            // surface it as a clean 409 rather than an unhandled 500 (mirrors Sign()'s Conflict).
-            return Conflict("EDRPOU already registered");
-        }
-
-        // Only the initial creation is reported; this endpoint is an upsert and
-        // profile edits are routine.
-        if (isNewEntity)
-        {
-        await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
-
-        // A company gets its contracts here, not by an operator's hand: the owner decided on
-        // 2026-10-21 that a company is created with a contract for every provider, and the
-        // client signs what already exists. The writer only adds what is missing, so calling
-        // it again when a provider publishes a new text is the backfill too.
-        await _contractWriter.EnsureContractsForAsync(entity, userId.Value, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        }
-
-        return Ok(MapToDto(entity));
+            LegalEntityWriteOutcome.Invalid => BadRequest(result.Error!),
+            LegalEntityWriteOutcome.Unauthenticated => Unauthorized(),
+            LegalEntityWriteOutcome.Conflict => Conflict(result.Error!),
+            LegalEntityWriteOutcome.NotFound => NotFound(result.Error!),
+            _ => Ok(result.Entity)
+        };
     }
 
     // Multi-company (epic #103): list all legal entities owned by the caller (0..N).
@@ -141,13 +94,11 @@ public sealed class LegalEntityController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var entities = await _dbContext.LegalEntities
-            .AsNoTracking()
-            .Where(e => e.UserId == userId.Value)
-            .OrderBy(e => e.CreatedAtUtc)
-            .ToListAsync(cancellationToken);
+        var entities = await _getMyLegalEntitiesHandler.HandleAsync(
+            new GetMyLegalEntitiesQuery(userId.Value),
+            cancellationToken);
 
-        return Ok(entities.Select(MapToDto));
+        return Ok(entities);
     }
 
     // Multi-company (epic #103): create a NEW legal entity for the caller. Unlike the
@@ -159,60 +110,18 @@ public sealed class LegalEntityController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] UpsertLegalEntityRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Name is required");
+        var result = await _createLegalEntityHandler.HandleAsync(
+            new CreateLegalEntityCommand(GetUserId(), DetailsOf(request)),
+            cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(request.Edrpou))
-            return BadRequest("EDRPOU is required");
-
-        // Format gate, not just non-empty: a 16-digit typo is not an EDRPOU (#128).
-        var edrpouProblem = LegalEntityIdentifier.DescribeEdrpouProblem(request.Edrpou);
-        if (edrpouProblem != null)
-            return BadRequest(edrpouProblem);
-
-        var vatProblem = LegalEntityIdentifier.DescribeVatProblem(request.VatNumber);
-        if (vatProblem != null)
-            return BadRequest(vatProblem);
-
-        var userId = GetUserId();
-        if (userId == null) return Unauthorized();
-
-        var entity = new LegalEntity
+        return result.Outcome switch
         {
-            Id = Guid.CreateVersion7(),
-            UserId = userId.Value,
-            Name = request.Name,
-            Edrpou = request.Edrpou,
-            VatNumber = request.VatNumber,
-            Address = request.Address,
-            DirectorName = request.DirectorName,
-            Phone = request.Phone,
-            Email = request.Email,
-            CreatedAtUtc = SystemClock.UtcNow,
-            UpdatedAtUtc = SystemClock.UtcNow
+            LegalEntityWriteOutcome.Invalid => BadRequest(result.Error!),
+            LegalEntityWriteOutcome.Unauthenticated => Unauthorized(),
+            LegalEntityWriteOutcome.Conflict => Conflict(result.Error!),
+            LegalEntityWriteOutcome.NotFound => NotFound(result.Error!),
+            _ => Ok(result.Entity)
         };
-        _dbContext.LegalEntities.Add(entity);
-
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            // Duplicate legal_entities.edrpou (globally unique) — surface as a clean 409.
-            return Conflict("EDRPOU already registered");
-        }
-
-        await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
-
-        // A company gets its contracts here, not by an operator's hand: the owner decided on
-        // 2026-10-21 that a company is created with a contract for every provider, and the
-        // client signs what already exists. The writer only adds what is missing, so calling
-        // it again when a provider publishes a new text is the backfill too.
-        await _contractWriter.EnsureContractsForAsync(entity, userId.Value, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(MapToDto(entity));
     }
 
     // Multi-company (epic #103 S3a): update a SPECIFIC owned legal entity by id. The legacy
@@ -226,51 +135,18 @@ public sealed class LegalEntityController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpsertLegalEntityRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Name is required");
+        var result = await _updateLegalEntityHandler.HandleAsync(
+            new UpdateLegalEntityCommand(GetUserId(), id, DetailsOf(request)),
+            cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(request.Edrpou))
-            return BadRequest("EDRPOU is required");
-
-        // Format gate, not just non-empty: a 16-digit typo is not an EDRPOU (#128).
-        var edrpouProblem = LegalEntityIdentifier.DescribeEdrpouProblem(request.Edrpou);
-        if (edrpouProblem != null)
-            return BadRequest(edrpouProblem);
-
-        var vatProblem = LegalEntityIdentifier.DescribeVatProblem(request.VatNumber);
-        if (vatProblem != null)
-            return BadRequest(vatProblem);
-
-        var userId = GetUserId();
-        if (userId == null) return Unauthorized();
-
-        var entity = await _dbContext.LegalEntities
-            .FirstOrDefaultAsync(e => e.Id == id && e.UserId == userId.Value, cancellationToken);
-
-        if (entity is null)
-            return NotFound("Legal entity not found");
-
-        entity.Name = request.Name;
-        entity.Edrpou = request.Edrpou;
-        entity.VatNumber = request.VatNumber;
-        entity.Address = request.Address;
-        entity.DirectorName = request.DirectorName;
-        entity.Phone = request.Phone;
-        entity.Email = request.Email;
-        entity.UpdatedAtUtc = SystemClock.UtcNow;
-        _dbContext.LegalEntities.Update(entity);
-
-        try
+        return result.Outcome switch
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            // Duplicate legal_entities.edrpou (globally unique) — surface as a clean 409.
-            return Conflict("EDRPOU already registered");
-        }
-
-        return Ok(MapToDto(entity));
+            LegalEntityWriteOutcome.Invalid => BadRequest(result.Error!),
+            LegalEntityWriteOutcome.Unauthenticated => Unauthorized(),
+            LegalEntityWriteOutcome.Conflict => Conflict(result.Error!),
+            LegalEntityWriteOutcome.NotFound => NotFound(result.Error!),
+            _ => Ok(result.Entity)
+        };
     }
     // The route was lost on 2026-10-01: 934e3793 moved the method and dropped the attribute with
     // it, and the revert that put the body back (b52f1359, 2026-10-12) did not put the attribute
@@ -285,48 +161,11 @@ public sealed class LegalEntityController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var contracts = await _dbContext.Contracts
-            .AsNoTracking()
-            .Include(c => c.Entity)
-            .Include(c => c.Brand)
-            .Where(c => c.UserId == userId.Value)
-            .OrderByDescending(c => c.CreatedAtUtc)
-            .ToListAsync(cancellationToken);
+        var contracts = await _getCustomerContractsHandler.HandleAsync(
+            new GetCustomerContractsQuery(userId.Value),
+            cancellationToken);
 
-        // The text the customer is asked to read before signing. It lives once per provider and
-        // the contract says which version it is against - so the text is read by that pair, and
-        // a contract whose version has no text yet says so rather than showing an empty page.
-        // The table holds one row per provider per version - four providers and a handful of
-        // versions each - so it is read whole and matched here.
-        var texts = (await _dbContext.ContractVersions
-                .AsNoTracking()
-                .ToListAsync(cancellationToken))
-            .ToDictionary(v => (v.BrandId, v.Version), v => v.Body);
-
-        var result = contracts.Select(c =>
-        {
-            texts.TryGetValue((c.BrandId, c.TermsVersion), out var body);
-            return new
-            {
-                id = c.Id,
-                legalEntityId = c.LegalEntityId,
-                legalEntityName = c.Entity?.Name,
-                brandId = c.BrandId,
-                brandName = c.Brand?.Name,
-                createdAt = c.CreatedAtUtc,
-                // The validity term, and whether it has run out. A contract list that does not
-                // say when a contract ends cannot answer "which of these is about to expire".
-                expiresAt = c.ExpiresAtUtc,
-                expired = c.ExpiresAtUtc <= SystemClock.UtcNow,
-                // Which version of the provider's text this contract is against, and the text
-                // itself. The mobile's "REVIEW THE TEXT" had nothing behind it before this.
-                termsVersion = c.TermsVersion,
-                termsText = body,
-                hasText = body is not null
-            };
-        });
-
-        return Ok(result);
+        return Ok(contracts);
     }
 
     /// <summary>
@@ -345,52 +184,18 @@ public sealed class LegalEntityController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Sign([FromBody] SignContractRequest request, CancellationToken cancellationToken)
     {
-        if (request.ContractId == Guid.Empty)
-            return BadRequest("ContractId is required");
+        var result = await _signContractHandler.HandleAsync(
+            new SignContractCommand(GetUserId(), request.ContractId, request.SignatureData),
+            cancellationToken);
 
-        var userId = GetUserId();
-        if (userId == null) return Unauthorized();
-
-        var contract = await _dbContext.Contracts
-            .FirstOrDefaultAsync(c => c.Id == request.ContractId && c.UserId == userId.Value, cancellationToken);
-
-        if (contract is null)
-            return NotFound("Contract not found");
-
-        // A contract that has already expired is not signed. The term is the whole point of
-        // having one: without this check the expiry would be a field nobody reads, and the
-        // signature would outlive the agreement it is a signature of.
-        if (!ContractValidity.CanBeSigned(contract.ExpiresAtUtc, SystemClock.UtcNow))
-            return BadRequest($"This contract expired on {contract.ExpiresAtUtc:yyyy-MM-dd} and cannot be signed.");
-
-        var alreadySigned = await _dbContext.UserContracts
-            .AnyAsync(uc => uc.ContractId == request.ContractId && uc.UserId == userId.Value, cancellationToken);
-
-        if (alreadySigned)
-            return Conflict("Contract already signed");
-
-        var userContract = new UserContract
+        return result.Outcome switch
         {
-            Id = Guid.CreateVersion7(),
-            UserId = userId.Value,
-            ContractId = request.ContractId,
-            SignatureData = request.SignatureData,
-            SignedAtUtc = SystemClock.UtcNow,
-            // The version that was actually signed, frozen into the signature. A later version
-            // of the terms does not rewrite what the customer read, and the audit trail has to
-            // be able to say which one it was.
-            TermsVersion = contract.TermsVersion
+            SignContractOutcome.Invalid => BadRequest(result.Error!),
+            SignContractOutcome.Unauthenticated => Unauthorized(),
+            SignContractOutcome.NotFound => NotFound(result.Error!),
+            SignContractOutcome.Conflict => Conflict(result.Error!),
+            _ => Ok(result.Signature)
         };
-
-        _dbContext.UserContracts.Add(userContract);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(new
-        {
-            id = userContract.Id,
-            contractId = userContract.ContractId,
-            signedAt = userContract.SignedAtUtc
-        });
     }
 
     [HttpGet("contracts/signed")]
@@ -400,34 +205,11 @@ public sealed class LegalEntityController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var signed = await _dbContext.UserContracts
-            .AsNoTracking()
-            .Include(uc => uc.Contract)
-                .ThenInclude(c => c!.Entity)
-            .Include(uc => uc.Contract)
-                .ThenInclude(c => c!.Brand)
-            .Where(uc => uc.UserId == userId.Value)
-            .OrderByDescending(uc => uc.SignedAtUtc)
-            .ToListAsync(cancellationToken);
+        var signed = await _getCustomerSignedContractsHandler.HandleAsync(
+            new GetCustomerSignedContractsQuery(userId.Value),
+            cancellationToken);
 
-        var result = signed.Select(uc => new
-        {
-            id = uc.Id,
-            contractId = uc.ContractId,
-            legalEntityName = uc.Contract?.Entity?.Name,
-            // The brand is carried by id, not only by name: a client that has to decide
-            // "is this brand already signed?" needs something it can compare, and two
-            // brands may share a name. The name is the label; the id is the fact.
-            brandId = uc.Contract?.BrandId,
-            brandName = uc.Contract?.Brand?.Name,
-            signedAt = uc.SignedAtUtc,
-            // A signature outlives the contract it is a signature of, so the term travels
-            // with it - otherwise a signed-contract list cannot say which of them has run out.
-            expiresAt = uc.Contract?.ExpiresAtUtc,
-            expired = uc.Contract?.ExpiresAtUtc <= SystemClock.UtcNow
-        });
-
-        return Ok(result);
+        return Ok(signed);
     }
 
     private Guid? GetUserId()
@@ -438,19 +220,14 @@ public sealed class LegalEntityController : ControllerBase
         return Guid.TryParse(claim, out var id) ? id : null;
     }
 
-    private static object MapToDto(LegalEntity e) => new
-    {
-        id = e.Id,
-        name = e.Name,
-        edrpou = e.Edrpou,
-        vatNumber = e.VatNumber,
-        address = e.Address,
-        directorName = e.DirectorName,
-        phone = e.Phone,
-        email = e.Email,
-        createdAt = e.CreatedAtUtc,
-        updatedAt = e.UpdatedAtUtc
-    };
+    private static LegalEntityDetails DetailsOf(UpsertLegalEntityRequest request) => new(
+        request.Name,
+        request.Edrpou,
+        request.VatNumber,
+        request.Address,
+        request.DirectorName,
+        request.Phone,
+        request.Email);
 }
 
 public sealed class UpsertLegalEntityRequest
