@@ -48,6 +48,27 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# --passwords-only: write the role passwords into the env file and stop.
+#
+# It exists because the PRODUCTION compose file names the two role passwords, and the
+# staging deploy's preflight resolves that compose file against the production env file
+# - so the passwords have to be in the env file before the staging deploy runs, not
+# only before the production one. This mode does that without touching the database:
+# a staging deploy must not depend on the production database being up.
+#
+# (The alternative - a compose file whose password variable has an empty default - is
+# worse: the compose file would load, the application would be recreated with an EMPTY
+# password, and the outage would happen AFTER the container was replaced instead of
+# before it.)
+PASSWORDS_ONLY=0
+for argument in "$@"; do
+  case "$argument" in
+    --passwords-only) PASSWORDS_ONLY=1 ;;
+    -h|--help) sed -n '2,40p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "unknown argument: $argument" >&2; exit 2 ;;
+  esac
+done
+
 ENV_FILE="${FUELFLOW_ENV_FILE:-.env}"
 CONTAINER="${POSTGRES_CONTAINER:-fuelflow-postgres}"
 
@@ -157,6 +178,11 @@ export POSTGRES_READONLY_PASSWORD="${POSTGRES_READONLY_PASSWORD:-}"
 READONLY_ENABLED=1
 if [[ -z "$POSTGRES_READONLY_PASSWORD" ]]; then
   READONLY_ENABLED=0
+fi
+
+if [[ "$PASSWORDS_ONLY" == "1" ]]; then
+  say "the role passwords are in $ENV_FILE; the database was not touched"
+  exit 0
 fi
 
 # ------------------------------------------------------------------------------

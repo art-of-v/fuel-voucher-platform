@@ -1590,6 +1590,19 @@ jobs:
       # files on the box itself, which is where the defect actually was and which the
       # template test explicitly cannot reach. --env-only stops after the env scan, so it
       # costs a second and never touches a container.
+      # The production compose file names the two database role passwords, and the check
+      # below resolves THAT file against the production .env - so the passwords have to be
+      # in the env file before this job runs, not only before the production one.
+      #
+      # The script writes them when they are missing. This mode touches no database, so a
+      # staging deploy does not depend on the production database being up.
+      #
+      # It is here rather than in the production deploy job because the workflow chains
+      # staging BEFORE production: a value the production deploy would write, and the
+      # staging preflight needs, has to be written by the job that runs first.
+      - name: Write the database role passwords into the env file
+        run: bash /root/FuelFlow/deploy/ensure-database-roles.sh --passwords-only
+
       - name: Check the box env files are readable by Compose
         run: bash /root/FuelFlow/deploy/preflight.sh --env-only
 
