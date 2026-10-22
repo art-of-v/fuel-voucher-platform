@@ -545,11 +545,15 @@ LineItems =
     }
 
     [Fact]
-    public async Task ARetriedDelivery_AfterAJournalFailure_BooksTheMoneyAndIssuesTheFuel()
+    public async Task ALaterDelivery_AfterAJournalFailure_RecoversTheOrderAndBooksTheMoneyOnce()
     {
-        // The point of rolling back rather than half-applying: the delivery is retried, and the retry
-        // finds an order that is still waiting for its fuel. Nothing was written the first time, so
-        // the second time there is nothing to undo and nothing to double.
+        // The point of rolling back rather than half-applying: nothing was written, so the next
+        // delivery for this invoice finds an order that is still waiting for its fuel, and it books
+        // the money exactly once. Nothing to undo and nothing to double.
+        //
+        // A later delivery, not the same one: a delivery carries (invoice, status, modifiedDate) as
+        // its identity, so a redelivery of the failed one is refused by the unique index before it
+        // is ever processed. That is a separate defect, and it has its own issue.
         var order = BuildOrder("INV-RETRY", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -567,7 +571,10 @@ LineItems =
         period.ClosedByUserId = null;
         await _context.SaveChangesAsync();
 
-        var response = await _handler.HandleAsync(WebhookCommand("INV-RETRY", "success"));
+        var retry = WebhookCommand("INV-RETRY", "success");
+        retry.ModifiedDate = TestClock.UtcNow.AddMinutes(5);
+
+        var response = await _handler.HandleAsync(retry);
 
         response.Success.Should().BeTrue();
         response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
