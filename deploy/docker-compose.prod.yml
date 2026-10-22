@@ -93,7 +93,7 @@ services:
     networks:
       # `default` = the prod project network (reaches fuelflow-backend/admin/website as before).
       # `shared` = the external network the staging stack also joins, so this Caddy can reach
-      # staging-admin / staging-backend / staging-website.
+      # staging-admin / fuelflow-staging-backend / staging-website.
       default: {}
       shared: {}
     depends_on:
