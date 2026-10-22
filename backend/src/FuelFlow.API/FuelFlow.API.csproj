@@ -30,6 +30,12 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
+    <!-- The outbound HTTP clients: a timeout on every one, a circuit breaker on every one, and a
+         retry with backoff on the ones that only read. The package is the official home of the
+         resilience pipeline (Polly) for IHttpClientFactory - see
+         SharedKernel/Resilience/OutboundHttpClient.cs for the policy and for why the acquirer
+         is not retried. -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
     <PackageReference Include="Net.Codecrete.QrCodeGenerator" Version="2.1.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.18.0-rc.1" />
     <PackageReference Include="QuestPDF" Version="2026.9.1" />

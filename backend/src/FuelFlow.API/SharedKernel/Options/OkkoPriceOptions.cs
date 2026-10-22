@@ -30,7 +30,9 @@ public sealed class OkkoPriceOptions
     public string EndpointUrl { get; set; } = "https://www.okko.ua/api/uk/fuels";
 
     /// <summary>Abort the fetch after this long so a hung connection cannot occupy the job slot.</summary>
-    public int TimeoutSeconds { get; set; } = 30;
+    public const int DefaultTimeoutSeconds = 30;
+
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 
     /// <summary>
     /// Identifies us to OKKO. Set to a contactable address so a human can see who is polling.

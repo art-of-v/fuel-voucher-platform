@@ -16,9 +16,20 @@ public sealed class ExpoPushOptions
     /// </summary>
     public string? AccessToken { get; set; }
 
-    /// <summary>
-    /// Master switch. When false the sender no-ops — in-app notifications are still written, only
+/// <summary>
+    /// Master switch. When false the sender no-ops - in-app notifications are still written, only
     /// the outbound push is skipped. Lets a deploy turn push off without a code change.
     /// </summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// The deadline the push server is given. The push is fired on the thread that created the
+    /// notification, so a push server that never answers would hold that thread.
+    /// </summary>
+    public const int DefaultTimeoutSeconds = 10;
+
+    /// <summary>
+    /// How long the push server is given to accept the batch. Zero or less means the default.
+    /// </summary>
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 }

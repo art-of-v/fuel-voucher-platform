@@ -28,7 +28,9 @@ public sealed class MinfinPriceOptions
     public string EndpointUrl { get; set; } = "https://index.minfin.com.ua/ua/markets/fuel/tm/";
 
     /// <summary>Abort the fetch after this long so a hung connection cannot occupy the job slot.</summary>
-    public int TimeoutSeconds { get; set; } = 30;
+    public const int DefaultTimeoutSeconds = 30;
+
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 
     /// <summary>Identifies us to the publisher. Set to a contactable address so a human can see who is polling.</summary>
     public string UserAgent { get; set; } = "FuelFlow price sync (https://github.com/art-of-v/fuel-voucher-platform)";
