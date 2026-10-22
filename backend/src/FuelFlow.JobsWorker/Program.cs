@@ -11,6 +11,7 @@ using FulfillmentService = FuelFlow.API.BackgroundJobs.FulfillmentService;
 using NotificationService = FuelFlow.API.BackgroundJobs.NotificationService;
 using RefundStatusSyncService = FuelFlow.API.BackgroundJobs.RefundStatusSyncService;
 using VoucherStockMonitor = FuelFlow.API.BackgroundJobs.VoucherStockMonitor;
+using FuelFlow.API.Extensions;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Brands;
@@ -93,9 +94,11 @@ try
     builder.Services.AddHealthChecks()
         .AddNpgSql(cappedConnectionString, name: "postgres", tags: ["ready"]);
 
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseNpgsql(
-            cappedConnectionString));
+    // The same database registration the API uses, rather than a second AddDbContext: this host
+    // runs the API's services, so it must also get the outbox interceptor and - now that the
+    // tables carry row-level policies - the tenant scope. A worker has no HTTP request, so the
+    // accessor resolves to the system scope and the background jobs keep reading across tenants.
+    builder.Services.AddDatabase(connectionString!, maxPoolSize);
 
     builder.Services.AddScoped<NotificationService>();
     builder.Services.AddScoped<VoucherStockMonitor>();
