@@ -268,7 +268,13 @@ internal static class SecurityConfigurationValidator
         // one role puts the whole thing back, and it does so silently.
         if (connectionString.Length > 0)
         {
-            if (migrationConnectionString.Length == 0)
+            // The migration connection string is only required when the application MIGRATES
+            // at boot. A deployment that manages the schema by hand (RunMigrationsOnBoot=false)
+            // has no migration to run, and refusing it to start over a connection string it
+            // will never open would be a refusal of the wrong thing.
+            var runMigrationsOnBoot = configuration.GetValue<bool?>("RunMigrationsOnBoot") ?? true;
+
+            if (runMigrationsOnBoot && migrationConnectionString.Length == 0)
             {
                 throw new InvalidOperationException(
                     "Refusing to start: Database:MigrationConnectionString is not set. The "
@@ -277,6 +283,12 @@ internal static class SecurityConfigurationValidator
                     + "migration runs as another one that can change the schema. Point "
                     + "Database__MigrationConnectionString at the migration role (deploy/"
                     + "ensure-database-roles.sh creates both).");
+            }
+
+            if (migrationConnectionString.Length == 0)
+            {
+                // The schema is managed by hand; there is no second role to check.
+                return;
             }
 
             var applicationRole = RoleOf(connectionString);
