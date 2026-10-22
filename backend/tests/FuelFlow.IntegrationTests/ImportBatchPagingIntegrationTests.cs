@@ -186,7 +186,6 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
             Id = fuelTypeId,
             Name = "Batch fuel " + Guid.NewGuid().ToString("N")[..8],
             BrandId = brandId,
-            BasePrice = 50m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

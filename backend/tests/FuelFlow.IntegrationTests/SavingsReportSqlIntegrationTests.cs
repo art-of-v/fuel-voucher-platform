@@ -60,7 +60,6 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
                 Id = fuelTypeId,
                 Name = "Savings " + Guid.NewGuid().ToString("N")[..8],
                 BrandId = brandId,
-                BasePrice = 50m,
                 CreatedAtUtc = TestClock.UtcNow,
                 UpdatedAtUtc = TestClock.UtcNow
             });

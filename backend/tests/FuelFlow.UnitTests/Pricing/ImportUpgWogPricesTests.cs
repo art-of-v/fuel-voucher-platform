@@ -67,10 +67,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             BrandId = brandId,
             Name = name,
             BrandFuelCode = code,
-            BasePrice = pump,
             // A fuel with no cost has no customer price either - which is the state the catalogue's
             // own fuels are in, and the state the import has to leave them in.
-            DiscountPrice = cost is null ? null : pump - 1m,
             MarginUahPerLiter = profit,
             SupplierPricePerLiter = cost,
             PumpPricePerLiter = pump,
@@ -134,8 +132,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             // nothing about what we pay, so nobody has priced this fuel yet. A zero would claim we
             // sell it for nothing.
             fuel.PumpPricePerLiter.Should().Be(created.PumpPerLiter);
-            fuel.BasePrice.Should().BeNull();
-            fuel.DiscountPrice.Should().BeNull();
+            fuel.FinalPerLiter().Should().BeNull("no cost and no margin, so the fuel has no price of ours");
             fuel.MarginUahPerLiter.Should().BeNull("no acquisition cost is known yet, so there is no margin");
         }
     }
@@ -253,9 +250,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
     {
         // The state every fuel on the catalogue is in today: no supplier cost, no margin. The pump
         // moved, so the reprice path runs - and it must not write a price of zero, because a price of
-        // zero IS a price: it says the customer takes the fuel for nothing, and the database refuses
-        // the row (ck_fuel_types_prices_non_negative). The old code wrote one on every fuel it
-        // touched, and fourteen of them on production carried it.
+        // zero IS a price: it says the customer takes the fuel for nothing. The old code wrote one on
+        // every fuel it touched, and fourteen of them on production carried it.
         SeedFuel("upg-100", BrandIds.Upg, "upg100", "upg100", cost: null, profit: null, pump: 90.00m);
         await _context.SaveChangesAsync();
 
@@ -268,10 +264,11 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         // The pump is known, and it is written - it is the reference, not the customer price.
         fuel.PumpPricePerLiter.Should().Be(99.90m);
         // And the price the customer pays is not written at all any more: it is computed from the
-        // knobs, and the copies are not what it comes from. What matters here is that nothing writes
-        // a zero - a price of zero IS a price, and it says the customer takes the fuel for nothing.
-        fuel.BasePrice.Should().NotBe(0m);
-        fuel.DiscountPrice.Should().NotBe(0m);
+        // knobs, and the fuel has no cost and no margin - so it has no price of ours, and not a
+        // price of zero either.
+        fuel.FinalPerLiter().Should().BeNull("nobody has costed this fuel, so it has no price of ours");
+        fuel.SupplierPricePerLiter.Should().BeNull();
+        fuel.MarginUahPerLiter.Should().BeNull();
 
         // And the other half of it: a fuel that IS priced keeps the price the formula gives it. The
         // fix must not turn every price into a null.
@@ -313,7 +310,9 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         _context.ChangeTracker.Clear();
         var wog = await _context.FuelTypes.SingleAsync(f => f.BrandId == BrandIds.Wog);
-        wog.BasePrice.Should().Be(103.50m);
+        // The column price is the reference the customer's saving is measured against, and the UPG
+        // sheet must not write WOG's.
+        wog.PumpPricePerLiter.Should().Be(103.50m);
         (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Upg)).Should().Be(7);
     }
 

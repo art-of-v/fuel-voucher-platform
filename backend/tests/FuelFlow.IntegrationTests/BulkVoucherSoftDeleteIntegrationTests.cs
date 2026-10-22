@@ -466,8 +466,6 @@ private async Task SeedAsync()
                 Id = ToUuid("okko-dp"),
                 Name = "Дизель",
                 BrandId = BrandIds.Okko,
-                BasePrice = 60m,
-                DiscountPrice = 60m,
                 CreatedAtUtc = TestClock.UtcNow,
                 UpdatedAtUtc = TestClock.UtcNow
             });

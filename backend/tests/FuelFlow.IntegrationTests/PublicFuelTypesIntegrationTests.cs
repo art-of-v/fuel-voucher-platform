@@ -132,6 +132,22 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
     }
 
     [Fact]
+    public async Task The_Two_Retired_Names_Carry_The_Computed_Prices()
+    {
+        var (_, fuelId, _) = await SeedAsync(cost: 40m, margin: 3m, withStock: true);
+
+        var fuel = (await ListAsync()).Single(f => f.Id == fuelId.ToString());
+
+        // The columns behind these two names are gone from fuel_types, and the names stay: they are
+        // what the app has always read. What they carry is the computed price - basePrice is the
+        // COLUMN price the saving is measured against, and discountPrice is the price we charge.
+        // The same two words in the table and in this contract meant two different facts, and the
+        // table no longer has an opinion.
+        fuel.BasePrice.Should().Be(92.90m, "the reference is the column price");
+        fuel.DiscountPrice.Should().Be(43m, "the price we charge is the cost plus the margin");
+    }
+
+    [Fact]
     public async Task A_fuel_the_shop_can_sell_carries_our_price()
     {
         var (_, fuelId, _) = await SeedAsync(cost: 40m, margin: 3m, withStock: true);

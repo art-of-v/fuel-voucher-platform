@@ -129,8 +129,6 @@ public sealed class ReconciliationPagingIntegrationTests : IClassFixture<TestDat
             BrandId = brand.Id,
             Name = $"Reconciliation paging test fuel {Guid.NewGuid():N}",
             BrandFuelCode = $"recon-paging-{Guid.NewGuid():N}",
-            BasePrice = 1200m,
-            DiscountPrice = 1000m,
             MarginUahPerLiter = 10m,
             PumpPricePerLiter = 1200m,
             CreatedAtUtc = TestClock.UtcNow,

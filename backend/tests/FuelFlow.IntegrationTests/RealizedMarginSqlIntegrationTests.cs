@@ -135,7 +135,6 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             Id = fuelTypeId,
             Name = "Margin " + Guid.NewGuid().ToString("N")[..8],
             BrandId = brandId,
-            BasePrice = 50m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

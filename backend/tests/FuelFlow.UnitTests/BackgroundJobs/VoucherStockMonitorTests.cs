@@ -42,8 +42,6 @@ public sealed class VoucherStockMonitorTests : IDisposable
             Id = ToUuid("test-expiring-dp"),
             Name = "ДП ЄВРО",
             BrandId = BrandIds.Okko,
-            BasePrice = 100,
-            DiscountPrice = 95,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

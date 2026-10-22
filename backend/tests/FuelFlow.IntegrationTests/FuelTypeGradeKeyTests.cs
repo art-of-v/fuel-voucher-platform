@@ -46,8 +46,6 @@ public sealed class FuelTypeGradeKeyTests : IClassFixture<TestDatabaseFixture>
             Id = ToUuid(id),
             BrandId = brandId,
             Name = name,
-            BasePrice = 50m,
-            DiscountPrice = 48m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         };

@@ -57,8 +57,6 @@ public sealed class AdminVoucherDetailSupplierCostTests : IDisposable
             Id = ToUuid("okko-95"),
             Name = "A-95",
             BrandId = BrandIds.Okko,
-            BasePrice = 55,
-            DiscountPrice = 52,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

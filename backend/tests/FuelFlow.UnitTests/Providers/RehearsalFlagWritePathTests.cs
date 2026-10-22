@@ -573,7 +573,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = ToUuid("empty-dp"), BrandId = BrandIds.Okko, Name = "ДП ЄВРО (empty)",
-            BasePrice = 50m, DiscountPrice = 50m,
             CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
@@ -607,7 +606,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = ToUuid("live-dp"), BrandId = BrandIds.Okko, Name = "ДП ЄВРО",
-            BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelNominals.Add(new FuelNominal
@@ -623,7 +621,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = ToUuid("qa-a95"), BrandId = BrandIds.Okko, Name = "А95 ЄВРО(QA)",
-            BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         // The rehearsal flag lives on the NOMINAL now - the pool is part of the size's identity, and it is

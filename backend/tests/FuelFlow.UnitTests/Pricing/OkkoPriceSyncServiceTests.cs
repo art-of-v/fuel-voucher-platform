@@ -221,8 +221,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         _context.AddMissing(BrandIds.Okko);
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = Id("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BrandFuelCode = "A-95",
-            BasePrice = 54, DiscountPrice = 51
+            Id = Id("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BrandFuelCode = "A-95"
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();

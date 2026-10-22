@@ -300,8 +300,8 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
             -- second 'okko' would break the unique index on the slug. The fuel's name carries a
             -- suffix, because the catalogue already holds OKKO's "A-95" and the grade key refuses
             -- two spellings of one grade at one brand.
-            INSERT INTO fuel_types (id, name, brand_id, base_price, discount_price, created_at_utc, updated_at_utc, is_deleted)
-            SELECT '33333333-3333-4333-8333-0000000000cc', 'А-95 (seed script)', b.id, 40.00, 40.00, now(), now(), false
+            INSERT INTO fuel_types (id, name, brand_id, created_at_utc, updated_at_utc, is_deleted)
+            SELECT '33333333-3333-4333-8333-0000000000cc', 'А-95 (seed script)', b.id, now(), now(), false
             FROM brands b
             WHERE b.slug = 'okko'
             ON CONFLICT (id) DO NOTHING;

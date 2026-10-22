@@ -116,8 +116,8 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         _context.Orders.AddRange(paidOrder, pendingOrder, excludedOrder);
 
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "DP", BrandId = BrandIds.Okko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "DP", BrandId = BrandIds.Okko, CreatedAtUtc = now, UpdatedAtUtc = now });
 
         // Seeded as offers plus volumes: the report resolves its margin through
         // (Brand, fuel, litres) -> fuel_offers, so per-litre figures belong on the offer.

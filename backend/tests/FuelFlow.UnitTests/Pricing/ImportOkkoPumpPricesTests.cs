@@ -42,15 +42,15 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
             new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "okko", Color = "#000000", LogoText = "okko" },
             new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "wog", Color = "#000000", LogoText = "wog" });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 },
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52 },
-            new FuelTypeEntity { Id = ToUuid("okko-gas"), Name = "ГАЗ", BrandId = BrandIds.Okko, BasePrice = 29, DiscountPrice = 27 },
-            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 60, DiscountPrice = 56 },
-            new FuelTypeEntity { Id = ToUuid("okko-pulls-dp"), Name = "ДП PULLS", BrandId = BrandIds.Okko, BasePrice = 58, DiscountPrice = 55 });
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko },
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko },
+            new FuelTypeEntity { Id = ToUuid("okko-gas"), Name = "ГАЗ", BrandId = BrandIds.Okko },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko },
+            new FuelTypeEntity { Id = ToUuid("okko-pulls-dp"), Name = "ДП PULLS", BrandId = BrandIds.Okko });
 
         // A competitor fuel the import must not touch.
         _context.FuelTypes.Add(new FuelTypeEntity
-            { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53 });
+            { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog });
 
         AddPackages("okko-95", "A-95", 10, 54, 5, 56);
         AddPackages("okko-dp", "ДП ЄВРО", 10, 55, 5, 57);
@@ -312,8 +312,6 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
             Id = ToUuid("okko-95-euro"),
             Name = "A-95 EURO",
             BrandId = BrandIds.Okko,
-            BasePrice = 56,
-            DiscountPrice = 53,
             BrandFuelCode = "A-95"
         });
         AddPackages("okko-95-euro", "A-95 EURO", 10, 56, 5, 58);
