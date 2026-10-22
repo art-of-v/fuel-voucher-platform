@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="FuelFlow.IntegrationTests" />
+    <InternalsVisibleTo Include="FuelFlow.JobsWorker" />
     <InternalsVisibleTo Include="FuelFlow.UnitTests" />
     <!-- CatalogueTestData lives here so three test projects share one seeding helper instead of
          keeping three copies that drift. See the type for the full reasoning. -->

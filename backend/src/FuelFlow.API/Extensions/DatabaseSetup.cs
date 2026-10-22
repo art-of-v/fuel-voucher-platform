@@ -60,6 +60,11 @@ internal static class DatabaseSetup
         // DatabaseConnectionPool. The Hangfire storage and the health check get the same string.
         var poolSizeLimited = DatabaseConnectionPool.WithPoolSettings(connectionString, maxPoolSize);
 
+        // TenantScopeAccessor reads the request, and a host that builds a DbContext without the
+        // full AddFeatureServices path (the jobs worker, a focused test) must still get one. The
+        // registration is a TryAdd, so the API's own call is not duplicated.
+        services.AddHttpContextAccessor();
+
         services.Configure<DatabaseOptions>(opts =>
         {
             opts.ConnectionString = poolSizeLimited;
