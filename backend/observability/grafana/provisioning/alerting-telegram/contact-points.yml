@@ -9,8 +9,39 @@ contactPoints:
       - uid: fuelflow-telegram
         type: telegram
         settings:
+          # The bot token is a credential, so it comes from the environment.
           bottoken: $TELEGRAM_BOT_TOKEN
-          chatid: $TELEGRAM_CHAT_ID
+          # The chat id is a LITERAL, and that is deliberate - the reason is long, and it
+          # is the whole reason this file says what it says.
+          #
+          # Grafana substitutes $VAR into this YAML and parses the result again. A chat
+          # id is a negative number, so it parses as a YAML NUMBER, and Grafana's
+          # Telegram integration wants a string. It says so and refuses to start:
+          #
+          #   cannot unmarshal number into Go struct field Config.chatid of type string
+          #
+          # and because the contact point is the first thing the alerting provisioning
+          # reads, the whole provisioning dies with it: no rules, no contact point, and
+          # Grafana exits 1 and restart-loops. That is not a theory - it is what the
+          # production box did on 2026-10-22 when the overlay was applied, and why the
+          # metric-based alerting had never run there: the stack was started without the
+          # overlay, and with it Grafana would not start at all.
+          #
+          # Quoting the placeholder does NOT help. The quotes are consumed with the
+          # substitution, so the value arrives with its quotes inside it, and Telegram
+          # answers "chat not found" to every alert (400 Bad Request) - the rules
+          # evaluate, the state is right, and nothing reaches anybody. Measured on the
+          # box: with the quoted placeholder the provisioning succeeds and every
+          # notification fails with
+          #
+          #   failed to send telegram message: webhook response status 400 Bad Request
+          #
+          # A chat id is an identifier, not a credential - without the bot token it
+          # reaches nothing - so it belongs in the repository, where it is visible in a
+          # diff and cannot drift silently. deploy/preflight.sh checks that it still
+          # matches TELEGRAM_CHAT_ID in deploy/.env, so the two cannot disagree, and
+          # deploy/check-alerting-provisioning.sh checks that this file loads at all.
+          chatid: "-5510388216"
           parse_mode: HTML
           message: |
             {{- /* Prometheus rules label by `job`, Loki rules by `service`. Fall back
