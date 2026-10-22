@@ -38,6 +38,7 @@ public sealed class SecurityConfigurationValidatorTests
         ["SmsClub:Token"] = "sms-token",
         ["SmsClub:SenderName"] = "FuelFlow",
         ["DeviceAuth:Enabled"] = "true",
+        ["Attestation:AcknowledgeDisabledInProduction"] = "true",
     };
 
     private static IConfiguration Config(Dictionary<string, string?> settings) =>
@@ -382,5 +383,93 @@ public sealed class SecurityConfigurationValidatorTests
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
         act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenAttestationIsNotEnforcing_AndNotAcknowledged()
+    {
+        var settings = ValidProductionBaseline();
+        settings.Remove("Attestation:AcknowledgeDisabledInProduction");
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*app attestation is not enforcing*")
+            .WithMessage("*AcknowledgeDisabledInProduction*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenAttestationIsNotEnforcing_ButAcknowledged()
+    {
+        var settings = ValidProductionBaseline();
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenAttestationModeIsUnknown()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Mode"] = "Sometimes";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Attestation:Mode 'Sometimes'*");
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenAttestationEnforcesWithNoPlatforms()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Enabled"] = "true";
+        settings["Attestation:Mode"] = "Enforce";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*EnforcePlatforms*empty*");
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenIosAttestationEnforcesWithoutAnAppId()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Enabled"] = "true";
+        settings["Attestation:Mode"] = "Enforce";
+        settings["Attestation:EnforcePlatforms:0"] = "ios";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Attestation:AppleAppId*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenIosAttestationIsFullyConfigured()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Enabled"] = "true";
+        settings["Attestation:Mode"] = "Enforce";
+        settings["Attestation:EnforcePlatforms:0"] = "ios";
+        settings["Attestation:AppleAppId"] = "TB929MCW58.com.fuelflowmarketplace.www";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenAndroidAttestationEnforcesWithoutCredentials()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Enabled"] = "true";
+        settings["Attestation:Mode"] = "Enforce";
+        settings["Attestation:EnforcePlatforms:0"] = "android";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Attestation:GoogleCredentialsJson*");
     }
 }

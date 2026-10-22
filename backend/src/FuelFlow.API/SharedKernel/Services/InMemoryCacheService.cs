@@ -76,6 +76,18 @@ namespace FuelFlow.SharedKernel.Services
             return Task.CompletedTask;
         }
 
+        public Task<string?> GetAndDeleteAsync(string key, CancellationToken cancellationToken = default)
+        {
+            if (!_cache.TryRemove(key, out var entry))
+                return Task.FromResult<string?>(null);
+
+            if (entry.ExpiresAt > _clock.GetUtcNow().UtcDateTime)
+                return Task.FromResult<string?>(entry.Value);
+
+            _logger.LogDebug("Discarded expired cache key {Key}", key);
+            return Task.FromResult<string?>(null);
+        }
+
         private void TrimOverflow()
         {
             int excess = _cache.Count - MaxEntries;

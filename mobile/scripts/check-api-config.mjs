@@ -17,7 +17,7 @@
  *      live in both eas.json and app.json, but the two copies must never drift — the Aug 2026
  *      outage was exactly such a drift.
  *
- * Runtime counterpart: resolveApiBaseUrl() in mobile/src/core/api/apiClient.ts resolves the URL
+ * Runtime counterpart: resolveApiBaseUrl() in mobile/src/core/api/apiConfig.ts resolves the URL
  * from EXPO_PUBLIC_API_URL, then expo.extra.apiUrl, then a hardcoded production constant. It
  * deliberately never throws: it runs at module load, before React mounts, where a throw would be
  * an uncatchable launch SIGABRT rather than a catchable error.

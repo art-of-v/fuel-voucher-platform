@@ -27,6 +27,9 @@ internal static class PipelineSetup
         app.UseMiddleware<SessionValidationMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<DeviceSignatureMiddleware>();
+        // After DeviceSignatureMiddleware: both middlewares need the same buffered body, and the
+        // device id the signature middleware validated is the id the attestation key is bound to.
+        app.UseMiddleware<AttestationMiddleware>();
         // After DeviceSignatureMiddleware: that middleware can add the device's identity, and the
         // scope must be resolved from the principal the request actually ends up with.
         app.UseMiddleware<TenantScopeMiddleware>();

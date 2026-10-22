@@ -1,13 +1,26 @@
 using FuelFlow.SharedKernel.Abstractions;
 using Microsoft.Extensions.Caching.Distributed;
+using StackExchange.Redis;
 
 namespace FuelFlow.SharedKernel.Services;
 
 public sealed class RedisCacheService : ICacheService
 {
     private readonly IDistributedCache _cache;
+    private readonly IConnectionMultiplexer? _redis;
 
-    public RedisCacheService(IDistributedCache cache) => _cache = cache;
+    /// <summary>
+    /// The optional multiplexer is only needed for the atomic <see cref="GetAndDeleteAsync"/>
+    /// operation. <see cref="IDistributedCache"/> has no GETDEL, so the cache and the one-time
+    /// challenge store would otherwise need two implementations and two configuration paths.
+    /// DI supplies the same singleton the health check pings; a test that constructs this class
+    /// with only an <see cref="IDistributedCache"/> still works, with the non-atomic fallback.
+    /// </summary>
+    public RedisCacheService(IDistributedCache cache, IConnectionMultiplexer? redis = null)
+    {
+        _cache = cache;
+        _redis = redis;
+    }
 
     public async Task SetAsync(string key, string value, TimeSpan expiry, CancellationToken ct = default)
     {
@@ -25,4 +38,20 @@ public sealed class RedisCacheService : ICacheService
 
     public async Task RemoveAsync(string key, CancellationToken ct = default) =>
         await _cache.RemoveAsync(key, ct);
+
+    public async Task<string?> GetAndDeleteAsync(string key, CancellationToken ct = default)
+    {
+        if (_redis is not null)
+        {
+            // GETDEL is atomic in Redis and is the whole reason this method exists.
+            return await _redis.GetDatabase().StringGetDeleteAsync(key);
+        }
+
+        // No multiplexer: the caller gets the old non-atomic behaviour rather than a NullReference.
+        // The production registration always supplies the multiplexer; this path is for tests and
+        // for any future composition that still passes only the distributed cache.
+        var value = await _cache.GetStringAsync(key, ct);
+        await _cache.RemoveAsync(key, ct);
+        return value;
+    }
 }

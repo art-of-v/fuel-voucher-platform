@@ -60,6 +60,7 @@ using FuelFlow.Features.Brands.GetPublicPackages;
 using FuelFlow.Features.Brands.GetPublicBrandStations;
 using FuelFlow.Features.Brands.GetPublicBrands;
 using FuelFlow.Features.Brands.UpdateBrand;
+using FuelFlow.Features.Attestation;
 using FuelFlow.Features.Updates;
 using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
@@ -88,6 +89,7 @@ using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Resilience;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Security.Attestation;
 using FuelFlow.SharedKernel.Services;
 using Scrutor;
 using Microsoft.OpenApi;
@@ -134,6 +136,7 @@ internal static class ServiceSetup
         services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));
         services.Configure<TelegramOptions>(config.GetSection(TelegramOptions.SectionName));
         services.Configure<ExpoPushOptions>(config.GetSection(ExpoPushOptions.SectionName));
+        services.Configure<AttestationOptions>(config.GetSection(AttestationOptions.SectionName));
 
         var connectionString = config.BuildConnectionString();
         var redisConnection = RedisConnectionParser.Parse(config.GetConnectionString("Redis") ?? "localhost:6379");
@@ -280,6 +283,8 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<GenerateChallengeCommandHandler>();
         services.AddScoped<VerifyChallengeCommandHandler>();
         services.AddScoped<LogoutDeviceCommandHandler>();
+        services.AddScoped<AttestationChallengeService>();
+        services.AddScoped<AttestationService>();
         services.AddScoped<LogoutSessionCommandHandler>();
         // Central QA test-access gate. Scoped: it reads the per-request DB context via
         // RuntimeSettingsService. SetQaTestAccessCommandHandler is picked up by the CommandHandler scan.
@@ -413,6 +418,8 @@ services.AddScoped<TermQuoteQueryHandler>();
     {
         services.AddHttpContextAccessor();
         services.AddSingleton<ICacheService, RedisCacheService>();
+        services.AddSingleton<IAppleAppAttestVerifier, AppleAppAttestVerifier>();
+        services.AddSingleton<IPlayIntegrityVerifier, PlayIntegrityVerifier>();
         services.AddSingleton<IAsymmetricSignatureVerifier, AsymmetricSignatureVerifier>();
         services.AddScoped<IPhoneNumberService, PhoneNumberService>();
         services.AddExceptionHandler<GlobalExceptionHandler>();

@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { BASE_URL } from '../api/apiClient';
+import { BASE_URL } from '../api/apiConfig';
+import { ensureSslPinningInitialized } from '../security/sslPinning';
 
 export interface AppVersionInfo {
   minimumVersion: string;
@@ -40,6 +41,10 @@ export function isVersionBelow(current: string | null, minimum: string): boolean
 
 export async function fetchAppVersion(): Promise<AppVersionInfo | null> {
   try {
+    // This is one of the first requests at launch and it bypasses apiFetch, so initialize
+    // pinning before letting it out.
+    await ensureSslPinningInitialized(BASE_URL);
+
     const response = await fetch(`${BASE_URL}/api/app-version`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
