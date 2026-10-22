@@ -36,10 +36,21 @@ public sealed class DeactivateSupplierCommandHandler
 
         supplier.IsActive = false;
         supplier.UpdatedAtUtc = SystemClock.UtcNow;
-        await _context.SaveChangesAsync(ct);
 
-        await SupplierAudit.RecordAsync(
-            _events, "SupplierDeactivated", supplier, command.ActorUserId, command.ActorUserName, ct);
+        // The audit row is tracked before the save, so this file's own save commits it in the same
+        // transaction as the change it describes (planning #533). Without a signed-in user there
+        // is nobody to attribute the change to, so nothing is recorded.
+        if (command.ActorUserId is { } actorId)
+        {
+            _events.RecordEvent(
+                "Supplier", supplier.Id.ToString(), "SupplierDeactivated",
+                null, SupplierAudit.Snapshot(supplier),
+                actorId, command.ActorUserName,
+                SupplierAudit.Summary("SupplierDeactivated", supplier),
+                "all");
+        }
+
+        await _context.SaveChangesAsync(ct);
 
         return SupplierWriteResult.Done();
     }

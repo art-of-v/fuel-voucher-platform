@@ -53,14 +53,16 @@ public sealed class AdminDeleteBrandCommandHandler
         }
         Brand.IsDeleted = true;
         Brand.DeletedAtUtc = archivedAt;
-        await _context.SaveChangesAsync(ct);
 
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Brand", command.Id.ToString(), "BrandDeleted",
             JsonSerializer.Serialize(new { name, slug }), "{}", command.UserId, command.UserName,
             $"Deleted brand {name}",
-            slug,
-            ct);
+            slug);
+
+        // One save for the branch and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminDeleteBrandResult(true);
     }

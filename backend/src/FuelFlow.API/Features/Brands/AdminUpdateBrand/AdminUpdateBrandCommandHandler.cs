@@ -48,7 +48,6 @@ public sealed class AdminUpdateBrandCommandHandler
         Brand.SortOrder = request.SortOrder;
         Brand.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Brands.Update(Brand);
-        await _context.SaveChangesAsync(ct);
 
         var changes = new List<string>();
         if (oldName != request.Name)
@@ -64,12 +63,15 @@ public sealed class AdminUpdateBrandCommandHandler
         var summary = changes.Count > 0
             ? $"{Brand.Name}: {string.Join(", ", changes)}"
             : $"Updated brand {Brand.Name}";
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Brand", command.Id.ToString(), "BrandUpdated",
             oldValue, newValue, command.UserId, command.UserName,
             summary,
-            Brand.Slug,
-            ct);
+            Brand.Slug);
+
+        // One save for the brand and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminUpdateBrandResult(true);
     }

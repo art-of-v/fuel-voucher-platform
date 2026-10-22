@@ -74,8 +74,22 @@ public sealed class UpdateSupplierCommandHandler
         // AsTracking is load-bearing, not decoration. The context's default is TrackAll, so without it
         // these property changes reach no change tracker, SaveChanges writes nothing for the row, and the
         // response below - built from this same instance - still shows the new values. The outbox row added
-        // in RecordAsync always persists, which is what made the audit trail claim success while the table
-        // disagreed. Same reason as ConfirmVoucherExchangeCommandHandler and the Settings handlers.
+        // by the audit service always persists, which is what made the audit trail claim success while the
+        // table disagreed. Same reason as ConfirmVoucherExchangeCommandHandler and the Settings handlers.
+        //
+        // The audit row is tracked before the save, so this file's own save commits it in the same
+        // transaction as the supplier it describes (planning #533). Without a signed-in user there
+        // is nobody to attribute the change to, so nothing is recorded.
+        if (command.ActorUserId is { } actorId)
+        {
+            _events.RecordEvent(
+                "Supplier", supplier.Id.ToString(), "SupplierUpdated",
+                null, SupplierAudit.Snapshot(supplier),
+                actorId, command.ActorUserName,
+                SupplierAudit.Summary("SupplierUpdated", supplier),
+                "all");
+        }
+
         try
         {
             await _context.SaveChangesAsync(ct);
@@ -84,9 +98,6 @@ public sealed class UpdateSupplierCommandHandler
         {
             return SupplierWriteResult.NameTaken(name);
         }
-
-        await SupplierAudit.RecordAsync(
-            _events, "SupplierUpdated", supplier, command.ActorUserId, command.ActorUserName, ct);
 
         return SupplierWriteResult.Done(SupplierDto.From(supplier));
     }

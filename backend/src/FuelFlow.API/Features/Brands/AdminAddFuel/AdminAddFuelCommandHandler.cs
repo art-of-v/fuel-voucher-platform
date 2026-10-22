@@ -235,15 +235,16 @@ public sealed class AdminAddFuelCommandHandler
             });
         }
 
-        await _context.SaveChangesAsync(ct);
-
         var newValue = JsonSerializer.Serialize(new { fuel.Id, fuel.Name, request.SupplierPricePerLiter, request.MarginUahPerLiter, request.PumpPricePerLiter, FinalPricePerLiter = finalPerLiter });
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Fuel", fuel.Id.ToString(), "FuelAdded",
             null, newValue, command.UserId, command.UserName,
             $"{Brand.Name} / {fuel.Name}: added at {(finalPerLiter ?? request.PumpPricePerLiter ?? 0m):F2} UAH/L",
-            Brand!.Slug,
-            ct);
+            Brand!.Slug);
+
+        // One save for the sizes, the price history and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminAddFuelResult { Success = true, CreatedFuelId = fuel.Id };
     }

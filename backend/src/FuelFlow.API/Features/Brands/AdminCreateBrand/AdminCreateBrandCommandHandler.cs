@@ -52,15 +52,17 @@ public sealed class AdminCreateBrandCommandHandler
             UpdatedAtUtc = SystemClock.UtcNow
         };
         _context.Brands.Add(Brand);
-        await _context.SaveChangesAsync(ct);
 
         var newValue = JsonSerializer.Serialize(new { Brand.Slug, Brand.Name });
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Brand", Brand.Id.ToString(), "BrandCreated",
             null, newValue, command.UserId, command.UserName,
             $"Created brand {Brand.Name}",
-            Brand.Slug,
-            ct);
+            Brand.Slug);
+
+        // One save for the brand and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminCreateBrandResult { Success = true, Brand = Brand };
     }

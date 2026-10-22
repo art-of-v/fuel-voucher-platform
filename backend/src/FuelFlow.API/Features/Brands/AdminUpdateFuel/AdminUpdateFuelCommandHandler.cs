@@ -213,8 +213,6 @@ public sealed class AdminUpdateFuelCommandHandler
 
         _context.FuelTypes.Update(fuel);
 
-        await _context.SaveChangesAsync(ct);
-
         var newValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
@@ -240,12 +238,15 @@ public sealed class AdminUpdateFuelCommandHandler
             ? $"{BrandName} / {fuel.Name}: {string.Join(", ", changes)}"
             : $"{BrandName} / {fuel.Name}: updated";
 
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Fuel", command.FuelId.ToString(), "PriceChanged",
             oldValue, newValue, command.UserId, command.UserName,
             summary,
-            Brand!.Slug,
-            ct);
+            Brand!.Slug);
+
+        // One save for the fuel, the price history and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return new AdminUpdateFuelResult { Success = true };
     }
