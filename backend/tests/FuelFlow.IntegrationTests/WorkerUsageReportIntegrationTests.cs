@@ -174,7 +174,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             await ResetAsync(seed);
         }
 
-        var controller = new GetWorkerUsageReportController(CreateContext());
+        var controller = new GetWorkerUsageReportController(new GetWorkerUsageReportQueryHandler(CreateContext()));
         controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(Guid.NewGuid()) };
 
         var result = await controller.Get(Guid.Empty, cancellationToken: CancellationToken.None);
@@ -208,7 +208,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             await seed.SaveChangesAsync();
         }
 
-        var controller = new GetWorkerUsageReportController(CreateContext());
+        var controller = new GetWorkerUsageReportController(new GetWorkerUsageReportQueryHandler(CreateContext()));
         controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(workerId) };
 
         var result = await controller.Get(companyId, page: 1, pageSize: 2);
@@ -240,7 +240,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             await seed.SaveChangesAsync();
         }
 
-        var controller = new GetWorkerUsageReportController(CreateContext());
+        var controller = new GetWorkerUsageReportController(new GetWorkerUsageReportQueryHandler(CreateContext()));
         controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(workerId) };
 
         var result = await controller.Get(companyId, page: 1, pageSize: 100_000);
@@ -254,7 +254,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
 
     private async Task<GetWorkerUsageReportResponse> GetReportAsync(Guid userId, Guid companyId)
     {
-        var controller = new GetWorkerUsageReportController(CreateContext());
+        var controller = new GetWorkerUsageReportController(new GetWorkerUsageReportQueryHandler(CreateContext()));
         controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(userId) };
 
         var result = await controller.Get(companyId, cancellationToken: CancellationToken.None);

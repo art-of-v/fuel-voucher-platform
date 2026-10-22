@@ -1,9 +1,7 @@
 using System.Security.Claims;
-using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.GetWorkerUsageReport;
 
@@ -19,11 +17,11 @@ namespace FuelFlow.Features.Vouchers.GetWorkerUsageReport;
 [Authorize]
 public sealed class GetWorkerUsageReportController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly GetWorkerUsageReportQueryHandler _handler;
 
-    public GetWorkerUsageReportController(ApplicationDbContext context)
+    public GetWorkerUsageReportController(GetWorkerUsageReportQueryHandler handler)
     {
-        _context = context;
+        _handler = handler;
     }
 
     /// <summary>
@@ -57,61 +55,16 @@ public sealed class GetWorkerUsageReportController : ControllerBase
             return Unauthorized();
         }
 
-        // The same predicate the wallet already uses to decide what a worker holds
-        // (GetUserVouchersCommandHandler): issued to this worker, for this company.
-        var held = _context.FuelVouchers
-            .AsNoTracking()
-            .Where(v => v.WorkerUserId == userId && v.LegalEntityId == legalEntityId)
-            .Where(v => !v.IsDeleted && v.Status != VoucherStatus.VerificationFailed);
-
-        // The count is asked of the same query the page is, so the two cannot disagree.
-        var totalCount = await held.CountAsync(cancellationToken);
-
-        // The totals are computed over EVERY voucher the worker holds, not over the page. They
-        // used to be computed from the rows the endpoint returned, which was the same number only
-        // because the endpoint returned every row. A total that described the page would be a
-        // different number on every page, and the summary is the part the worker reads.
-        var totals = await held
-            .GroupBy(_ => 1)
-            .Select(g => new WorkerUsageTotals(
-                Count: g.Count(),
-                LitersReceived: g.Sum(v => v.Liters),
-                LitersUsed: g.Where(v => v.Status == VoucherStatus.Used).Sum(v => v.Liters),
-                LitersRemaining: g.Where(v => v.Status != VoucherStatus.Used).Sum(v => v.Liters),
-                CountUsed: g.Count(v => v.Status == VoucherStatus.Used),
-                CountRemaining: g.Count(v => v.Status != VoucherStatus.Used)))
-            .FirstOrDefaultAsync(cancellationToken)
-            ?? new WorkerUsageTotals(0, 0, 0, 0, 0, 0);
-
-        var rows = await held
-            .OrderByDescending(v => v.IssuedAtUtc)
-            .ThenByDescending(v => v.CreatedAtUtc)
-            // The tie-break: two vouchers can share an issue timestamp, and a page boundary
-            // that falls between them would skip one. A skipped row is fuel the worker does
-            // not know they hold.
-            .ThenBy(v => v.Id)
-            .Skip(paging.Skip)
-            .Take(paging.PageSize)
-            .Select(v => new WorkerUsageListItem(
-                v.Id,
-                v.Brand,
-                v.FuelTypeId,
-                v.VoucherNumber,
-                v.Liters,
-                v.Status.ToString(),
-                v.CustomerExpirationDate,
-                v.IssuedAtUtc,
-                v.UsedAtUtc,
-                v.Status == VoucherStatus.Used))
-            .ToListAsync(cancellationToken);
+        var result = await _handler.HandleAsync(
+            new GetWorkerUsageReportQuery(userId, legalEntityId, paging), cancellationToken);
 
         // The body keeps its shape - the app reads an object with a totals block and an items
         // list - and the count travels in a header, so a client can tell that another page
         // follows without the shape changing.
-        Response.Headers["X-Total-Count"] = totalCount.ToString();
-        Response.Headers["X-Has-Next-Page"] = totalCount > paging.Skip + rows.Count ? "true" : "false";
+        Response.Headers["X-Total-Count"] = result.TotalCount.ToString();
+        Response.Headers["X-Has-Next-Page"] = result.TotalCount > paging.Skip + result.Items.Count ? "true" : "false";
 
-        return Ok(new GetWorkerUsageReportResponse(legalEntityId, totals, rows));
+        return Ok(new GetWorkerUsageReportResponse(legalEntityId, result.Totals, result.Items));
     }
 
     /// <summary>
@@ -124,32 +77,3 @@ public sealed class GetWorkerUsageReportController : ControllerBase
         return claim is not null && Guid.TryParse(claim, out var id) ? id : Guid.Empty;
     }
 }
-
-/// <summary>One voucher in the worker's report.</summary>
-/// <param name="IssuedAtUtc">When the owner handed it over; null for a voucher issued before this
-/// feature existed, since the column is only populated from now on.</param>
-/// <param name="UsedAtUtc">When it was refuelled with; null while unused.</param>
-public sealed record WorkerUsageListItem(
-    Guid Id,
-    string Brand,
-    Guid FuelTypeId,
-    string VoucherNumber,
-    decimal Liters,
-    string Status,
-    DateOnly ExpirationDate,
-    DateTime? IssuedAtUtc,
-    DateTime? UsedAtUtc,
-    bool IsUsed);
-
-public sealed record WorkerUsageTotals(
-    int Count,
-    decimal LitersReceived,
-    decimal LitersUsed,
-    decimal LitersRemaining,
-    int CountUsed,
-    int CountRemaining);
-
-public sealed record GetWorkerUsageReportResponse(
-    Guid LegalEntityId,
-    WorkerUsageTotals Totals,
-    List<WorkerUsageListItem> Items);
