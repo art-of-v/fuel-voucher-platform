@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.History;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -74,12 +75,12 @@ public sealed class GetUserPurchasesCommandHandler
             .Distinct()
             .ToList();
 
-        // Which voucher each renewal line actually delivered. IgnoreQueryFilters because the global
+        // Which voucher each renewal line actually delivered. IncludingReleasedFulfilments because the global
         // filter hides RELEASED deliveries, and a renewal whose voucher was later handed back is still
         // part of the timeline - it was an unfiltered column on voucher_renewal_items before this.
         var deliveredByLine = new Dictionary<Guid, Fulfillment>();
         foreach (var f in await _context.Fulfillments
-                     .IgnoreQueryFilters()
+                     .IncludingReleasedFulfilments()
                      .Where(f => f.LineItemId != null && orderIds.Contains(f.OrderId))
                      .OrderBy(f => f.FulfilledAtUtc)
                      .ToListAsync(cancellationToken))

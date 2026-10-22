@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -96,13 +97,13 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
             command.InvoiceId,
             command.Status);
 
-        // IgnoreQueryFilters: an invoice can outlive its order becoming hidden. A customer can
+        // IncludingSoftDeleted: an invoice can outlive its order becoming hidden. A customer can
         // swipe-delete an unpaid checkout (soft delete, IsDeleted=true) while its Monobank invoice
         // stays live and payable. Without this, a later "success" callback would miss the
         // soft-deleted order (global !IsDeleted filter), log order_not_found, and leave the customer
         // charged with no voucher and no fulfillment. Mirrors RefundOrderCommandHandler's lookup.
         var order = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.MonobankInvoiceId == command.InvoiceId, cancellationToken);
 

@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,7 @@ public sealed class RefundOrderCommandHandler
         CancellationToken cancellationToken = default)
     {
         var order = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeletedAndReleasedFulfilments()
             .Include(o => o.LineItems)
             .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)
@@ -99,10 +100,10 @@ public sealed class RefundOrderCommandHandler
                 //
                 // ComputeUnfulfilledLines below reaches the same rule the other way round, by
                 // filtering ReleasedAtUtc by hand, because it reads the navigation off an order
-                // loaded with IgnoreQueryFilters() and that load also switches this filter off.
+                // loaded with the combined scope and that load also switches this filter off.
                 // Two mechanisms for one rule is fragile, and worth collapsing into a named
-                // predicate - but NOT by adding IgnoreQueryFilters here, which is what an audit
-                // reading the missing opt-out suggests. That was tried: it reinstates the S9 bug
+                // predicate - but NOT by adding the fulfilment scope to this count, which is what
+                // an audit reading the missing opt-out suggests. That was tried: it reinstates the S9 bug
                 // pinned by HandleAsync_ShouldNotCountReleasedFulfillmentsAsDelivered, where a
                 // customer who paid for two units and received one was told nothing remained to be
                 // returned.
@@ -509,9 +510,9 @@ public sealed class RefundOrderCommandHandler
 
         foreach (var group in grouped)
         {
-            // ReleasedAtUtc has to be excluded here by hand, because the query above calls
-            // IgnoreQueryFilters() - which is why it sees soft-deleted orders - and that also
-            // switches off Fulfillment's global `ReleasedAtUtc == null` filter. That filter exists
+            // ReleasedAtUtc has to be excluded here by hand, because the query above uses the
+            // combined scope - which is why it sees soft-deleted orders - and that also switches
+            // off Fulfillment's global `ReleasedAtUtc == null` filter. That filter exists
             // for exactly this reason (see FulfillmentConfiguration): a delivery the reconciliation
             // job released is not a delivery the customer received.
             //

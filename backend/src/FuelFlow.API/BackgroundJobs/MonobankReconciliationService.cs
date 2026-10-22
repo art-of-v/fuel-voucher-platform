@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
@@ -64,12 +65,12 @@ public class MonobankReconciliationService
         var minAgeCutoff = now.AddMinutes(-_options.ReconciliationMinAgeMinutes);
         var maxAgeCutoff = now.AddHours(-_options.ReconciliationMaxAgeHours);
 
-        // IgnoreQueryFilters: a customer can swipe-delete an unpaid checkout (soft delete) while its
+        // IncludingSoftDeleted: a customer can swipe-delete an unpaid checkout (soft delete) while its
         // invoice stays live and payable; if it is then paid and the webhook is lost, the order must
         // still be recoverable (the handler restores IsDeleted on a paid transition). Projection only -
         // never track the Order here, so the handler's own load+mutate cannot hit a tracking conflict.
         var candidates = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Where(o => o.Status == OrderStatus.PendingPayment
                      && o.MonobankInvoiceId != null
                      && o.CreatedAtUtc < minAgeCutoff

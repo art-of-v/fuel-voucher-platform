@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,10 +34,10 @@ namespace FuelFlow.Features.Orders.DeleteOrder;
         // either be refused by the database with an opaque error or - before the FK existed -
         // silently orphan every voucher it ever delivered. Say so instead.
         //
-        // IgnoreQueryFilters because a soft-deleted voucher is still a row the FK counts; letting
+        // IncludingSoftDeleted because a soft-deleted voucher is still a row the FK counts; letting
         // the !IsDeleted filter hide it here would pass this guard and then fail on the constraint.
         var deliveredCount = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .CountAsync(v => v.OrderId == command.Id, cancellationToken);
 

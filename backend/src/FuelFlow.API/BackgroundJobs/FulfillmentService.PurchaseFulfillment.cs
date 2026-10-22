@@ -214,10 +214,10 @@ public partial class FulfillmentService
 
             // Which stock pool this order draws from: a QA test account is served only test vouchers,
             // every real account only real stock. Resolved once per order and re-asserted at the atomic
-            // claim. IgnoreQueryFilters so this matches the raw-SQL claim predicate, which sees the row
+            // claim. IncludingSoftDeleted so this matches the raw-SQL claim predicate, which sees the row
             // regardless of any soft-delete filter.
             var isTestAccount = await _context.Users
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .Where(u => u.Id == order.UserId)
                 .Select(u => u.IsQaAccount)
                 .FirstOrDefaultAsync(cancellationToken);

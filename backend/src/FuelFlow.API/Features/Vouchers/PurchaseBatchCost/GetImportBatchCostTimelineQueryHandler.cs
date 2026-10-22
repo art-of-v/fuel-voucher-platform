@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -92,19 +93,19 @@ public sealed class GetImportBatchCostTimelineQueryHandler
             .AsNoTracking()
             .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut
                 && _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Any(v => v.Id == m.VoucherId && v.ImportJobId == query.ImportId))
             .Select(m => new
             {
                 ExchangeBatchId = m.BatchId,
                 OldVoucherId = m.VoucherId,
                 FuelTypeId = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => (Guid?)v.FuelTypeId)
                     .FirstOrDefault() ?? Guid.Empty,
                 Brand = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => v.Brand)
                     .FirstOrDefault() ?? string.Empty,
@@ -112,12 +113,12 @@ public sealed class GetImportBatchCostTimelineQueryHandler
                 CostPerLiterApplied = m.AppliedCostPerLiter,
                 CreatedAtUtc = m.OccurredAtUtc,
                 OldLiters = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.Liters)
                     .FirstOrDefault(),
                 OldCostPerLiter = _context.FuelVouchers
-                    .IgnoreQueryFilters()
+                    .IncludingSoftDeleted()
                     .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.CostPerLiter)
                     .FirstOrDefault()

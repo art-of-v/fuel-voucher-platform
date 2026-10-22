@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -240,7 +241,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasComment(                "Soft delete. The row stays: the paper was real, and the record of it has to survive the" +
                     "delete.");
 
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         // These live in the model, not in a hand-written migration, so EF owns them: it will
         // never drop one by accident, and a regenerated `migrations script` can reproduce the

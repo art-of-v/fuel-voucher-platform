@@ -2,6 +2,7 @@ using FuelFlow.Features.Acquiring.Reconciliation;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -56,7 +57,7 @@ public sealed class GetStatementReconciliationQueryHandler
             ? new List<Order>()
             : await _context.Orders
                 .AsNoTracking()
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .Where(o => o.MonobankInvoiceId != null && invoiceIds.Contains(o.MonobankInvoiceId))
                 .ToListAsync(cancellationToken);
 
@@ -97,7 +98,7 @@ public sealed class GetStatementReconciliationQueryHandler
                 .AsNoTracking()
                 // A deleted order must not hide the refund that belongs to it: the money went back
                 // either way, and the act is a record of money.
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .Where(o => issuedOrderIds.Contains(o.Id))
                 .ToListAsync(cancellationToken);
 
@@ -138,7 +139,7 @@ public sealed class GetStatementReconciliationQueryHandler
 
         var missing = (await _context.Orders
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Where(o => o.MonobankInvoiceId != null
                         && o.CreatedAtUtc >= fromUtc
                         && o.CreatedAtUtc < toUtc

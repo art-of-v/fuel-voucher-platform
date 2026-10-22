@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,7 +46,6 @@ public sealed class GetRenewableCustomerVouchersQueryHandler
         CancellationToken cancellationToken = default)
     {
         var q = _context.FuelVouchers
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Include(v => v.FuelType)
             .Include(v => v.AssignedToUser)

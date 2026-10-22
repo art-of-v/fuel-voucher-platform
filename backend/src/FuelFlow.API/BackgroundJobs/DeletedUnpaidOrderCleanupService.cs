@@ -2,6 +2,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,7 @@ namespace FuelFlow.API.BackgroundJobs;
 /// and the row lingers. <see cref="MonobankReconciliationService"/> later drives the abandoned invoice
 /// to a terminal state, so an unpaid + soft-deleted order settles as <c>IsDeleted=true</c> +
 /// <c>Cancelled</c>. Nothing else ever removes those rows, so they accumulate indefinitely and clutter
-/// the admin purchases view (which reads with <c>IgnoreQueryFilters</c>). This job garbage-collects them.
+/// the admin purchases view (which reads with the soft-delete scope). This job garbage-collects them.
 ///
 /// The purge predicate — <c>IsDeleted</c> AND <c>Status == Cancelled</c> AND aged past the retention
 /// window — is deliberately conservative and self-excludes any paid order: a payment (even one arriving
@@ -55,7 +56,7 @@ public class DeletedUnpaidOrderCleanupService
         var cutoff = SystemClock.UtcNow.AddDays(-retentionDays);
 
         // AsTracking + Include so EF itself cascades the delete to the loaded line items (robust
-        // regardless of the brand's DB-level FK behaviour); IgnoreQueryFilters because every
+        // regardless of the brand's DB-level FK behaviour); the soft-delete scope because every
         // candidate is, by definition, soft-deleted and hidden by the global !IsDeleted filter.
         //
         // !FuelVouchers.Any is not an optimisation, it is required: fuel_vouchers.order_id is ON
@@ -75,14 +76,14 @@ public class DeletedUnpaidOrderCleanupService
         // no on its own - order_line_items.order_id is RESTRICT - so the guard was removed and the
         // explicit line removal below is what this job adapts to instead.
         var abandoned = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsTracking()
             .Include(o => o.LineItems)
             .Where(o => o.IsDeleted
                      && o.Status == OrderStatus.Cancelled
                      && o.UpdatedAtUtc < cutoff)
-            .Where(o => !_context.FuelVouchers.IgnoreQueryFilters().Any(v => v.OrderId == o.Id))
-            .Where(o => !_context.Payments.IgnoreQueryFilters()
+            .Where(o => !_context.FuelVouchers.Any(v => v.OrderId == o.Id))
+            .Where(o => !_context.Payments
                 .Any(p => p.OrderId == o.Id && p.Kind == PaymentKind.Refund))
             .OrderBy(o => o.UpdatedAtUtc)
             .Take(BatchSize)

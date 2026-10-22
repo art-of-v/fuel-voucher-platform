@@ -35,10 +35,10 @@ public sealed class UnarchiveVoucherCommandHandler
         UnarchiveVoucherCommand command,
         CancellationToken cancellationToken = default)
     {
-        // IgnoreQueryFilters is the whole point: the row being brought back is exactly the one the
+        // IncludingSoftDeleted is the whole point: the row being brought back is exactly the one the
         // global !IsDeleted filter hides, so an ordinary lookup would report it missing.
         var voucher = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .Where(v => v.Id == command.VoucherId)
             .Select(v => new { v.IsDeleted, v.VoucherNumber, v.Brand, v.Status })
@@ -69,7 +69,7 @@ public sealed class UnarchiveVoucherCommandHandler
         await _context.ExecuteReplaySafeAsync(async ct =>
         {
             var affected = await _context.FuelVouchers
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .Where(v => v.Id == command.VoucherId && v.IsDeleted)
                 .ExecuteUpdateAsync(
                     s => s

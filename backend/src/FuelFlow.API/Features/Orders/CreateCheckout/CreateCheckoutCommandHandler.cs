@@ -59,7 +59,6 @@ public sealed class CreateCheckoutCommandHandler
         }
 
         var user = await _context.Users
-            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == command.UserId.Value, cancellationToken);
 
         if (user == null || !user.IsActive || user.IsDeleted)

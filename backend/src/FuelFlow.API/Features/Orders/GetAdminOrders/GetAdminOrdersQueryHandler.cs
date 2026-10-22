@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.DTOs;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +22,7 @@ public sealed class GetAdminOrdersQueryHandler
         // The count is taken from the query WITHOUT the includes: a count that joined the
         // fulfillments and the line items would count rows, not orders.
         var baseQuery = _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeletedAndReleasedFulfilments()
             .AsNoTracking();
 
         var total = await baseQuery.CountAsync(cancellationToken);

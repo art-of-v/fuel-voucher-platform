@@ -1,4 +1,5 @@
 using FuelFlow.Features.Company.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -61,7 +62,7 @@ internal sealed class CompanyMemberConfiguration : IEntityTypeConfiguration<Comp
         builder.HasIndex(e => e.WorkerUserId)
             .HasDatabaseName("ix_company_members_worker_user_id");
 
-        builder.HasQueryFilter(e => !e.IsDeleted);
+        builder.HasQueryFilter(QueryFilterKeys.SoftDelete, e => !e.IsDeleted);
 
         builder.HasOne(e => e.LegalEntity)
             .WithMany()

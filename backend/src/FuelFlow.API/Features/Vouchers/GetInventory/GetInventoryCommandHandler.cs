@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.GetInventory;
@@ -22,7 +23,7 @@ public sealed class GetInventoryCommandHandler
         // the answer is one row per (brand, fuel, litres), and the database can produce exactly
         // that without shipping every voucher through the process to count it there.
         var grouped = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .AsNoTracking()
             .GroupBy(v => new { v.Brand, v.FuelTypeId, v.Liters })
             .Select(g => new InventoryGroup(

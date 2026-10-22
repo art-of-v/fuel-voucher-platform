@@ -26,7 +26,6 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
     public async Task<VoucherExchangeCostContextResponse> HandleAsync(Guid importId, CancellationToken ct = default)
     {
         var news = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == importId
                 && !v.IsDeleted
@@ -48,7 +47,6 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
             // Cost already recorded on this import's own vouchers (null until it is entered); cost lives on
             // the vouchers, so a partly-costed import reports the mean of the part that is.
             var existing = await _context.FuelVouchers
-                .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(v => v.ImportJobId == importId && v.FuelTypeId == group.Key && v.CostPerLiter != null)
                 .Select(v => new { v.Liters, v.CostPerLiter!.Value })

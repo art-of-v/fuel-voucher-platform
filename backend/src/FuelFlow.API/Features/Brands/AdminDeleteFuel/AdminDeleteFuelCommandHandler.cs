@@ -47,7 +47,6 @@ public sealed class AdminDeleteFuelCommandHandler
         // are already unusable and the only repair is un-archiving and reconciling by hand.
         var blockingStatuses = VoucherStatuses.Blocking;
         var liveVouchers = await _context.FuelVouchers
-            .IgnoreQueryFilters()
             .Where(v => v.FuelTypeId == command.FuelId && !v.IsDeleted && blockingStatuses.Contains(v.Status))
             .Select(v => new { v.Id, v.Status, v.VoucherNumber, v.Liters })
             .Take(6)
@@ -56,7 +55,6 @@ public sealed class AdminDeleteFuelCommandHandler
         if (liveVouchers.Count > 0)
         {
             var total = await _context.FuelVouchers
-                .IgnoreQueryFilters()
                 .CountAsync(v => v.FuelTypeId == command.FuelId && !v.IsDeleted && blockingStatuses.Contains(v.Status), ct);
 
             return new AdminDeleteFuelResult

@@ -77,7 +77,6 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
     // never clears.
     private IQueryable<FuelVoucher> Filter(DateOnly cutoff)
         => _context.FuelVouchers
-            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => !v.IsDeleted
                 && v.AssignedToUserId == null

@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Errors;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,14 +32,14 @@ public sealed class SessionValidationMiddleware
                 return;
             }
 
-            // IgnoreQueryFilters, and the explicit IsDeleted below, are both load-bearing.
+            // IncludingSoftDeleted, and the explicit IsDeleted below, are both load-bearing.
             // users now carries a global `!IsDeleted` filter, so a soft-deleted account would be
             // invisible here and `account == null` would reject them - correct, but by accident
             // and for the wrong reason, and it would make this middleware unable to tell
             // "deleted" from "no such user" in the log. Selecting the flag explicitly says what
             // it means: a deleted account is rejected on purpose, not by accident.
             var account = await dbContext.Users
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .AsNoTracking()
                 .Where(u => u.Id == userId)
                 .Select(u => new { u.IsDeleted, u.IsBanned, u.TokenVersion })

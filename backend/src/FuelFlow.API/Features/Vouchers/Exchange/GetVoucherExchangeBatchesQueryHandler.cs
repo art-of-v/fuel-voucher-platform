@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Exchange;
@@ -62,7 +63,7 @@ public sealed class GetVoucherExchangeBatchesQueryHandler
         // the paper is RESTRICT.
         var rows = from m in _context.VoucherMovements.AsNoTracking()
                    where m.Kind == VoucherMovementKinds.ExchangeOut
-                   join v in _context.FuelVouchers.IgnoreQueryFilters() on m.VoucherId equals v.Id
+                   join v in _context.FuelVouchers.IncludingSoftDeleted() on m.VoucherId equals v.Id
                    select new
                    {
                        m.BatchId,

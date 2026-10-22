@@ -231,6 +231,41 @@ public sealed class TenantRowLevelSecurityIntegrationTests : IClassFixture<TestD
     }
 
     [Fact]
+    public async Task Bypassing_the_model_filters_does_not_bypass_the_policies()
+    {
+        var customerA = Guid.NewGuid();
+        var customerB = Guid.NewGuid();
+        var liveOrderA = Guid.NewGuid();
+        var deletedOrderB = Guid.NewGuid();
+
+        await using (var seed = CreateContext())
+        {
+            seed.Users.AddRange(NewUser(customerA), NewUser(customerB));
+            await seed.SaveChangesAsync();
+
+            await InsertOrderAsync(seed, liveOrderA, customerA, legalEntityId: null);
+            await InsertOrderAsync(seed, deletedOrderB, customerB, legalEntityId: null, isDeleted: true);
+        }
+
+        await using var connection = await OpenAsAsync(customerA);
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(connection)
+            .Options;
+
+        await using var context = new ApplicationDbContext(options, TestQrCipher.Instance);
+
+        var visible = await context.Orders
+            .IncludingSoftDeleted()
+            .Select(o => o.Id)
+            .ToListAsync();
+
+        visible.Should().ContainSingle()
+            .Which.Should().Be(liveOrderA,
+                "the soft-delete scope lifts the EF filter, not the row-level policy: another " +
+                "tenant's deleted order stays invisible");
+    }
+
+    [Fact]
     public async Task The_system_scope_reads_across_tenants()
     {
         var customerA = Guid.NewGuid();
@@ -369,21 +404,23 @@ public sealed class TenantRowLevelSecurityIntegrationTests : IClassFixture<TestD
         ApplicationDbContext context,
         Guid id,
         Guid userId,
-        Guid? legalEntityId)
+        Guid? legalEntityId,
+        bool isDeleted = false)
     {
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO public.orders
-                (id, user_id, legal_entity_id, price, status, created_at_utc, updated_at_utc)
+                (id, user_id, legal_entity_id, price, status, is_deleted, created_at_utc, updated_at_utc)
             VALUES
-                (@id, @user_id, @legal_entity_id, 100, 'Paid', now(), now())
+                (@id, @user_id, @legal_entity_id, 100, 'Paid', @is_deleted, now(), now())
             """,
             new NpgsqlParameter("id", NpgsqlDbType.Uuid) { Value = id },
             new NpgsqlParameter("user_id", NpgsqlDbType.Uuid) { Value = userId },
             new NpgsqlParameter("legal_entity_id", NpgsqlDbType.Uuid)
             {
                 Value = legalEntityId ?? (object)DBNull.Value,
-            });
+            },
+            new NpgsqlParameter("is_deleted", NpgsqlDbType.Boolean) { Value = isDeleted });
     }
 
     private async Task InsertVoucherAsync(

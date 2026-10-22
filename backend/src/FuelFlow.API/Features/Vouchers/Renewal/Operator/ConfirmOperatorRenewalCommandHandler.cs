@@ -126,10 +126,10 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             cancellationToken);
 
         // Tracked load (NoTracking is the DbContext default — mutations would silently no-op otherwise).
-        // IgnoreQueryFilters so a soft-deleted row is distinguishable (→ not_found) rather than invisible.
+        // IncludingSoftDeleted so a soft-deleted row is distinguishable (→ not_found) rather than invisible.
         var voucher = await _context.FuelVouchers
             .AsTracking()
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Include(v => v.AssignedToUser)
             .FirstOrDefaultAsync(v => v.Id == command.VoucherId, cancellationToken);
 

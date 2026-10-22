@@ -391,7 +391,6 @@ if (knownCodes.Contains(code))
         var blocking = VoucherStatuses.Blocking;
 
         var absent = await _context.FuelTypes
-            .IgnoreQueryFilters()
             .Where(f => f.BrandId == brandId
                 && !f.IsDeleted
                 && f.BrandFuelCode != null
@@ -407,7 +406,6 @@ if (knownCodes.Contains(code))
         foreach (var fuel in absent)
         {
             var live = await _context.FuelVouchers
-                .IgnoreQueryFilters()
                 .CountAsync(v => v.FuelTypeId == fuel.Id && !v.IsDeleted && blocking.Contains(v.Status), ct);
 
             if (live > 0)
@@ -420,7 +418,7 @@ if (knownCodes.Contains(code))
 
             if (!dryRun)
             {
-                var fuelRow = await _context.FuelTypes.IgnoreQueryFilters()
+                var fuelRow = await _context.FuelTypes
                     .FirstAsync(f => f.Id == fuel.Id, ct);
                 fuelRow.IsDeleted = true;
                 fuelRow.DeletedAtUtc = SystemClock.UtcNow;

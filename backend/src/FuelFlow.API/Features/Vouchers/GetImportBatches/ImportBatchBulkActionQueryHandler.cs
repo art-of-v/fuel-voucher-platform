@@ -1,6 +1,7 @@
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -79,7 +80,7 @@ public sealed class ImportBatchBulkActionQueryHandler
         }
 
         var vouchers = await _context.FuelVouchers
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Where(v => v.ImportJobId == query.ImportId && from.Contains(v.Status))
             .ToListAsync(cancellationToken);
 

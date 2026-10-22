@@ -90,9 +90,9 @@ public partial class FulfillmentService
 
             // Which stock pool this renewal draws from: a QA test account is served only test
             // vouchers, every real account only real stock. Resolved once and re-asserted at the atomic
-            // claim. IgnoreQueryFilters so it matches the raw-SQL claim predicate.
+            // claim. IncludingSoftDeleted so it matches the raw-SQL claim predicate.
             var isTestAccount = await _context.Users
-                .IgnoreQueryFilters()
+                .IncludingSoftDeleted()
                 .Where(u => u.Id == order.UserId)
                 .Select(u => u.IsQaAccount)
                 .FirstOrDefaultAsync(cancellationToken);
@@ -116,11 +116,11 @@ public partial class FulfillmentService
             // is now simply "this line already has a fulfilment". A line that failed for want of stock
             // has none, which is exactly right - it is still owed.
             //
-            // IgnoreQueryFilters because the filter hides released fulfilments, and a released one is
+            // IncludingReleasedFulfilments because the filter hides released fulfilments, and a released one is
             // still an applied one: the term was pushed either way. Treating it as unapplied would make
             // the retry sweep extend the same voucher a second time.
             var deliveredLineIds = (await _context.Fulfillments
-                    .IgnoreQueryFilters()
+                    .IncludingReleasedFulfilments()
                     .Where(f => f.OrderId == orderId && f.LineItemId != null)
                     .Select(f => f.LineItemId!.Value)
                     .ToListAsync(cancellationToken))
