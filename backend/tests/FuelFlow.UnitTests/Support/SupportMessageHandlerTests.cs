@@ -140,31 +140,72 @@ public sealed class SupportMessageHandlerTests : IDisposable
 public sealed class SupportMessageValidatorTests
 {
     [Theory]
-    [InlineData("valid@example.com", "Hello", true)]
-    [InlineData("", "Hello", false)]
-    [InlineData("not-an-email", "Hello", false)]
-    [InlineData("valid@example.com", "", false)]
-    [InlineData(null, "Hello", false)]
-    public void Validate_BasicCases(string? email, string message, bool expectedValid)
+    [InlineData("valid@example.com", "Hello", true, null)]
+    [InlineData("", "Hello", false, "Email")]
+    [InlineData("not-an-email", "Hello", false, "Email")]
+    [InlineData("valid@example.com", "", false, "Message")]
+    [InlineData(null, "Hello", false, "Email")]
+    public void Validate_BasicCases(string? email, string message, bool expectedValid, string? expectedField)
     {
-        var validator = new CreateSupportMessageCommandValidator();
-        var result = validator.Validate(new CreateSupportMessageCommand(email!, message, null));
-        result.IsValid.Should().Be(expectedValid);
+        var errors = CreateSupportMessageCommandValidator.Validate(
+            new CreateSupportMessageCommand(email!, message, null));
+
+        if (expectedValid)
+        {
+            errors.Should().BeEmpty("a command that breaks no rule has no errors");
+            return;
+        }
+
+        errors.Should().ContainKey(expectedField!);
     }
 
     [Fact]
     public void Validate_MessageOver4000Chars_Fails()
     {
-        var validator = new CreateSupportMessageCommandValidator();
-        var result = validator.Validate(new CreateSupportMessageCommand("a@b.com", new string('x', 4001), null));
-        result.IsValid.Should().BeFalse();
+        var errors = CreateSupportMessageCommandValidator.Validate(
+            new CreateSupportMessageCommand("a@b.com", new string('x', 4001), null));
+
+        errors.Should().ContainKey("Message");
     }
 
     [Fact]
     public void Validate_MessageAt4000Chars_Passes()
     {
-        var validator = new CreateSupportMessageCommandValidator();
-        var result = validator.Validate(new CreateSupportMessageCommand("a@b.com", new string('x', 4000), null));
-        result.IsValid.Should().BeTrue();
+        var errors = CreateSupportMessageCommandValidator.Validate(
+            new CreateSupportMessageCommand("a@b.com", new string('x', 4000), null));
+
+        errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Validate_EmailOver254Chars_Fails()
+    {
+        var email = new string('a', 250) + "@example.com";
+
+        var errors = CreateSupportMessageCommandValidator.Validate(
+            new CreateSupportMessageCommand(email, "Hello", null));
+
+        errors.Should().ContainKey("Email");
+    }
+
+    [Fact]
+    public void Validate_EmailWithSurroundingWhitespace_Passes()
+    {
+        // The form on palne.shop trims before it sends; a padded address is the same address.
+        var errors = CreateSupportMessageCommandValidator.Validate(
+            new CreateSupportMessageCommand("  padded@example.com  ", "  padded message  ", null));
+
+        errors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Validate_EmptyEmail_SaysTheSameThingThePageShows()
+    {
+        // The message is what the visitor reads on palne.shop, so it is pinned here rather
+        // than left to a package's default wording.
+        var errors = CreateSupportMessageCommandValidator.Validate(
+            new CreateSupportMessageCommand("", "Hello", null));
+
+        errors["Email"].Should().ContainSingle().Which.Should().Be("Вкажіть email.");
     }
 }

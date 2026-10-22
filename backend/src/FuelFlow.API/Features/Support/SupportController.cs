@@ -34,6 +34,14 @@ public sealed class SupportController : ControllerBase
         CreateSupportMessageCommand command,
         CancellationToken cancellationToken)
     {
+        // The form's rules, checked before anything is stored. This used to be a global
+        // FluentValidation filter, and it was the only thing in the API that used the package:
+        // the validation layer was an empty shell, and the shell is gone (C-5). The answer is
+        // the same one the filter gave - a 400 whose body names the fields that broke.
+        var errors = CreateSupportMessageCommandValidator.Validate(command);
+        if (errors.Count > 0)
+            return BadRequest(new ValidationProblemDetails(errors));
+
         // Honeypot: real users never see this field, so any value means a bot.
         if (!string.IsNullOrWhiteSpace(command.Website))
             return NoContent();
