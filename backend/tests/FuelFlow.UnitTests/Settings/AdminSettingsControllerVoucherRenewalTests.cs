@@ -1,6 +1,9 @@
 using FluentAssertions;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Settings;
+using FuelFlow.Features.Settings.GetAdminSettings;
+using FuelFlow.Features.Settings.RegisterFeedbackWebhook;
+using FuelFlow.Features.Settings.UpdateAdminSettings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
@@ -14,7 +17,7 @@ using Xunit;
 namespace FuelFlow.UnitTests.Settings;
 
 /// <summary>
-/// The settings controller takes the bot client purely to report webhook state and to register it;
+/// The settings handlers take the bot client purely to report webhook state and to register it;
 /// these tests never assert on bot behaviour, only that the wiring does not throw.
 /// </summary>
 internal sealed class SettingsTestTelegramFeedbackClient : ITelegramFeedbackClient
@@ -47,11 +50,17 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _settings = new RuntimeSettingsService(_context);
+
+        // The controller is a thin shell over the handlers, so the test wires the handlers: the
+        // settings service for the rows, the context for the fuel catalogue, and the bot client for
+        // the webhook state.
+        var feedbackBot = new SettingsTestTelegramFeedbackClient();
+        var feedbackOptions = Options.Create(new TelegramFeedbackOptions());
+
         _controller = new AdminSettingsController(
-            _settings,
-            _context,
-            new SettingsTestTelegramFeedbackClient(),
-            Options.Create(new TelegramFeedbackOptions()))
+            new GetAdminSettingsQueryHandler(_settings, _context, feedbackBot, feedbackOptions),
+            new UpdateAdminSettingsCommandHandler(_settings),
+            new RegisterFeedbackWebhookCommandHandler(feedbackBot, feedbackOptions))
         {
             // No authenticated user — GetUserId/GetUserName resolve to null, which is fine here.
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }

@@ -2,6 +2,11 @@ using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Suppliers;
+using FuelFlow.Features.Vouchers.Suppliers.CreateSupplier;
+using FuelFlow.Features.Vouchers.Suppliers.DeactivateSupplier;
+using FuelFlow.Features.Vouchers.Suppliers.GetSuppliers;
+using FuelFlow.Features.Vouchers.Suppliers.ReactivateSupplier;
+using FuelFlow.Features.Vouchers.Suppliers.UpdateSupplier;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Testing;
@@ -41,7 +46,15 @@ public sealed class SuppliersControllerTests : IDisposable
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "+380677757766"),
             new System.Security.Claims.Claim("first_name", "qa")
         };
-        _controller = new SuppliersController(_context, new AuditEventService(_context))
+        // The controller is a thin shell over the handlers, so the test wires the handlers and the
+        // controller reads the claims the same way it does in production.
+        var events = new AuditEventService(_context);
+        _controller = new SuppliersController(
+            new GetSuppliersQueryHandler(_context),
+            new CreateSupplierCommandHandler(_context, events),
+            new UpdateSupplierCommandHandler(_context, events),
+            new DeactivateSupplierCommandHandler(_context, events),
+            new ReactivateSupplierCommandHandler(_context, events))
         {
             ControllerContext = new ControllerContext
             {
@@ -432,7 +445,7 @@ public sealed class SuppliersControllerTests : IDisposable
 
         var conflict = result.Result.Should().BeOfType<ConflictObjectResult>().Subject;
         var body = JsonSerializer.SerializeToElement(conflict.Value);
-        body.GetProperty("code").GetString().Should().Be(SuppliersController.NameTakenCode);
+        body.GetProperty("code").GetString().Should().Be(SupplierWriteResult.NameTakenCode);
         body.GetProperty("message").GetString().Should().Contain("ФОП Стретович Микола");
         (await _context.Suppliers.CountAsync()).Should().Be(1);
     }
