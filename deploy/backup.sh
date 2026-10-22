@@ -166,6 +166,15 @@ echo "[$(date -Is)] Backing up '${POSTGRES_DB}' -> ${OUT}"
 # still broken: a backup that cannot be replayed to a point in time is not a backup, it
 # is a snapshot with extra steps.
 #
+# AND THE OTHER WAY IT LOOKS BROKEN, which is not broken: a database that writes nothing
+# produces no WAL, so the archive does not grow, so the archive looks old. On 2026-10-22
+# the API had been down for nine hours, the database had nothing to write, the archive had
+# not grown since 21:19 - and this check called it a broken archive, failed the backup and
+# paged whoever was on call, about a backup that was made, encrypted, shipped and
+# replayable. The check therefore asks the archiver whether it has anything WAITING, not
+# whether the directory has grown: a segment the archiver has not archived is a hole in
+# the history, and a quiet database is not.
+#
 # shellcheck source=pitr-common.sh
 source "$SCRIPT_DIR/pitr-common.sh"
 
