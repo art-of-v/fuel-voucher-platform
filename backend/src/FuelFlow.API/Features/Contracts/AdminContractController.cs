@@ -4,6 +4,7 @@ using FuelFlow.Features.Contracts.GetSignedContractSignature;
 using FuelFlow.Features.Contracts.GetSignedContracts;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -66,12 +67,15 @@ public sealed class AdminContractController : ControllerBase
         // an unattributed look at a biometric artefact is refused rather than performed
         // anonymously.
         var userId = GetUserId();
-        if (userId is null) return Unauthorized();
+        if (userId is null)
+            return ApiError.Unauthorized("The token carries no user, so the signature could not be attributed.");
 
         var signature = await _getSignature.HandleAsync(
             new GetSignedContractSignatureQuery(id, userId.Value, GetUserName()), ct);
 
-        return signature is null ? NotFound() : Ok(signature);
+        return signature is null
+            ? ApiError.NotFound("There is no signature with that id.")
+            : Ok(signature);
     }
 
     /// <summary>
