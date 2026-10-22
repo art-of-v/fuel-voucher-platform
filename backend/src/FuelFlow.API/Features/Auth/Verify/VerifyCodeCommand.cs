@@ -294,7 +294,7 @@ public sealed class VerifyCodeCommandHandler
         if (SeedRoles.IsStaff(roleName))
         {
             var displayName = string.Join(" ", new[] { user.FirstName, user.LastName }.Where(s => !string.IsNullOrWhiteSpace(s)));
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "Auth",
                 user.Id.ToString(),
                 "StaffLoggedIn",
@@ -303,8 +303,12 @@ public sealed class VerifyCodeCommandHandler
                 user.Id,
                 string.IsNullOrWhiteSpace(displayName) ? user.PhoneNumber : displayName,
                 $"{roleName} logged in ({user.PhoneNumber})",
-                user.Id.ToString(),
-                cancellationToken);
+                user.Id.ToString());
+
+            // A login is not a change to anything else, so there is no business write to share a
+            // transaction with: the row is committed on its own. The audit service does not save, so
+            // the caller does (planning #533).
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
         return new VerifyCodeResponse(
@@ -357,7 +361,7 @@ public sealed class VerifyCodeCommandHandler
 
         if (adminUser == null) return;
 
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Auth",
             adminUser.Id.ToString(),
             "AdminLoginFailed",
@@ -366,7 +370,10 @@ public sealed class VerifyCodeCommandHandler
             adminUser.Id,
             adminUser.PhoneNumber,
             $"Failed admin login for {phoneNumber} ({reason})",
-            adminUser.Id.ToString(),
-            cancellationToken);
+            adminUser.Id.ToString());
+
+        // A failed login changes nothing else, so the row is committed on its own. The audit
+        // service does not save, so the caller does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
     }
 }

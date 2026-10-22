@@ -107,18 +107,14 @@ public sealed class UnarchiveVoucherCommandHandler
                 ActorUserId = unarchiveActor,
                 OccurredAtUtc = SystemClock.UtcNow
             });
-
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
         }
 
         if (command.ActingAdminUserId.HasValue)
         {
-            await _eventService.RecordEventAsync(
+            // Tracked, not saved: the row has to commit with the flag flip above, inside this
+            // transaction, or a restored voucher would exist with nothing naming who restored it
+            // (planning #533).
+            _eventService.RecordEvent(
                 "Voucher",
                 voucher.VoucherNumber,
                 "VoucherUnarchived",
@@ -127,8 +123,15 @@ public sealed class UnarchiveVoucherCommandHandler
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
                 $"Unarchived voucher {voucher.VoucherNumber} ({voucher.Brand})",
-                voucher.Brand,
-                cancellationToken);
+                voucher.Brand);
+        }
+
+        // One save for the event and the audit row, inside the transaction the flag flip ran in.
+        await _context.SaveChangesAsync(cancellationToken);
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
         }
 
         return new UnarchiveVoucherResult { Success = true };

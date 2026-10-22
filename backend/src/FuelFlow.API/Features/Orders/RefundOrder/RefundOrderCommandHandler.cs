@@ -345,9 +345,10 @@ public sealed class RefundOrderCommandHandler
             // Order status will be updated by RefundStatusSyncService when Monobank confirms
 
             refundPayment.UpdatedAtUtc = SystemClock.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
 
-            await _providerEventService.RecordEventAsync(
+            // Tracked before the save, so the refund's state and the row that records it commit
+            // together (planning #533).
+            _providerEventService.RecordEvent(
                 aggregateType: "Refund",
                 aggregateId: refundPayment.Id.ToString(),
                 eventType: "RefundRequested",
@@ -358,8 +359,9 @@ public sealed class RefundOrderCommandHandler
                 summary: command.IsAutomatic
                     ? $"Automatic refund of {amount} kopecks for partially fulfilled order"
                     : $"Manual refund of {amount} kopecks requested by admin",
-                providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown",
-                ct: cancellationToken);
+                providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown");
+
+            await _context.SaveChangesAsync(cancellationToken);
 
             return new RefundOrderResult
             {
@@ -382,9 +384,10 @@ public sealed class RefundOrderCommandHandler
             // unhandled 500.
             refundPayment.ErrorMessage = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
             refundPayment.UpdatedAtUtc = SystemClock.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
 
-            await _providerEventService.RecordEventAsync(
+            // Tracked before the save, so the failed refund and the row that records it commit
+            // together (planning #533).
+            _providerEventService.RecordEvent(
                 aggregateType: "Refund",
                 aggregateId: refundPayment.Id.ToString(),
                 eventType: "RefundFailed",
@@ -393,8 +396,9 @@ public sealed class RefundOrderCommandHandler
                 changedByUserId: changedByUserId,
                 changedByUserName: changedByUserName,
                 summary: $"Refund of {amount} kopecks for order {order.Id} failed: {ex.Message}",
-                providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown",
-                ct: cancellationToken);
+                providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown");
+
+            await _context.SaveChangesAsync(cancellationToken);
 
             return new RefundOrderResult
             {

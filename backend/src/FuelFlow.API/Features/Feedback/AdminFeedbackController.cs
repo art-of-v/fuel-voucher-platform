@@ -271,6 +271,13 @@ public sealed class AdminFeedbackController : ControllerBase
 
         // ExecuteUpdateAsync bypasses change tracking by design, so it lands regardless of the
         // context's default query behaviour (DatabaseSetup).
+        // One transaction for the status change and the audit row. ExecuteUpdateAsync commits on its
+        // own, so without the transaction a message could move states with no row naming who moved
+        // it - and the audit row would be a separate write that can fail on its own (planning #533).
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(ct)
+            : null;
+
         var changed = await _context.FeedbackMessages
             .Where(m => ids.Contains(m.Id) && m.Status != status)
             .ExecuteUpdateAsync(
@@ -279,7 +286,7 @@ public sealed class AdminFeedbackController : ControllerBase
 
         if (changed > 0)
         {
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "FeedbackMessage",
                 ids.Count == 1 ? ids[0].ToString() : $"bulk:{changed}",
                 "FeedbackStatusChanged",
@@ -288,8 +295,14 @@ public sealed class AdminFeedbackController : ControllerBase
                 actingId.Value,
                 CurrentUserName(),
                 $"Marked {changed} feedback message(s) as {status}",
-                actingId.Value.ToString(),
-                ct);
+                actingId.Value.ToString());
+
+            await _context.SaveChangesAsync(ct);
+        }
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(ct);
         }
 
         return Ok(new FeedbackMutationResponse(true, changed));

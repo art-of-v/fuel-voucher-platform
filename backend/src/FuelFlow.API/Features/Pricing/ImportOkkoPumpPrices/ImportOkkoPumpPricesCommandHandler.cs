@@ -274,8 +274,12 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // also re-stamps price_updated_at / price_updated_by_user_id.
             await _priceRecorder.RecordRangeAsync(
                 repricedFuels, PriceHistoryReasons.PumpImport, actor, now, ct);
+
+            // Tracked before the save, so the audit rows, the price history and the new pump prices
+            // commit together - and in one save, where before this was a save per fuel (planning #533).
+            RecordEvents(applied, actor, actingUserName);
+
             await _context.SaveChangesAsync(ct);
-            await RecordEventsAsync(applied, actor, actingUserName, ct);
         }
 
         // A sheet row is accounted for when either lookup consumed it: the code it publishes, or the
@@ -305,12 +309,15 @@ public sealed class ImportOkkoPumpPricesCommandHandler
     /// Writes one <c>PumpPriceImported</c> audit row per fuel whose pump actually moved, mirroring the
     /// operator path's <c>PriceChanged</c> trail — so a price drop on the public site shows up in the
     /// brand history with the import, not just with whoever last typed a number.
+    /// <para>
+    /// It tracks the rows and lets the caller's save commit them: the row and the price it describes
+    /// are one fact (planning #533).
+    /// </para>
     /// </summary>
-    private async Task RecordEventsAsync(
+    private void RecordEvents(
         IReadOnlyList<OkkoPumpApplied> applied,
         Guid? actorId,
-        string? actorName,
-        CancellationToken ct)
+        string? actorName)
     {
         foreach (var a in applied.Where(a => a.Changed))
         {
@@ -328,10 +335,10 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 ? $"OKKO / {a.FuelName}: pump {previous:F2} → {a.PumpPricePerLiter:F2} UAH/L (imported from site)"
                 : $"OKKO / {a.FuelName}: pump set to {a.PumpPricePerLiter:F2} UAH/L (imported from site)";
 
-            await _events.RecordEventAsync(
+            _events.RecordEvent(
                 "Fuel", a.FuelTypeId.ToString(), "PumpPriceImported",
                 oldValue, newValue, actorId ?? Guid.Empty, actorName,
-                summary, OkkoSlug, ct);
+                summary, OkkoSlug);
         }
     }
 }

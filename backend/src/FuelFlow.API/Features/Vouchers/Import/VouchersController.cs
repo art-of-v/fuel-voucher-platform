@@ -4,7 +4,6 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using System.Text.Json;
 
 namespace FuelFlow.Features.Vouchers.Import;
 
@@ -15,7 +14,6 @@ public sealed class VouchersController : ControllerBase
     private readonly ImportVouchersCommandHandler _importHandler;
     private readonly GetVouchersQueryHandler _getHandler;
     private readonly IQrGenerator _qrGenerator;
-    private readonly AuditEventService _eventService;
     private readonly ImportConcurrencyGuard _importGuard;
     private readonly ILogger<VouchersController> _logger;
 
@@ -23,14 +21,12 @@ public sealed class VouchersController : ControllerBase
         ImportVouchersCommandHandler importHandler,
         GetVouchersQueryHandler getHandler,
         IQrGenerator qrGenerator,
-        AuditEventService eventService,
         ImportConcurrencyGuard importGuard,
         ILogger<VouchersController> logger)
     {
         _importHandler = importHandler;
         _getHandler = getHandler;
         _qrGenerator = qrGenerator;
-        _eventService = eventService;
         _importGuard = importGuard;
         _logger = logger;
     }
@@ -80,31 +76,12 @@ public sealed class VouchersController : ControllerBase
         try
         {
             using var stream = file.OpenReadStream();
-            var command = new ImportVouchersCommand(stream, file.FileName, supplierId, adminId);
+            var command = new ImportVouchersCommand(stream, file.FileName, supplierId, adminId, adminName);
             var result = await _importHandler.HandleAsync(command, cancellationToken);
 
-            // adminId was resolved at the top of the method, for the import itself.
-            if (adminId != Guid.Empty)
-            {
-                await _eventService.RecordEventAsync(
-                    "Voucher",
-                    result.ImportId.ToString(),
-                    "VoucherImported",
-                    null,
-                    JsonSerializer.Serialize(new
-                    {
-                        fileName = file.FileName,
-                        imported = result.Imported,
-                        duplicates = result.Duplicates,
-                        failed = result.Failed,
-                        verificationFailed = result.VerificationFailed
-                    }),
-                    adminId,
-                    adminName,
-                    $"Imported {result.Imported} vouchers from {file.FileName}",
-                    "all",
-                    cancellationToken);
-            }
+            // The audit row is written by the handler, in the same save that marks the import
+            // completed - so a summary of the import exists exactly when the import did
+            // (planning #533).
 
             return Ok(result);
         }

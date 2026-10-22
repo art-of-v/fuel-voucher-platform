@@ -415,6 +415,28 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // movement_batches.surcharge_uah, and each voucher's own cost is on the voucher. There is no
         // third number here that is not one of those two.
 
+        // Tracked inside this transaction, not saved on its own: the exchange and the row that
+        // records it commit together, or the transaction rolls both back (planning #533).
+        _eventService.RecordEvent(
+            "Voucher",
+            batchId.ToString(),
+            "VoucherExchanged",
+            null,
+            JsonSerializer.Serialize(new
+            {
+                exchangeBatchId = batchId,
+                oldCount = olds.Count,
+                newCount = news.Count,
+                paired = pairing.PairedCount,
+                unpairedOld = pairing.UnpairedOldCount,
+                unpairedNew = pairing.UnpairedNewCount,
+                surchargeUah = command.SurchargeUah
+            }),
+            command.ActingUserId,
+            command.ActingUserName,
+            $"Exchanged {olds.Count} stock voucher(s) → {news.Count} new; доплата {command.SurchargeUah:0.##} UAH",
+            "all");
+
         try
         {
             await _context.SaveChangesAsync(ct);
@@ -433,27 +455,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             // out of this method, so nothing half-exchanged survives.
             return Fail("One or more selected vouchers were already exchanged.");
         }
-
-        await _eventService.RecordEventAsync(
-            "Voucher",
-            batchId.ToString(),
-            "VoucherExchanged",
-            null,
-            JsonSerializer.Serialize(new
-            {
-                exchangeBatchId = batchId,
-                oldCount = olds.Count,
-                newCount = news.Count,
-                paired = pairing.PairedCount,
-                unpairedOld = pairing.UnpairedOldCount,
-                unpairedNew = pairing.UnpairedNewCount,
-                surchargeUah = command.SurchargeUah
-            }),
-            command.ActingUserId,
-            command.ActingUserName,
-            $"Exchanged {olds.Count} stock voucher(s) → {news.Count} new; доплата {command.SurchargeUah:0.##} UAH",
-            "all",
-            ct);
 
         if (tx is not null)
             await tx.CommitAsync(ct);

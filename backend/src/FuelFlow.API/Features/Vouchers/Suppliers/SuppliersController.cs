@@ -132,6 +132,11 @@ public sealed class SuppliersController : ControllerBase
         };
 
         _context.Suppliers.Add(supplier);
+
+        // Tracked before the save: the row and the supplier it describes commit together, or
+        // neither does (planning #533).
+        Record("SupplierCreated", supplier);
+
         try
         {
             await _context.SaveChangesAsync(ct);
@@ -141,7 +146,6 @@ public sealed class SuppliersController : ControllerBase
             return Conflict(NameTaken(name));
         }
 
-        await RecordAsync("SupplierCreated", supplier, ct);
         return Ok(ToDto(supplier));
     }
 
@@ -195,8 +199,10 @@ public sealed class SuppliersController : ControllerBase
         // AsTracking is load-bearing, not decoration. The context's default is TrackAll, so without it
         // these property changes reach no change tracker, SaveChanges writes nothing for the row, and the
         // response below - built from this same instance - still shows the new values. The outbox row added
-        // in RecordAsync always persists, which is what made the audit trail claim success while the table
+        // in Record always persists, which is what made the audit trail claim success while the table
         // disagreed. Same reason as ConfirmVoucherExchangeCommandHandler and the Settings handlers.
+        Record("SupplierUpdated", supplier);
+
         try
         {
             await _context.SaveChangesAsync(ct);
@@ -206,7 +212,6 @@ public sealed class SuppliersController : ControllerBase
             return Conflict(NameTaken(name));
         }
 
-        await RecordAsync("SupplierUpdated", supplier, ct);
         return Ok(ToDto(supplier));
     }
 
@@ -226,9 +231,11 @@ public sealed class SuppliersController : ControllerBase
 
         supplier.IsActive = false;
         supplier.UpdatedAtUtc = SystemClock.UtcNow;
+
+        Record("SupplierDeactivated", supplier);
+
         await _context.SaveChangesAsync(ct);
 
-        await RecordAsync("SupplierDeactivated", supplier, ct);
         return NoContent();
     }
 
@@ -241,9 +248,11 @@ public sealed class SuppliersController : ControllerBase
 
         supplier.IsActive = true;
         supplier.UpdatedAtUtc = SystemClock.UtcNow;
+
+        Record("SupplierReactivated", supplier);
+
         await _context.SaveChangesAsync(ct);
 
-        await RecordAsync("SupplierReactivated", supplier, ct);
         return Ok(ToDto(supplier));
     }
 
@@ -303,12 +312,16 @@ public sealed class SuppliersController : ControllerBase
         return null;
     }
 
-    private Task RecordAsync(string type, Supplier supplier, CancellationToken ct)
+    /// <summary>
+    /// Tracks the audit row for a supplier change. It is committed by the caller's own save, so the
+    /// row and the change it describes land together - or neither lands (planning #533).
+    /// </summary>
+    private void Record(string type, Supplier supplier)
     {
         var actorId = Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id)
             ? id
             : (Guid?)null;
-        if (actorId is null) return Task.CompletedTask;
+        if (actorId is null) return;
 
         var actorName = User.FindFirst("first_name")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
 
@@ -332,8 +345,8 @@ public sealed class SuppliersController : ControllerBase
             supplier.IsActive
         });
 
-        return _events.RecordEventAsync("Supplier", supplier.Id.ToString(), type, null, snapshot,
-            actorId.Value, actorName, $"{type}: {supplier.Name}", "all", ct);
+        _events.RecordEvent("Supplier", supplier.Id.ToString(), type, null, snapshot,
+            actorId.Value, actorName, $"{type}: {supplier.Name}", "all");
     }
 }
 

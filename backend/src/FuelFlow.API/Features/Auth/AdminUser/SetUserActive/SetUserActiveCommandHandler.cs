@@ -56,9 +56,7 @@ public sealed class SetUserActiveCommandHandler
         target.UpdatedAtUtc = SystemClock.UtcNow;
         // Activation changes purchase eligibility, not the validity of the session.
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "User",
             target.Id.ToString(),
             command.IsActive ? "UserActivated" : "UserDeactivated",
@@ -73,8 +71,11 @@ public sealed class SetUserActiveCommandHandler
             command.ActingUserId,
             command.ActingUserName,
             (command.IsActive ? "Activated user " : "Deactivated user ") + target.PhoneNumber,
-            command.ActingUserId.ToString(),
-            cancellationToken);
+            command.ActingUserId.ToString());
+
+        // One save for the flag and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
             "User {TargetId} {Action} by {ActingUserId} ({ActingRole})",

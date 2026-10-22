@@ -92,11 +92,9 @@ public sealed class UpdateVoucherCommandHandler
             });
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-
         if (command.ActingAdminUserId.HasValue)
         {
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "Voucher",
                 entity.Id.ToString(),
                 "VoucherUpdated",
@@ -105,9 +103,12 @@ public sealed class UpdateVoucherCommandHandler
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
                 $"Updated voucher {entity.VoucherNumber} ({entity.Brand})",
-                entity.Brand,
-                cancellationToken);
+                entity.Brand);
         }
+
+        // One save for the status change, the event and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
 
         return new UpdateVoucherResult { Success = true };
     }

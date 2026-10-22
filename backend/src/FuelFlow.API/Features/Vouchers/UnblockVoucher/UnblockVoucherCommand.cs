@@ -109,11 +109,9 @@ public sealed class UnblockVoucherCommandHandler
             });
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-
         if (command.ActingAdminUserId.HasValue)
         {
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "Voucher",
                 voucher.Id.ToString(),
                 "VoucherUnblocked",
@@ -122,9 +120,12 @@ public sealed class UnblockVoucherCommandHandler
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
                 $"Unblocked voucher {voucher.VoucherNumber} ({voucher.Brand})",
-                voucher.Brand,
-                cancellationToken);
+                voucher.Brand);
         }
+
+        // One save for the unblock, the movement, the event and the audit row: the row and the
+        // change it describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
 
         return new UnblockVoucherResult { Success = true };
     }

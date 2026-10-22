@@ -132,7 +132,12 @@ public sealed class BulkActionVouchersCommandHandler
 
             if (command.ActingAdminUserId.HasValue)
             {
-                await _eventService.RecordEventAsync(
+                // The one row that cannot share a transaction with the change it describes: the
+                // archive above commits per batch, on purpose (see the comment at the top of this
+                // branch), so there is no single transaction for a summary of the whole run to join.
+                // What carries the authorship of the archive itself is the per-voucher `Archived`
+                // event, written inside each batch's transaction - this row is the count.
+                _eventService.RecordEvent(
                     "Voucher",
                     "all",
                     "VoucherBulkAction",
@@ -143,8 +148,9 @@ public sealed class BulkActionVouchersCommandHandler
                     keptCount > 0
                         ? $"Bulk action delete_all archived {removedCount} vouchers, kept {keptCount} that were paid"
                         : $"Bulk action delete_all removed {removedCount} vouchers",
-                    "all",
-                    cancellationToken);
+                    "all");
+
+                await _context.SaveChangesAsync(cancellationToken);
             }
 
             if (keptCount > 0)
@@ -268,11 +274,9 @@ public sealed class BulkActionVouchersCommandHandler
         // the deletion silently unapplied - a bulk delete that reported success and deleted nothing.
         _context.FuelVouchers.UpdateRange(entities);
 
-        await _context.SaveChangesAsync(cancellationToken);
-
         if (command.ActingAdminUserId.HasValue)
         {
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "Voucher",
                 "bulk",
                 "VoucherBulkAction",
@@ -286,9 +290,12 @@ public sealed class BulkActionVouchersCommandHandler
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
                 $"Bulk action {command.Action} on {entities.Count} vouchers",
-                "all",
-                cancellationToken);
+                "all");
         }
+
+        // One save for the vouchers, their events and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
 
         if (command.Action == "activate" && entities.Count > 0)
         {

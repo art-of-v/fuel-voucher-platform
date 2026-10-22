@@ -172,20 +172,21 @@ public sealed class BackfillBrandFuelCodesCommandHandler
 
         if (!command.DryRun && fills.Count > 0)
         {
-            await _context.SaveChangesAsync(ct);
-
+            // Tracked before the save, so the rows and the codes they describe commit together
+            // (planning #533).
             foreach (var fill in fills)
             {
-                await _events.RecordEventAsync(
+                _events.RecordEvent(
                     "Fuel", fill.FuelTypeId.ToString(), "BrandFuelCodeBackfilled",
                     null,
                     JsonSerializer.Serialize(new { fill.Name, Category = fill.Category, BrandFuelCode = fill.Code }),
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
                     actingUserName,
                     $"{fill.Name}: matched OKKO's published code {fill.Code}",
-                    OkkoSlug,
-                    ct);
+                    OkkoSlug);
             }
+
+            await _context.SaveChangesAsync(ct);
         }
 
         return new BackfillBrandFuelCodesResult(

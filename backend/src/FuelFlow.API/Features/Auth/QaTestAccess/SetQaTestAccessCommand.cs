@@ -66,6 +66,15 @@ public sealed class SetQaTestAccessCommandHandler
             return new SetQaTestAccessResult(previous, command.Enabled, RevokedSessions: 0);
         }
 
+        // One transaction for the switch, the revocations and the audit row. The switch is written by
+        // RuntimeSettingsService.UpsertAsync and the revocations by the helper below - each of them
+        // saves on its own, and the audit row can only be written once the revocation count is
+        // known. Without the transaction the switch could be flipped with no row saying who flipped
+        // it (planning #533).
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
         await _settings.UpsertAsync(
             AppSettingKeys.QaTestAccessEnabled,
             command.Enabled.ToString(),
@@ -82,7 +91,7 @@ public sealed class SetQaTestAccessCommandHandler
         // OldValue/NewValue are jsonb columns, so they must carry valid JSON — never a bare "True".
         // These record only the switch state, the revocation count and the actor role; the QA code
         // and phone are deliberately absent.
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "QaTestAccess",
             AppSettingKeys.QaTestAccessEnabled,
             command.Enabled ? "QaTestAccessEnabled" : "QaTestAccessDisabled",
@@ -93,8 +102,15 @@ public sealed class SetQaTestAccessCommandHandler
             command.Enabled
                 ? "Enabled QA test access"
                 : $"Disabled QA test access (revoked {revoked} QA session(s))",
-            command.ActingUserId.ToString(),
-            cancellationToken);
+            command.ActingUserId.ToString());
+
+        // The audit row, committed inside the transaction with the switch it describes.
+        await _context.SaveChangesAsync(cancellationToken);
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
+        }
 
         _metrics?.QaTestAccessSwitchChanged(command.Enabled);
         _logger.LogWarning(

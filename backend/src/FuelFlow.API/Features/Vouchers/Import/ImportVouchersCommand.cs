@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Movements;
@@ -21,8 +22,12 @@ namespace FuelFlow.Features.Vouchers.Import;
 /// ledger answers. A deposit that cannot say who took delivery of the paper cannot be the start of a
 /// voucher's life story, and an import is the start of most of them.
 /// </param>
+/// <param name="ActingUserName">
+/// Their name, for the audit row that says what the import brought in. Nullable: a machine-driven
+/// import has no name to give.
+/// </param>
 public sealed record ImportVouchersCommand(
-    Stream PdfStream, string FileName, Guid SupplierId, Guid ActingUserId);
+    Stream PdfStream, string FileName, Guid SupplierId, Guid ActingUserId, string? ActingUserName = null);
 
 // One rejected row, surfaced inline in the import result so staff see WHY a row failed
 // (not just a count). Reason is the same human-readable message persisted to
@@ -56,6 +61,7 @@ public sealed class ImportVouchersCommandHandler
     private readonly FuelFlowMetrics _metrics;
     private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     private readonly NotificationDispatcher _notifications;
+    private readonly FuelFlow.Features.Brands.AuditEventService _auditEvents;
 
     public ImportVouchersCommandHandler(
         IImportVouchersDbContext context,
@@ -67,7 +73,8 @@ public sealed class ImportVouchersCommandHandler
         IBackgroundJobClient backgroundJobClient,
         FuelFlowMetrics metrics,
         NotificationDispatcher notifications,
-        FuelFlow.Features.Vouchers.Security.IQrCipher qrCipher)
+        FuelFlow.Features.Vouchers.Security.IQrCipher qrCipher,
+        FuelFlow.Features.Brands.AuditEventService auditEvents)
     {
         _context = context;
         _pdfRenderer = pdfRenderer;
@@ -79,6 +86,7 @@ public sealed class ImportVouchersCommandHandler
         _notifications = notifications;
         _metrics = metrics;
         _qrCipher = qrCipher;
+        _auditEvents = auditEvents;
     }
 
     /// <summary>
@@ -564,6 +572,30 @@ public sealed class ImportVouchersCommandHandler
 
         import.Status = "Completed";
         import.CompletedAtUtc = SystemClock.UtcNow;
+
+        // The summary of the import, written here rather than by the controller that asked for it:
+        // the row and the "Completed" status are one fact, and this save commits them together. The
+        // controller used to write it after the handler returned, which made it a second, separate
+        // write that could fail on its own - an import with no row saying what it brought in
+        // (planning #533).
+        _auditEvents.RecordEvent(
+            "Voucher",
+            import.Id.ToString(),
+            "VoucherImported",
+            null,
+            JsonSerializer.Serialize(new
+            {
+                FileName = request.FileName,
+                Imported = import.ImportedCount,
+                Duplicates = import.DuplicateCount,
+                Failed = import.FailedCount,
+                VerificationFailed = import.VerificationFailedCount
+            }),
+            request.ActingUserId,
+            request.ActingUserName,
+            $"Imported {import.ImportedCount} vouchers from {request.FileName}",
+            "all");
+
         await _context.SaveChangesAsync(cancellationToken);
 
         stopwatch.Stop();

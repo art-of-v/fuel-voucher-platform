@@ -287,13 +287,20 @@ public sealed class AdminPaymentsController : ControllerBase
         payment.UserId = customerId;
         payment.UpdatedAtUtc = SystemClock.UtcNow;
 
+        // Tracked before the save: the row and the payment it describes commit together, or neither
+        // does (planning #533).
+        Record(payment, before, after);
+
         await _context.SaveChangesAsync(ct);
-        await RecordAsync(payment, before, after, ct);
 
         return NoContent();
     }
 
-    private Task RecordAsync(Payment payment, string before, string after, CancellationToken ct)
+    /// <summary>
+    /// Tracks the audit row for a payment placed by hand. Committed by the caller's own save, so the
+    /// row and the change it describes land together (planning #533).
+    /// </summary>
+    private void Record(Payment payment, string before, string after)
     {
         var actorId = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id)
             ? id
@@ -301,16 +308,16 @@ public sealed class AdminPaymentsController : ControllerBase
 
         // No actor, no record: an audit row that cannot name who placed money names nothing. Same
         // short-circuit SuppliersController uses.
-        if (actorId is null) return Task.CompletedTask;
+        if (actorId is null) return;
 
         var actorName = User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value;
 
-        return _events.RecordEventAsync(
+        _events.RecordEvent(
             "Payment", payment.Id.ToString(),
             "PaymentPlaced", before, after,
             actorId.Value, actorName,
             $"Placed {payment.AmountUah:N2} {payment.Currency} declared on {payment.Provider}",
-            "all", ct);
+            "all");
     }
 }
 

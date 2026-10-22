@@ -287,16 +287,17 @@ public sealed class BrandFuelController : ControllerBase
             });
         }
 
-        await _context.SaveChangesAsync(ct);
-
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new { fuel.Id, fuel.Name, request.SupplierPricePerLiter, request.MarginUahPerLiter, request.PumpPricePerLiter, FinalPricePerLiter = finalPerLiter });
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Fuel", fuel.Id.ToString(), "FuelAdded",
             null, newValue, userId, GetUserName(),
             $"{Brand.Name} / {fuel.Name}: added at {(finalPerLiter ?? request.PumpPricePerLiter ?? 0m):F2} UAH/L",
-            Brand!.Slug,
-            ct);
+            Brand!.Slug);
+
+        // One save for the fuel, its sizes, its price history and the audit row: the row and the
+        // change it describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return Created($"/api/admin/brand-fuels/{fuel.Id}", new { id = fuel.Id });
     }
@@ -478,8 +479,6 @@ public sealed class BrandFuelController : ControllerBase
 
         _context.FuelTypes.Update(fuel);
 
-        await _context.SaveChangesAsync(ct);
-
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new
         {
@@ -506,12 +505,15 @@ public sealed class BrandFuelController : ControllerBase
             ? $"{BrandName} / {fuel.Name}: {string.Join(", ", changes)}"
             : $"{BrandName} / {fuel.Name}: updated";
 
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Fuel", fuelId.ToString(), "PriceChanged",
             oldValue, newValue, userId, GetUserName(),
             summary,
-            Brand!.Slug,
-            ct);
+            Brand!.Slug);
+
+        // One save for the fuel, its price history and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return Ok(new { success = true });
     }
@@ -567,16 +569,18 @@ public sealed class BrandFuelController : ControllerBase
 
         fuel.IsDeleted = true;
         fuel.DeletedAtUtc = archivedAt;
-        await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Fuel", fuelId.ToString(), "FuelRemoved",
             JsonSerializer.Serialize(new { fuelName, BrandName }), "{}",
             userId, GetUserName(),
             $"{BrandName} / {fuelName}: removed",
-            Brand!.Slug,
-            ct);
+            Brand!.Slug);
+
+        // One save for the archived fuel and the audit row: the row and the change it describes
+        // commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return Ok(new { success = true });
     }
@@ -658,16 +662,17 @@ var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsyn
             }
         }
 
-    await _context.SaveChangesAsync(ct);
-
-        var userId = GetUserId();
+    var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(nominals.OrderBy(n => n).ToList());
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Nominal", id.ToString(), "NominalSetChanged",
             oldValue, newValue, userId, GetUserName(),
             $"{Brand.Name}: nominals changed [{string.Join(", ", nominals.OrderBy(n => n))}]",
-            Brand.Slug,
-            ct);
+            Brand.Slug);
+
+        // One save for the sizes and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return Ok(new { success = true });
     }
