@@ -1,10 +1,9 @@
-using FuelFlow.Features.Contracts.SharedModels;
-using FuelFlow.Persistence;
+using FuelFlow.Features.Contracts.GetProvider;
+using FuelFlow.Features.Contracts.GetVersions;
+using FuelFlow.Features.Contracts.PublishVersion;
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Contracts;
 
@@ -31,18 +30,21 @@ namespace FuelFlow.Features.Contracts;
 [Route("api/admin/contract-versions")]
 public sealed class AdminContractVersionsController : ControllerBase
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly GetContractVersionsQueryHandler _getVersionsHandler;
+    private readonly GetContractProviderQueryHandler _getProviderHandler;
+    private readonly PublishContractVersionCommandHandler _publishHandler;
     private readonly ContractTextExtractor _textExtractor;
-    private readonly ContractWriter _contractWriter;
 
     public AdminContractVersionsController(
-        ApplicationDbContext dbContext,
-        ContractTextExtractor textExtractor,
-        ContractWriter contractWriter)
+        GetContractVersionsQueryHandler getVersionsHandler,
+        GetContractProviderQueryHandler getProviderHandler,
+        PublishContractVersionCommandHandler publishHandler,
+        ContractTextExtractor textExtractor)
     {
-        _dbContext = dbContext;
+        _getVersionsHandler = getVersionsHandler;
+        _getProviderHandler = getProviderHandler;
+        _publishHandler = publishHandler;
         _textExtractor = textExtractor;
-        _contractWriter = contractWriter;
     }
 
     /// <summary>
@@ -53,21 +55,8 @@ public sealed class AdminContractVersionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetVersions([FromQuery] Guid brandId, CancellationToken cancellationToken)
     {
-        var versions = await _dbContext.ContractVersions
-            .AsNoTracking()
-            .Where(v => v.BrandId == brandId)
-            .OrderByDescending(v => v.Version)
-            .Select(v => new
-            {
-                v.Id,
-                v.BrandId,
-                v.Version,
-                v.Body,
-                v.TermDays,
-                v.CreatedAtUtc,
-                v.CreatedByUserId
-            })
-            .ToListAsync(cancellationToken);
+        var versions = await _getVersionsHandler.HandleAsync(
+            new GetContractVersionsQuery(brandId), cancellationToken);
 
         return Ok(versions);
     }
@@ -96,49 +85,24 @@ public sealed class AdminContractVersionsController : ControllerBase
         if (request.TermDays <= 0)
             return BadRequest("The term must be at least one day - a contract that expires the moment it is made is not a contract");
 
-        var brand = await _dbContext.Brands
-            .AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == request.BrandId, cancellationToken);
+        var brand = await _getProviderHandler.HandleAsync(
+            new GetContractProviderQuery(request.BrandId), cancellationToken);
 
         if (brand is null)
             return NotFound("Provider not found");
 
-        var current = await _dbContext.ContractVersions
-            .Where(v => v.BrandId == request.BrandId)
-            .OrderByDescending(v => v.Version)
-            .Select(v => (short?)v.Version)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var version = new ContractVersion
-        {
-            Id = Guid.CreateVersion7(),
-            BrandId = request.BrandId,
-            Version = (short)((current ?? 0) + 1),
-            Body = request.Body.Trim(),
-            TermDays = request.TermDays,
-            CreatedAtUtc = SystemClock.UtcNow,
-            CreatedByUserId = null
-        };
-
-        _dbContext.ContractVersions.Add(version);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        // The backfill: a company that was created before this provider published any text has
-        // no contract for it, and without this it never would - the writer only runs when a
-        // company is created. This is the owner's answer to "do the companies that already
-        // existed get contracts too?".
-        var contractsCreated = await _contractWriter.EnsureContractsForAllAsync(cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var published = await _publishHandler.HandleAsync(
+            new PublishContractVersionCommand(request.BrandId, request.Body, request.TermDays), cancellationToken);
 
         return Ok(new
         {
-            version.Id,
-            version.BrandId,
-            version.Version,
-            version.TermDays,
-            version.CreatedAtUtc,
+            published.Id,
+            published.BrandId,
+            published.Version,
+            published.TermDays,
+            published.CreatedAtUtc,
             // How many companies were given a contract for this provider by this publish.
-            contractsCreated
+            contractsCreated = published.ContractsCreated
         });
     }
 
@@ -180,9 +144,11 @@ public sealed class AdminContractVersionsController : ControllerBase
         if (!ContractTextExtractor.SupportedExtensions.Contains(extension))
             return BadRequest($"Only {string.Join(" and ", ContractTextExtractor.SupportedExtensions)} documents are read");
 
-        var brand = await _dbContext.Brands
-            .AsNoTracking()
-            .FirstOrDefaultAsync(b => b.Id == brandId, cancellationToken);
+        // The provider is looked up before the document is read: an upload for a provider that is
+        // not there is a mistake in the form, and reading a document for it would be work for
+        // nothing.
+        var brand = await _getProviderHandler.HandleAsync(
+            new GetContractProviderQuery(brandId), cancellationToken);
 
         if (brand is null)
             return NotFound("Provider not found");
@@ -210,44 +176,21 @@ public sealed class AdminContractVersionsController : ControllerBase
                 "The document has no text in it. A scanned document is a picture of a contract, "
                 + "and a contract the customer cannot read is not a contract.");
 
-        var current = await _dbContext.ContractVersions
-            .Where(v => v.BrandId == brandId)
-            .OrderByDescending(v => v.Version)
-            .Select(v => (short?)v.Version)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var version = new ContractVersion
-        {
-            Id = Guid.CreateVersion7(),
-            BrandId = brandId,
-            Version = (short)((current ?? 0) + 1),
-            Body = body.Trim(),
-            TermDays = termDays,
-            CreatedAtUtc = SystemClock.UtcNow,
-            CreatedByUserId = null
-        };
-
-        _dbContext.ContractVersions.Add(version);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        // The backfill, for the same reason as in Publish: a company created before this
-        // provider published any text has no contract for it, and only the writer can give
-        // it one.
-        var contractsCreated = await _contractWriter.EnsureContractsForAllAsync(cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var published = await _publishHandler.HandleAsync(
+            new PublishContractVersionCommand(brandId, body, termDays), cancellationToken);
 
         return Ok(new
         {
-            version.Id,
-            version.BrandId,
-            version.Version,
-            version.TermDays,
-            version.CreatedAtUtc,
+            published.Id,
+            published.BrandId,
+            published.Version,
+            published.TermDays,
+            published.CreatedAtUtc,
             // How much text was read out of the document, so the operator can see that the
             // upload was read and not stored as an empty page.
-            characters = version.Body.Length,
+            characters = published.Characters,
             // How many companies were given a contract for this provider by this publish.
-            contractsCreated
+            contractsCreated = published.ContractsCreated
         });
     }
 

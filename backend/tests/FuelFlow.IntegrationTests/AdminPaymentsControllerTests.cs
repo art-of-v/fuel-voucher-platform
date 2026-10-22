@@ -3,6 +3,10 @@ using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Payments.Admin;
+using FuelFlow.Features.Payments.Admin.AttachPayment;
+using FuelFlow.Features.Payments.Admin.GetCustomerByCode;
+using FuelFlow.Features.Payments.Admin.GetUnallocatedPayments;
+using FuelFlow.Features.Payments.Admin.SearchCustomers;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Domain;
@@ -38,7 +42,14 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
     private AdminPaymentsController CreateController(ApplicationDbContext context)
     {
-        var controller = new AdminPaymentsController(context, new AuditEventService(context))
+        // The controller talks to handlers, and the handlers talk to the database: the screen is
+        // built the way the rest of the platform is, so the rules in it are the rules the suite
+        // can reach.
+        var controller = new AdminPaymentsController(
+            new GetUnallocatedPaymentsQueryHandler(context),
+            new SearchCustomersQueryHandler(context),
+            new GetCustomerByCodeQueryHandler(context),
+            new AttachPaymentCommandHandler(context, new AuditEventService(context)))
         {
             ControllerContext = new ControllerContext
             {
