@@ -1138,6 +1138,17 @@ jobs:
           cd dryrun
           export PGPASSWORD=postgres
           db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
+          # The dump is production DDL, and its row-level-security policies name the cluster's
+          # roles. pg_dump carries `CREATE POLICY ... TO fuelflow_app`, not the role itself,
+          # because roles are cluster-wide and a plain database dump does not include them. This
+          # throwaway container has only the image's superuser, so the restore stopped at the
+          # first policy with `role "fuelflow_app" does not exist` - before a single migration
+          # ran (run 39841000220, 2026-10-22). Create the three contract roles first; DDL only
+          # needs them to exist, so they get no LOGIN and no password. Keep this list in step
+          # with deploy/ensure-database-roles.sh.
+          for role in fuelflow_app fuelflow_migrator fuelflow_readonly; do
+            db -q -v ON_ERROR_STOP=1 -c "CREATE ROLE $role NOLOGIN"
+          done
           db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
           db -q -c "\\copy \"__EFMigrationsHistory\" FROM 'history.csv' WITH (FORMAT csv, HEADER true)"
           # Order is EXPLICIT, and it must be, because the dump contains real foreign keys:
@@ -1366,6 +1377,12 @@ jobs:
           cd dryrun
           export PGPASSWORD=postgres
           db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
+          # Same reason as the production restore above: the staging dump can carry the same
+          # role-naming policies, and this container starts with no roles. It passes today only
+          # because this dump has no such policy yet.
+          for role in fuelflow_app fuelflow_migrator fuelflow_readonly; do
+            db -q -v ON_ERROR_STOP=1 -c "CREATE ROLE $role NOLOGIN"
+          done
           db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
           db -q -c "\\copy \"__EFMigrationsHistory\" FROM 'history.csv' WITH (FORMAT csv, HEADER true)"
           db -t -A -c "SELECT count(*) FROM \"__EFMigrationsHistory\"" | sed 's/^/staging migrations restored: /'
