@@ -1,0 +1,18 @@
+name: "FuelFlow CodeQL configuration"
+
+# The one baselined rule, with the condition it depends on.
+#
+# `cs/log-forging` fires on every log call whose argument a request can influence. In this
+# codebase those arguments are structured parameters of a message template, and production
+# emits CompactJsonFormatter (Observability:StructuredLogs is true in
+# appsettings.Production.json, wired by SharedKernel/Observability/LoggingSetup.cs), so a CR/LF
+# inside a value is JSON-escaped at the sink and cannot start a new log record. The local
+# console formatter is the text one and is Development-only. Rewriting ~55 call sites would not
+# change a byte of what production writes.
+#
+# This baseline is honest only while the sink stays structured. If production ever switches to
+# a text formatter, or a sink starts writing the rendered message to a line-oriented file,
+# remove this filter: the risk it ignores becomes real at that moment.
+query-filters:
+  - exclude:
+      id: cs/log-forging

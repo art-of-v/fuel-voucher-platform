@@ -1,21 +1,35 @@
 name: CodeQL
 
-# Static security analysis (SAST) — MANUAL-ONLY (workflow_dispatch), deliberately.
+# Static security analysis (SAST) - a REQUIRED gate, not a manual run.
 #
-# **The repository is public until it is not.** It goes PRIVATE on 2026-11-01. On a
-# personal-account private repository, code scanning cannot upload SARIF to the Security tab (that
-# needs org-level GitHub Advanced Security), and every hosted job-minute is billed — so running
-# CodeQL automatically on each push/PR would both fail at the upload step AND burn billable
-# minutes. That is the reason this is manual, and the reason the two `Analyze (...)` contexts are
-# not on main's required checks (planning #37).
+# **The repository is public until it is not.** It goes PRIVATE on 2026-11-01. That date is
+# the reason CodeQL was made manual-only in October (planning #37/#39): on a personal-account
+# private repository a SARIF upload cannot reach the Security tab (it needs org-level GHAS)
+# and hosted minutes are billed. While the repository is PUBLIC the analysis is free, the
+# upload works, and the scan can gate a pull request - so it does.
 #
-# **Until the flip, a manual scan still reaches the Security tab** — the analysis is free while
-# the repository is public — so the full scan is worth triggering before the flip, and again
-# whenever something is worth knowing about.
+# The gate, in three pieces:
+#   1. `changes` decides which languages this change can affect from the diff alone. A PR that
+#      touches only the admin site never pays for the C# analysis, and a docs-only PR analyzes
+#      nothing at all. On an unavailable base commit it fails OPEN and analyzes both.
+#   2. `analyze-csharp` / `analyze-javascript-typescript` run only for the languages the diff
+#      touches. Dependabot PRs and PRs from forks are skipped: their token cannot upload SARIF,
+#      and a dependency bump does not change source CodeQL can see anyway.
+#   3. `codeql-required` always runs, collapses the two analyses into ONE status context, and
+#      fails on any open code-scanning alert for the ref. It is the context the main ruleset
+#      requires (alongside `CI required`), so a finding blocks the merge instead of appearing
+#      in the Security tab a day later. Newline-forging is baselined in
+#      `.github/codeql/codeql-config.yml` with its reason; everything else is live.
 #
-# For ongoing coverage once private, use the local CodeQL CLI (planning #39) — that runs off
-# GitHub, zero minutes.
+# **When the repository goes private on 2026-11-01, this workflow stops being a gate** - the
+# upload will fail on a personal account and the minutes are billed. At that point disable the
+# `pull_request`/`push` triggers and use `docs/RUNBOOK_CODEQL_LOCAL.md` (planning repo), which
+# runs the same two languages through the CodeQL CLI off GitHub. Do not "fix" the upload by
+# removing `security-events: write`; that silently turns the gate into a green no-op.
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -27,19 +41,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  analyze:
-    name: Analyze (${{ matrix.language }})
+  # The cost gate and the path gate. Pure `git diff`, like ci.yml's detector - a third-party
+  # filter action would be a new supply-chain dependency on a path that reads a money
+  # repository. Fails OPEN: an unavailable base or a failed diff analyzes BOTH languages.
+  changes:
+    name: Detect changed languages
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # build-mode "none" analyzes source without a full compile — sidesteps the .NET SDK
-          # setup and works with the multi-project layout.
-          - language: csharp
-            build-mode: none
-          - language: javascript-typescript
-            build-mode: none
+    outputs:
+      csharp: ${{ steps.filter.outputs.csharp }}
+      javascript: ${{ steps.filter.outputs.javascript }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Filter changed paths
+        id: filter
+        run: |
+          set -euo pipefail
+          allchanged=0
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            base="${{ github.event.before }}"
+          else
+            base=""
+          fi
+          if [ -z "${base:-}" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "Base commit unavailable - analyzing both languages."
+            allchanged=1; changed=""
+          else
+            changed="$(git diff --name-only "$base" "${{ github.sha }}")" || { echo "diff failed - analyzing both languages."; allchanged=1; changed=""; }
+          fi
+          echo "Changed files:"; echo "$changed"
+          csharp=false; javascript=false
+          while IFS= read -r f; do
+            if [ -z "$f" ]; then continue; fi
+            case "$f" in
+            backend/*) csharp=true ;;
+            admin/*|mobile/*|website/*|scripts/*) javascript=true ;;
+            # A workflow or CodeQL-config change can change what gets scanned, so it arms both.
+            .github/*) csharp=true; javascript=true ;;
+            # Anything else (docs, deploy, repo-root files) cannot change a C# or JS/TS result.
+            *) ;;
+            esac
+          done <<< "$changed"
+          if [ "$allchanged" = "1" ]; then csharp=true; javascript=true; fi
+          echo "csharp=$csharp" >> "$GITHUB_OUTPUT"
+          echo "javascript=$javascript" >> "$GITHUB_OUTPUT"
+
+  analyze-csharp:
+    name: Analyze (csharp)
+    needs: changes
+    # A dependency bump cannot change the source CodeQL reads, and a fork/Dependabot token
+    # cannot upload SARIF. Skipping here is safe because `codeql-required` still reports.
+    if: >-
+      needs.changes.outputs.csharp == 'true' &&
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,10 +107,85 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
+          languages: csharp
+          # build-mode "none" analyzes source without a full compile - sidesteps the .NET SDK
+          # setup and works with the multi-project layout.
+          build-mode: none
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:csharp"
+          # The alert query below must not race the SARIF processing.
+          wait-for-processing: true
+
+  analyze-javascript-typescript:
+    name: Analyze (javascript-typescript)
+    needs: changes
+    if: >-
+      needs.changes.outputs.javascript == 'true' &&
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: "/language:javascript-typescript"
+          # The alert query below must not race the SARIF processing.
+          wait-for-processing: true
+
+  # The single context the main ruleset requires. Same shape as `CI required` in ci.yml: it
+  # runs even when the analyses were skipped, so a language-gated PR never leaves the required
+  # context unreported. It fails when an analysis failed or was cancelled, and when the scan
+  # left an OPEN alert on this pull request (or on the branch, for a push) - the second half is
+  # what makes the scan a gate rather than a report. The `pr=` filter is diff-scoped: it returns
+  # the alerts this pull request's analysis raised, not the branch's whole backlog. Dismissed
+  # alerts (the documented baselines) do not count.
+  codeql-required:
+    name: CodeQL required
+    if: always()
+    needs: [changes, analyze-csharp, analyze-javascript-typescript]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no analysis failed
+        run: |
+          set -euo pipefail
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "::error::A CodeQL analysis failed or was cancelled."
+            exit 1
+          fi
+          echo "CodeQL analyses succeeded or were skipped."
+
+      - name: Fail on an open code-scanning alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            filter="pr=${{ github.event.pull_request.number }}"
+            what="pull request #${{ github.event.pull_request.number }}"
+          else
+            filter="ref=refs/heads/${GITHUB_REF_NAME}"
+            what="ref refs/heads/${GITHUB_REF_NAME}"
+          fi
+          # Paginated: the first page is 100 alerts and the query must not stop at it.
+          open="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&${filter}&per_page=100" --jq '.[].number' | wc -l | tr -d ' ')"
+          if [ "$open" != "0" ]; then
+            echo "::error::CodeQL has ${open} open alert(s) on ${what}. A merge must not carry a new finding."
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&${filter}&per_page=100" \
+              --jq '.[] | "  #\(.number) \(.rule.id) \(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line) - \(.rule.description)"'
+            exit 1
+          fi
+          echo "CodeQL has no open alerts on ${what}."
