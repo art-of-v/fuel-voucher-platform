@@ -182,6 +182,9 @@ services:
       # Note: the app validates Token + SenderName on boot; both must be non-empty.
       SmsClub__Token: ${SMSCLUB_TOKEN:-}
       SmsClub__SenderName: ${SMSCLUB_SENDER_NAME:-}
+      # The deadline the SMS brand is given. The OTP path waits on it, so a brand that never
+      # answers must not hold a login for the hundred seconds HttpClient allows by default.
+      SmsClub__TimeoutSeconds: ${SMSCLUB_TIMEOUT_SECONDS:-10}
 
       # --- Monobank (LIVE payments) — app refuses to start if PublicKey is missing/placeholder ---
       Monobank__Enabled: "true"
@@ -359,6 +362,8 @@ services:
       # /api/updates/manifest answers 204 (no update) — the feature stays inert, so an
       # unconfigured deploy never breaks an installed app.
       Updates__PublicBaseUrl: ${OTA_PUBLIC_BASE_URL:-}
+      # The deadline the CDN is given. An installed app asking "is there an update?" waits on it.
+      Updates__TimeoutSeconds: ${OTA_TIMEOUT_SECONDS:-15}
     volumes:
       # The CA that signed the database's certificate. The application verifies the server
       # against it, so the file has to be inside the container - the connection string names
