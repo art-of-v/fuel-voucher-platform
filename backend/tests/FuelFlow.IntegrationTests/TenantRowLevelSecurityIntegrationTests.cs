@@ -38,9 +38,14 @@ public sealed class TenantRowLevelSecurityIntegrationTests : IClassFixture<TestD
     {
         var expected = new Dictionary<string, string[]>
         {
-            ["orders"] = ["tenant_isolation"],
-            ["fuel_vouchers"] = ["tenant_isolation_read", "tenant_isolation_write"],
-            ["user_contracts"] = ["tenant_isolation"],
+            ["orders"] = ["tenant_isolation", "tenant_isolation_readonly"],
+            ["fuel_vouchers"] =
+            [
+                "tenant_isolation_read",
+                "tenant_isolation_readonly",
+                "tenant_isolation_write",
+            ],
+            ["user_contracts"] = ["tenant_isolation", "tenant_isolation_readonly"],
         };
 
         await using var connection = await OpenAdminAsync();
@@ -68,9 +73,9 @@ public sealed class TenantRowLevelSecurityIntegrationTests : IClassFixture<TestD
 
             reader.GetBoolean(0).Should().BeTrue($"{table} has row-level security enabled");
             reader.GetString(1).Split(',').Should().BeEquivalentTo(policies);
-            reader.GetString(2).Should().Be(
-                "fuelflow_app",
-                "the owner and the read-only reporting role must not be filtered by the policies");
+            reader.GetString(2).Split(',').Should().BeEquivalentTo(
+                new[] { "fuelflow_app", "fuelflow_readonly" },
+                "the traffic role is policed and the reporting role has a read-all policy");
         }
     }
 
@@ -249,6 +254,29 @@ public sealed class TenantRowLevelSecurityIntegrationTests : IClassFixture<TestD
     }
 
     [Fact]
+    public async Task The_readonly_reporting_role_reads_across_tenants()
+    {
+        var customerA = Guid.NewGuid();
+        var customerB = Guid.NewGuid();
+        var orderA = Guid.NewGuid();
+        var orderB = Guid.NewGuid();
+
+        await using (var seed = CreateContext())
+        {
+            seed.Users.AddRange(NewUser(customerA), NewUser(customerB));
+            await seed.SaveChangesAsync();
+
+            await InsertOrderAsync(seed, orderA, customerA, legalEntityId: null);
+            await InsertOrderAsync(seed, orderB, customerB, legalEntityId: null);
+        }
+
+        await using var reporting = await OpenAsReadonlyAsync();
+        (await VisibleOrderIdsAsync(reporting, orderA, orderB)).Should().BeEquivalentTo(
+            new[] { orderA, orderB },
+            "the optional reporting role exists to read across tenants, and row-level security is default-deny");
+    }
+
+    [Fact]
     public async Task The_host_writes_the_system_scope_before_the_first_statement()
     {
         var accessor = new TenantScopeAccessor(new HttpContextAccessor());
@@ -302,6 +330,17 @@ public sealed class TenantRowLevelSecurityIntegrationTests : IClassFixture<TestD
             """;
         command.Parameters.AddWithValue("user_id", userId?.ToString("D") ?? "");
         command.Parameters.AddWithValue("is_system", system ? "on" : "off");
+        await command.ExecuteNonQueryAsync();
+
+        return connection;
+    }
+
+    private async Task<NpgsqlConnection> OpenAsReadonlyAsync()
+    {
+        var connection = await OpenAdminAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SET ROLE fuelflow_readonly;";
         await command.ExecuteNonQueryAsync();
 
         return connection;
