@@ -86,7 +86,8 @@ namespace FuelFlow.API.Migrations
                 migrationBuilder,
                 periodKey: "fuelflow_uuidv7(period_start::timestamp AT TIME ZONE 'UTC')",
                 entryKey: "fuelflow_uuidv7(created_at_utc)",
-                lineKey: "fuelflow_uuidv7(e.created_at_utc)");
+                lineKey: "fuelflow_uuidv7(e.created_at_utc)",
+                sequenceKey: "fuelflow_uuidv7(now())");
         }
 
         /// <inheritdoc />
@@ -105,19 +106,22 @@ namespace FuelFlow.API.Migrations
                 migrationBuilder,
                 periodKey: "gen_random_uuid()",
                 entryKey: "gen_random_uuid()",
-                lineKey: "gen_random_uuid()");
+                lineKey: "gen_random_uuid()",
+                sequenceKey: "gen_random_uuid()");
         }
 
         /// <summary>
-        /// Rewrites the three accounting tables' keys and moves every reference to them. The
-        /// three expressions are what a row's new key is built from - one per table - so the
-        /// same machinery serves the time-ordered rewrite and the random one.
+        /// Rewrites the accounting tables' keys and moves every reference to them: the three
+        /// tables of the journal, and the sequence that numbers its entries. The four
+        /// expressions are what a row's new key is built from - one per table - so the same
+        /// machinery serves the time-ordered rewrite and the random one.
         /// </summary>
         private static void ReKeyTheLedger(
             MigrationBuilder migrationBuilder,
             string periodKey,
             string entryKey,
-            string lineKey)
+            string lineKey,
+            string sequenceKey)
         {
             // The rows are re-keyed through three maps rather than in place, because the keys of
             // one table are the keys another table points at: a line points at its entry, an
@@ -158,6 +162,21 @@ namespace FuelFlow.API.Migrations
                 SELECT l.id, {lineKey}
                   FROM journal_lines l
                   JOIN journal_entries e ON e.id = l.entry_id;
+                """);
+
+            // The sequences get their own map: a sequence has no timestamp of its own either -
+            // the table is a name and a counter - so its key is stamped with the moment of the
+            // rewrite, which is the closest thing to the moment the row was written that the
+            // table still knows.
+            migrationBuilder.Sql($"""
+                CREATE TEMP TABLE ledger_sequence_keys (
+                    old_id uuid PRIMARY KEY,
+                    new_id uuid NOT NULL
+                );
+
+                INSERT INTO ledger_sequence_keys (old_id, new_id)
+                SELECT id, {sequenceKey}
+                  FROM document_sequences;
                 """);
 
             // The three foreign keys are dropped for the length of the rewrite and added back
@@ -271,6 +290,22 @@ namespace FuelFlow.API.Migrations
                  WHERE s.name = 'journal:' || k.old_id::text;
                 """);
 
+            // The sequence's OWN key moves too, so that the table holds one shape of key and
+            // not two: the rows that are there were written with a random key, and the
+            // application writes a time-ordered one for every row it adds from now on. A table
+            // whose key shape is decided by which deploy wrote the row is the thing F-29 was
+            // about, and this table is small enough that the cost of getting it right is
+            // one statement.
+            //
+            // Nothing points at a sequence's id - the application finds its counter by NAME -
+            // so the key can move on its own, with no reference to follow.
+            migrationBuilder.Sql("""
+                UPDATE document_sequences s
+                   SET id = k.new_id
+                  FROM ledger_sequence_keys k
+                 WHERE k.old_id = s.id;
+                """);
+
             // The balance is checked NOW, rather than at the end of the transaction.
             //
             // The two balance triggers are CONSTRAINT triggers, deferred to the end of the
@@ -308,6 +343,7 @@ namespace FuelFlow.API.Migrations
             // the pool afterwards - and a pooled connection that still carries a table is a
             // surprise for whoever borrows it next.
             migrationBuilder.Sql("""
+                DROP TABLE ledger_sequence_keys;
                 DROP TABLE ledger_line_keys;
                 DROP TABLE ledger_entry_keys;
                 DROP TABLE ledger_period_keys;
