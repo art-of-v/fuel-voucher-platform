@@ -3,6 +3,10 @@ using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.AdminAddFuel;
+using FuelFlow.Features.Brands.AdminDeleteFuel;
+using FuelFlow.Features.Brands.AdminUpdateFuel;
+using FuelFlow.Features.Brands.AdminUpdateNominals;
 using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Features.Brands.GetProviderById;
 using FuelFlow.Features.Brands.GetProviderHistory;
@@ -40,13 +44,17 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
     private BrandFuelController CreateController()
     {
+        // The controller asks a handler for the sizes; the handler owns the database and the audit
+        // trail. They all share this one context, exactly as the controller used to.
+        var events = new AuditEventService(_context);
+        var prices = new PriceHistoryRecorder(_context);
         var controller = new BrandFuelController(
             new GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
-            new AuditEventService(_context),
-            _context,
-            NotificationDispatcher.Disabled,
-            new PriceHistoryRecorder(_context));
+            new AdminAddFuelCommandHandler(_context, events, prices),
+            new AdminUpdateFuelCommandHandler(_context, events, prices),
+            new AdminDeleteFuelCommandHandler(_context, events),
+            new AdminUpdateNominalsCommandHandler(_context, events));
 
         // UpdateNominals records an audit event attributed to the caller, so the controller needs a
         // principal - there is no ASP.NET pipeline in a unit test.
