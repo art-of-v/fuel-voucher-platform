@@ -101,6 +101,20 @@ public sealed class ContractTextExtractorTests
         text.Should().Contain("First paragraph.");
     }
 
+    [Fact]
+    public async Task A_Word_Document_With_A_Byte_Order_Mark_Is_Still_Read()
+    {
+        // Word writes a UTF-8 byte order mark at the start of word/document.xml. The mark is not
+        // part of the document, and an XML parser rejects it as a character before the root
+        // element - so the reader has to read the mark and drop it, the way it always did.
+        var extractor = new ContractTextExtractor();
+        await using var content = WordDocumentWithByteOrderMark("First paragraph.");
+
+        var text = await extractor.ExtractAsync(content, "terms.docx", CancellationToken.None);
+
+        text.Should().Contain("First paragraph.");
+    }
+
     /// <summary>
     /// A .docx whose body is a huge run of zeros: a few kilobytes on the wire, gigabytes when
     /// expanded.
@@ -121,6 +135,14 @@ public sealed class ContractTextExtractorTests
 
     /// <summary>A .docx with the given paragraphs, built the way Word builds one.</summary>
     private static MemoryStream WordDocument(params string[] paragraphs)
+        => Docx(DocumentXml(paragraphs));
+
+    /// <summary>A .docx whose body starts with a byte order mark, the way Word writes one.</summary>
+    private static MemoryStream WordDocumentWithByteOrderMark(params string[] paragraphs)
+        => Docx(DocumentXml(paragraphs), byteOrderMark: true);
+
+    /// <summary>The markup of a Word document with the given paragraphs.</summary>
+    private static string DocumentXml(IEnumerable<string> paragraphs)
     {
         var body = new StringBuilder();
         foreach (var paragraph in paragraphs)
@@ -128,15 +150,24 @@ public sealed class ContractTextExtractorTests
             body.Append("<w:p><w:r><w:t>").Append(paragraph).Append("</w:t></w:r></w:p>");
         }
 
-        var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
             + "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
             + "<w:body>" + body + "</w:body></w:document>";
+    }
 
+    /// <summary>A .docx whose body is the given markup.</summary>
+    private static MemoryStream Docx(string xml, bool byteOrderMark = false)
+    {
         var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
             var entry = archive.CreateEntry("word/document.xml");
             using var entryStream = entry.Open();
+            if (byteOrderMark)
+            {
+                entryStream.Write(Encoding.UTF8.GetPreamble());
+            }
+
             entryStream.Write(Encoding.UTF8.GetBytes(xml));
         }
 

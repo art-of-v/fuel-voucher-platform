@@ -128,7 +128,12 @@ public sealed class ContractTextExtractor
             await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken);
         }
 
-        var xml = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+        // The bytes are decoded the way a reader decodes them: a byte order mark is a mark, and
+        // it is not part of the document. Word writes one, and an XML parser rejects it as a
+        // character before the root element - so the mark is read and dropped, as it always was.
+        buffer.Position = 0;
+        using var reader = new StreamReader(buffer, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        var xml = await reader.ReadToEndAsync(cancellationToken);
 
         XNamespace wordprocessing = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
