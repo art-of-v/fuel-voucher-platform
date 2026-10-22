@@ -15,7 +15,13 @@ namespace FuelFlow.API.Extensions;
 
 internal static class AuthSetup
 {
-    private const string PlaceholderSecret = "CHANGE_THIS_TO_A_SECURE_RANDOM_KEY_IN_PRODUCTION_AT_LEAST_32_CHARACTERS";
+    /// <summary>
+    /// The placeholder this class used to refuse, kept because it is a literal that was published
+    /// in a public repository too - and because the template ships a DIFFERENT one, which is why
+    /// the refusal is now a pattern and not an equality check.
+    /// </summary>
+    private const string LegacyPlaceholderSecret = "CHANGE_THIS_TO_A_SECURE_RANDOM_KEY_IN_PRODUCTION_AT_LEAST_32_CHARACTERS";
+
     private const int MinSecretLength = 32;
 
     internal static IServiceCollection AddJwtAuth(this IServiceCollection services, IConfiguration config, IWebHostEnvironment environment)
@@ -32,7 +38,9 @@ internal static class AuthSetup
         var jwtOptions = config.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
         var secret = jwtOptions.Secret;
-        if (string.IsNullOrWhiteSpace(secret) || secret == PlaceholderSecret)
+        if (string.IsNullOrWhiteSpace(secret)
+            || secret == LegacyPlaceholderSecret
+            || PlaceholderSecret.LooksLikePlaceholder(secret))
         {
             // There is no committed fallback key any more. It used to be one constant - the same
             // string in every checkout, on every machine, forever - and it was reachable from
@@ -41,10 +49,23 @@ internal static class AuthSetup
             // that is in everybody's repository, and a switch that opens the door in Production is
             // one environment variable away from being live. The development answer is a key that
             // is generated per process, so there is nothing to leak and nothing to share.
+            //
+            // The placeholder is refused here for the same reason the constant was: a key that is
+            // published is a key that is public. The template's own value - "CHANGE_ME_at_least_32_
+            // characters_long_random_string" - is 53 characters long, so it passed the length check,
+            // and it was not the one literal this check compared against, so Production booted on it
+            // without a word. The repository is public until 2026-11-01: an HS256 token signed with
+            // that string can be forged by anybody, which is full staff console access with the
+            // whole session model bypassed. So the refusal is a PATTERN now - a value that reads
+            // like a placeholder is refused whatever wording it uses - and the length check below
+            // stays for the value that is simply too short.
             if (!environment.IsDevelopment())
             {
                 throw new InvalidOperationException(
-                    "Jwt:Secret is not configured. Set the 'Jwt:Secret' configuration value to a secure random key of at least 32 characters.");
+                    "Jwt:Secret is not configured, or it is still a placeholder from the env template. "
+                    + "Set the 'Jwt:Secret' configuration value to a secure random key of at least 32 characters "
+                    + "(openssl rand -base64 36). The template's own value is published in a public repository, "
+                    + "and an access token signed with it can be forged by anybody.");
             }
 
             secret = GenerateEphemeralSecret();

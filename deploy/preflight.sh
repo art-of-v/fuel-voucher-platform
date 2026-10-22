@@ -9,7 +9,8 @@
 # container had already been replaced. A preflight that runs first turns all four
 # into a non-event.
 #
-#   1. Env files that Docker Compose can actually read
+#   1. Env files that Docker Compose can actually read, and whose secrets are not
+#      still the values the env template ships
 #   2. The rendered Caddy config
 #   3. Upstream names that mean one container instead of two
 #   4. Image tags, and whether a mutable `:main` could quietly win
@@ -223,6 +224,74 @@ check_env_file() {
 }
 
 # ------------------------------------------------------------------------------
+# The four secrets the env templates ship must not survive into the deployed file.
+#
+# deploy/.env.production.example ships four placeholders:
+#
+#   POSTGRES_PASSWORD=CHANGE_ME_openssl_rand_base64_36
+#   REDIS_PASSWORD=CHANGE_ME_openssl_rand_hex_32
+#   JWT_SECRET=CHANGE_ME_at_least_32_characters_long_random_string
+#   QR_CIPHER_KEY=CHANGE_ME_openssl_rand_base64_32
+#
+# They are INSTRUCTIONS, not secrets - and the repository is public until 2026-11-01, so
+# they are on the internet. An operator who copies the template and misses a line deploys
+# a platform whose access tokens are signed with a string anybody can read: the JWT key
+# signs an HS256 token, so anyone can forge a staff token with it. That is full staff
+# console access - refunds, payment placement, customer PII, the redeemable voucher
+# payloads - and the whole session model (rotation, reuse detection, device binding) is
+# bypassed, because the forger never holds a refresh token.
+#
+# Two checks, because either one alone has a hole:
+#
+#   - the PATTERN. Any value that reads like a placeholder is refused, whatever wording it
+#     uses. The application refuses the same pattern at boot (SharedKernel/Security/
+#     PlaceholderSecret.cs), so the two agree on what a placeholder is.
+#   - the TEMPLATE'S OWN VALUES, verbatim. The pattern can be defeated by editing the
+#     template to hide the placeholder - "CHANGE_ME" is a word, and a template that says
+#     "REPLACE_THIS" would sail past it. Comparing against the template's values cannot be
+#     defeated that way: the template's own values are what it compares against.
+#
+# The failure never prints the value. The check fires on a value that is either a
+# placeholder or the template's own - both public - but a check that prints the value it
+# found would print a REAL secret into the deploy log the day it misfires.
+#
+# A literal scan, like the env-file check above: sourcing the file would execute it, and
+# these files hold secrets.
+# ------------------------------------------------------------------------------
+check_placeholder_secrets() {
+  local file="$1"; shift
+  local templates=("$@")
+  local var value template template_value template_present=0
+
+  for template in ${templates[@]+"${templates[@]}"}; do
+    if [[ -f "$template" ]]; then template_present=1; fi
+  done
+
+  if [[ $template_present -eq 0 ]]; then
+    warn "$file: no env template is available here, so the verbatim template check could not run (the placeholder pattern is still checked)"
+  fi
+
+  for var in JWT_SECRET QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
+    value="$(grep -E "^${var}=" "$file" | head -1 | cut -d= -f2- || true)"
+    if [[ -z "$value" ]]; then
+      continue
+    fi
+
+    if [[ "${value,,}" =~ (change[_-]?me|replace[_-]?me|insert[_-]?here|placeholder|example|your[_-]) ]]; then
+      fail "$file: $var still holds a placeholder value. The env templates ship placeholder values because they are instructions, not secrets - and they are published in a public repository, so a value that was never replaced is a value everybody has. The JWT key signs the access tokens, so anyone who reads it can forge a staff token. Generate a real one (openssl rand -base64 36 for the JWT key and the database password, openssl rand -hex 32 for Redis, openssl rand -base64 32 for the QR cipher key) and put it in $file."
+    fi
+
+    for template in ${templates[@]+"${templates[@]}"}; do
+      [[ -f "$template" ]] || continue
+      template_value="$(grep -E "^${var}=" "$template" | head -1 | cut -d= -f2- || true)"
+      if [[ -n "$template_value" && "$value" == "$template_value" ]]; then
+        fail "$file: $var still holds the value from $template. The pattern check cannot see this one - the template's value does not read like a placeholder - but the value is published in a public repository all the same, and a JWT key that everybody has is a JWT key that anybody can sign a staff token with. Generate a real one and put it in $file."
+      fi
+    done
+  done
+}
+
+# ------------------------------------------------------------------------------
 # The two environments must not share the voucher QR cipher key.
 #
 # The key encrypts the redeemable QR payload of every voucher at rest, and it is
@@ -379,9 +448,13 @@ if [[ "$NO_DEFAULTS" -eq 0 ]]; then
   check_env_file .env.staging optional
   # The two environments must not share the voucher QR cipher key - see the function.
   check_qr_key_separation
+  # The four secrets the templates ship must not have survived into the deployed files.
+  check_placeholder_secrets .env .env.production.example .env.staging.example
+  check_placeholder_secrets .env.staging .env.production.example .env.staging.example
 fi
 for extra in ${EXTRA_ENV_FILES+"${EXTRA_ENV_FILES[@]}"}; do
   check_env_file "$extra" optional
+  check_placeholder_secrets "$extra" .env.production.example .env.staging.example
 done
 
 # One credential check, on the one file caddy actually reads it from. The check
