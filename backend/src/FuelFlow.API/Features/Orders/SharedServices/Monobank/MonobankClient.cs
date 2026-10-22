@@ -9,6 +9,18 @@ public sealed class MonobankClient : IMonobankClient
 {
     /// <summary>Matches the options <c>ReadFromJsonAsync</c> would have used.</summary>
     private static readonly JsonSerializerOptions StatementJsonOptions = new(JsonSerializerDefaults.Web);
+
+    /// <summary>
+    /// What the receipt says the purchase was for when the caller declares nothing: the fuel.
+    /// <para>
+    /// It is a literal in Ukrainian because the acquirer prints exactly what we declare it - a
+    /// destination that reads as "Паливо" is what the customer and the tax inspector read. Two
+    /// checkout paths (a voucher renewal and a multi-item basket) declare no destination of their
+    /// own and land here, so this string is on a fiscal receipt.
+    /// </para>
+    /// </summary>
+    public const string DefaultDestination = "Паливо";
+
     private readonly MonobankOptions _options;
     private readonly HttpClient _httpClient;
     private readonly ILogger<MonobankClient> _logger;
@@ -59,7 +71,7 @@ public sealed class MonobankClient : IMonobankClient
                 // What the payment is for, as it appears on the receipt. Previously the same string
                 // as `reference` ("FuelFlow Order 7258a522-..."), which printed an internal UUID as
                 // the purchase description.
-                ["destination"] = request.Destination ?? "╨ƒ╨░╨╗╨╕╨▓╨╛",
+                ["destination"] = request.Destination ?? DefaultDestination,
             };
 
             if (request.Items is { Count: > 0 })

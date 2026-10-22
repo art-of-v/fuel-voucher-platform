@@ -341,7 +341,7 @@ public sealed class CreateCheckoutCommandHandler
                 // Monobank is the one place amounts must be kopecks.
                 Amount = Money.ForMonobank(order.Price),
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
-                Destination = "Паливо",
+                Destination = MonobankClient.DefaultDestination,
                 Items = MonobankBasketBuilder.Build(order.LineItems.Select(li => (
                     li.Brand, li.FuelTypeId,
                     fuelNames.GetValueOrDefault(li.FuelTypeId),
