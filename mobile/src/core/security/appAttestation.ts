@@ -87,7 +87,10 @@ async function requestChallenge(action: string, requestHash: string): Promise<st
   });
 
   if (typeof data.challenge !== 'string' || !data.challenge) {
-    throw new AttestationError('The attestation challenge response was empty', 'ATTESTATION_INVALID');
+    throw new AttestationError(
+      'The attestation challenge response was empty',
+      'ATTESTATION_INVALID',
+    );
   }
 
   return data.challenge;
@@ -135,10 +138,7 @@ async function getAppleHeaders(requestHash: string): Promise<AttestationHeaders 
     const challenge = await requestChallenge('mobile-request', requestHash);
 
     try {
-      const proof = await AppIntegrity.generateAssertionAsync(
-        keyId,
-        `${challenge}:${requestHash}`,
-      );
+      const proof = await AppIntegrity.generateAssertionAsync(keyId, `${challenge}:${requestHash}`);
 
       return {
         'X-Attestation-Provider': 'apple',
@@ -166,13 +166,18 @@ async function ensureGoogleProvider(): Promise<boolean> {
 
   const projectNumber = googleCloudProjectNumber();
   if (!projectNumber) {
-    console.warn('[Attestation] Google Cloud project number is not configured; Android proof skipped');
+    console.warn(
+      '[Attestation] Google Cloud project number is not configured; Android proof skipped',
+    );
     return false;
   }
 
   googleProviderPromise = AppIntegrity.prepareIntegrityTokenProviderAsync(projectNumber)
     .then(() => true)
     .catch((error) => {
+      // Do not cache a transient Play Services/network failure for the life of the process:
+      // the next protected request gets one fresh attempt.
+      googleProviderPromise = null;
       console.error('[Attestation] Play Integrity provider preparation failed:', error);
       return false;
     });

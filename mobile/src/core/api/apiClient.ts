@@ -2,11 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { SecurityService } from './securityService';
 import { TokenStorage } from './tokenStorage';
-import {
-  BASE_URL,
-  CLIENT_PLATFORM_HEADER,
-  NATIVE_CLIENT_PLATFORM,
-} from './apiConfig';
+import { BASE_URL, CLIENT_PLATFORM_HEADER, NATIVE_CLIENT_PLATFORM } from './apiConfig';
 import {
   clearAppleAttestationKey,
   getAttestationHeaders,
@@ -171,7 +167,9 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     ...(Platform.OS === 'ios' || Platform.OS === 'android'
       ? { [CLIENT_OS_HEADER]: Platform.OS }
       : {}),
-    ...(Constants.expoConfig?.version ? { [APP_VERSION_HEADER]: Constants.expoConfig.version } : {}),
+    ...(Constants.expoConfig?.version
+      ? { [APP_VERSION_HEADER]: Constants.expoConfig.version }
+      : {}),
     ...(options.headers as Record<string, string>),
   };
 

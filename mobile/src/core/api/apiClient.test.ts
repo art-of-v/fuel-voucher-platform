@@ -104,9 +104,7 @@ describe('apiClient', () => {
 
   it('re-signs after replacing a retired Apple key, because the first nonce was consumed', async () => {
     (isAttestationProtected as jest.Mock).mockReturnValueOnce(true);
-    (SecurityService.hasKeys as jest.Mock)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true);
+    (SecurityService.hasKeys as jest.Mock).mockResolvedValueOnce(true).mockResolvedValueOnce(true);
     (SecurityService.signPayload as jest.Mock)
       .mockResolvedValueOnce('signature-1')
       .mockResolvedValueOnce('signature-2');
