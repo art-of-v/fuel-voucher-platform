@@ -94,8 +94,19 @@ FuelFlow/
 ### Full stack via Docker Compose
 
 ```bash
-docker-compose up --build
+cp .env.example .env
+# The API refuses to start without the voucher QR key. Generate one and put it in .env:
+#   openssl rand -base64 32
+docker compose up --build
 ```
+
+The API answers on `http://localhost:5000`, the admin SPA on `http://localhost:5002` — the admin
+proxies `/api` to the API, so the browser sees one origin. The mobile app is **not** part of this
+stack: it is an Expo app and runs on a device or a simulator (`npm start` in `mobile/`).
+
+CI brings this same stack up and asserts that the API is healthy
+(`scripts/check-local-stack.sh`), so a broken compose file is a red build rather than a surprise
+on a new machine.
 
 ### Backend only
 
@@ -105,7 +116,9 @@ dotnet run
 ```
 
 The API listens on `http://localhost:5202` (`Properties/launchSettings.json`). Hangfire is at
-`/hangfire`, Swagger at `/swagger`.
+`/hangfire`, Swagger at `/swagger`. It still needs a PostgreSQL and a Redis — the compose stack
+above provides both (`docker compose up -d admin-database redis`), and the API connects to the
+same database the stack creates.
 
 ### Admin frontend
 
