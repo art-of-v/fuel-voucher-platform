@@ -61,7 +61,10 @@ describe("initSentry", () => {
 
     initSentry();
 
-    const options = vi.mocked(Sentry.init).mock.calls[0][0] as Record<string, unknown>;
+    const options = vi.mocked(Sentry.init).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
     expect(options).not.toHaveProperty("sendDefaultPii");
     expect(options).not.toHaveProperty("replaysSessionSampleRate");
   });

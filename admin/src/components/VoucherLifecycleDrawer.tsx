@@ -98,7 +98,7 @@ export function VoucherLifecycleDrawer({
     queryFn: () =>
       apiRequest<unknown, LifecycleResponse>(
         "GET",
-        `/api/admin/vouchers/${encodeURIComponent(voucherId!)}/lifecycle`
+        `/api/admin/vouchers/${encodeURIComponent(voucherId!)}/lifecycle`,
       ),
     staleTime: 30_000,
   });
@@ -112,7 +112,9 @@ export function VoucherLifecycleDrawer({
             {t("voucherLifecycle.title")}
           </SheetTitle>
           <SheetDescription className="mt-1 text-sm text-muted-foreground">
-            {data?.voucherNumber ?? voucherNumber ?? t("voucherLifecycle.loading")}
+            {data?.voucherNumber ??
+              voucherNumber ??
+              t("voucherLifecycle.loading")}
           </SheetDescription>
         </div>
 
@@ -125,7 +127,9 @@ export function VoucherLifecycleDrawer({
           )}
 
           {isError && (
-            <p className="text-sm text-destructive">{t("voucherLifecycle.loadFailed")}</p>
+            <p className="text-sm text-destructive">
+              {t("voucherLifecycle.loadFailed")}
+            </p>
           )}
 
           {data && (
@@ -143,7 +147,9 @@ export function VoucherLifecycleDrawer({
               ) : (
                 <ol className="relative space-y-4 border-l border-border pl-5">
                   {data.entries.map((entry, index) => (
-                    <li key={`${entry.source}-${entry.type}-${entry.occurredAtUtc}-${index}`}>
+                    <li
+                      key={`${entry.source}-${entry.type}-${entry.occurredAtUtc}-${index}`}
+                    >
                       <Entry entry={entry} />
                     </li>
                   ))}
@@ -170,10 +176,17 @@ function Header({ data }: { data: LifecycleResponse }) {
       <Row label={t("vouchers.brand")} value={data.brand} />
       <Row label={t("vouchers.volume")} value={`${data.liters}`} />
       <Row label={t("vouchers.status")} value={data.status} />
-      <Row label={t("vouchers.supplier")} value={data.supplierName ?? t("voucherLifecycle.unknown")} />
+      <Row
+        label={t("vouchers.supplier")}
+        value={data.supplierName ?? t("voucherLifecycle.unknown")}
+      />
       <Row
         label={t("vouchers.costPerLiter")}
-        value={data.costPerLiter === null ? t("voucherLifecycle.notRecorded") : `${data.costPerLiter}`}
+        value={
+          data.costPerLiter === null
+            ? t("voucherLifecycle.notRecorded")
+            : `${data.costPerLiter}`
+        }
       />
       <Row label={t("vouchers.expires")} value={data.supplierExpirationDate} />
       <Row
@@ -218,8 +231,12 @@ function Entry({ entry }: { entry: LifecycleEntry }) {
       </span>
 
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-sm font-medium">{wordFor(t, entry, entry.type)}</span>
-        <span className="text-xs text-muted-foreground">{formatDateTime(entry.occurredAtUtc)}</span>
+        <span className="text-sm font-medium">
+          {wordFor(t, entry, entry.type)}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {formatDateTime(entry.occurredAtUtc)}
+        </span>
       </div>
 
       {(entry.from || entry.to) && (
@@ -244,7 +261,9 @@ function Entry({ entry }: { entry: LifecycleEntry }) {
         </p>
       )}
 
-      <p className="mt-1 text-xs text-muted-foreground">{authorFor(t, entry)}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {authorFor(t, entry)}
+      </p>
 
       {entry.reason && <p className="mt-1 text-xs italic">{entry.reason}</p>}
     </div>
@@ -261,7 +280,11 @@ function Entry({ entry }: { entry: LifecycleEntry }) {
  * nothing, and far better than one seeing an invented label for a fact the database asserts.
  * </p>
  */
-function wordFor(t: (key: string, ...params: string[]) => string, entry: LifecycleEntry, word: string): string {
+function wordFor(
+  t: (key: string, ...params: string[]) => string,
+  entry: LifecycleEntry,
+  word: string,
+): string {
   const prefix =
     entry.source === "movement"
       ? "voucherLifecycle.kind"
@@ -271,8 +294,14 @@ function wordFor(t: (key: string, ...params: string[]) => string, entry: Lifecyc
   return t(`${prefix}.${word}`);
 }
 
-function authorFor(t: (key: string, ...params: string[]) => string, entry: LifecycleEntry): string {
-  if (entry.actorKind === "system" || (!entry.actorKind && !entry.actorUserId)) {
+function authorFor(
+  t: (key: string, ...params: string[]) => string,
+  entry: LifecycleEntry,
+): string {
+  if (
+    entry.actorKind === "system" ||
+    (!entry.actorKind && !entry.actorUserId)
+  ) {
     return t("voucherLifecycle.system");
   }
   if (entry.actorName) return entry.actorName;

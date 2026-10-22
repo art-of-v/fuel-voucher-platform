@@ -3,11 +3,18 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
 
-import { BatchCostTimeline, type BatchCostTimelineResponse } from "./BatchCostTimeline";
+import {
+  BatchCostTimeline,
+  type BatchCostTimelineResponse,
+} from "./BatchCostTimeline";
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key, language: "uk", setLanguage: vi.fn() }),
+  useI18n: () => ({
+    t: (key: string) => key,
+    language: "uk",
+    setLanguage: vi.fn(),
+  }),
 }));
 
 import { apiRequest } from "@/lib/api-client";
@@ -42,12 +49,24 @@ const RESPONSE: BatchCostTimelineResponse = {
   ],
 };
 
-function renderTimeline(props: { importId: string | null; enabled?: boolean } = { importId: "import-1" }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderTimeline(
+  props: { importId: string | null; enabled?: boolean } = {
+    importId: "import-1",
+  },
+) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const wrap = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return render(<BatchCostTimeline importId={props.importId} enabled={props.enabled ?? true} />, { wrapper: wrap });
+  return render(
+    <BatchCostTimeline
+      importId={props.importId}
+      enabled={props.enabled ?? true}
+    />,
+    { wrapper: wrap },
+  );
 }
 
 describe("BatchCostTimeline", () => {
@@ -80,7 +99,9 @@ describe("BatchCostTimeline", () => {
 
     fireEvent.click(screen.getByText("imports.costTimeline"));
 
-    await waitFor(() => expect(screen.getByText("imports.costTimelineEmpty")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("imports.costTimelineEmpty")).toBeTruthy(),
+    );
   });
 
   // An uncosted voucher has no "before" to show. A literal 0.00 would read as "this batch cost

@@ -354,6 +354,20 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The admin had no lint gate at all until C-8: the money screens were typed `any` end to
+      # end, and a field the server had renamed went unnoticed because nothing checked the
+      # shape of an answer. `no-explicit-any` is an error, and the gate treats a warning as a
+      # failure (`--max-warnings=0`), so a new `any` cannot be introduced quietly.
+      - name: Lint
+        run: npm run lint
+
+      # Makes `.prettierrc.json` binding, like the mobile job's. The admin had no Prettier
+      # configuration at all, so every file was formatted by hand - which is why a formatted
+      # file and an unformatted one were indistinguishable, and why nobody could agree on a
+      # style.
+      - name: Format check
+        run: npm run format:check
+
       - name: Test
         run: npm run test
 

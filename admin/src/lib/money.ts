@@ -15,9 +15,9 @@
  */
 
 /** Narrow no-break space (U+202F). */
-const NNBSP = ' ';
+const NNBSP = " ";
 
-export const CURRENCY_SYMBOL = '₴';
+export const CURRENCY_SYMBOL = "₴";
 
 export interface MoneyOptions {
   /** Pin the fraction digits. Omit for the «kopecks only when needed» default. */
@@ -62,5 +62,7 @@ export function formatMoney(
   // U+2212 MINUS SIGN, not a hyphen — it aligns with the digits.
   const sign = negative ? "−" : "";
 
-  return hideSymbol ? `${sign}${body}` : `${sign}${body}${NNBSP}${CURRENCY_SYMBOL}`;
+  return hideSymbol
+    ? `${sign}${body}`
+    : `${sign}${body}${NNBSP}${CURRENCY_SYMBOL}`;
 }

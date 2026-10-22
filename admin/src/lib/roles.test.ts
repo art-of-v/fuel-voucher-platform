@@ -28,7 +28,9 @@ describe("assignableRoles", () => {
   it("never offers the retired QA role to assign", () => {
     // The backend refuses to hand it out (SeedRoles.IsValidRoleName), so a dropdown that offers
     // it is a control that is guaranteed to fail.
-    expect(assignableRoles(ROLE_PRODUCT_OWNER, ROLE_USER)).not.toContain(ROLE_QA);
+    expect(assignableRoles(ROLE_PRODUCT_OWNER, ROLE_USER)).not.toContain(
+      ROLE_QA,
+    );
     expect(assignableRoles(ROLE_PRODUCT_OWNER, null)).not.toContain(ROLE_QA);
   });
 
@@ -39,8 +41,14 @@ describe("assignableRoles", () => {
   });
 
   it("gives an Admin User and Manager for a User or Manager target", () => {
-    expect(assignableRoles(ROLE_ADMIN, ROLE_USER)).toEqual([ROLE_USER, ROLE_MANAGER]);
-    expect(assignableRoles(ROLE_ADMIN, ROLE_MANAGER)).toEqual([ROLE_USER, ROLE_MANAGER]);
+    expect(assignableRoles(ROLE_ADMIN, ROLE_USER)).toEqual([
+      ROLE_USER,
+      ROLE_MANAGER,
+    ]);
+    expect(assignableRoles(ROLE_ADMIN, ROLE_MANAGER)).toEqual([
+      ROLE_USER,
+      ROLE_MANAGER,
+    ]);
   });
 
   it("gives an Admin nothing for an Admin target", () => {
@@ -54,7 +62,9 @@ describe("assignableRoles", () => {
 
   it("never offers ProductOwner as a role to assign", () => {
     // The PO is pinned by the env bootstrap only; the app can never mint one.
-    expect(assignableRoles(ROLE_PRODUCT_OWNER, ROLE_USER)).not.toContain(ROLE_PRODUCT_OWNER);
+    expect(assignableRoles(ROLE_PRODUCT_OWNER, ROLE_USER)).not.toContain(
+      ROLE_PRODUCT_OWNER,
+    );
   });
 
   it("gives the employee tier nothing at all", () => {

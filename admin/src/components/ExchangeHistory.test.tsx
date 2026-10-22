@@ -8,7 +8,11 @@ import { formatMoney } from "@/lib/money";
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key, language: "uk", setLanguage: vi.fn() }),
+  useI18n: () => ({
+    t: (key: string) => key,
+    language: "uk",
+    setLanguage: vi.fn(),
+  }),
 }));
 
 import { apiRequest } from "@/lib/api-client";
@@ -77,7 +81,9 @@ const DETAIL = {
 };
 
 function renderHistory() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -93,7 +99,7 @@ function renderHistory() {
  */
 function cellTexts(): string[] {
   return Array.from(document.querySelectorAll("td, th")).map((cell) =>
-    (cell.textContent ?? "").replace(/\s/g, "")
+    (cell.textContent ?? "").replace(/\s/g, ""),
   );
 }
 
@@ -124,7 +130,7 @@ describe("ExchangeHistory", () => {
 
   it("lists every pair in a batch with its own cost", async () => {
     mockedApiRequest.mockImplementation((_method: string, url: string) =>
-      Promise.resolve(url.includes("/batches/") ? DETAIL : BATCHES)
+      Promise.resolve(url.includes("/batches/") ? DETAIL : BATCHES),
     );
     renderHistory();
     await waitForRows();
@@ -142,7 +148,7 @@ describe("ExchangeHistory", () => {
 
   it("puts each pair's share beside the batch total, so the two are not confused", async () => {
     mockedApiRequest.mockImplementation((_method: string, url: string) =>
-      Promise.resolve(url.includes("/batches/") ? DETAIL : BATCHES)
+      Promise.resolve(url.includes("/batches/") ? DETAIL : BATCHES),
     );
     renderHistory();
     await waitForRows();
@@ -159,7 +165,7 @@ describe("ExchangeHistory", () => {
 
   it("returns from a batch to the list", async () => {
     mockedApiRequest.mockImplementation((_method: string, url: string) =>
-      Promise.resolve(url.includes("/batches/") ? DETAIL : BATCHES)
+      Promise.resolve(url.includes("/batches/") ? DETAIL : BATCHES),
     );
     renderHistory();
     await waitForRows();
@@ -169,18 +175,21 @@ describe("ExchangeHistory", () => {
 
     await userEvent.click(screen.getByText("voucherExchange.historyBack"));
     // Back on the list: the drill-down's columns are gone and the list's are back.
-    await waitFor(() =>
-      expect(screen.queryByText("OLD-0001")).toBeNull()
-    );
+    await waitFor(() => expect(screen.queryByText("OLD-0001")).toBeNull());
     expect(screen.getByText("voucherExchange.historySurcharge")).toBeDefined();
   });
 
   it("says so plainly when no exchange has been recorded", async () => {
-    mockedApiRequest.mockResolvedValue({ ...BATCHES, data: [], total: 0, suppliers: [] });
+    mockedApiRequest.mockResolvedValue({
+      ...BATCHES,
+      data: [],
+      total: 0,
+      suppliers: [],
+    });
     renderHistory();
 
     await waitFor(() =>
-      expect(screen.getByText("voucherExchange.historyEmpty")).toBeDefined()
+      expect(screen.getByText("voucherExchange.historyEmpty")).toBeDefined(),
     );
   });
 
@@ -189,7 +198,9 @@ describe("ExchangeHistory", () => {
     renderHistory();
 
     await waitFor(() =>
-      expect(screen.getByText("voucherExchange.historyLoadFailed")).toBeDefined()
+      expect(
+        screen.getByText("voucherExchange.historyLoadFailed"),
+      ).toBeDefined(),
     );
   });
 });

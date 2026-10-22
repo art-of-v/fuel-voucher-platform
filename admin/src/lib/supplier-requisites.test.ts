@@ -65,10 +65,16 @@ describe("supplier РНОКР validation", () => {
 
 describe("supplier requisites as a pair", () => {
   it("gates on either field being wrong", () => {
-    expect(isValidSupplierRequisites({ edrIpn: "38528147", rnkrr: "12345" })).toBe(true);
+    expect(
+      isValidSupplierRequisites({ edrIpn: "38528147", rnkrr: "12345" }),
+    ).toBe(true);
     expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "" })).toBe(true);
-    expect(isValidSupplierRequisites({ edrIpn: "nope", rnkrr: "" })).toBe(false);
-    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "nope" })).toBe(false);
+    expect(isValidSupplierRequisites({ edrIpn: "nope", rnkrr: "" })).toBe(
+      false,
+    );
+    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "nope" })).toBe(
+      false,
+    );
   });
 
   it("does not require an identifier at all - an ФОП and an LLC carry different ones", () => {

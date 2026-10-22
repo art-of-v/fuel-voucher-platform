@@ -1,7 +1,7 @@
 interface LionMarkProps {
-    /** Rendered edge length in px. The mask is 320px, so anything up to ~120px stays crisp. */
-    size?: number;
-    className?: string;
+  /** Rendered edge length in px. The mask is 320px, so anything up to ~120px stays crisp. */
+  size?: number;
+  className?: string;
 }
 
 /**
@@ -23,12 +23,12 @@ interface LionMarkProps {
  * grey smudge this replaced: one asset per theme, and a hue edit away from broken.
  */
 export function LionMark({ size = 56, className }: LionMarkProps) {
-    return (
-        <span
-            role="presentation"
-            aria-hidden="true"
-            style={{ width: size, height: size }}
-            className={className ? `brand-mark ${className}` : "brand-mark"}
-        />
-    );
+  return (
+    <span
+      role="presentation"
+      aria-hidden="true"
+      style={{ width: size, height: size }}
+      className={className ? `brand-mark ${className}` : "brand-mark"}
+    />
+  );
 }

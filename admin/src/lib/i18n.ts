@@ -428,7 +428,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "status.deactivated": "Deactivated",
     "contracts.availableTitle": "Contracts",
     "contracts.textsTitle": "Contract texts",
-    "contracts.textsHint": "One text per provider, kept in versions. A new version changes the text every contract of that provider shows; the old one is kept, because what a customer signed has to stay answerable.",
+    "contracts.textsHint":
+      "One text per provider, kept in versions. A new version changes the text every contract of that provider shows; the old one is kept, because what a customer signed has to stay answerable.",
     "contracts.selectProvider": "Provider",
     "contracts.document": "Document (.docx or .pdf)",
     "contracts.termDays": "Term, days",
@@ -1543,7 +1544,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "status.deactivated": "Деактивовано",
     "contracts.availableTitle": "Договори",
     "contracts.textsTitle": "Тексти договорів",
-    "contracts.textsHint": "Один текст на провайдера, зберігається версіями. Нова версія змінює текст, який бачать усі договори цього провайдера; стара лишається — бо що саме підписав клієнт, має залишатися відповідним.",
+    "contracts.textsHint":
+      "Один текст на провайдера, зберігається версіями. Нова версія змінює текст, який бачать усі договори цього провайдера; стара лишається — бо що саме підписав клієнт, має залишатися відповідним.",
     "contracts.selectProvider": "Провайдер",
     "contracts.document": "Документ (.docx або .pdf)",
     "contracts.termDays": "Термін, днів",
@@ -3248,7 +3250,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "status.deactivated": "Deaktiviert",
     "contracts.availableTitle": "Verträge",
     "contracts.textsTitle": "Vertragstexte",
-    "contracts.textsHint": "Ein Text je Anbieter, in Versionen abgelegt. Eine neue Version ändert den Text, den alle Verträge dieses Anbieters zeigen; die alte bleibt erhalten, denn was ein Kunde unterzeichnet hat, muss beantwortbar bleiben.",
+    "contracts.textsHint":
+      "Ein Text je Anbieter, in Versionen abgelegt. Eine neue Version ändert den Text, den alle Verträge dieses Anbieters zeigen; die alte bleibt erhalten, denn was ein Kunde unterzeichnet hat, muss beantwortbar bleiben.",
     "contracts.selectProvider": "Anbieter",
     "contracts.document": "Dokument (.docx oder .pdf)",
     "contracts.termDays": "Laufzeit, Tage",
@@ -3274,7 +3277,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "contracts.view": "Ansehen",
     "contracts.noneSigned": "Noch keine unterzeichneten Verträge",
     "contracts.signatureInvalid": "Ungültige Unterschriftdaten",
-    "contracts.signatureUnreadable": "Die Unterschrift konnte nicht gelesen werden.",
+    "contracts.signatureUnreadable":
+      "Die Unterschrift konnte nicht gelesen werden.",
     "contracts.selectDocument": "Wählen Sie ein Dokument zum Veröffentlichen.",
     "import.start": "Import starten",
     "import.close": "Schließen",
@@ -3321,7 +3325,8 @@ export const translations: Record<Language, Record<string, string>> = {
     // The refunds we issued in the period: the acquirer nests a reversal under the payment it
     // reverses and does not file it as a row, so the statement alone cannot show money going back.
     "statementAct.refundsIssued": "Erstattungen im Zeitraum",
-    "statementAct.refundsTitle": "Die in diesem Zeitraum erteilten Erstattungen",
+    "statementAct.refundsTitle":
+      "Die in diesem Zeitraum erteilten Erstattungen",
     "statementAct.refundAmount": "Betrag",
     "statementAct.refundIssuedAt": "Erstattungsdatum",
     "statementAct.acquirerTime": "Zeit beim Acquirer",
@@ -4365,7 +4370,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "status.deactivated": "Desactivado",
     "contracts.availableTitle": "Contratos",
     "contracts.textsTitle": "Textos de los contratos",
-    "contracts.textsHint": "Un texto por proveedor, guardado en versiones. Una versión nueva cambia el texto que muestran todos los contratos de ese proveedor; la anterior se conserva, porque lo que firmó el cliente debe seguir siendo verificable.",
+    "contracts.textsHint":
+      "Un texto por proveedor, guardado en versiones. Una versión nueva cambia el texto que muestran todos los contratos de ese proveedor; la anterior se conserva, porque lo que firmó el cliente debe seguir siendo verificable.",
     "contracts.selectProvider": "Proveedor",
     "contracts.document": "Documento (.docx o .pdf)",
     "contracts.termDays": "Plazo, días",
@@ -4473,7 +4479,14 @@ export const translations: Record<Language, Record<string, string>> = {
 interface I18nStore {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string, ...params: string[]) => string;
+  /**
+   * The parameters are the values a translation interpolates (`{0}`, `{1}`, ...).
+   *
+   * They are numbers as often as they are strings - a count of payments, a quantity of litres -
+   * and the replacement below has always coerced them. The type says so, because the alternative
+   * was a caller casting every number to a string by hand to satisfy a signature that lied.
+   */
+  t: (key: string, ...params: (string | number)[]) => string;
 }
 
 export const useI18n = create<I18nStore>()(
@@ -4481,12 +4494,12 @@ export const useI18n = create<I18nStore>()(
     (set, get) => ({
       language: "uk", // Default to Ukrainian
       setLanguage: (lang) => set({ language: lang }),
-      t: (key: string, ...params: string[]) => {
+      t: (key: string, ...params: (string | number)[]) => {
         const lang = get().language;
         let translation =
           translations[lang]?.[key] || translations["en"]?.[key] || key;
         params.forEach((param, i) => {
-          translation = translation.replace(`{${i}}`, param);
+          translation = translation.replace(`{${i}}`, String(param));
         });
         return translation;
       },

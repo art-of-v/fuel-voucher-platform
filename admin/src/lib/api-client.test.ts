@@ -49,10 +49,17 @@ describe("apiRequest response parsing", () => {
   describe("error code preservation", () => {
     it("keeps the code from a 409 so the caller can localise", async () => {
       vi.mocked(fetch).mockResolvedValue(
-        jsonResponse(409, { code: "below_cost", message: "Renewal surcharge is below cost by 200.00 UAH." }),
+        jsonResponse(409, {
+          code: "below_cost",
+          message: "Renewal surcharge is below cost by 200.00 UAH.",
+        }),
       );
 
-      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/voucher-renewal/confirm",
+        {},
+      ).catch((e) => e);
 
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).code).toBe("below_cost");
@@ -60,9 +67,13 @@ describe("apiRequest response parsing", () => {
     });
 
     it("leaves code undefined when the body carries none", async () => {
-      vi.mocked(fetch).mockResolvedValue(jsonResponse(400, { error: "Something was wrong" }));
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, { error: "Something was wrong" }),
+      );
 
-      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch((e) => e);
+      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch(
+        (e) => e,
+      );
 
       expect(err).toBeInstanceOf(ApiError);
       expect((err as ApiError).code).toBeUndefined();
@@ -72,9 +83,13 @@ describe("apiRequest response parsing", () => {
     // A structured body may legitimately carry `code: null`; reading that as the string "null"
     // would send a screen looking up a translation for a code called "null".
     it("ignores a non-string code", async () => {
-      vi.mocked(fetch).mockResolvedValue(jsonResponse(400, { code: null, message: "Bad request" }));
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, { code: null, message: "Bad request" }),
+      );
 
-      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch((e) => e);
+      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch(
+        (e) => e,
+      );
 
       expect((err as ApiError).code).toBeUndefined();
     });
@@ -83,13 +98,20 @@ describe("apiRequest response parsing", () => {
     // that came with it.
     it("keeps the code on an opaque 500", async () => {
       vi.mocked(fetch).mockResolvedValue(
-        jsonResponse(500, { code: "internal", message: "An unexpected error occurred" }),
+        jsonResponse(500, {
+          code: "internal",
+          message: "An unexpected error occurred",
+        }),
       );
 
-      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch((e) => e);
+      const err = await apiRequest("POST", "/api/admin/whatever", {}).catch(
+        (e) => e,
+      );
 
       expect((err as ApiError).code).toBe("internal");
-      expect((err as ApiError).message).not.toContain("An unexpected error occurred");
+      expect((err as ApiError).message).not.toContain(
+        "An unexpected error occurred",
+      );
     });
   });
 
@@ -102,21 +124,32 @@ describe("apiRequest response parsing", () => {
       vi.mocked(fetch).mockResolvedValue(
         jsonResponse(400, {
           code: "below_cost",
-          message: "Renewal surcharge is below the replacement voucher's cost by 200.00 UAH.",
+          message:
+            "Renewal surcharge is below the replacement voucher's cost by 200.00 UAH.",
           data: { shortfallUah: 200 },
         }),
       );
 
-      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/voucher-renewal/confirm",
+        {},
+      ).catch((e) => e);
 
       expect((err as ApiError).code).toBe("below_cost");
       expect((err as ApiError).data).toEqual({ shortfallUah: 200 });
     });
 
     it("leaves data undefined when the body carries none", async () => {
-      vi.mocked(fetch).mockResolvedValue(jsonResponse(409, { code: "no_stock", message: "No stock" }));
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(409, { code: "no_stock", message: "No stock" }),
+      );
 
-      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/voucher-renewal/confirm",
+        {},
+      ).catch((e) => e);
 
       expect((err as ApiError).code).toBe("no_stock");
       expect((err as ApiError).data).toBeUndefined();
@@ -133,17 +166,29 @@ describe("apiRequest response parsing", () => {
         }),
       );
 
-      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/voucher-renewal/confirm",
+        {},
+      ).catch((e) => e);
 
       expect((err as ApiError).data).toEqual({ liters: 10 });
     });
 
     it("leaves data undefined when every entry was dropped", async () => {
       vi.mocked(fetch).mockResolvedValue(
-        jsonResponse(400, { code: "below_cost", message: "nope", data: { shortfallUah: null } }),
+        jsonResponse(400, {
+          code: "below_cost",
+          message: "nope",
+          data: { shortfallUah: null },
+        }),
       );
 
-      const err = await apiRequest("POST", "/api/admin/voucher-renewal/confirm", {}).catch((e) => e);
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/voucher-renewal/confirm",
+        {},
+      ).catch((e) => e);
 
       expect((err as ApiError).data).toBeUndefined();
     });
@@ -170,22 +215,26 @@ describe("apiRequest response parsing", () => {
   });
 
   it("parses and returns the JSON body for a 200 with content", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { id: "abc", isActive: true }));
-
-    const result = await apiRequest<undefined, { id: string; isActive: boolean }>(
-      "GET",
-      "/api/admin/users/abc",
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, { id: "abc", isActive: true }),
     );
+
+    const result = await apiRequest<
+      undefined,
+      { id: string; isActive: boolean }
+    >("GET", "/api/admin/users/abc");
 
     expect(result).toEqual({ id: "abc", isActive: true });
   });
 
   it("throws with the server message on a non-ok response", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(404, { message: "User not found" }));
-
-    await expect(apiRequest("POST", "/api/admin/users/abc/activate")).rejects.toThrow(
-      "User not found",
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(404, { message: "User not found" }),
     );
+
+    await expect(
+      apiRequest("POST", "/api/admin/users/abc/activate"),
+    ).rejects.toThrow("User not found");
   });
 
   it("surfaces the `error` field an admin endpoint returns instead of raw JSON", async () => {
@@ -193,11 +242,21 @@ describe("apiRequest response parsing", () => {
     // failure. The old extraction only looked at message/detail/title, so the operator
     // saw the raw JSON blob; now the reason is shown directly.
     vi.mocked(fetch).mockResolvedValue(
-      jsonResponse(502, { success: false, error: "Monobank rejected the cancellation" }),
+      jsonResponse(502, {
+        success: false,
+        error: "Monobank rejected the cancellation",
+      }),
     );
 
     await expect(
-      apiRequest("POST", "/api/admin/orders/1/refund", undefined, undefined, undefined, 0),
+      apiRequest(
+        "POST",
+        "/api/admin/orders/1/refund",
+        undefined,
+        undefined,
+        undefined,
+        0,
+      ),
     ).rejects.toThrow("Monobank rejected the cancellation");
   });
 
@@ -206,11 +265,22 @@ describe("apiRequest response parsing", () => {
     // useless to the operator. It must be replaced with a plain sentence plus the traceId
     // that links to the Error Logs tab — not shown verbatim.
     vi.mocked(fetch).mockResolvedValue(
-      jsonResponse(500, { status: 500, title: "An unexpected error occurred", traceId: "trace-abc" }),
+      jsonResponse(500, {
+        status: 500,
+        title: "An unexpected error occurred",
+        traceId: "trace-abc",
+      }),
     );
 
     await expect(
-      apiRequest("POST", "/api/admin/orders/1/refund", undefined, undefined, undefined, 0),
+      apiRequest(
+        "POST",
+        "/api/admin/orders/1/refund",
+        undefined,
+        undefined,
+        undefined,
+        0,
+      ),
     ).rejects.toThrow(/Something went wrong on the server.*trace-abc/);
   });
 
@@ -221,7 +291,9 @@ describe("apiRequest response parsing", () => {
         .mockImplementation(async () => jsonResponse(200, { ok: true }));
       ensureAccessToken.mockResolvedValue("fresh-token");
 
-      await expect(apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0)).resolves.toEqual({
+      await expect(
+        apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0),
+      ).resolves.toEqual({
         ok: true,
       });
       expect(ensureAccessToken).toHaveBeenCalledOnce();
@@ -236,7 +308,9 @@ describe("apiRequest response parsing", () => {
       // A fresh Response per call: a Response body is single-use, so one shared instance makes
       // every request after the first fail somewhere other than the 401 path, and this test
       // would pass without ever reaching the code it exists to cover.
-      vi.mocked(fetch).mockImplementation(async () => new Response(null, { status: 401 }));
+      vi.mocked(fetch).mockImplementation(
+        async () => new Response(null, { status: 401 }),
+      );
       ensureAccessToken.mockResolvedValue(null);
 
       for (let i = 0; i < 10; i++) {
@@ -254,7 +328,9 @@ describe("apiRequest response parsing", () => {
     });
 
     it("signs the session out when the retried request comes back 401 as well", async () => {
-      vi.mocked(fetch).mockImplementation(async () => new Response(null, { status: 401 }));
+      vi.mocked(fetch).mockImplementation(
+        async () => new Response(null, { status: 401 }),
+      );
       ensureAccessToken.mockResolvedValue("fresh-token");
 
       await expect(
@@ -280,7 +356,10 @@ describe("apiRequest response parsing", () => {
         .mockResolvedValueOnce(new Response(null, { status: 401 }))
         .mockImplementation(
           async () =>
-            new Response(null, { status: 429, headers: { "Retry-After": "30" } }),
+            new Response(null, {
+              status: 429,
+              headers: { "Retry-After": "30" },
+            }),
         );
       ensureAccessToken.mockResolvedValue("fresh-token");
 
@@ -288,7 +367,9 @@ describe("apiRequest response parsing", () => {
         apiRequest("GET", "/api/admin/vouchers", undefined, undefined, 0, 0),
       ).rejects.toThrow();
 
-      expect(block).toHaveBeenCalledWith(expect.objectContaining({ reason: "rate_limited" }));
+      expect(block).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "rate_limited" }),
+      );
       expect(signOut).not.toHaveBeenCalled();
     });
 

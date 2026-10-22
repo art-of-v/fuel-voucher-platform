@@ -34,7 +34,8 @@ export const REFRESH_RATE_LIMIT_FALLBACK_SECONDS = 60;
  * actually a self-inflicted rate limit, and its retry button spent another unit
  * of the budget that produced it.
  */
-export type RefreshStatus = "refreshed" | "expired" | "rate_limited" | "unavailable";
+export type RefreshStatus =
+  "refreshed" | "expired" | "rate_limited" | "unavailable";
 
 export interface RefreshResult {
   status: RefreshStatus;
@@ -52,11 +53,15 @@ export interface HttpError extends Error {
 }
 
 export function isSessionRejected(err: unknown): boolean {
-  return typeof err === "object" && err !== null && (err as HttpError).status === 401;
+  return (
+    typeof err === "object" && err !== null && (err as HttpError).status === 401
+  );
 }
 
 async function toHttpError(res: Response): Promise<HttpError> {
-  const err = new Error((await res.text()) || `Request failed (${res.status})`) as HttpError;
+  const err = new Error(
+    (await res.text()) || `Request failed (${res.status})`,
+  ) as HttpError;
   err.name = "HttpError";
   err.status = res.status;
   return err;
@@ -64,7 +69,11 @@ async function toHttpError(res: Response): Promise<HttpError> {
 
 let accessToken: string | null = null;
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -105,7 +114,7 @@ export async function sendCode(phoneNumber: string): Promise<void> {
 
 export async function verifyCode(
   phoneNumber: string,
-  code: string
+  code: string,
 ): Promise<void> {
   const res = await fetchWithTimeout(getApiUrl("/api/auth/admin/verify"), {
     method: "POST",
@@ -155,15 +164,20 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
  */
 async function attemptRefresh(): Promise<RefreshResult> {
   try {
-    const res = await fetchWithTimeout(getApiUrl("/api/auth/refresh"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-    }, REFRESH_TIMEOUT_MS);
+    const res = await fetchWithTimeout(
+      getApiUrl("/api/auth/refresh"),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      },
+      REFRESH_TIMEOUT_MS,
+    );
 
     // Only the server rejecting the token itself proves the session is over: 400 when
     // no usable refresh token arrived, 401 when the presented one is dead or revoked.
-    if (res.status === 400 || res.status === 401) return { status: "expired", retryAfterSeconds: 0 };
+    if (res.status === 400 || res.status === 401)
+      return { status: "expired", retryAfterSeconds: 0 };
     // A rate limit is a verdict of "not now", not "try harder" - and not an outage either.
     if (res.status === 429) {
       return { status: "rate_limited", retryAfterSeconds: readRetryAfter(res) };
@@ -242,6 +256,9 @@ export async function logout(): Promise<void> {
       credentials: "include",
     });
   } catch {
+    // The server could not be told, or answered with an error. The local session is cleared
+    // either way - the operator asked to be signed out, and a cookie we could not revoke is a
+    // cookie that expires on its own.
   } finally {
     clearTokens();
   }

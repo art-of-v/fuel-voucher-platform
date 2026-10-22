@@ -11,36 +11,43 @@ export function getApiUrl(path: string): string {
   return `${baseUrl}${path}`;
 }
 
-export function formatDate(dateString: string | number | Date | null | undefined): string {
-  if (!dateString) return '—';
+export function formatDate(
+  dateString: string | number | Date | null | undefined,
+): string {
+  if (!dateString) return "—";
   const d = new Date(dateString);
-  if (isNaN(d.getTime())) return '—';
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
+  if (isNaN(d.getTime())) return "—";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
   return `${day}.${month}.${year}`;
 }
 
-export function formatDateTime(dateString: string | number | Date | null | undefined): string {
-  if (!dateString) return '—';
+export function formatDateTime(
+  dateString: string | number | Date | null | undefined,
+): string {
+  if (!dateString) return "—";
   const d = new Date(dateString);
-  if (isNaN(d.getTime())) return '—';
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
+  if (isNaN(d.getTime())) return "—";
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const seconds = String(d.getSeconds()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const seconds = String(d.getSeconds()).padStart(2, "0");
   return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 }
 
 export const DEFAULT_NOMINALS = [2, 3, 5, 10, 20, 50];
 
-export function parseNominals(input: string, fallback: number[] = DEFAULT_NOMINALS): number[] {
+export function parseNominals(
+  input: string,
+  fallback: number[] = DEFAULT_NOMINALS,
+): number[] {
   const parsed = input
     .split(",")
-    .map(s => parseInt(s.trim()))
-    .filter(n => !isNaN(n) && n > 0);
+    .map((s) => parseInt(s.trim()))
+    .filter((n) => !isNaN(n) && n > 0);
   return parsed.length > 0 ? parsed : fallback;
 }
 
@@ -48,42 +55,49 @@ type Translator = (key: string, ...params: string[]) => string;
 
 function localizeChange(change: string, t: Translator): string {
   let m = change.match(/^name (.+) → (.+)$/);
-  if (m) return t('history.changeName', m[1], m[2]);
+  if (m) return t("history.changeName", m[1], m[2]);
   m = change.match(/^supplier (.+) → (.+)$/);
-  if (m) return t('history.changeSupplier', m[1], m[2]);
+  if (m) return t("history.changeSupplier", m[1], m[2]);
   m = change.match(/^margin (.+) → (.+)$/);
-  if (m) return t('history.changeMargin', m[1], m[2]);
+  if (m) return t("history.changeMargin", m[1], m[2]);
   m = change.match(/^final (.+) → (.+)$/);
-  if (m) return t('history.changeFinal', m[1], m[2]);
+  if (m) return t("history.changeFinal", m[1], m[2]);
   m = change.match(/^logo (.+) → (.+)$/);
-  if (m) return t('history.changeLogo', m[1], m[2]);
+  if (m) return t("history.changeLogo", m[1], m[2]);
   m = change.match(/^color (.+) → (.+)$/);
-  if (m) return t('history.changeColor', m[1], m[2]);
+  if (m) return t("history.changeColor", m[1], m[2]);
   return change;
 }
 
 export function localizeEventSummary(summary: string, t: Translator): string {
   let m = summary.match(/^Created brand (.+)$/);
-  if (m) return t('history.providerCreated', m[1]);
+  if (m) return t("history.providerCreated", m[1]);
   m = summary.match(/^Deleted brand (.+)$/);
-  if (m) return t('history.providerDeleted', m[1]);
+  if (m) return t("history.providerDeleted", m[1]);
   m = summary.match(/^Updated brand (.+)$/);
-  if (m) return t('history.providerUpdated', m[1]);
+  if (m) return t("history.providerUpdated", m[1]);
   m = summary.match(/^(.+): nominals changed \[(.+)\]$/);
-  if (m) return t('history.nominalsChanged', m[1], m[2]);
+  if (m) return t("history.nominalsChanged", m[1], m[2]);
   m = summary.match(/^(.+) \/ (.+): added at (.+) UAH\/L$/);
-  if (m) return t('history.fuelAdded', m[1], m[2], m[3]);
+  if (m) return t("history.fuelAdded", m[1], m[2], m[3]);
   m = summary.match(/^(.+) \/ (.+): removed$/);
-  if (m) return t('history.fuelRemoved', m[1], m[2]);
+  if (m) return t("history.fuelRemoved", m[1], m[2]);
   m = summary.match(/^(.+) \/ (.+): updated$/);
-  if (m) return t('history.fuelUpdated', m[1], m[2]);
+  if (m) return t("history.fuelUpdated", m[1], m[2]);
   m = summary.match(/^(.+) \/ (.+): (.+)$/);
-  if (m) return `${m[1]} / ${m[2]}: ${m[3].split(", ").map(c => localizeChange(c, t)).join(", ")}`;
+  if (m)
+    return `${m[1]} / ${m[2]}: ${m[3]
+      .split(", ")
+      .map((c) => localizeChange(c, t))
+      .join(", ")}`;
   m = summary.match(/^(.+): (.+)$/);
-  if (m) return `${m[1]}: ${m[2].split(", ").map(c => localizeChange(c, t)).join(", ")}`;
+  if (m)
+    return `${m[1]}: ${m[2]
+      .split(", ")
+      .map((c) => localizeChange(c, t))
+      .join(", ")}`;
   return summary;
 }
-
 
 /**
  * Escapes one value for a CSV cell.
@@ -103,7 +117,7 @@ export function localizeEventSummary(summary: string, t: Translator): string {
  * as literal text" and strip it on display.
  */
 export function csvCell(value: string | null | undefined): string {
-  const v = value ?? '';
+  const v = value ?? "";
   const needsGuard = /^[=+\-@\t\r]/.test(v);
   return `"${(needsGuard ? `'${v}` : v).replace(/"/g, '""')}"`;
 }

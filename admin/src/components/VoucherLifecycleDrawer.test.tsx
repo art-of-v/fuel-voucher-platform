@@ -9,20 +9,32 @@ import { apiRequest } from "@/lib/api-client";
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string, ...p: string[]) => (p.length ? `${key}:${p[0]}` : key), language: "uk", setLanguage: vi.fn() }),
+  useI18n: () => ({
+    t: (key: string, ...p: string[]) => (p.length ? `${key}:${p[0]}` : key),
+    language: "uk",
+    setLanguage: vi.fn(),
+  }),
 }));
 
 const mockedApiRequest = vi.mocked(apiRequest);
 
-function renderDrawer(props: { voucherId: string | null; onOpenChange?: (o: boolean) => void }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderDrawer(props: {
+  voucherId: string | null;
+  onOpenChange?: (o: boolean) => void;
+}) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   // The caller owns the open state, so the callback is part of the contract rather than optional -
   // a drawer that cannot be told to close is a drawer nobody uses.
   const onOpenChange = props.onOpenChange ?? vi.fn();
-  return render(<VoucherLifecycleDrawer {...props} onOpenChange={onOpenChange} />, { wrapper });
+  return render(
+    <VoucherLifecycleDrawer {...props} onOpenChange={onOpenChange} />,
+    { wrapper },
+  );
 }
 
 const FULL = {
@@ -44,20 +56,40 @@ const FULL = {
   lineage: ["v1"],
   entries: [
     {
-      source: "movement", type: "issued", occurredAtUtc: "2026-05-01T10:00:00Z",
-      from: "pool", to: "customer",
-      previousCustomerExpiration: null, newCustomerExpiration: null, termCode: null,
-      amountUah: null, costDeltaUah: null,
-      actorKind: "user", actorUserId: "u1", actorName: "Olena K",
-      reason: null, externalRef: null, orderId: "o1",
+      source: "movement",
+      type: "issued",
+      occurredAtUtc: "2026-05-01T10:00:00Z",
+      from: "pool",
+      to: "customer",
+      previousCustomerExpiration: null,
+      newCustomerExpiration: null,
+      termCode: null,
+      amountUah: null,
+      costDeltaUah: null,
+      actorKind: "user",
+      actorUserId: "u1",
+      actorName: "Olena K",
+      reason: null,
+      externalRef: null,
+      orderId: "o1",
     },
     {
-      source: "event", type: "StatusChanged", occurredAtUtc: "2026-05-01T11:00:00Z",
-      from: "Assigned", to: "Used",
-      previousCustomerExpiration: null, newCustomerExpiration: null, termCode: null,
-      amountUah: null, costDeltaUah: null,
-      actorKind: "system", actorUserId: null, actorName: null,
-      reason: null, externalRef: null, orderId: null,
+      source: "event",
+      type: "StatusChanged",
+      occurredAtUtc: "2026-05-01T11:00:00Z",
+      from: "Assigned",
+      to: "Used",
+      previousCustomerExpiration: null,
+      newCustomerExpiration: null,
+      termCode: null,
+      amountUah: null,
+      costDeltaUah: null,
+      actorKind: "system",
+      actorUserId: null,
+      actorName: null,
+      reason: null,
+      externalRef: null,
+      orderId: null,
     },
   ],
 };
@@ -81,14 +113,18 @@ describe("VoucherLifecycleDrawer", () => {
     await waitFor(() => expect(mockedApiRequest).toHaveBeenCalled());
     expect(mockedApiRequest).toHaveBeenCalledWith(
       "GET",
-      "/api/admin/vouchers/v1/lifecycle"
+      "/api/admin/vouchers/v1/lifecycle",
     );
 
     // The key IS the word, so an unmapped term still reads as itself.
-    await waitFor(() => expect(screen.getByText("voucherLifecycle.kind.issued")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("voucherLifecycle.kind.issued")).toBeTruthy(),
+    );
     expect(screen.getByText("voucherLifecycle.kind.pool")).toBeTruthy();
     expect(screen.getByText("voucherLifecycle.kind.customer")).toBeTruthy();
-    expect(screen.getByText("voucherLifecycle.event.StatusChanged")).toBeTruthy();
+    expect(
+      screen.getByText("voucherLifecycle.event.StatusChanged"),
+    ).toBeTruthy();
   });
 
   it("shows the resolved author's name and says 'the system' when there is none", async () => {
@@ -109,7 +145,9 @@ describe("VoucherLifecycleDrawer", () => {
     renderDrawer({ voucherId: "v1" });
 
     // The id is still answerable, so it is shown rather than replaced by a placeholder.
-    await waitFor(() => expect(screen.getByText("voucherLifecycle.actorById:u1")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("voucherLifecycle.actorById:u1")).toBeTruthy(),
+    );
   });
 
   it("says an error rather than an empty timeline", async () => {
@@ -118,7 +156,7 @@ describe("VoucherLifecycleDrawer", () => {
 
     // "Nothing happened" and "we could not read it" are different answers and must not look alike.
     await waitFor(() =>
-      expect(screen.getByText("voucherLifecycle.loadFailed")).toBeTruthy()
+      expect(screen.getByText("voucherLifecycle.loadFailed")).toBeTruthy(),
     );
     expect(screen.queryByText("voucherLifecycle.empty")).toBeNull();
   });
@@ -127,7 +165,9 @@ describe("VoucherLifecycleDrawer", () => {
     mockedApiRequest.mockResolvedValue({ ...FULL, entries: [] });
     renderDrawer({ voucherId: "v1" });
 
-    await waitFor(() => expect(screen.getByText("voucherLifecycle.empty")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("voucherLifecycle.empty")).toBeTruthy(),
+    );
   });
 
   it("marks an archived voucher instead of pretending it is live", async () => {
@@ -135,7 +175,7 @@ describe("VoucherLifecycleDrawer", () => {
     renderDrawer({ voucherId: "v1" });
 
     await waitFor(() =>
-      expect(screen.getByText("voucherLifecycle.archivedNote")).toBeTruthy()
+      expect(screen.getByText("voucherLifecycle.archivedNote")).toBeTruthy(),
     );
   });
 

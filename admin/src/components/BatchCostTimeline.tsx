@@ -69,7 +69,7 @@ export function BatchCostTimeline({
     queryKey: ["/api/admin/voucher-imports", importId, "cost-timeline"],
     queryFn: async () => {
       if (!importId) return { importId: "", entries: [], currentCosts: [] };
-      return await apiRequest<any, BatchCostTimelineResponse>(
+      return await apiRequest<void, BatchCostTimelineResponse>(
         "GET",
         `/api/admin/voucher-imports/${importId}/cost-timeline`,
       );
@@ -89,7 +89,11 @@ export function BatchCostTimeline({
         aria-expanded={open}
         className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
       >
-        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        {open ? (
+          <ChevronDown className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5" />
+        )}
         <History className="w-3.5 h-3.5" />
         <span>{t("imports.costTimeline")}</span>
       </button>
@@ -97,34 +101,57 @@ export function BatchCostTimeline({
       {open && (
         <div className="mt-2 border border-border/50 rounded-md overflow-hidden">
           {isLoading ? (
-            <p className="p-3 text-xs text-muted-foreground">{t("common.loading")}</p>
+            <p className="p-3 text-xs text-muted-foreground">
+              {t("common.loading")}
+            </p>
           ) : entries.length === 0 ? (
-            <p className="p-3 text-xs text-muted-foreground">{t("imports.costTimelineEmpty")}</p>
+            <p className="p-3 text-xs text-muted-foreground">
+              {t("imports.costTimelineEmpty")}
+            </p>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-muted/40 text-left text-muted-foreground">
-                  <th className="p-2 font-medium">{t("imports.timelineDate")}</th>
-                  <th className="p-2 font-medium">{t("imports.timelineFuel")}</th>
-                  <th className="p-2 font-medium text-right">{t("imports.timelineOut")}</th>
-                  <th className="p-2 font-medium text-right">{t("imports.timelineSurcharge")}</th>
-                  <th className="p-2 font-medium text-right">{t("imports.timelineCostMove")}</th>
+                  <th className="p-2 font-medium">
+                    {t("imports.timelineDate")}
+                  </th>
+                  <th className="p-2 font-medium">
+                    {t("imports.timelineFuel")}
+                  </th>
+                  <th className="p-2 font-medium text-right">
+                    {t("imports.timelineOut")}
+                  </th>
+                  <th className="p-2 font-medium text-right">
+                    {t("imports.timelineSurcharge")}
+                  </th>
+                  <th className="p-2 font-medium text-right">
+                    {t("imports.timelineCostMove")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {entries.map((entry) => (
-                  <tr key={`${entry.exchangeBatchId}-${entry.fuelTypeId}`} className="border-t border-border/50">
+                  <tr
+                    key={`${entry.exchangeBatchId}-${entry.fuelTypeId}`}
+                    className="border-t border-border/50"
+                  >
                     <td className="p-2 font-mono">{date(entry.atUtc)}</td>
                     <td className="p-2">
                       <div>{entry.fuelTypeId}</div>
-                      <div className="text-muted-foreground uppercase text-[10px]">{entry.brand}</div>
+                      <div className="text-muted-foreground uppercase text-[10px]">
+                        {entry.brand}
+                      </div>
                     </td>
                     <td className="p-2 text-right font-mono">
-                      {entry.vouchersExchangedOut} · {entry.litersExchangedOut} L
+                      {entry.vouchersExchangedOut} · {entry.litersExchangedOut}{" "}
+                      L
                     </td>
-                    <td className="p-2 text-right font-mono">{formatMoney(entry.surchargeUah)}</td>
                     <td className="p-2 text-right font-mono">
-                      {perL(entry.costPerLiterBefore)} → {perL(entry.costPerLiterAfter)}
+                      {formatMoney(entry.surchargeUah)}
+                    </td>
+                    <td className="p-2 text-right font-mono">
+                      {perL(entry.costPerLiterBefore)} →{" "}
+                      {perL(entry.costPerLiterAfter)}
                     </td>
                   </tr>
                 ))}
@@ -140,8 +167,12 @@ export function BatchCostTimeline({
           {data && data.currentCosts.length > 0 && (
             <div className="border-t border-border/50 p-2 text-xs text-muted-foreground">
               {data.currentCosts.map((cost) => (
-                <div key={`${cost.fuelTypeId}-${cost.brand}`} className="font-mono">
-                  {cost.fuelTypeName || cost.fuelTypeId} · {perL(cost.costPerLiter)}
+                <div
+                  key={`${cost.fuelTypeId}-${cost.brand}`}
+                  className="font-mono"
+                >
+                  {cost.fuelTypeName || cost.fuelTypeId} ·{" "}
+                  {perL(cost.costPerLiter)}
                 </div>
               ))}
             </div>

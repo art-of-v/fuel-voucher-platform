@@ -51,7 +51,11 @@ describe("session lifecycle", () => {
     it("restores the session when a refresh cookie may exist", async () => {
       localStorage.setItem("fuelflow.session", "1");
       refreshAccessToken.mockResolvedValue(refreshed());
-      fetchCurrentUser.mockResolvedValue({ id: "u1", phone: "+380", role: "Admin" });
+      fetchCurrentUser.mockResolvedValue({
+        id: "u1",
+        phone: "+380",
+        role: "Admin",
+      });
 
       await bootSession();
 
@@ -61,7 +65,10 @@ describe("session lifecycle", () => {
 
     it("falls back to the login form when the server rejects the session", async () => {
       localStorage.setItem("fuelflow.session", "1");
-      refreshAccessToken.mockResolvedValue({ status: "expired", retryAfterSeconds: 0 });
+      refreshAccessToken.mockResolvedValue({
+        status: "expired",
+        retryAfterSeconds: 0,
+      });
 
       await bootSession();
 
@@ -72,7 +79,10 @@ describe("session lifecycle", () => {
 
     it("reports a rate limit as a rate limit, not as an outage", async () => {
       localStorage.setItem("fuelflow.session", "1");
-      refreshAccessToken.mockResolvedValue({ status: "rate_limited", retryAfterSeconds: 30 });
+      refreshAccessToken.mockResolvedValue({
+        status: "rate_limited",
+        retryAfterSeconds: 30,
+      });
 
       await bootSession();
 
@@ -104,8 +114,15 @@ describe("session lifecycle", () => {
     });
 
     it("gives every caller the same verdict, and signs out exactly once", async () => {
-      useSession.setState({ status: "authenticated", user: null, blocker: null });
-      refreshAccessToken.mockResolvedValue({ status: "expired", retryAfterSeconds: 0 });
+      useSession.setState({
+        status: "authenticated",
+        user: null,
+        blocker: null,
+      });
+      refreshAccessToken.mockResolvedValue({
+        status: "expired",
+        retryAfterSeconds: 0,
+      });
 
       const results = await Promise.all([
         ensureAccessToken(),
@@ -125,7 +142,11 @@ describe("session lifecycle", () => {
 
   describe("signOut", () => {
     it("clears the session locally even if the server call fails", async () => {
-      useSession.setState({ status: "authenticated", user: { id: "u1" } as never, blocker: null });
+      useSession.setState({
+        status: "authenticated",
+        user: { id: "u1" } as never,
+        blocker: null,
+      });
       localStorage.setItem("fuelflow.session", "1");
 
       await signOut();

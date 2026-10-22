@@ -8,45 +8,45 @@ import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 
 interface HeldPayment {
-    id: string;
-    amountUah: number;
-    currency: string;
-    paidAtUtc: string | null;
-    provider: string;
-    userId: string | null;
-    userPhone: string | null;
-    userName: string | null;
-    declaredCode: string | null;
-    declaredText: string | null;
-    declaredBy: string | null;
+  id: string;
+  amountUah: number;
+  currency: string;
+  paidAtUtc: string | null;
+  provider: string;
+  userId: string | null;
+  userPhone: string | null;
+  userName: string | null;
+  declaredCode: string | null;
+  declaredText: string | null;
+  declaredBy: string | null;
 }
 
 interface OpenOrder {
-    id: string;
-    userId: string;
-    price: number;
-    createdAtUtc: string;
+  id: string;
+  userId: string;
+  price: number;
+  createdAtUtc: string;
 }
 
 interface HeldPaymentsResponse {
-    data: HeldPayment[];
-    total: number;
-    openOrders: OpenOrder[];
+  data: HeldPayment[];
+  total: number;
+  openOrders: OpenOrder[];
 }
 
 interface CustomerHit {
-    id: string;
-    phoneNumber: string | null;
-    settlementCode: string | null;
-    name: string | null;
+  id: string;
+  phoneNumber: string | null;
+  settlementCode: string | null;
+  name: string | null;
 }
 
 /** One row in the picker. `phoneNumber` is what an operator reads when two names are alike. */
 interface CustomerOption {
-    id: string;
-    phoneNumber: string | null;
-    settlementCode: string | null;
-    name: string | null;
+  id: string;
+  phoneNumber: string | null;
+  settlementCode: string | null;
+  name: string | null;
 }
 
 /**
@@ -62,255 +62,378 @@ interface CustomerOption {
  * order or to a customer it already names, and there is no "best match" here to try first.
  */
 export default function HeldPaymentsTab() {
-    const { t } = useI18n();
-    const qc = useQueryClient();
+  const { t } = useI18n();
+  const qc = useQueryClient();
 
-    const [codeLookup, setCodeLookup] = useState("");
-    const [lookedUp, setLookedUp] = useState<CustomerHit | null | undefined>(undefined);
-    const [ownerSearch, setOwnerSearch] = useState("");
-    const [chosenOwner, setChosenOwner] = useState<CustomerOption | null>(null);
-    const [orderChoice, setOrderChoice] = useState<Record<string, string>>({});
+  const [codeLookup, setCodeLookup] = useState("");
+  const [lookedUp, setLookedUp] = useState<CustomerHit | null | undefined>(
+    undefined,
+  );
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [chosenOwner, setChosenOwner] = useState<CustomerOption | null>(null);
+  const [orderChoice, setOrderChoice] = useState<Record<string, string>>({});
 
-    const { data, isLoading, isFetching, refetch } = useQuery({
-        queryKey: ["admin", "heldPayments"],
-        queryFn: () => apiRequest<any, HeldPaymentsResponse>("GET", "/api/admin/payments/unallocated?limit=200"),
-    });
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["admin", "heldPayments"],
+    queryFn: () =>
+      apiRequest<void, HeldPaymentsResponse>(
+        "GET",
+        "/api/admin/payments/unallocated?limit=200",
+      ),
+  });
 
-    const invalidate = () => {
-        qc.invalidateQueries({ queryKey: ["admin", "heldPayments"] });
-    };
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["admin", "heldPayments"] });
+  };
 
-    const attach = useMutation({
-        mutationFn: (body: { paymentId: string; orderId?: string; userId?: string }) =>
-            apiRequest<unknown, void>(
-                "POST",
-                `/api/admin/payments/${body.paymentId}/attach`,
-                { orderId: body.orderId ?? null, userId: body.userId ?? null },
-            ),
-        onSuccess: invalidate,
-        // ApiError.message already carries the server's sentence — see api-client — so the refusal
-        // the operator most needs ("that order belongs to a different customer") is shown as-is
-        // rather than being replaced with "something went wrong".
-        onError: (e: unknown) => toast.error(e instanceof Error ? e.message : String(e)),
-    });
+  const attach = useMutation({
+    mutationFn: (body: {
+      paymentId: string;
+      orderId?: string;
+      userId?: string;
+    }) =>
+      apiRequest<unknown, void>(
+        "POST",
+        `/api/admin/payments/${body.paymentId}/attach`,
+        { orderId: body.orderId ?? null, userId: body.userId ?? null },
+      ),
+    onSuccess: invalidate,
+    // ApiError.message already carries the server's sentence — see api-client — so the refusal
+    // the operator most needs ("that order belongs to a different customer") is shown as-is
+    // rather than being replaced with "something went wrong".
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : String(e)),
+  });
 
-    const lookup = useMutation({
-        mutationFn: () => apiRequest<unknown, CustomerHit>(
-            "GET", `/api/admin/payments/customers/by-code?code=${encodeURIComponent(codeLookup.trim())}`),
-        onSuccess: (customer) => {
-            setLookedUp(customer);
-            toast.success(t("heldPayments.codeFound"));
-        },
-        // 404 carries the explanation the endpoint wrote — mistyped, or not registered yet — and those
-        // are different problems, so it is surfaced rather than flattened into a failure.
-        onError: (e: unknown) => {
-            setLookedUp(null);
-            toast.error(e instanceof Error ? e.message : String(e));
-        },
-    });
+  const lookup = useMutation({
+    mutationFn: () =>
+      apiRequest<unknown, CustomerHit>(
+        "GET",
+        `/api/admin/payments/customers/by-code?code=${encodeURIComponent(codeLookup.trim())}`,
+      ),
+    onSuccess: (customer) => {
+      setLookedUp(customer);
+      toast.success(t("heldPayments.codeFound"));
+    },
+    // 404 carries the explanation the endpoint wrote — mistyped, or not registered yet — and those
+    // are different problems, so it is surfaced rather than flattened into a failure.
+    onError: (e: unknown) => {
+      setLookedUp(null);
+      toast.error(e instanceof Error ? e.message : String(e));
+    },
+  });
 
-    // Search-as-you-type. Enabled at two characters because that is where the endpoint starts
-    // answering, and a disabled query that returns nothing looks like "no such customer".
-    const ownerOptions = useQuery({
-        queryKey: ["admin", "customerSearch", ownerSearch],
-        queryFn: () => apiRequest<any, CustomerOption[]>(
-            "GET", `/api/admin/payments/customers?search=${encodeURIComponent(ownerSearch.trim())}`),
-        enabled: ownerSearch.trim().length >= 2,
-        staleTime: 30_000,
-    });
+  // Search-as-you-type. Enabled at two characters because that is where the endpoint starts
+  // answering, and a disabled query that returns nothing looks like "no such customer".
+  const ownerOptions = useQuery({
+    queryKey: ["admin", "customerSearch", ownerSearch],
+    queryFn: () =>
+      apiRequest<void, CustomerOption[]>(
+        "GET",
+        `/api/admin/payments/customers?search=${encodeURIComponent(ownerSearch.trim())}`,
+      ),
+    enabled: ownerSearch.trim().length >= 2,
+    staleTime: 30_000,
+  });
 
-    const openOrdersByUser = useMemo(() => {
-        const grouped = new Map<string, OpenOrder[]>();
-        for (const order of data?.openOrders ?? []) {
-            grouped.set(order.userId, [...(grouped.get(order.userId) ?? []), order]);
-        }
-        return grouped;
-    }, [data?.openOrders]);
+  const openOrdersByUser = useMemo(() => {
+    const grouped = new Map<string, OpenOrder[]>();
+    for (const order of data?.openOrders ?? []) {
+      grouped.set(order.userId, [...(grouped.get(order.userId) ?? []), order]);
+    }
+    return grouped;
+  }, [data?.openOrders]);
 
-    const rows = data?.data ?? [];
+  const rows = data?.data ?? [];
 
-    return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="glass-panel p-6 space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                    <h3 className="font-semibold">{t("heldPayments.title")}</h3>
-                    <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching}>
-                        <RefreshCw className="w-4 h-4" />
-                    </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">{t("heldPayments.explainer")}</p>
-
-                {/* The lookup for money declared with a code that matched nobody. */}
-                <div className="flex flex-wrap items-end gap-2 pt-2">
-                    <label className="text-sm flex-1 min-w-64">
-                        {t("heldPayments.codeLookup")}
-                        <Input
-                            value={codeLookup}
-                            onChange={(e) => { setCodeLookup(e.target.value.toUpperCase()); setLookedUp(undefined); }}
-                            placeholder="K7P2M4XB"
-                            className="font-mono"
-                            maxLength={8}
-                        />
-                    </label>
-                    <Button onClick={() => lookup.mutate()} disabled={lookup.isPending || codeLookup.trim().length !== 8}>
-                        {t("heldPayments.find")}
-                    </Button>
-                </div>
-
-                {lookedUp !== undefined && (
-                    lookedUp === null
-                        ? <p className="text-sm text-muted-foreground">{t("heldPayments.codeNotFound")}</p>
-                        : (
-                            <div className="text-sm">
-                                <span className="text-muted-foreground">{t("heldPayments.codeBelongsTo")}: </span>
-                                <span className="font-semibold">{lookedUp.name || t("heldPayments.noName")}</span>
-                                {lookedUp.phoneNumber && <span className="text-muted-foreground"> · {lookedUp.phoneNumber}</span>}
-                                <span className="text-muted-foreground font-mono"> · {lookedUp.id}</span>
-                            </div>
-                        )
-                )}
-            </div>
-
-            <div className="glass-panel overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-muted">
-                            <th className="text-left p-4">{t("heldPayments.amount")}</th>
-                            <th className="text-left p-4">{t("heldPayments.paidAt")}</th>
-                            <th className="text-left p-4">{t("heldPayments.customer")}</th>
-                            <th className="text-left p-4">{t("heldPayments.declared")}</th>
-                            <th className="text-left p-4">{t("heldPayments.place")}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {isLoading && <tr><td className="p-4" colSpan={5}>{t("common.loading")}</td></tr>}
-                        {!isLoading && rows.length === 0 && (
-                            <tr><td className="p-4 text-muted-foreground" colSpan={5}>{t("heldPayments.empty")}</td></tr>
-                        )}
-                        {rows.map((payment) => {
-                            const orders = payment.userId ? (openOrdersByUser.get(payment.userId) ?? []) : [];
-                            const chosen = orderChoice[payment.id] ?? "";
-                            const matching = chosen && orders.find(o => o.id === chosen)?.price === payment.amountUah;
-                            const busy = attach.isPending;
-
-                            return (
-                                <tr key={payment.id} className="border-border hover:bg-foreground/5 transition-colors">
-                                    <td className="p-4 font-bold text-foreground whitespace-nowrap">
-                                        {payment.amountUah.toFixed(2)} {payment.currency}
-                                    </td>
-                                    <td className="p-4 text-muted-foreground whitespace-nowrap">
-                                        {payment.paidAtUtc ? new Date(payment.paidAtUtc).toLocaleString() : "—"}
-                                    </td>
-                                    <td className="p-4">
-                                        {payment.userId ? (
-                                            <div>
-                                                <div>{payment.userName || t("heldPayments.noName")}</div>
-                                                {payment.userPhone && <div className="text-xs text-muted-foreground">{payment.userPhone}</div>}
-                                            </div>
-                                        ) : (
-                                            <span className="text-destructive font-semibold">{t("heldPayments.unknown")}</span>
-                                        )}
-                                    </td>
-                                    <td className="p-4 text-muted-foreground">
-                                        {payment.declaredCode && (
-                                            <div className="font-mono text-xs">{payment.declaredCode}</div>
-                                        )}
-                                        {payment.declaredText && (
-                                            <div className="text-xs italic">“{payment.declaredText}”</div>
-                                        )}
-                                        {payment.declaredBy && (
-                                            <div className="text-xs">{t("heldPayments.by")} {payment.declaredBy}</div>
-                                        )}
-                                    </td>
-                                    <td className="p-4">
-                                        {!payment.userId ? (
-                                            <div className="space-y-2 min-w-72">
-                                                <p className="text-xs text-muted-foreground">{t("heldPayments.needsOwner")}</p>
-                                                {chosenOwner ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-semibold">
-                                                            {chosenOwner.name || t("heldPayments.noName")}
-                                                        </span>
-                                                        {chosenOwner.phoneNumber && (
-                                                            <span className="text-xs text-muted-foreground">{chosenOwner.phoneNumber}</span>
-                                                        )}
-                                                        <Button size="sm" variant="ghost"
-                                                            onClick={() => setChosenOwner(null)}>
-                                                            {t("common.cancel")}
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        <Input
-                                                            value={ownerSearch}
-                                                            onChange={(e) => setOwnerSearch(e.target.value)}
-                                                            placeholder={t("heldPayments.searchCustomer")}
-                                                        />
-                                                        {ownerSearch.trim().length >= 2 && (
-                                                            <div className="max-h-40 overflow-y-auto border border-input rounded-md">
-                                                                {(ownerOptions.data ?? []).length === 0
-                                                                    ? <p className="p-2 text-xs text-muted-foreground">{t("heldPayments.noCustomers")}</p>
-                                                                    : (ownerOptions.data ?? []).map(c => (
-                                                                        <button
-                                                                            key={c.id}
-                                                                            type="button"
-                                                                            className="w-full text-left px-2 py-1 text-sm hover:bg-foreground/5"
-                                                                            onClick={() => setChosenOwner(c)}
-                                                                        >
-                                                                            <span className="font-medium">{c.name || t("heldPayments.noName")}</span>
-                                                                            {c.phoneNumber && <span className="text-muted-foreground"> · {c.phoneNumber}</span>}
-                                                                            {c.settlementCode && <span className="font-mono text-xs text-muted-foreground"> · {c.settlementCode}</span>}
-                                                                        </button>
-                                                                    ))}
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                                {chosenOwner && (
-                                                    <Button
-                                                        size="sm"
-                                                        disabled={busy}
-                                                        onClick={() => attach.mutate({ paymentId: payment.id, userId: chosenOwner.id })}
-                                                    >
-                                                        {t("heldPayments.giveTo")} {chosenOwner.name || t("heldPayments.noName")}
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        ) : orders.length === 0 ? (
-                                            <span className="text-xs text-muted-foreground">{t("heldPayments.noOpenOrder")}</span>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <select
-                                                    className="border border-input bg-background rounded-md px-2 py-1 text-xs"
-                                                    value={chosen}
-                                                    onChange={(e) => setOrderChoice((c) => ({ ...c, [payment.id]: e.target.value }))}
-                                                >
-                                                    <option value="">{t("heldPayments.pickOrder")}</option>
-                                                    {orders.map((o) => (
-                                                        <option key={o.id} value={o.id}>
-                                                            {new Date(o.createdAtUtc).toLocaleString()} · {o.price.toFixed(2)} {payment.currency}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <Button
-                                                    size="sm"
-                                                    disabled={busy || !chosen}
-                                                    onClick={() => attach.mutate({ paymentId: payment.id, orderId: chosen })}
-                                                >
-                                                    {t("heldPayments.attach")}
-                                                </Button>
-                                                {chosen && !matching && (
-                                                    <span className="text-xs text-muted-foreground">{t("heldPayments.amountDiffers")}</span>
-                                                )}
-                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="glass-panel p-6 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="font-semibold">{t("heldPayments.title")}</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
         </div>
-    );
+        <p className="text-sm text-muted-foreground">
+          {t("heldPayments.explainer")}
+        </p>
+
+        {/* The lookup for money declared with a code that matched nobody. */}
+        <div className="flex flex-wrap items-end gap-2 pt-2">
+          <label className="text-sm flex-1 min-w-64">
+            {t("heldPayments.codeLookup")}
+            <Input
+              value={codeLookup}
+              onChange={(e) => {
+                setCodeLookup(e.target.value.toUpperCase());
+                setLookedUp(undefined);
+              }}
+              placeholder="K7P2M4XB"
+              className="font-mono"
+              maxLength={8}
+            />
+          </label>
+          <Button
+            onClick={() => lookup.mutate()}
+            disabled={lookup.isPending || codeLookup.trim().length !== 8}
+          >
+            {t("heldPayments.find")}
+          </Button>
+        </div>
+
+        {lookedUp !== undefined &&
+          (lookedUp === null ? (
+            <p className="text-sm text-muted-foreground">
+              {t("heldPayments.codeNotFound")}
+            </p>
+          ) : (
+            <div className="text-sm">
+              <span className="text-muted-foreground">
+                {t("heldPayments.codeBelongsTo")}:{" "}
+              </span>
+              <span className="font-semibold">
+                {lookedUp.name || t("heldPayments.noName")}
+              </span>
+              {lookedUp.phoneNumber && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {lookedUp.phoneNumber}
+                </span>
+              )}
+              <span className="text-muted-foreground font-mono">
+                {" "}
+                · {lookedUp.id}
+              </span>
+            </div>
+          ))}
+      </div>
+
+      <div className="glass-panel overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="text-left p-4">{t("heldPayments.amount")}</th>
+              <th className="text-left p-4">{t("heldPayments.paidAt")}</th>
+              <th className="text-left p-4">{t("heldPayments.customer")}</th>
+              <th className="text-left p-4">{t("heldPayments.declared")}</th>
+              <th className="text-left p-4">{t("heldPayments.place")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && (
+              <tr>
+                <td className="p-4" colSpan={5}>
+                  {t("common.loading")}
+                </td>
+              </tr>
+            )}
+            {!isLoading && rows.length === 0 && (
+              <tr>
+                <td className="p-4 text-muted-foreground" colSpan={5}>
+                  {t("heldPayments.empty")}
+                </td>
+              </tr>
+            )}
+            {rows.map((payment) => {
+              const orders = payment.userId
+                ? (openOrdersByUser.get(payment.userId) ?? [])
+                : [];
+              const chosen = orderChoice[payment.id] ?? "";
+              const matching =
+                chosen &&
+                orders.find((o) => o.id === chosen)?.price ===
+                  payment.amountUah;
+              const busy = attach.isPending;
+
+              return (
+                <tr
+                  key={payment.id}
+                  className="border-border hover:bg-foreground/5 transition-colors"
+                >
+                  <td className="p-4 font-bold text-foreground whitespace-nowrap">
+                    {payment.amountUah.toFixed(2)} {payment.currency}
+                  </td>
+                  <td className="p-4 text-muted-foreground whitespace-nowrap">
+                    {payment.paidAtUtc
+                      ? new Date(payment.paidAtUtc).toLocaleString()
+                      : "—"}
+                  </td>
+                  <td className="p-4">
+                    {payment.userId ? (
+                      <div>
+                        <div>
+                          {payment.userName || t("heldPayments.noName")}
+                        </div>
+                        {payment.userPhone && (
+                          <div className="text-xs text-muted-foreground">
+                            {payment.userPhone}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-destructive font-semibold">
+                        {t("heldPayments.unknown")}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-4 text-muted-foreground">
+                    {payment.declaredCode && (
+                      <div className="font-mono text-xs">
+                        {payment.declaredCode}
+                      </div>
+                    )}
+                    {payment.declaredText && (
+                      <div className="text-xs italic">
+                        “{payment.declaredText}”
+                      </div>
+                    )}
+                    {payment.declaredBy && (
+                      <div className="text-xs">
+                        {t("heldPayments.by")} {payment.declaredBy}
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    {!payment.userId ? (
+                      <div className="space-y-2 min-w-72">
+                        <p className="text-xs text-muted-foreground">
+                          {t("heldPayments.needsOwner")}
+                        </p>
+                        {chosenOwner ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">
+                              {chosenOwner.name || t("heldPayments.noName")}
+                            </span>
+                            {chosenOwner.phoneNumber && (
+                              <span className="text-xs text-muted-foreground">
+                                {chosenOwner.phoneNumber}
+                              </span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setChosenOwner(null)}
+                            >
+                              {t("common.cancel")}
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <Input
+                              value={ownerSearch}
+                              onChange={(e) => setOwnerSearch(e.target.value)}
+                              placeholder={t("heldPayments.searchCustomer")}
+                            />
+                            {ownerSearch.trim().length >= 2 && (
+                              <div className="max-h-40 overflow-y-auto border border-input rounded-md">
+                                {(ownerOptions.data ?? []).length === 0 ? (
+                                  <p className="p-2 text-xs text-muted-foreground">
+                                    {t("heldPayments.noCustomers")}
+                                  </p>
+                                ) : (
+                                  (ownerOptions.data ?? []).map((c) => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1 text-sm hover:bg-foreground/5"
+                                      onClick={() => setChosenOwner(c)}
+                                    >
+                                      <span className="font-medium">
+                                        {c.name || t("heldPayments.noName")}
+                                      </span>
+                                      {c.phoneNumber && (
+                                        <span className="text-muted-foreground">
+                                          {" "}
+                                          · {c.phoneNumber}
+                                        </span>
+                                      )}
+                                      {c.settlementCode && (
+                                        <span className="font-mono text-xs text-muted-foreground">
+                                          {" "}
+                                          · {c.settlementCode}
+                                        </span>
+                                      )}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {chosenOwner && (
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              attach.mutate({
+                                paymentId: payment.id,
+                                userId: chosenOwner.id,
+                              })
+                            }
+                          >
+                            {t("heldPayments.giveTo")}{" "}
+                            {chosenOwner.name || t("heldPayments.noName")}
+                          </Button>
+                        )}
+                      </div>
+                    ) : orders.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        {t("heldPayments.noOpenOrder")}
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="border border-input bg-background rounded-md px-2 py-1 text-xs"
+                          value={chosen}
+                          onChange={(e) =>
+                            setOrderChoice((c) => ({
+                              ...c,
+                              [payment.id]: e.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">
+                            {t("heldPayments.pickOrder")}
+                          </option>
+                          {orders.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {new Date(o.createdAtUtc).toLocaleString()} ·{" "}
+                              {o.price.toFixed(2)} {payment.currency}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          disabled={busy || !chosen}
+                          onClick={() =>
+                            attach.mutate({
+                              paymentId: payment.id,
+                              orderId: chosen,
+                            })
+                          }
+                        >
+                          {t("heldPayments.attach")}
+                        </Button>
+                        {chosen && !matching && (
+                          <span className="text-xs text-muted-foreground">
+                            {t("heldPayments.amountDiffers")}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }

@@ -27,7 +27,10 @@ describe("apiRequest request body encoding", () => {
   beforeEach(() => {
     refreshAccessToken.mockReset();
     clearTokens.mockReset();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(200, { ok: true })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse(200, { ok: true })),
+    );
     vi.stubGlobal("location", { href: "" } as Location);
   });
 
@@ -58,7 +61,8 @@ describe("apiRequest request body encoding", () => {
 
     await apiRequest("POST", "/api/admin/suppliers", payload);
 
-    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     const sent = init.body as string;
 
     // The body must parse straight to the object it was given...
@@ -74,8 +78,11 @@ describe("apiRequest request body encoding", () => {
 
     await apiRequest("POST", "/api/voucher-catalog/import", form);
 
-    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const [, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(init.body).toBe(form);
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+    expect(
+      (init.headers as Record<string, string>)["Content-Type"],
+    ).toBeUndefined();
   });
 });

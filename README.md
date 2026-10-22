@@ -55,6 +55,8 @@ travel over a transactional outbox, and every domain/admin change is audited.
 ```
 FuelFlow/
 ├── admin/                    # React 19 admin dashboard (Vite + Tailwind 4 + shadcn/ui)
+│   └── src/pages/admin/      # One component per screen (users, purchases, vouchers, imports,
+│                             #   reconciliation, reports) behind the session gate
 ├── backend/                  # .NET 10 ASP.NET Core API + standalone jobs worker
 │   ├── Directory.Build.props # The MSBuild settings every project shares
 │   └── src/
@@ -101,6 +103,17 @@ cd admin
 npm install
 npm run dev        # Vite dev server on :5173, proxies /api → localhost:5202
 ```
+
+The admin runs the same four checks as the mobile app, and CI runs them on every pull request:
+
+```bash
+npm run typecheck     # tsc --noEmit
+npm run lint          # ESLint — `any` is an error, and a warning fails the gate
+npm run format:check  # Prettier
+npm run test          # Vitest
+```
+
+`npm run lint:fix` and `npm run format` fix what can be fixed automatically.
 
 ### Mobile app
 

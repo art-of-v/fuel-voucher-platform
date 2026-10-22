@@ -1,8 +1,8 @@
-import * as React from "react"
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "lucide-react"
+import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 /**
  * A panel that slides in from the right edge.
@@ -23,24 +23,24 @@ import { cn } from "@/lib/utils"
  * accessibility comes from the primitive; the panel-from-the-edge look comes from the classes.
  * </p>
  */
-const Sheet = DialogPrimitive.Root
-const SheetTrigger = DialogPrimitive.Trigger
-const SheetClose = DialogPrimitive.Close
-const SheetTitle = DialogPrimitive.Title
-const SheetDescription = DialogPrimitive.Description
+const Sheet = DialogPrimitive.Root;
+const SheetTrigger = DialogPrimitive.Trigger;
+const SheetClose = DialogPrimitive.Close;
+const SheetTitle = DialogPrimitive.Title;
+const SheetDescription = DialogPrimitive.Description;
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     /** Hides the built-in close button, for a panel that supplies its own. */
-    hideClose?: boolean
+    hideClose?: boolean;
   }
 >(({ className, children, hideClose, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay
       className={cn(
         "fixed inset-0 z-50 bg-black/60 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        className
+        className,
       )}
     />
     <DialogPrimitive.Content
@@ -50,7 +50,7 @@ const SheetContent = React.forwardRef<
         // as a portaled sibling stacked over the backdrop-filter overlay, glass-panel's translucent
         // surface composites to an invisible rectangle in Chromium.
         "glass-chrome text-foreground fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col gap-0 border-l border-border p-0 shadow-2xl duration-300 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-2xl",
-        className
+        className,
       )}
       {...props}
     >
@@ -65,8 +65,8 @@ const SheetContent = React.forwardRef<
       )}
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
-))
-SheetContent.displayName = DialogPrimitive.Content.displayName
+));
+SheetContent.displayName = DialogPrimitive.Content.displayName;
 
 export {
   Sheet,
@@ -75,4 +75,4 @@ export {
   SheetContent,
   SheetTitle,
   SheetDescription,
-}
+};
