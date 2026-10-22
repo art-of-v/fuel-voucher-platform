@@ -453,6 +453,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "contracts.signedAt": "Signed date",
     "contracts.signature": "Signature",
     "contracts.view": "View",
+    "contracts.signatureHint":
+      "The image is the customer's handwritten signature - a biometric artefact. Opening it is recorded in the audit trail.",
+    "contracts.signatureRestricted":
+      "The signatures are for the Admin tier: a Manager may not open them.",
+    "contracts.signaturesPage": "Page {0} of {1}",
+    "contracts.signatureLoadFailed": "The signature could not be loaded.",
     "contracts.noneSigned": "No signed contracts yet",
     "contracts.signatureInvalid": "Invalid signature data",
     "contracts.signatureUnreadable": "The signature could not be read.",
@@ -1569,6 +1575,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "contracts.signedAt": "Дата підпису",
     "contracts.signature": "Підпис",
     "contracts.view": "Переглянути",
+    "contracts.signatureHint":
+      "Зображення — це рукописний підпис клієнта, тобто біометричний артефакт. Кожне відкриття записується в журнал аудиту.",
+    "contracts.signatureRestricted":
+      "Підписи доступні лише рівню Admin: менеджер їх відкрити не може.",
+    "contracts.signaturesPage": "Сторінка {0} з {1}",
+    "contracts.signatureLoadFailed": "Не вдалося завантажити підпис.",
     "contracts.noneSigned": "Підписаних договорів ще немає",
     "contracts.signatureInvalid": "Некоректні дані підпису",
     "contracts.signatureUnreadable": "Підпис не вдалося прочитати.",
@@ -3275,6 +3287,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "contracts.signedAt": "Unterzeichnet am",
     "contracts.signature": "Unterschrift",
     "contracts.view": "Ansehen",
+    "contracts.signatureHint":
+      "Das Bild ist die handschriftliche Unterschrift des Kunden - ein biometrisches Artefakt. Jedes Öffnen wird im Audit-Protokoll vermerkt.",
+    "contracts.signatureRestricted":
+      "Die Unterschriften sind für die Admin-Ebene: ein Manager darf sie nicht öffnen.",
+    "contracts.signaturesPage": "Seite {0} von {1}",
+    "contracts.signatureLoadFailed": "Die Unterschrift konnte nicht geladen werden.",
     "contracts.noneSigned": "Noch keine unterzeichneten Verträge",
     "contracts.signatureInvalid": "Ungültige Unterschriftdaten",
     "contracts.signatureUnreadable":
@@ -4395,6 +4413,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "contracts.signedAt": "Fecha de firma",
     "contracts.signature": "Firma",
     "contracts.view": "Ver",
+    "contracts.signatureHint":
+      "La imagen es la firma manuscrita del cliente: un artefacto biométrico. Cada apertura queda registrada en la auditoría.",
+    "contracts.signatureRestricted":
+      "Las firmas son del nivel Admin: un Manager no puede abrirlas.",
+    "contracts.signaturesPage": "Página {0} de {1}",
+    "contracts.signatureLoadFailed": "No se pudo cargar la firma.",
     "contracts.noneSigned": "Todavía no hay contratos firmados",
     "contracts.signatureInvalid": "Datos de firma no válidos",
     "contracts.signatureUnreadable": "No se ha podido leer la firma.",

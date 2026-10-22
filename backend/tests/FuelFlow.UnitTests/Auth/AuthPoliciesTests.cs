@@ -63,6 +63,20 @@ public class AuthPoliciesTests
     }
 
     [Fact]
+    public void The_Signature_Is_The_Admin_Tier_And_A_List_Of_Its_Own()
+    {
+        // A customer's handwritten signature cannot be revoked and cannot be rotated, so it is
+        // not a thing the staff read surface hands out: it is a capability of its own, for the
+        // Admin tier (planning #622, S-13). And it is a list of its own, for the same reason the
+        // voucher payload's is - joining the read surface must not bring every customer's
+        // handwriting with it.
+        SeedRoles.SignaturePayloadRoleNames.Should().BeEquivalentTo(
+            [SeedRoles.ProductOwnerName, SeedRoles.AdminName]);
+        SeedRoles.SignaturePayloadRoleNames.Should().NotBeSameAs(SeedRoles.StaffRoleNames);
+        SeedRoles.SignaturePayloadRoleNames.Should().NotContain(SeedRoles.ManagerName);
+    }
+
+    [Fact]
     public void The_Capability_Lists_Are_Separate_Lists_And_Not_One_Array_Under_Another_Name()
     {
         // The point of separate lists: narrowing one capability must not narrow the others, and a

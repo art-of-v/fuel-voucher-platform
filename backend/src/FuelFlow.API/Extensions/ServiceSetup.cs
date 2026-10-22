@@ -22,6 +22,7 @@ using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Contracts.GetAdminContracts;
+using FuelFlow.Features.Contracts.GetSignedContractSignature;
 using FuelFlow.Features.Contracts.GetSignedContracts;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Monobank.ProcessWebhook;
@@ -460,6 +461,7 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
     {
         services.AddScoped<GetAdminContractsQueryHandler>();
         services.AddScoped<GetSignedContractsQueryHandler>();
+        services.AddScoped<GetSignedContractSignatureQueryHandler>();
     }
 
     private static void AddAdminServices(IServiceCollection services)

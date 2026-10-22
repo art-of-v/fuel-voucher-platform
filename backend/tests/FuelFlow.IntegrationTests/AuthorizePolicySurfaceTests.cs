@@ -81,7 +81,11 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["GET /api/admin/fuel-types"] = AuthPolicies.Staff,
         ["GET /api/admin/fuel-types/{id}"] = AuthPolicies.Staff,
         ["GET /api/admin/legal-entity/contracts"] = AuthPolicies.Staff,
-        ["GET /api/admin/legal-entity/contracts/signed-contracts"] = AuthPolicies.Staff,
+        // The signatures are a biometric artefact: the image is behind a capability of its own,
+        // and the list is behind it too, because the list is a list of customers (planning
+        // #622, S-13).
+        ["GET /api/admin/legal-entity/contracts/signed-contracts"] = AuthPolicies.SignaturePayload,
+        ["GET /api/admin/legal-entity/contracts/signed-contracts/{id:guid}"] = AuthPolicies.SignaturePayload,
         ["GET /api/admin/orders"] = AuthPolicies.Staff,
         ["GET /api/admin/orders/{id}"] = AuthPolicies.Staff,
         ["GET /api/admin/orders/{id:guid}/receipt"] = AuthPolicies.Staff,
@@ -209,6 +213,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         // belongs to the tier that moves money - and it is a list of its own, so that joining the
         // read surface does not hand over every customer's code.
         (AuthPolicies.SettlementCode, [SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName]),
+        // A customer's handwritten signature cannot be revoked and cannot be rotated, so it is
+        // not a thing the read surface hands out: the Admin tier holds it, and opening an image
+        // writes an audit row (planning #622, S-13).
+        (AuthPolicies.SignaturePayload, [SeedRoles.ProductOwnerName, SeedRoles.AdminName]),
     ];
 
     /// <summary>

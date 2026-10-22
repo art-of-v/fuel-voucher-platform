@@ -444,3 +444,50 @@ export interface AdminSupplier {
   name: string;
   isActive: boolean;
 }
+
+/**
+ * A row of the signed contracts table (`GET /api/admin/legal-entity/contracts/signed-contracts`).
+ *
+ * <p>
+ * The list carries no signature image, and it is a page: a handwritten signature cannot be
+ * revoked and cannot be rotated, so it is a capability of its own on the server
+ * (`AuthPolicies.SignaturePayload`), and the image is served per record.
+ */
+export interface AdminSignedContract {
+  id: string;
+  contractId: string;
+  brandId: string | null;
+  brandName: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  userId: string;
+  customerName: string | null;
+  signedAtUtc: string;
+  expiresAtUtc: string | null;
+  expired: boolean;
+  termsVersion: number;
+}
+
+/**
+ * One customer's handwritten signature
+ * (`GET /api/admin/legal-entity/contracts/signed-contracts/{id}`).
+ *
+ * <p>
+ * The image is here and NOT in the list, and opening it writes an audit row naming the
+ * operator - so the client asks for it when the operator asks for it, and nowhere else.
+ */
+export interface AdminSignedContractSignature {
+  id: string;
+  contractId: string;
+  brandId: string | null;
+  brandName: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  userId: string;
+  customerName: string | null;
+  signedAtUtc: string;
+  expiresAtUtc: string | null;
+  expired: boolean;
+  termsVersion: number;
+  signatureData: string | null;
+}

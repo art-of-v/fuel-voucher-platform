@@ -122,6 +122,26 @@ internal static class SeedRoles
     public static readonly string[] VoucherPayloadRoleNames = { ProductOwnerName, AdminName };
 
     /// <summary>
+    /// The roles that may see a customer's handwritten signature - the image the customer drew on
+    /// the contract.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why this is narrower than the staff surface.</b> A signature is the one artefact that
+    /// cannot be repaired: the customer drew it once, it cannot be revoked, it cannot be rotated,
+    /// and the law treats a handwritten signature as a biometric artefact. A leaked copy of a
+    /// person's handwriting is not a credential to expire - it is a mark on their identity, forever.
+    /// </para>
+    /// <para>
+    /// The list of signatures is also a list of identities - one row per customer, with a name or
+    /// a phone number beside it - so it is the same kind of harvest the redeemable voucher payload
+    /// was, and it is met with the same answer: a capability of its own, a page instead of the
+    /// whole table, and an audit row when the image itself is opened (planning #622, S-13).
+    /// </para>
+    /// </remarks>
+    public static readonly string[] SignaturePayloadRoleNames = { ProductOwnerName, AdminName };
+
+    /// <summary>
     /// The roles that may see a customer's settlement code - the identifier the settlement channel
     /// resolves money to.
     /// <para>

@@ -39,6 +39,13 @@ public sealed class NoTrackingMutationGuardTests
     // A file that persists is safe if it shows intent to change tracked state. AsTracking
     // re-enables tracking on the load; Add/Update/Remove attach state explicitly; the
     // Execute*/raw-SQL forms bypass the change tracker entirely and always hit the database.
+    //
+    // RecordEvent is in the list for the reader that persists without changing anything: the
+    // audit service TRACKS the row and never saves it (planning #533), so the caller's own
+    // SaveChanges is what commits it. The Add therefore lives in the service, and the intent to
+    // persist has to be read from the call - without this, a handler whose whole job is "look at
+    // a biometric artefact and leave a trace" is reported as a file that persists with no
+    // declared intent.
     private static readonly string[] PersistenceMarkers =
     [
         ".AsTracking(",
@@ -46,6 +53,7 @@ public sealed class NoTrackingMutationGuardTests
         ".Update(", ".UpdateRange(",
         ".Remove(", ".RemoveRange(",
         "ExecuteUpdate", "ExecuteDelete", "ExecuteSql",
+        ".RecordEvent(",
     ];
 
     [Fact]

@@ -203,7 +203,14 @@ internal static class AuthSetup
             // roles that may place a payment for a customer (planning #530, S-10) - and it is
             // listed apart from the read surface, so joining the lists does not bring it along.
             .AddPolicy(AuthPolicies.SettlementCode, policy =>
-                policy.RequireRole(SeedRoles.SettlementCodeRoleNames));
+                policy.RequireRole(SeedRoles.SettlementCodeRoleNames))
+            // A customer's handwritten signature is a biometric artefact: it cannot be revoked
+            // and it cannot be rotated, so a leak is not repairable. The list of signatures is
+            // also a list of identities, so the list is a page and the image is behind this
+            // capability - and opening one writes an audit row naming the operator
+            // (planning #622, S-13).
+            .AddPolicy(AuthPolicies.SignaturePayload, policy =>
+                policy.RequireRole(SeedRoles.SignaturePayloadRoleNames));
 
         // A 401 and a 403 answer with an empty body by default, which would be a second error
         // shape. They leave as the one envelope instead - the headers are untouched.
