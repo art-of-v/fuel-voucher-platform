@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -65,74 +66,65 @@ public sealed class UnarchiveVoucherCommandHandler
         // failed SaveChanges leaving nothing naming who did it — the exact action-without-an-author the
         // actor constraints exist to prevent. Guarded by IsRelational so the in-memory unit brand,
         // which has no transactions and no ExecuteUpdate, is unaffected.
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-
-        var affected = await _context.FuelVouchers
-            .IgnoreQueryFilters()
-            .Where(v => v.Id == command.VoucherId && v.IsDeleted)
-            .ExecuteUpdateAsync(
-                s => s
-                    .SetProperty(v => v.IsDeleted, false)
-                    .SetProperty(v => v.UpdatedAtUtc, SystemClock.UtcNow),
-                cancellationToken);
-
-        if (affected == 0)
+        await _context.ExecuteReplaySafeAsync(async ct =>
         {
-            if (tx is not null)
+            var affected = await _context.FuelVouchers
+                .IgnoreQueryFilters()
+                .Where(v => v.Id == command.VoucherId && v.IsDeleted)
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(v => v.IsDeleted, false)
+                        .SetProperty(v => v.UpdatedAtUtc, SystemClock.UtcNow),
+                    ct);
+
+            if (affected == 0)
             {
-                await tx.RollbackAsync(cancellationToken);
+                // Lost the race, or the voucher was not archived in the first place. Nothing was
+                // written, so there is nothing to roll back and nothing to record.
+                return;
             }
 
-            return new UnarchiveVoucherResult { Success = true };
-        }
-
-        // D-13. `Unarchived`, not `StatusChanged`: the comment above explains why status is left
-        // alone, and writing a StatusChanged here would assert a transition the statement did not
-        // make. A voucher can be archived while sitting in any state, so from/to would be a
-        // fabrication rather than a record.
-        //
-        // Written after the `affected == 0` return above, so the idempotent path records nothing:
-        // one un-archive, one row.
-        var actorId = command.ActingAdminUserId is { } actor && actor != Guid.Empty ? actor : (Guid?)null;
-        if (actorId is { } unarchiveActor)
-        {
-            _context.VoucherEvents.Add(new VoucherEvent
+            // D-13. `Unarchived`, not `StatusChanged`: the comment above explains why status is left
+            // alone, and writing a StatusChanged here would assert a transition the statement did not
+            // make. A voucher can be archived while sitting in any state, so from/to would be a
+            // fabrication rather than a record.
+            //
+            // Written after the `affected == 0` return above, so the idempotent path records nothing:
+            // one un-archive, one row.
+            var actorId = command.ActingAdminUserId is { } actor && actor != Guid.Empty ? actor : (Guid?)null;
+            if (actorId is { } unarchiveActor)
             {
-                Id = Guid.CreateVersion7(),
-                VoucherId = command.VoucherId,
-                EventType = VoucherEventTypes.Unarchived,
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = unarchiveActor,
-                OccurredAtUtc = SystemClock.UtcNow
-            });
-        }
+                _context.VoucherEvents.Add(new VoucherEvent
+                {
+                    Id = Guid.CreateVersion7(),
+                    VoucherId = command.VoucherId,
+                    EventType = VoucherEventTypes.Unarchived,
+                    ActorKind = VoucherActorKinds.User,
+                    ActorUserId = unarchiveActor,
+                    OccurredAtUtc = SystemClock.UtcNow
+                });
+            }
 
-        if (command.ActingAdminUserId.HasValue)
-        {
-            // Tracked, not saved: the row has to commit with the flag flip above, inside this
-            // transaction, or a restored voucher would exist with nothing naming who restored it
-            // (planning #533).
-            _eventService.RecordEvent(
-                "Voucher",
-                voucher.VoucherNumber,
-                "VoucherUnarchived",
-                JsonSerializer.Serialize(new { isDeleted = true, status = voucher.Status.ToString() }),
-                JsonSerializer.Serialize(new { isDeleted = false, status = voucher.Status.ToString() }),
-                command.ActingAdminUserId.Value,
-                command.ActingAdminName,
-                $"Unarchived voucher {voucher.VoucherNumber} ({voucher.Brand})",
-                voucher.Brand);
-        }
+            if (command.ActingAdminUserId.HasValue)
+            {
+                // Tracked, not saved: the row has to commit with the flag flip above, inside this
+                // transaction, or a restored voucher would exist with nothing naming who restored it
+                // (planning #533).
+                _eventService.RecordEvent(
+                    "Voucher",
+                    voucher.VoucherNumber,
+                    "VoucherUnarchived",
+                    JsonSerializer.Serialize(new { isDeleted = true, status = voucher.Status.ToString() }),
+                    JsonSerializer.Serialize(new { isDeleted = false, status = voucher.Status.ToString() }),
+                    command.ActingAdminUserId.Value,
+                    command.ActingAdminName,
+                    $"Unarchived voucher {voucher.VoucherNumber} ({voucher.Brand})",
+                    voucher.Brand);
+            }
 
-        // One save for the event and the audit row, inside the transaction the flag flip ran in.
-        await _context.SaveChangesAsync(cancellationToken);
-
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
-        }
+            // One save for the event and the audit row, inside the transaction the flag flip ran in.
+            await _context.SaveChangesAsync(ct);
+        }, cancellationToken);
 
         return new UnarchiveVoucherResult { Success = true };
     }

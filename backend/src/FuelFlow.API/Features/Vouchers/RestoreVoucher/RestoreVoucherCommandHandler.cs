@@ -1,6 +1,7 @@
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,69 +75,67 @@ public sealed class RestoreVoucherCommandHandler
 
         // The transition and the record of it are one fact, so they commit together - see the same
         // note in MarkVoucherAsUsedCommandHandler.
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-
-        var affected = await _context.FuelVouchers
-            .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Used)
-            .ExecuteUpdateAsync(
-                s => s
-                    .SetProperty(v => v.Status, VoucherStatus.Assigned)
-                    // Cleared in the same statement that undoes the redemption. UsedAtUtc answers
-                    // "when was this redeemed", and leaving it set hands the voucher a redemption
-                    // that no longer happened - which a worker usage report would then count.
-                    .SetProperty(v => v.UsedAtUtc, (DateTime?)null)
-                    .SetProperty(v => v.UpdatedAtUtc, occurredAtUtc),
-                cancellationToken);
-
-        if (affected == 0)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the event row once.
+        RestoreVoucherResponse? lostRace = await _context.ExecuteReplaySafeAsync<RestoreVoucherResponse?>(async ct =>
         {
-            if (tx is not null)
+            var affected = await _context.FuelVouchers
+                .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Used)
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(v => v.Status, VoucherStatus.Assigned)
+                        // Cleared in the same statement that undoes the redemption. UsedAtUtc answers
+                        // "when was this redeemed", and leaving it set hands the voucher a redemption
+                        // that no longer happened - which a worker usage report would then count.
+                        .SetProperty(v => v.UsedAtUtc, (DateTime?)null)
+                        .SetProperty(v => v.UpdatedAtUtc, occurredAtUtc),
+                    ct);
+
+            if (affected == 0)
             {
-                await tx.RollbackAsync(cancellationToken);
+                // Nothing was written, so there is nothing to roll back: the empty transaction
+                // commits as it stands.
+                //
+                // Lost the race. Re-read so the caller is told the real outcome rather than a stale one.
+                var current = await _context.FuelVouchers
+                    .AsNoTracking()
+                    .Where(v => v.Id == command.VoucherId)
+                    .Select(v => (VoucherStatus?)v.Status)
+                    .FirstOrDefaultAsync(ct);
+
+                return current switch
+                {
+                    VoucherStatus.Assigned => new RestoreVoucherResponse(true, "Voucher is already in Assigned status"),
+                    null => new RestoreVoucherResponse(false, "Voucher not found", "NotFound"),
+                    _ => new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {current})", "InvalidState")
+                };
             }
 
-            // Lost the race. Re-read so the caller is told the real outcome rather than a stale one.
-            var current = await _context.FuelVouchers
-                .AsNoTracking()
-                .Where(v => v.Id == command.VoucherId)
-                .Select(v => (VoucherStatus?)v.Status)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            return current switch
+            // A restore moves no paper either. The customer's ticket never left them, so undoing the
+            // redemption returns no voucher to any pool - which is why there is no `returned` movement
+            // here, and why this is the exact inverse of the mark-used event rather than a new shape.
+            //
+            // Written only after the CAS reports it won, so the idempotent and lost-race branches record
+            // nothing: one handover, one row.
+            _context.VoucherEvents.Add(new VoucherEvent
             {
-                VoucherStatus.Assigned => new RestoreVoucherResponse(true, "Voucher is already in Assigned status"),
-                null => new RestoreVoucherResponse(false, "Voucher not found", "NotFound"),
-                _ => new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {current})", "InvalidState")
-            };
-        }
+                Id = Guid.NewGuid(),
+                VoucherId = command.VoucherId,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = nameof(VoucherStatus.Used),
+                ToStatus = nameof(VoucherStatus.Assigned),
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.UserId,
+                OccurredAtUtc = occurredAtUtc
+            });
 
-        // A restore moves no paper either. The customer's ticket never left them, so undoing the
-        // redemption returns no voucher to any pool - which is why there is no `returned` movement
-        // here, and why this is the exact inverse of the mark-used event rather than a new shape.
-        //
-        // Written only after the CAS reports it won, so the idempotent and lost-race branches record
-        // nothing: one handover, one row.
-        _context.VoucherEvents.Add(new VoucherEvent
-        {
-            Id = Guid.NewGuid(),
-            VoucherId = command.VoucherId,
-            EventType = VoucherEventTypes.StatusChanged,
-            FromStatus = nameof(VoucherStatus.Used),
-            ToStatus = nameof(VoucherStatus.Assigned),
-            ActorKind = VoucherActorKinds.User,
-            ActorUserId = command.UserId,
-            OccurredAtUtc = occurredAtUtc
-        });
+            await _context.SaveChangesAsync(ct);
 
-        await _context.SaveChangesAsync(cancellationToken);
+            return null;
+        }, cancellationToken: cancellationToken);
 
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
-        }
-
-        return new RestoreVoucherResponse(true, "Voucher restored to Assigned status");
+        return lostRace ?? new RestoreVoucherResponse(true, "Voucher restored to Assigned status");
     }
 }

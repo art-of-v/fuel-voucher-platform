@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
@@ -151,23 +152,22 @@ public class FulfillmentService
                 // instances already tracked, and `Update()` would throw on the duplicate key.
                 _context.ChangeTracker.Clear();
 
-                // The transaction is DISPOSED at the end of this iteration, so every exit path closes
-                // it: a commit where the work was done, a rollback everywhere else.
-                //
-                // It used to be opened and closed by hand, and one path — the one that leaves an old
-                // mismatch alone for a human — jumped over the commit. There was no `finally` either,
-                // and the `catch` only runs on an exception, so that path left the transaction open on
-                // the connection. The next order's BeginTransactionAsync then threw "The connection is
-                // already in a transaction and cannot participate in another transaction", which
-                // killed the whole batch rather than the one order — and the abandoned transaction
-                // held its row locks until the connection closed, which blocked the writers behind it.
-                await using var transaction = _context.Database.IsRelational()
-                    ? await _context.Database.BeginTransactionAsync(cancellationToken)
-                    : (IDbContextTransaction?)null;
+                // The counts the alerts announce: the body fills them, the alerts read them after
+                // the commit.
+                Dictionary<decimal, int> lineItemCounts = new();
+                Dictionary<decimal, int> voucherCounts = new();
 
-                try
+                // How many vouchers this order is about to have taken back, held until the
+                // transaction has committed. 0 means there is nothing to announce afterwards.
+                var notifyMismatch = 0;
+
+                // Set by the body when it leaves an old mismatch alone for a human. The alert that
+                // says so goes out after the commit, like the release alert below.
+                var mismatchLeftForAHuman = false;
+
+                async Task ApplyAsync()
                 {
-                    if (transaction != null)
+                    if (_context.Database.IsRelational())
                     {
                         // Serialize trimming per order so it can never race with a concurrent
                         // fulfillment that is assigning vouchers to the same order.
@@ -190,58 +190,53 @@ public class FulfillmentService
 
                         if (freshOrder == null || freshOrder.Status != OrderStatus.Fulfilled)
                         {
-                            await transaction.CommitAsync(cancellationToken);
-                            continue;
+                            return;
                         }
 
                         currentOrder = freshOrder;
                     }
 
-var lineItemCounts = currentOrder.LineItems?
+                    lineItemCounts = currentOrder.LineItems?
                         .GroupBy(li => li.Liters)
                         .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity))
-                    ?? [];
+                        ?? [];
 
-var fulfillments = await _context.Fulfillments
-        .Where(f => f.OrderId == currentOrder.Id)
-        .ToListAsync(cancellationToken);
+                    var fulfillments = await _context.Fulfillments
+                        .Where(f => f.OrderId == currentOrder.Id)
+                        .ToListAsync(cancellationToken);
 
-var fulfillmentVoucherIds = fulfillments.Select(f => f.VoucherId).ToList();
+                    var fulfillmentVoucherIds = fulfillments.Select(f => f.VoucherId).ToList();
 
-var vouchers = fulfillmentVoucherIds.Count != 0
-    ? await _context.FuelVouchers
-        .Where(v => fulfillmentVoucherIds.Contains(v.Id))
-        .ToListAsync(cancellationToken)
-    : [];
+                    var vouchers = fulfillmentVoucherIds.Count != 0
+                        ? await _context.FuelVouchers
+                            .Where(v => fulfillmentVoucherIds.Contains(v.Id))
+                            .ToListAsync(cancellationToken)
+                        : [];
 
-var vouchersById = vouchers.ToDictionary(v => v.Id);
+                    var vouchersById = vouchers.ToDictionary(v => v.Id);
 
-var voucherCounts = vouchers
-    .GroupBy(v => v.Liters)
-    .ToDictionary(g => g.Key, g => g.Count());
+                    voucherCounts = vouchers
+                        .GroupBy(v => v.Liters)
+                        .ToDictionary(g => g.Key, g => g.Count());
 
-// Per-line comparison is only sound when every fulfilment names its line. A single unattributed
-// row would make the per-line counts disagree with reality in a way that reads as a short delivery,
-// and the repair below would then take fuel from a customer to "fix" it.
-var fullyAttributed = fulfillments.Count > 0 && fulfillments.All(f => f.LineItemId.HasValue);
+                    // Per-line comparison is only sound when every fulfilment names its line. A single unattributed
+                    // row would make the per-line counts disagree with reality in a way that reads as a short delivery,
+                    // and the repair below would then take fuel from a customer to "fix" it.
+                    var fullyAttributed = fulfillments.Count > 0 && fulfillments.All(f => f.LineItemId.HasValue);
 
-var hasMismatch = fullyAttributed
-    ? HasPerLineMismatch(currentOrder.LineItems, fulfillments)
-    : lineItemCounts.Any(kv =>
-        !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
+                    var hasMismatch = fullyAttributed
+                        ? HasPerLineMismatch(currentOrder.LineItems, fulfillments)
+                        : lineItemCounts.Any(kv =>
+                            !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
 
-if (!fullyAttributed && fulfillments.Count > 0)
-{
-    // Worth saying, because this is the weaker comparison and an operator reading the log should know
-    // which one produced the verdict below.
-    _logger.LogInformation(
-        "Order {OrderId}: {Unattributed} of {Total} fulfilments carry no line, so the count is compared by litres",
-        currentOrder.Id, fulfillments.Count(f => f.LineItemId is null), fulfillments.Count);
-}
-
-                    // How many vouchers this order is about to have taken back, held until the
-                    // transaction has committed. 0 means there is nothing to announce afterwards.
-                    var notifyMismatch = 0;
+                    if (!fullyAttributed && fulfillments.Count > 0)
+                    {
+                        // Worth saying, because this is the weaker comparison and an operator reading the log should know
+                        // which one produced the verdict below.
+                        _logger.LogInformation(
+                            "Order {OrderId}: {Unattributed} of {Total} fulfilments carry no line, so the count is compared by litres",
+                            currentOrder.Id, fulfillments.Count(f => f.LineItemId is null), fulfillments.Count);
+                    }
 
                     // #217: a mismatch is a SIGNAL, not a verdict. Acting on it destroys a real
                     // delivery record and takes the fuel back from whoever holds it - and the only
@@ -262,24 +257,12 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         // The transaction is closed BEFORE the alert. The alert is a Telegram HTTP
                         // call, and holding a transaction open across one is the thing the comment
                         // further down this method warns about. Nothing was written on this path,
-                        // so it is closed without a commit — which releases the advisory lock and
-                        // the row locks with it.
-                        if (transaction != null)
-                        {
-                            await transaction.RollbackAsync(cancellationToken);
-                        }
+                        // so it is closed without a write — which releases the advisory lock and
+                        // the row locks with it. The alert itself waits for the commit: the flag
+                        // below carries the decision out of the transaction.
+                        mismatchLeftForAHuman = true;
 
-                        await _notifications.FulfillmentMismatchAsync(
-                            currentOrder.Id.ToString(),
-                            currentOrder.Id.ToString()[..8],
-                            currentOrder.LineItems?.FirstOrDefault()?.Brand ?? "?",
-                            0,
-                            lineItemCounts.Values.Sum(),
-                            voucherCounts.Values.Sum(),
-                            corrected: false,
-                            cancellationToken);
-
-                        continue;
+                        return;
                     }
 
                     if (hasMismatch)
@@ -412,41 +395,64 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         // second reason not to.
                         notifyMismatch = releasedCount;
                     }
-
-                    if (transaction != null)
-                    {
-                        await transaction.CommitAsync(cancellationToken);
-                    }
-
-                    // The release is durable now, so it is safe to announce it. If this starts
-                    // repeating for one order, the reconciliation is reading a wrong quantity
-                    // rather than finding a real mismatch; the per-order throttle key keeps that
-                    // from becoming a loop of alerts.
-                    if (notifyMismatch > 0)
-                    {
-                        await _notifications.FulfillmentMismatchAsync(
-                            currentOrder.Id.ToString(),
-                            currentOrder.Id.ToString()[..8],
-                            currentOrder.LineItems?.FirstOrDefault()?.Brand ?? "?",
-                            notifyMismatch,
-                            lineItemCounts.Sum(l => l.Value),
-                            voucherCounts.Sum(v => v.Value),
-                            corrected: true,
-                            cancellationToken);
-                    }
-
-                    if (currentOrder.Status == OrderStatus.PartiallyFulfilled)
-                    {
-                        await TryAutoRefundAsync(currentOrder.Id, cancellationToken);
-                    }
                 }
-                catch
+
+                // The transaction is DISPOSED at the end of this iteration, so every exit path closes
+                // it: a commit where the work was done, a rollback everywhere else.
+                //
+                // It used to be opened and closed by hand, and one path — the one that leaves an old
+                // mismatch alone for a human — jumped over the commit. There was no `finally` either,
+                // and the `catch` only runs on an exception, so that path left the transaction open on
+                // the connection. The next order's BeginTransactionAsync then threw "The connection is
+                // already in a transaction and cannot participate in another transaction", which
+                // killed the whole batch rather than the one order — and the abandoned transaction
+                // held its row locks until the connection closed, which blocked the writers behind it.
+                //
+                // The helper opens the transaction, commits it at the end of the body and rolls it
+                // back when the body throws, so every exit path closes it again.
+                //
+                // The transaction runs through ReplaySafeTransaction, so the execution strategy may
+                // replay it: a transient failure retries the body rather than losing the repair.
+                await _context.ExecuteReplaySafeAsync(_ => ApplyAsync(), cancellationToken);
+
+                // The mismatch that was left alone for a human. The alert goes out now, with the
+                // transaction closed: it is a Telegram HTTP call, and the body left it waiting
+                // rather than sending it from inside the transaction.
+                if (mismatchLeftForAHuman)
                 {
-                    if (transaction != null)
-                    {
-                        await transaction.RollbackAsync(cancellationToken);
-                    }
-                    throw;
+                    await _notifications.FulfillmentMismatchAsync(
+                        currentOrder.Id.ToString(),
+                        currentOrder.Id.ToString()[..8],
+                        currentOrder.LineItems?.FirstOrDefault()?.Brand ?? "?",
+                        0,
+                        lineItemCounts.Values.Sum(),
+                        voucherCounts.Values.Sum(),
+                        corrected: false,
+                        cancellationToken);
+
+                    continue;
+                }
+
+                // The release is durable now, so it is safe to announce it. If this starts
+                // repeating for one order, the reconciliation is reading a wrong quantity
+                // rather than finding a real mismatch; the per-order throttle key keeps that
+                // from becoming a loop of alerts.
+                if (notifyMismatch > 0)
+                {
+                    await _notifications.FulfillmentMismatchAsync(
+                        currentOrder.Id.ToString(),
+                        currentOrder.Id.ToString()[..8],
+                        currentOrder.LineItems?.FirstOrDefault()?.Brand ?? "?",
+                        notifyMismatch,
+                        lineItemCounts.Sum(l => l.Value),
+                        voucherCounts.Sum(v => v.Value),
+                        corrected: true,
+                        cancellationToken);
+                }
+
+                if (currentOrder.Status == OrderStatus.PartiallyFulfilled)
+                {
+                    await TryAutoRefundAsync(currentOrder.Id, cancellationToken);
                 }
             }
         } while (hasMore);
@@ -658,7 +664,6 @@ if (!fullyAttributed && fulfillments.Count > 0)
         _context.ChangeTracker.Clear();
 
         var shouldAutoRefund = false;
-        IDbContextTransaction? transaction = null;
 
         // Staff alerts about stock that ran out are collected here and sent AFTER the transaction is
         // closed. They are Telegram HTTP calls, and this method holds a transaction across a long
@@ -667,15 +672,15 @@ if (!fullyAttributed && fulfillments.Count > 0)
         // fulfilment that the transaction later rolled back.
         var pendingStockAlerts = new List<PendingStockAlert>();
 
-        try
+        // The body of the transaction, as a local function: it reads the locals above, and the
+        // helper needs it as a delegate it may run again.
+        async Task ApplyAsync()
         {
             if (_context.Database.IsRelational())
             {
                 // Serialize fulfillment per order across all processes (API replicas + JobsWorker)
                 // and keep the voucher claim + fulfillment insert in ONE transaction so a failed
                 // insert can never leave a voucher assigned without a fulfillment row.
-                transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-
                 await _context.Database.ExecuteSqlInterpolatedAsync(
                     $"SELECT pg_advisory_xact_lock(hashtext('fulfillment-order'), hashtext({order.Id.ToString()}))",
                     cancellationToken);
@@ -697,7 +702,6 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         await _context.SaveChangesAsync(cancellationToken);
                     }
 
-                    await transaction.CommitAsync(cancellationToken);
                     return;
                 }
 
@@ -727,10 +731,6 @@ if (!fullyAttributed && fulfillments.Count > 0)
                     await _context.SaveChangesAsync(cancellationToken);
                 }
 
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                }
                 return;
             }
 
@@ -748,10 +748,6 @@ if (!fullyAttributed && fulfillments.Count > 0)
                     await _context.SaveChangesAsync(cancellationToken);
                 }
 
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                }
                 return;
             }
 
@@ -781,10 +777,6 @@ if (!fullyAttributed && fulfillments.Count > 0)
                     await _context.SaveChangesAsync(cancellationToken);
                 }
 
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                }
                 return;
             }
 
@@ -1028,20 +1020,12 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 _context.OutboxEvents.Update(outboxEvent);
                 await _context.SaveChangesAsync(cancellationToken);
             }
+        }
 
-            if (transaction != null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-        }
-        catch
-        {
-            if (transaction != null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-            throw;
-        }
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the job, and the retry
+        // claims the vouchers once.
+        await _context.ExecuteReplaySafeAsync(_ => ApplyAsync(), cancellationToken);
 
         // The transaction is closed. The alerts go out now - a staff alert that says "this order
         // could not be filled" is worth sending, and worth sending about work that really happened.
@@ -1256,18 +1240,19 @@ var lastFailedAtUtc = await _context.Payments
         _context.ChangeTracker.Clear();
 
         var shouldAutoRefund = false;
-        IDbContextTransaction? transaction = null;
 
         // Collected here and sent after the transaction is closed - see the same list in
         // AssignVouchersToOrderAsync for why the alert cannot be sent inside the transaction.
         var pendingStockAlerts = new List<PendingStockAlert>();
 
-        try
+        async Task ApplyAsync()
         {
+            // The strategy may replay the body, so the collected alerts start empty: a list that
+            // survived the replay would announce the same shortfall twice.
+            pendingStockAlerts.Clear();
+
             if (_context.Database.IsRelational())
             {
-                transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-
                 await _context.Database.ExecuteSqlInterpolatedAsync(
                     $"SELECT pg_advisory_xact_lock(hashtext('fulfillment-order'), hashtext({orderId.ToString()}))",
                     cancellationToken);
@@ -1281,10 +1266,6 @@ var lastFailedAtUtc = await _context.Payments
             if (order == null ||
                 (order.Status != OrderStatus.PendingFulfillment && order.Status != OrderStatus.PartiallyFulfilled))
             {
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                }
                 return;
             }
 
@@ -1296,10 +1277,6 @@ var lastFailedAtUtc = await _context.Payments
                     "Renewal order {OrderId} is eligible for fulfilment but has no captured payment; no vouchers were extended",
                     orderId);
 
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                }
                 return;
             }
 
@@ -1324,10 +1301,6 @@ var lastFailedAtUtc = await _context.Payments
             if (renewalLines.Count == 0)
             {
                 _logger.LogWarning("Renewal order {OrderId} has no renewal lines, skipping", orderId);
-                if (transaction != null)
-                {
-                    await transaction.CommitAsync(cancellationToken);
-                }
                 return;
             }
 
@@ -1690,20 +1663,11 @@ var lastFailedAtUtc = await _context.Payments
             }
             // fulfilledCount == 0: leave PendingFulfillment. The per-minute renewal backfill retries
             // and the no-stock alert has already been raised for each missing line.
+        }
 
-            if (transaction != null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-        }
-        catch
-        {
-            if (transaction != null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-            }
-            throw;
-        }
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than losing the renewal.
+        await _context.ExecuteReplaySafeAsync(_ => ApplyAsync(), cancellationToken);
 
         // The transaction is closed. The alerts go out now.
         foreach (var alert in pendingStockAlerts)

@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -75,51 +76,53 @@ public sealed class UnblockWorkerVoucherCommandHandler
         // The thaw and the record of it commit together - see the same note in
         // BlockWorkerVoucherCommand. Without it a failed SaveChanges leaves an Assigned voucher with
         // nothing saying who released it.
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-
-        var unblockedAtUtc = SystemClock.UtcNow;
-        var affected = await _context.FuelVouchers
-            .Where(v => v.Id == command.VoucherId
-                        && v.Status == VoucherStatus.Blocked
-                        && v.WorkerUserId != null)
-            .ExecuteUpdateAsync(
-                s => s
-                    .SetProperty(v => v.Status, VoucherStatus.Assigned)
-                    .SetProperty(v => v.UpdatedAtUtc, unblockedAtUtc),
-                cancellationToken);
-
-        if (affected == 0)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the event row once.
+        UnblockWorkerVoucherResult? lostRace = await _context.ExecuteReplaySafeAsync<UnblockWorkerVoucherResult?>(async ct =>
         {
-            if (tx is not null)
+            var unblockedAtUtc = SystemClock.UtcNow;
+            var affected = await _context.FuelVouchers
+                .Where(v => v.Id == command.VoucherId
+                            && v.Status == VoucherStatus.Blocked
+                            && v.WorkerUserId != null)
+                .ExecuteUpdateAsync(
+                    s => s
+                        .SetProperty(v => v.Status, VoucherStatus.Assigned)
+                        .SetProperty(v => v.UpdatedAtUtc, unblockedAtUtc),
+                    ct);
+
+            if (affected == 0)
             {
-                await tx.RollbackAsync(cancellationToken);
+                // Nothing was written, so there is nothing to roll back: the empty transaction
+                // commits as it stands and the caller is told the voucher was not unblocked.
+                return new UnblockWorkerVoucherResult("InvalidState", "Only a worker's blocked voucher can be unblocked.");
             }
 
-            return new UnblockWorkerVoucherResult("InvalidState", "Only a worker's blocked voucher can be unblocked.");
-        }
+            // D-13. Event only, exactly like the block: an unblock does not move the paper either. The
+            // worker never lost custody, so there is nothing for a movement to say.
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = command.VoucherId,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = nameof(VoucherStatus.Blocked),
+                ToStatus = nameof(VoucherStatus.Assigned),
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.OwnerUserId,
+                ActorPartyId = legalEntityId,
+                OccurredAtUtc = unblockedAtUtc
+            });
 
-        // D-13. Event only, exactly like the block: an unblock does not move the paper either. The
-        // worker never lost custody, so there is nothing for a movement to say.
-        _context.VoucherEvents.Add(new VoucherEvent
+            await _context.SaveChangesAsync(ct);
+
+            return null;
+        }, cancellationToken: cancellationToken);
+
+        if (lostRace is not null)
         {
-            Id = Guid.CreateVersion7(),
-            VoucherId = command.VoucherId,
-            EventType = VoucherEventTypes.StatusChanged,
-            FromStatus = nameof(VoucherStatus.Blocked),
-            ToStatus = nameof(VoucherStatus.Assigned),
-            ActorKind = VoucherActorKinds.User,
-            ActorUserId = command.OwnerUserId,
-            ActorPartyId = legalEntityId,
-            OccurredAtUtc = unblockedAtUtc
-        });
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
+            return lostRace;
         }
 
         _metrics.VoucherUnblocked();

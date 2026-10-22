@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -52,94 +53,102 @@ var member = await _context.CompanyMembers
             return new FireWorkerResult("NotFound", ErrorMessage: "Company member not found.");
         }
 
-        await using var tx = await _context.Database.BeginTransactionAsync(cancellationToken);
-
-        var assignedWorkerVouchers = await _context.FuelVouchers
-            .Where(x =>
-                x.LegalEntityId == legalEntityId &&
-                x.WorkerUserId == member.WorkerUserId &&
-                x.Status == VoucherStatus.Assigned)
-            .ToListAsync(cancellationToken);
-
-        // Fuel that leaves with the worker is company fuel again, so each voucher returns to the purchase it
-        // was bought under. Vouchers already Blocked are not in the set above, so they keep their
-        // issuance order: a frozen voucher stays the worker's, which is why the worker sees why it is
-        // unusable.
+        // The soft delete, the voucher freeze and the rows that record them are one fact, so they
+        // commit together - see the same note in BlockWorkerVoucherCommand.
         //
-        // Such a voucher is not stuck, though: the owner can put it back into the pool in one step
-        // (ReturnVoucherToPoolCommand, planning #558). It used to have only the thaw, which handed the
-        // paper back to the person who was just fired.
-        var restored = await IssuanceOrderLink.RestoreToPurchasesAsync(
-            _context,
-            assignedWorkerVouchers.Select(v => v.Id).ToList(),
-            cancellationToken);
-
-        foreach (var voucher in assignedWorkerVouchers)
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the movement and the event once.
+        var blockedVoucherCount = await _context.ExecuteReplaySafeAsync<int>(async ct =>
         {
-            // Captured before the rewrite below, for the movement's order_id: the recall is a
-            // consequence of the handover that put this voucher in the worker's hands, not of the
-            // purchase it now goes back to.
-            var issuanceOrderId = voucher.OrderId;
-            var firedAtUtc = SystemClock.UtcNow;
+            var assignedWorkerVouchers = await _context.FuelVouchers
+                .Where(x =>
+                    x.LegalEntityId == legalEntityId &&
+                    x.WorkerUserId == member.WorkerUserId &&
+                    x.Status == VoucherStatus.Assigned)
+                .ToListAsync(ct);
 
-            voucher.WorkerUserId = null;
-            voucher.Status = VoucherStatus.Blocked;
-            if (restored.TryGetValue(voucher.Id, out var orderId))
-                voucher.OrderId = orderId;
-            voucher.UpdatedAtUtc = firedAtUtc;
-            _context.Update(voucher);
-
-            // D-13, and the one place in this flow that is BOTH a movement and an event — which is the
-            // distinction the whole record turns on. The paper physically leaves the worker for the
-            // company, so `recall` is owed; and it stops being redeemable, so the status changes too.
-            // Neither row derives from the other.
+            // Fuel that leaves with the worker is company fuel again, so each voucher returns to the purchase it
+            // was bought under. Vouchers already Blocked are not in the set above, so they keep their
+            // issuance order: a frozen voucher stays the worker's, which is why the worker sees why it is
+            // unusable.
             //
-            // `recall` rather than `returned`, because the voucher returns to the company rather than
-            // to the warehouse — the same reason the gift went company -> worker.
-            _context.VoucherMovements.Add(new VoucherMovement
-            {
-                Id = Guid.CreateVersion7(),
-                Kind = VoucherMovementKinds.Recall,
-                VoucherId = voucher.Id,
-                FromLocation = VoucherLocations.Worker,
-                ToLocation = VoucherLocations.Company,
-                OrderId = issuanceOrderId,
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.OwnerUserId,
-                ActorPartyId = legalEntityId,
-                OccurredAtUtc = firedAtUtc
-            });
+            // Such a voucher is not stuck, though: the owner can put it back into the pool in one step
+            // (ReturnVoucherToPoolCommand, planning #558). It used to have only the thaw, which handed the
+            // paper back to the person who was just fired.
+            var restored = await IssuanceOrderLink.RestoreToPurchasesAsync(
+                _context,
+                assignedWorkerVouchers.Select(v => v.Id).ToList(),
+                ct);
 
-            _context.VoucherEvents.Add(new VoucherEvent
+            foreach (var voucher in assignedWorkerVouchers)
             {
-                Id = Guid.CreateVersion7(),
-                VoucherId = voucher.Id,
-                EventType = VoucherEventTypes.StatusChanged,
-                FromStatus = nameof(VoucherStatus.Assigned),
-                ToStatus = nameof(VoucherStatus.Blocked),
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.OwnerUserId,
-                ActorPartyId = legalEntityId,
-                OccurredAtUtc = firedAtUtc
-            });
-        }
+                // Captured before the rewrite below, for the movement's order_id: the recall is a
+                // consequence of the handover that put this voucher in the worker's hands, not of the
+                // purchase it now goes back to.
+                var issuanceOrderId = voucher.OrderId;
+                var firedAtUtc = SystemClock.UtcNow;
 
-        // Soft delete, not Remove. A membership is employment history: under the owner policy (#217)
-        // "this person worked here until March" is a fact about the company that we keep forever,
-        // and Remove destroyed it outright. The !IsDeleted query filter keeps the row out of every
-        // membership read, and the unique index on worker_user_id is filtered the same way, so the
-        // person can be invited again later.
-        member.IsDeleted = true;
-        member.DeletedAtUtc = SystemClock.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
-        await tx.CommitAsync(cancellationToken);
+                voucher.WorkerUserId = null;
+                voucher.Status = VoucherStatus.Blocked;
+                if (restored.TryGetValue(voucher.Id, out var orderId))
+                    voucher.OrderId = orderId;
+                voucher.UpdatedAtUtc = firedAtUtc;
+                _context.Update(voucher);
+
+                // D-13, and the one place in this flow that is BOTH a movement and an event — which is the
+                // distinction the whole record turns on. The paper physically leaves the worker for the
+                // company, so `recall` is owed; and it stops being redeemable, so the status changes too.
+                // Neither row derives from the other.
+                //
+                // `recall` rather than `returned`, because the voucher returns to the company rather than
+                // to the warehouse — the same reason the gift went company -> worker.
+                _context.VoucherMovements.Add(new VoucherMovement
+                {
+                    Id = Guid.CreateVersion7(),
+                    Kind = VoucherMovementKinds.Recall,
+                    VoucherId = voucher.Id,
+                    FromLocation = VoucherLocations.Worker,
+                    ToLocation = VoucherLocations.Company,
+                    OrderId = issuanceOrderId,
+                    ActorKind = VoucherActorKinds.User,
+                    ActorUserId = command.OwnerUserId,
+                    ActorPartyId = legalEntityId,
+                    OccurredAtUtc = firedAtUtc
+                });
+
+                _context.VoucherEvents.Add(new VoucherEvent
+                {
+                    Id = Guid.CreateVersion7(),
+                    VoucherId = voucher.Id,
+                    EventType = VoucherEventTypes.StatusChanged,
+                    FromStatus = nameof(VoucherStatus.Assigned),
+                    ToStatus = nameof(VoucherStatus.Blocked),
+                    ActorKind = VoucherActorKinds.User,
+                    ActorUserId = command.OwnerUserId,
+                    ActorPartyId = legalEntityId,
+                    OccurredAtUtc = firedAtUtc
+                });
+            }
+
+            // Soft delete, not Remove. A membership is employment history: under the owner policy (#217)
+            // "this person worked here until March" is a fact about the company that we keep forever,
+            // and Remove destroyed it outright. The !IsDeleted query filter keeps the row out of every
+            // membership read, and the unique index on worker_user_id is filtered the same way, so the
+            // person can be invited again later.
+            member.IsDeleted = true;
+            member.DeletedAtUtc = SystemClock.UtcNow;
+            await _context.SaveChangesAsync(ct);
+
+            return assignedWorkerVouchers.Count;
+        }, cancellationToken: cancellationToken);
 
         // Recorded after commit so a rolled-back transaction cannot inflate the counter.
-        if (assignedWorkerVouchers.Count > 0)
+        if (blockedVoucherCount > 0)
         {
-            _metrics.VouchersBlocked(assignedWorkerVouchers.Count);
+            _metrics.VouchersBlocked(blockedVoucherCount);
         }
 
-        return new FireWorkerResult("Success", assignedWorkerVouchers.Count);
+        return new FireWorkerResult("Success", blockedVoucherCount);
     }
 }

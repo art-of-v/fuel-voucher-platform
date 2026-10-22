@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -71,46 +72,46 @@ public sealed class SetQaTestAccessCommandHandler
         // saves on its own, and the audit row can only be written once the revocation count is
         // known. Without the transaction the switch could be flipped with no row saying who flipped
         // it (planning #533).
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-
-        await _settings.UpsertAsync(
-            AppSettingKeys.QaTestAccessEnabled,
-            command.Enabled.ToString(),
-            command.ActingUserId,
-            command.ActingUserName,
-            cancellationToken);
-
-        var revoked = 0;
-        if (!command.Enabled)
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the audit row once.
+        var revoked = await _context.ExecuteReplaySafeAsync(async ct =>
         {
-            revoked = await RevokeQaSessionsAsync(cancellationToken);
-        }
+            await _settings.UpsertAsync(
+                AppSettingKeys.QaTestAccessEnabled,
+                command.Enabled.ToString(),
+                command.ActingUserId,
+                command.ActingUserName,
+                ct);
 
-        // OldValue/NewValue are jsonb columns, so they must carry valid JSON — never a bare "True".
-        // These record only the switch state, the revocation count and the actor role; the QA code
-        // and phone are deliberately absent.
-        _eventService.RecordEvent(
-            "QaTestAccess",
-            AppSettingKeys.QaTestAccessEnabled,
-            command.Enabled ? "QaTestAccessEnabled" : "QaTestAccessDisabled",
-            JsonSerializer.Serialize(new { enabled = previous }),
-            JsonSerializer.Serialize(new { enabled = command.Enabled, revokedSessions = revoked, actorRole = command.ActingRole }),
-            command.ActingUserId,
-            command.ActingUserName,
-            command.Enabled
-                ? "Enabled QA test access"
-                : $"Disabled QA test access (revoked {revoked} QA session(s))",
-            command.ActingUserId.ToString());
+            var revokedSessions = 0;
+            if (!command.Enabled)
+            {
+                revokedSessions = await RevokeQaSessionsAsync(ct);
+            }
 
-        // The audit row, committed inside the transaction with the switch it describes.
-        await _context.SaveChangesAsync(cancellationToken);
+            // OldValue/NewValue are jsonb columns, so they must carry valid JSON — never a bare "True".
+            // These record only the switch state, the revocation count and the actor role; the QA code
+            // and phone are deliberately absent.
+            _eventService.RecordEvent(
+                "QaTestAccess",
+                AppSettingKeys.QaTestAccessEnabled,
+                command.Enabled ? "QaTestAccessEnabled" : "QaTestAccessDisabled",
+                JsonSerializer.Serialize(new { enabled = previous }),
+                JsonSerializer.Serialize(new { enabled = command.Enabled, revokedSessions = revokedSessions, actorRole = command.ActingRole }),
+                command.ActingUserId,
+                command.ActingUserName,
+                command.Enabled
+                    ? "Enabled QA test access"
+                    : $"Disabled QA test access (revoked {revokedSessions} QA session(s))",
+                command.ActingUserId.ToString());
 
-        if (tx is not null)
-        {
-            await tx.CommitAsync(cancellationToken);
-        }
+            // The audit row, committed inside the transaction with the switch it describes.
+            await _context.SaveChangesAsync(ct);
+
+            return revokedSessions;
+        }, cancellationToken);
 
         _metrics?.QaTestAccessSwitchChanged(command.Enabled);
         _logger.LogWarning(

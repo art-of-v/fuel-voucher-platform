@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -91,147 +92,151 @@ public sealed class GiftVouchersCommandHandler
         // Price 0 (no money moved), LegalEntityId the company, SourceOrderId the purchase the fuel
         // came from. One order per gift action, so the worker sees one receipt per handover rather
         // than a flat list, and the batch the owner actually handed over is the batch that shows up.
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-
-        var now = SystemClock.UtcNow;
-
-        // The vouchers may have been bought across several orders. One issuance order can only name
-        // one parent, so SourceOrderId is set only when they all came from the same purchase.
-        var purchaseOrderIds = vouchers
-            .Select(v => v.OrderId)
-            .Where(id => id is not null)
-            .Distinct()
-            .ToList();
-
-        var sharedPurchaseOrderId = purchaseOrderIds.Count == 1 ? purchaseOrderIds[0] : null;
-
-        // UnitPrice is the price the company itself paid, carried for information only. Price on the
-        // order stays 0, and every money view excludes this kind, so this number is never mistaken
-        // for revenue.
-        var companyCostByFuel = await LoadCompanyCostAsync(sharedPurchaseOrderId, cancellationToken);
-
+        //
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the order, the movements and the outbox row once.
         var issuanceOrderId = Guid.CreateVersion7();
 
-        var issuanceOrder = new Order
+        await _context.ExecuteReplaySafeAsync(async ct =>
         {
-            Id = issuanceOrderId,
-            // The worker, not the owner: the order belongs to whoever now holds the fuel, which is
-            // what makes it show up as a receipt in the worker's own wallet.
-            UserId = command.WorkerUserId,
-            LegalEntityId = legalEntityId,
-            Price = 0,
-            Kind = OrderKind.ReceivedFromCompany,
-            SourceOrderId = sharedPurchaseOrderId,
-            Status = OrderStatus.Fulfilled,
-            FulfilledAtUtc = now,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-            LineItems = vouchers.Select(voucher =>
-            {
-                var key = (Brand: voucher.Brand.ToLowerInvariant(), voucher.FuelTypeId, voucher.Liters);
-                var cost = companyCostByFuel.GetValueOrDefault(key);
+            var now = SystemClock.UtcNow;
 
-                return new OrderLineItem
+            // The vouchers may have been bought across several orders. One issuance order can only name
+            // one parent, so SourceOrderId is set only when they all came from the same purchase.
+            var purchaseOrderIds = vouchers
+                .Select(v => v.OrderId)
+                .Where(id => id is not null)
+                .Distinct()
+                .ToList();
+
+            var sharedPurchaseOrderId = purchaseOrderIds.Count == 1 ? purchaseOrderIds[0] : null;
+
+            // UnitPrice is the price the company itself paid, carried for information only. Price on the
+            // order stays 0, and every money view excludes this kind, so this number is never mistaken
+            // for revenue.
+            var companyCostByFuel = await LoadCompanyCostAsync(sharedPurchaseOrderId, ct);
+
+            var issuanceOrder = new Order
+            {
+                Id = issuanceOrderId,
+                // The worker, not the owner: the order belongs to whoever now holds the fuel, which is
+                // what makes it show up as a receipt in the worker's own wallet.
+                UserId = command.WorkerUserId,
+                LegalEntityId = legalEntityId,
+                Price = 0,
+                Kind = OrderKind.ReceivedFromCompany,
+                SourceOrderId = sharedPurchaseOrderId,
+                Status = OrderStatus.Fulfilled,
+                FulfilledAtUtc = now,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                LineItems = vouchers.Select(voucher =>
+                {
+                    var key = (Brand: voucher.Brand.ToLowerInvariant(), voucher.FuelTypeId, voucher.Liters);
+                    var cost = companyCostByFuel.GetValueOrDefault(key);
+
+                    return new OrderLineItem
+                    {
+                        Id = Guid.CreateVersion7(),
+                        OrderId = issuanceOrderId,
+                        Brand = voucher.Brand,
+                        // The brand's key beside its name - the voucher's own key, because the line
+                        // is about the same fuel the company hands over.
+                        BrandId = voucher.BrandId,
+                        FuelTypeId = voucher.FuelTypeId,
+                        Liters = voucher.Liters,
+                        Quantity = 1,
+                        UnitPrice = cost,
+                        LineTotal = cost
+                    };
+                }).ToList()
+            };
+
+            _context.Orders.Add(issuanceOrder);
+
+            // The lines are projected from the same `vouchers` list in the same order, so the mapping is
+            // positional. Captured here rather than re-derived per voucher, because guessing it would put a
+            // custody row on the wrong money line - and a wrong LineItemId is worse than none, since NULL
+            // honestly says "this movement has no line" while a wrong id says something false.
+            var lineIdByVoucher = vouchers
+                .Select((voucher, index) => (VoucherId: voucher.Id, LineId: issuanceOrder.LineItems.ElementAt(index).Id))
+                .ToDictionary(x => x.VoucherId, x => x.LineId);
+
+            foreach (var voucher in vouchers)
+            {
+                voucher.WorkerUserId = command.WorkerUserId;
+                // When the fuel changed hands. Its own column rather than UpdatedAtUtc, because a later
+                // block or recall would move that one and the worker's report would claim a different
+                // receipt date (#150).
+                voucher.IssuedAtUtc = SystemClock.UtcNow;
+                // The voucher now belongs to the handover, not to the purchase. It is still Assigned, and
+                // ck_voucher_held_has_order forbids an orderless one.
+                voucher.OrderId = issuanceOrder.Id;
+                voucher.UpdatedAtUtc = now;
+
+                _context.Update(voucher);
+
+                // D-13. This is a change of place and the ledger's own guard proves it: the voucher was
+                // `LegalEntityId == this company` and `WorkerUserId == null` a few lines ago, which is the
+                // company holding stock. It is now in a worker's hands. `gift` is the last movement kind
+                // with no writer, and this is the path that should have had one all along.
+                //
+                // No StatusChanged event, and deliberately: the voucher's status stays `Assigned` across a
+                // gift. What changed is who holds it, not what it is — and an event claiming a transition
+                // that did not happen would be exactly the "handler arranged it" row the exchange declines
+                // to write.
+                //
+                // amount_uah stays NULL like every other movement with an order behind it: the money is
+                // order_line_items.line_total, and this points at that line through order_id.
+                _context.VoucherMovements.Add(new VoucherMovement
                 {
                     Id = Guid.CreateVersion7(),
-                    OrderId = issuanceOrderId,
-                    Brand = voucher.Brand,
-                    // The brand's key beside its name - the voucher's own key, because the line
-                    // is about the same fuel the company hands over.
-                    BrandId = voucher.BrandId,
-                    FuelTypeId = voucher.FuelTypeId,
-                    Liters = voucher.Liters,
-                    Quantity = 1,
-                    UnitPrice = cost,
-                    LineTotal = cost
-                };
-            }).ToList()
-        };
+                    Kind = VoucherMovementKinds.Gift,
+                    VoucherId = voucher.Id,
+                    FromLocation = VoucherLocations.Company,
+                    ToLocation = VoucherLocations.Worker,
+                    OrderId = issuanceOrder.Id,
+                    LineItemId = lineIdByVoucher[voucher.Id],
+                    ActorKind = VoucherActorKinds.User,
+                    ActorUserId = command.OwnerUserId,
+                    ActorPartyId = legalEntityId,
+                    OccurredAtUtc = now
+                });
 
-        _context.Orders.Add(issuanceOrder);
+                _context.Fulfillments.Add(new Fulfillment
+                {
+                    OrderId = issuanceOrder.Id,
+                    VoucherId = voucher.Id,
+                    FulfilledAtUtc = now
+                });
+            }
 
-        // The lines are projected from the same `vouchers` list in the same order, so the mapping is
-        // positional. Captured here rather than re-derived per voucher, because guessing it would put a
-        // custody row on the wrong money line - and a wrong LineItemId is worse than none, since NULL
-        // honestly says "this movement has no line" while a wrong id says something false.
-        var lineIdByVoucher = vouchers
-            .Select((voucher, index) => (VoucherId: voucher.Id, LineId: issuanceOrder.LineItems.ElementAt(index).Id))
-            .ToDictionary(x => x.VoucherId, x => x.LineId);
+            await _context.SaveChangesAsync(ct);
 
-        foreach (var voucher in vouchers)
-        {
-            voucher.WorkerUserId = command.WorkerUserId;
-            // When the fuel changed hands. Its own column rather than UpdatedAtUtc, because a later
-            // block or recall would move that one and the worker's report would claim a different
-            // receipt date (#150).
-            voucher.IssuedAtUtc = SystemClock.UtcNow;
-            // The voucher now belongs to the handover, not to the purchase. It is still Assigned, and
-            // ck_voucher_held_has_order forbids an orderless one.
-            voucher.OrderId = issuanceOrder.Id;
-            voucher.UpdatedAtUtc = now;
-
-            _context.Update(voucher);
-
-            // D-13. This is a change of place and the ledger's own guard proves it: the voucher was
-            // `LegalEntityId == this company` and `WorkerUserId == null` a few lines ago, which is the
-            // company holding stock. It is now in a worker's hands. `gift` is the last movement kind
-            // with no writer, and this is the path that should have had one all along.
-            //
-            // No StatusChanged event, and deliberately: the voucher's status stays `Assigned` across a
-            // gift. What changed is who holds it, not what it is — and an event claiming a transition
-            // that did not happen would be exactly the "handler arranged it" row the exchange declines
-            // to write.
-            //
-            // amount_uah stays NULL like every other movement with an order behind it: the money is
-            // order_line_items.line_total, and this points at that line through order_id.
-            _context.VoucherMovements.Add(new VoucherMovement
+            // #150 W3 - tell the worker. Written into the outbox inside the same transaction as the
+            // gift, so a committed issue always has its notification queued and a rolled-back one never
+            // leaves a "you were given fuel" message pointing at fuel that was not actually handed over.
+            _context.OutboxEvents.Add(new OutboxEvent
             {
-                Id = Guid.CreateVersion7(),
-                Kind = VoucherMovementKinds.Gift,
-                VoucherId = voucher.Id,
-                FromLocation = VoucherLocations.Company,
-                ToLocation = VoucherLocations.Worker,
-                OrderId = issuanceOrder.Id,
-                LineItemId = lineIdByVoucher[voucher.Id],
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.OwnerUserId,
-                ActorPartyId = legalEntityId,
-                OccurredAtUtc = now
+                EventType = OutboxEventType.VoucherIssued,
+                Payload = System.Text.Json.JsonSerializer.Serialize(new VoucherIssuedPayload
+                {
+                    WorkerUserId = command.WorkerUserId.ToString(),
+                    CompanyName = companyName,
+                    VoucherCount = vouchers.Count,
+                    LegalEntityId = legalEntityId.ToString(),
+                }),
+                Processed = false,
+                CreatedAtUtc = now,
             });
 
-            _context.Fulfillments.Add(new Fulfillment
-            {
-                OrderId = issuanceOrder.Id,
-                VoucherId = voucher.Id,
-                FulfilledAtUtc = now
-            });
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // #150 W3 - tell the worker. Written into the outbox inside the same transaction as the
-        // gift, so a committed issue always has its notification queued and a rolled-back one never
-        // leaves a "you were given fuel" message pointing at fuel that was not actually handed over.
-        _context.OutboxEvents.Add(new OutboxEvent
-        {
-            EventType = OutboxEventType.VoucherIssued,
-            Payload = System.Text.Json.JsonSerializer.Serialize(new VoucherIssuedPayload
-            {
-                WorkerUserId = command.WorkerUserId.ToString(),
-                CompanyName = companyName,
-                VoucherCount = vouchers.Count,
-                LegalEntityId = legalEntityId.ToString(),
-            }),
-            Processed = false,
-            CreatedAtUtc = now,
-        });
-
-        await _context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            await _context.SaveChangesAsync(ct);
+        }, cancellationToken: cancellationToken);
 
         _metrics.VouchersGifted(vouchers.Count);
 
-        return new GiftVouchersResult("Success", vouchers.Count, IssuanceOrderId: issuanceOrder.Id);
+        return new GiftVouchersResult("Success", vouchers.Count, IssuanceOrderId: issuanceOrderId);
     }
 
     /// <summary>Price per (brand, fuel, litres) line on the company's own purchase, for reference.</summary>

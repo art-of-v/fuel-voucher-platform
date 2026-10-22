@@ -10,6 +10,7 @@ using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Time;
 using FuelFlow.Features.Vouchers;
@@ -211,15 +212,19 @@ var cipher = _qrCipher;
         // returns volume rows, which only the historical 20261015151014 migration still needs.
     }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        return SaveChangesGuardedAsync(cancellationToken);
-    }
+    // The overload taking the flag is not the one that is overridden, and the token-only one is:
+    // DbContext's own token-only overload forwards to the flag one, so overriding the flag one
+    // instead would run this guard twice for every save in the app.
+    //
     // The synchronous SaveChanges() is deliberately NOT wrapped. Every write in this app is async
     // (there is not one bare SaveChanges() call in src), and guarding it would mean blocking on
     // SaveChangesAsync with GetAwaiter().GetResult() - a deadlock waiting for a context that has no
     // SynchronizationContext today and no guarantee of one tomorrow, in exchange for logging that
     // nothing would emit.
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return SaveChangesGuardedAsync(cancellationToken);
+    }
 
     private async Task<int> SaveChangesGuardedAsync(CancellationToken cancellationToken)
     {
@@ -227,37 +232,46 @@ var cipher = _qrCipher;
         // stops being comparable afterwards.
         var transitions = CaptureOrderTransitions();
 
-        // The status change and the order_events row that records it are ONE unit of work. EF
-        // opens a separate implicit transaction per SaveChanges, so without this the change could
-        // land and the event could fail - an order that moved with no record of why, and no way to
-        // tell afterwards whether the event was lost or never written.
-        //
-        // A caller that already opened a transaction (the fulfilment service does) gets the one it
-        // has: a second transaction would throw, and the unit of work is already atomic there.
-        //
-        // Not on the in-memory provider: it has no transactions at all, and the unit tests are
-        // about the logic, not about the atomicity - the integration test is.
-        await using var transaction = transitions.Count > 0
-            && Database.CurrentTransaction is null
-            && Database.IsRelational()
-                ? await Database.BeginTransactionAsync(cancellationToken)
-                : null;
-
         try
         {
-            var affected = await base.SaveChangesAsync(cancellationToken);
+            // The status change and the order_events row that records it are ONE unit of work. EF
+            // opens a separate implicit transaction per SaveChanges, so without this the change could
+            // land and the event could fail - an order that moved with no record of why, and no way to
+            // tell afterwards whether the event was lost or never written.
+            //
+            // A caller that already opened a transaction (the fulfilment service does) gets the one it
+            // has: a second transaction would throw, and the unit of work is already atomic there.
+            //
+            // The transaction runs inside the execution strategy rather than beside it: a retrying
+            // strategy refuses a transaction opened by hand, and the retry has to write the change
+            // again rather than find it already accepted.
+            //
+            // Not on the in-memory provider: it has no transactions at all, and the unit tests are
+            // about the logic, not about the atomicity - the integration test is.
+            if (transitions.Count > 0
+                && Database.CurrentTransaction is null
+                && Database.IsRelational())
+            {
+                return await this.ExecuteReplaySafeAsync(
+                    async ct =>
+                    {
+                        var affected = await base.SaveChangesAsync(ct);
+
+                        await RecordOrderEventsAsync(transitions, ct);
+
+                        return affected;
+                    },
+                    cancellationToken);
+            }
+
+            var affectedRows = await base.SaveChangesAsync(cancellationToken);
 
             if (transitions.Count > 0)
             {
                 await RecordOrderEventsAsync(transitions, cancellationToken);
             }
 
-            if (transaction is not null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
-
-            return affected;
+            return affectedRows;
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -328,7 +342,8 @@ var cipher = _qrCipher;
     }
 
     private async Task RecordOrderEventsAsync(
-        IReadOnlyList<OrderTransition> transitions, CancellationToken cancellationToken)
+        IReadOnlyList<OrderTransition> transitions,
+        CancellationToken cancellationToken)
     {
         // One lookup for the whole batch. Reading the invoice id per transition meant one query
         // per order status change, inside the save that records it.
@@ -354,6 +369,8 @@ var cipher = _qrCipher;
             });
         }
 
+        // base.SaveChangesAsync: the token-only overload of DbContext, which forwards to the flag
+        // one - and that one is not overridden here, so the guard above does not run twice.
         await base.SaveChangesAsync(cancellationToken);
     }
 

@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -88,8 +89,38 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         // Taken BEFORE the load. A lock acquired after the read would serialize the writers but on
         // data they had already captured - the second operator would queue, wake up, and still extend
         // from the expiration it read before the first one committed.
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        // The ids are minted before the transaction, not inside it: a replayed renewal has to write
+        // the same order and the same line rather than a second set of them, and the order id is
+        // what answers "did it land?".
+        var renewalOrderId = Guid.CreateVersion7();
+        var renewalLineId = Guid.CreateVersion7();
 
+        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
+        // it: a transient failure retries the body rather than failing the request, and the retry
+        // writes the renewal once. A commit whose answer was lost on the way back is asked about
+        // rather than repeated - a customer is not charged twice for one renewal.
+        return await _context.ExecuteReplaySafeAsync<ConfirmOperatorRenewalResult>(
+            ct => ApplyRenewalAsync(command, term, renewalOrderId, renewalLineId, ct),
+            cancellationToken,
+            verifySucceeded: async ct =>
+                await _context.Orders
+                    .AsNoTracking()
+                    .AnyAsync(
+                        o => o.Id == renewalOrderId
+                            && o.LineItems.Any(l => l.SourceVoucherId == command.VoucherId),
+                        ct));
+    }
+
+    /// <summary>
+    /// The renewal itself, inside the transaction.
+    /// </summary>
+    private async Task<ConfirmOperatorRenewalResult> ApplyRenewalAsync(
+        ConfirmOperatorRenewalCommand command,
+        VoucherRenewalTerm term,
+        Guid renewalOrderId,
+        Guid renewalLineId,
+        CancellationToken cancellationToken)
+    {
         await _context.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtext('operator-renewal-voucher'), hashtext({command.VoucherId.ToString()}))",
             cancellationToken);
@@ -310,7 +341,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
         var renewalLine = new OrderLineItem
         {
-            Id = Guid.CreateVersion7(),
+            Id = renewalLineId,
             Brand = voucher.Brand,
             // The brand's key beside its name - the voucher's own key, because the line is
             // about the same fuel the customer brings back.
@@ -335,7 +366,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
         var renewalOrder = new Order
         {
-            Id = Guid.CreateVersion7(),
+            Id = renewalOrderId,
             UserId = customerUserId,
             LegalEntityId = customerLegalEntityId,
             Price = command.SurchargeUah,
@@ -451,8 +482,6 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                 "already_renewed",
                 "This voucher already has a renewal to that date.");
         }
-
-        await transaction.CommitAsync(cancellationToken);
 
         return new ConfirmOperatorRenewalResult
         {
