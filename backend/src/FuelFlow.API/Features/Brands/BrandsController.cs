@@ -127,16 +127,18 @@ private readonly GetBrandsQueryHandler _getAll;
             UpdatedAtUtc = SystemClock.UtcNow
         };
         _context.Brands.Add(Brand);
-        await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new { Brand.Slug, Brand.Name });
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Brand", Brand.Id.ToString(), "BrandCreated",
             null, newValue, userId, GetUserName(),
             $"Created brand {Brand.Name}",
-            Brand.Slug,
-            ct);
+            Brand.Slug);
+
+        // One save for the brand and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return CreatedAtAction(nameof(GetById), new { id = Brand.Id }, Brand);
     }
@@ -164,7 +166,6 @@ private readonly GetBrandsQueryHandler _getAll;
         Brand.SortOrder = request.SortOrder;
         Brand.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Brands.Update(Brand);
-        await _context.SaveChangesAsync(ct);
 
         var changes = new List<string>();
         if (oldName != request.Name)
@@ -181,12 +182,15 @@ private readonly GetBrandsQueryHandler _getAll;
         var summary = changes.Count > 0
             ? $"{Brand.Name}: {string.Join(", ", changes)}"
             : $"Updated brand {Brand.Name}";
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Brand", id.ToString(), "BrandUpdated",
             oldValue, newValue, userId, GetUserName(),
             summary,
-            Brand.Slug,
-            ct);
+            Brand.Slug);
+
+        // One save for the brand and the audit row: the row and the change it describes commit
+        // together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return Ok(new { success = true });
     }
@@ -217,15 +221,17 @@ private readonly GetBrandsQueryHandler _getAll;
         }
         Brand.IsDeleted = true;
         Brand.DeletedAtUtc = archivedAt;
-        await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "Brand", id.ToString(), "BrandDeleted",
             JsonSerializer.Serialize(new { name, slug }), "{}", userId, GetUserName(),
             $"Deleted brand {name}",
-            slug,
-            ct);
+            slug);
+
+        // One save for the archived brand, its fuels and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(ct);
 
         return Ok(new { success = true });
     }

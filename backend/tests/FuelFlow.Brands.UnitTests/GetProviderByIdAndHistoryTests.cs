@@ -164,12 +164,12 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     // --- AuditEventService ----------------------------------------------
 
     [Fact]
-    public async Task RecordEventAsync_ShouldPersistEvent()
+    public async Task RecordEvent_ShouldTrackTheRow_AndLeaveTheCommitToTheCaller()
     {
         var changedByUserId = Guid.NewGuid();
         var service = new AuditEventService(_context);
 
-        await service.RecordEventAsync(
+        service.RecordEvent(
             "Fuel",
             "fuel-a",
             "PriceChanged",
@@ -178,8 +178,14 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             changedByUserId,
             "Admin User",
             "Price updated",
-            "test-okko",
-            CancellationToken.None);
+            "test-okko");
+
+        // The service does not save. The row is committed by the caller's own save, so the row and
+        // the change it describes land in one transaction - or neither lands (planning #533).
+        (await _context.AuditEventOutbox.CountAsync()).Should().Be(0,
+            "a service that commits on its own would put the audit row in a transaction of its own");
+
+        await _context.SaveChangesAsync();
 
         var evt = await _context.AuditEventOutbox.SingleAsync();
         evt.AggregateType.Should().Be("Fuel");

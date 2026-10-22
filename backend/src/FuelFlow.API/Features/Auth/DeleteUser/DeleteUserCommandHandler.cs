@@ -109,14 +109,8 @@ public sealed class DeleteUserCommandHandler
             _context.RefreshTokens.Update(refreshToken);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation(
-            "User {UserId} soft-deleted (is_active=false, token_version={Version}, devices/refresh tokens revoked)",
-            user.Id, user.TokenVersion);
-
         var adminId = command.ActingAdminUserId ?? user.Id;
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "User",
             user.Id.ToString(),
             "UserDeleted",
@@ -125,8 +119,15 @@ public sealed class DeleteUserCommandHandler
             adminId,
             command.ActingAdminName,
             $"Deleted user {user.PhoneNumber}",
-            adminId.ToString(),
-            cancellationToken);
+            adminId.ToString());
+
+        // One save for the deletion, the revoked sessions and the audit row: the row and the change
+        // it describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "User {UserId} soft-deleted (is_active=false, token_version={Version}, devices/refresh tokens revoked)",
+            user.Id, user.TokenVersion);
 
         return new DeleteUserResult { Success = true };
     }

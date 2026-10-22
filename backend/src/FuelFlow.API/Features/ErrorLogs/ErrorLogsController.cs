@@ -172,6 +172,14 @@ public sealed class ErrorLogsController : ControllerBase
             : query.Where(e => e.ResolvedAtUtc != null);
 
         var actingName = GetUserName();
+
+        // One transaction for the flip and the audit row. ExecuteUpdateAsync commits on its own, so
+        // without the transaction a resolved error log could exist with no row naming who resolved
+        // it - and the audit row would be a separate write that can fail on its own (planning #533).
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(ct)
+            : null;
+
         var changed = await query.ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.ResolvedAtUtc,
                     request.Resolved ? SystemClock.UtcNow : (DateTime?)null)
@@ -185,7 +193,7 @@ public sealed class ErrorLogsController : ControllerBase
         {
             // ScopeId is required and an error record has none, so the acting user stands in -
             // the same workaround the user and QA-access aggregates already use.
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "ErrorLog",
                 ids.Count == 1 ? ids[0].ToString() : $"bulk:{changed}",
                 request.Resolved ? "ErrorLogsResolved" : "ErrorLogsReopened",
@@ -194,8 +202,14 @@ public sealed class ErrorLogsController : ControllerBase
                 actingId.Value,
                 actingName,
                 $"{(request.Resolved ? "Resolved" : "Reopened")} {changed} error log record(s)",
-                actingId.Value.ToString(),
-                ct);
+                actingId.Value.ToString());
+
+            await _context.SaveChangesAsync(ct);
+        }
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(ct);
         }
 
         return Ok(new { success = true, changed });

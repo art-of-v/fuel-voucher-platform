@@ -77,6 +77,17 @@ public sealed class RequestEmailChangeCommandHandler
         }
 
         var token = PendingEmailChange.Begin(user, newEmail);
+
+        // Tracked before the save, so the pending change and the row that records it commit
+        // together - a request that was made must never exist without its row (planning #533).
+        _eventService.RecordEvent(
+            "User", user.Id.ToString(), "EmailChangeRequested",
+            JsonSerializer.Serialize(new { email = user.Email }),
+            JsonSerializer.Serialize(new { pendingEmail = newEmail }),
+            user.Id, null,
+            "Self-service email change requested for " + user.PhoneNumber,
+            user.Id.ToString());
+
         // Persist the pending fields before sending so a send failure cannot leave a live link
         // pointing at an unstored token.
         await _context.SaveChangesAsync(cancellationToken);
@@ -85,14 +96,6 @@ public sealed class RequestEmailChangeCommandHandler
             newEmail,
             PendingEmailChange.BuildConfirmationEmail(PendingEmailChange.BuildConfirmUrl(command.ConfirmBaseUrl, token)),
             cancellationToken);
-
-        await _eventService.RecordEventAsync(
-            "User", user.Id.ToString(), "EmailChangeRequested",
-            JsonSerializer.Serialize(new { email = user.Email }),
-            JsonSerializer.Serialize(new { pendingEmail = newEmail }),
-            user.Id, null,
-            "Self-service email change requested for " + user.PhoneNumber,
-            user.Id.ToString(), cancellationToken);
 
         return new RequestEmailChangeResponse(EmailChangePending: true);
     }

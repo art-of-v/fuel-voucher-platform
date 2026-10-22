@@ -125,9 +125,7 @@ public sealed class SetUserBannedCommandHandler
                 target.Id, command.ActingUserId, command.ActingRole);
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "User",
             target.Id.ToString(),
             command.IsBanned ? "UserBanned" : "UserUnbanned",
@@ -142,8 +140,11 @@ public sealed class SetUserBannedCommandHandler
             command.ActingUserId,
             command.ActingUserName,
             (command.IsBanned ? "Banned user " : "Unbanned user ") + target.PhoneNumber,
-            command.ActingUserId.ToString(),
-            cancellationToken);
+            command.ActingUserId.ToString());
+
+        // One save for the flag, the revoked sessions and the audit row: the row and the change it
+        // describes commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
 
         return SetUserBannedResult.CreateSuccess();
     }

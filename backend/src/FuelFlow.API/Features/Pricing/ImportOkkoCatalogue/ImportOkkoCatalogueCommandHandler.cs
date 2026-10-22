@@ -315,13 +315,12 @@ if (knownCodes.Contains(code))
 
         if (!command.DryRun && created.Count > 0)
         {
-            await _context.SaveChangesAsync(ct);
-
             // One audit row per created fuel, so a catalogue that grew while nobody was looking says so
-            // in the same place a typed one does.
+            // in the same place a typed one does. Tracked before the save, so the rows and the fuels
+            // they describe commit together (planning #533).
             foreach (var c in created)
             {
-                await _events.RecordEventAsync(
+                _events.RecordEvent(
                     "Fuel", c.FuelTypeId.ToString(), "FuelCreatedByImport",
                     null,
                     JsonSerializer.Serialize(new { c.Name, c.BrandFuelCode, c.PumpPricePerLiter }),
@@ -329,9 +328,10 @@ if (knownCodes.Contains(code))
                     actingUserName,
                     $"{c.Name} ({c.BrandFuelCode}): added from OKKO's published list at {c.PumpPricePerLiter:F2} UAH/L pump, "
                     + "unpriced and not on sale until a margin is set",
-                    OkkoSlug,
-                    ct);
+                    OkkoSlug);
             }
+
+            await _context.SaveChangesAsync(ct);
         }
 
         return new OkkoCatalogueApplyResult(
@@ -433,17 +433,18 @@ if (knownCodes.Contains(code))
                 // carries it.
                 fuelRow.UpdatedAtUtc = SystemClock.UtcNow;
 
-                await _context.SaveChangesAsync(ct);
-
-                await _events.RecordEventAsync(
+                // Tracked before the save, so the row and the archived fuel commit together
+                // (planning #533).
+                _events.RecordEvent(
                     "Fuel", fuel.Id.ToString(), "FuelArchivedByImport",
                     null,
                     JsonSerializer.Serialize(new { fuel.Name, Reason = "no longer published by OKKO" }),
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
                     actingUserName,
                     $"{fuel.Name}: archived — OKKO no longer publishes this grade and it has no live vouchers",
-                    OkkoSlug,
-                    ct);
+                    OkkoSlug);
+
+                await _context.SaveChangesAsync(ct);
             }
 
             dropped.Add(new OkkoCatalogueArchived(fuel.Id, fuel.Name, 0, Archived: !dryRun));

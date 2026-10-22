@@ -177,6 +177,14 @@ public sealed class SetBatchCostCommandHandler
             _context.PurchaseBatches.Update(batch);
         }
 
+        // One transaction for the cost entry, the repricing it causes and the audit row that records
+        // it. What we paid, what the pool now costs and who typed it are one fact: a crash between
+        // them would leave the money recorded with no row explaining it - and this is the only trace
+        // of what a lot cost, there is no supplier invoice to fall back on (planning #533).
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
         // Persist FIRST: production runs NoTracking, so the blended recompute below (a fresh query)
         // would not see the unsaved voucher costs otherwise.
         await _context.SaveChangesAsync(cancellationToken);
@@ -212,7 +220,7 @@ public sealed class SetBatchCostCommandHandler
             // but the before/after is no longer machine-readable and the brand history has nothing
             // to render. This row is the only trace of what we paid — there is no supplier invoice to
             // fall back on — so it has to be as readable as the rest of the audit log.
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "Batch",
                 $"{command.ImportJobId}:{command.FuelTypeId}",
                 "BatchCostEntered",
@@ -229,8 +237,15 @@ public sealed class SetBatchCostCommandHandler
                 userId,
                 command.ActingUserName,
                 $"{brand} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
-                brand,
-                cancellationToken);
+                brand);
+        }
+
+        // The audit row, committed in the transaction with the cost entry it describes.
+        await _context.SaveChangesAsync(cancellationToken);
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
         }
 
         return new SetBatchCostResult(true, false, null, blended, repriced, targets.Count);

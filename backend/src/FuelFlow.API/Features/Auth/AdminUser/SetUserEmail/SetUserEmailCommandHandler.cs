@@ -63,15 +63,18 @@ public sealed class SetUserEmailCommandHandler
             target.PendingEmailTokenHash = null;
             target.PendingEmailExpiresAtUtc = null;
             target.UpdatedAtUtc = SystemClock.UtcNow;
-            await _context.SaveChangesAsync(cancellationToken);
 
-            await _eventService.RecordEventAsync(
+            _eventService.RecordEvent(
                 "User", target.Id.ToString(), "EmailCleared",
                 JsonSerializer.Serialize(new { email = oldEmail }),
                 JsonSerializer.Serialize(new { email = (string?)null }),
                 command.ActingUserId, command.ActingName,
                 "Email cleared for " + target.PhoneNumber,
-                command.ActingUserId.ToString(), cancellationToken);
+                command.ActingUserId.ToString());
+
+            // One save for the cleared address and the audit row: the row and the change it
+            // describes commit together, or neither does (planning #533).
+            await _context.SaveChangesAsync(cancellationToken);
 
             return SetUserEmailResult.CreateCleared();
         }
@@ -87,20 +90,23 @@ public sealed class SetUserEmailCommandHandler
         // Stage as pending (active email untouched) and email the confirmation link to the new
         // address; the public confirm endpoint promotes it. Only the token hash is stored.
         var token = PendingEmailChange.Begin(target, newEmail);
+
+        // Tracked before the save, so the pending change and the row that records it commit
+        // together - a request that was made must never exist without its row (planning #533).
+        _eventService.RecordEvent(
+            "User", target.Id.ToString(), "EmailChangeRequested",
+            JsonSerializer.Serialize(new { email = oldEmail }),
+            JsonSerializer.Serialize(new { pendingEmail = newEmail }),
+            command.ActingUserId, command.ActingName,
+            "Email change requested for " + target.PhoneNumber,
+            command.ActingUserId.ToString());
+
         await _context.SaveChangesAsync(cancellationToken);
 
         await _emailSender.SendAsync(
             newEmail,
             PendingEmailChange.BuildConfirmationEmail(PendingEmailChange.BuildConfirmUrl(command.ConfirmBaseUrl, token)),
             cancellationToken);
-
-        await _eventService.RecordEventAsync(
-            "User", target.Id.ToString(), "EmailChangeRequested",
-            JsonSerializer.Serialize(new { email = oldEmail }),
-            JsonSerializer.Serialize(new { pendingEmail = newEmail }),
-            command.ActingUserId, command.ActingName,
-            "Email change requested for " + target.PhoneNumber,
-            command.ActingUserId.ToString(), cancellationToken);
 
         _logger.LogInformation(
             "Email change requested for user {TargetId} by {ActingUserId}; confirmation sent",

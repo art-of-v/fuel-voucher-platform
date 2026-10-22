@@ -104,6 +104,19 @@ public sealed class SetUserRoleCommandHandler
         // (No EnableRetryOnFailure is configured on the context, so a manual transaction is safe.)
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
+        // Tracked inside this transaction, not saved: the row and the role change it describes
+        // commit together, or the transaction rolls both back (planning #533).
+        _eventService.RecordEvent(
+            "User",
+            target.Id.ToString(),
+            "RoleChanged",
+            JsonSerializer.Serialize(new { role = oldRoleName }),
+            JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion }),
+            command.ActingUserId,
+            command.ActingUserName,
+            "Role of " + target.PhoneNumber + " changed to " + command.RoleName,
+            command.ActingUserId.ToString());
+
         await _context.SaveChangesAsync(cancellationToken);
 
         if (isDemotion)
@@ -116,18 +129,6 @@ public sealed class SetUserRoleCommandHandler
                 "User {TargetId} demoted from {OldRole} to {NewRole} by {ActingUserId}; all sessions revoked",
                 command.UserId, oldRoleName, command.RoleName, command.ActingUserId);
         }
-
-        await _eventService.RecordEventAsync(
-            "User",
-            target.Id.ToString(),
-            "RoleChanged",
-            JsonSerializer.Serialize(new { role = oldRoleName }),
-            JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion }),
-            command.ActingUserId,
-            command.ActingUserName,
-            "Role of " + target.PhoneNumber + " changed to " + command.RoleName,
-            command.ActingUserId.ToString(),
-            cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 

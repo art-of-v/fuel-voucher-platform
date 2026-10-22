@@ -67,15 +67,18 @@ public sealed class ConfirmEmailChangeCommandHandler
         user.PendingEmailTokenHash = null;
         user.PendingEmailExpiresAtUtc = null;
         user.UpdatedAtUtc = SystemClock.UtcNow;
-        await _context.SaveChangesAsync(cancellationToken);
 
-        await _eventService.RecordEventAsync(
+        _eventService.RecordEvent(
             "User", user.Id.ToString(), "EmailChanged",
             JsonSerializer.Serialize(new { email = oldEmail }),
             JsonSerializer.Serialize(new { email = newEmail }),
             user.Id, null,
             "Email confirmed for " + user.PhoneNumber,
-            user.Id.ToString(), cancellationToken);
+            user.Id.ToString());
+
+        // One save for the new address and the audit row: the row and the change it describes
+        // commit together, or neither does (planning #533).
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Best-effort notice to the previous address so a silent hijack of the recovery channel is
         // visible to the prior owner. Never fails the confirmation.

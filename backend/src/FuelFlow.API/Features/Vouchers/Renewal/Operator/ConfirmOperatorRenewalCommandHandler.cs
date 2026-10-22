@@ -402,6 +402,36 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             });
         }
 
+        var summary = branch == VoucherRenewalBranch.Extend
+            ? $"Operator extended customer voucher {voucher.VoucherNumber} ({term.Code()}) → {newExpiration:yyyy-MM-dd}, surcharge ₴{command.SurchargeUah}"
+            : $"Operator replaced lapsed customer voucher {voucher.VoucherNumber} from stock {replacementVoucherNumber} ({term.Code()}), surcharge ₴{command.SurchargeUah}";
+
+        // old_value / new_value are jsonb columns — pass serialized JSON, never a bare string.
+        var newValueJson = JsonSerializer.Serialize(new
+        {
+            branch = branchCode,
+            voucherId = voucher.Id,
+            replacementVoucherId,
+            termCode = term.Code(),
+            oldExpiration = oldExpiration.ToString("yyyy-MM-dd"),
+            newExpiration = newExpiration.ToString("yyyy-MM-dd"),
+            surchargeUah = command.SurchargeUah,
+            customerUserId
+        });
+
+        // Tracked inside this transaction, not saved on its own: the renewal and the row that
+        // records it commit together, or the transaction rolls both back (planning #533).
+        _events.RecordEvent(
+            aggregateType: "Voucher",
+            aggregateId: voucher.Id.ToString(),
+            eventType: "VoucherRenewedByOperator",
+            oldValue: null,
+            newValue: newValueJson,
+            changedByUserId: command.ActingUserId,
+            changedByUserName: command.ActingUserName,
+            summary: summary,
+            providerId: voucher.Brand);
+
         try
         {
             await _context.SaveChangesAsync(cancellationToken);
@@ -421,35 +451,6 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                 "already_renewed",
                 "This voucher already has a renewal to that date.");
         }
-
-        var summary = branch == VoucherRenewalBranch.Extend
-            ? $"Operator extended customer voucher {voucher.VoucherNumber} ({term.Code()}) → {newExpiration:yyyy-MM-dd}, surcharge ₴{command.SurchargeUah}"
-            : $"Operator replaced lapsed customer voucher {voucher.VoucherNumber} from stock {replacementVoucherNumber} ({term.Code()}), surcharge ₴{command.SurchargeUah}";
-
-        // old_value / new_value are jsonb columns — pass serialized JSON, never a bare string.
-        var newValueJson = JsonSerializer.Serialize(new
-        {
-            branch = branchCode,
-            voucherId = voucher.Id,
-            replacementVoucherId,
-            termCode = term.Code(),
-            oldExpiration = oldExpiration.ToString("yyyy-MM-dd"),
-            newExpiration = newExpiration.ToString("yyyy-MM-dd"),
-            surchargeUah = command.SurchargeUah,
-            customerUserId
-        });
-
-        await _events.RecordEventAsync(
-            aggregateType: "Voucher",
-            aggregateId: voucher.Id.ToString(),
-            eventType: "VoucherRenewedByOperator",
-            oldValue: null,
-            newValue: newValueJson,
-            changedByUserId: command.ActingUserId,
-            changedByUserName: command.ActingUserName,
-            summary: summary,
-            providerId: voucher.Brand,
-            ct: cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 
