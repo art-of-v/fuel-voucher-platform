@@ -146,7 +146,12 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.OrderId);
+
+        // Postgres does not index a foreign key column on its own, and the parent's delete check and
+        // every join down this column scan without one. The key below is the PAIR (fuel type,
+        // brand), and fuel_type_id is its leading column.
         builder.HasIndex(e => e.FuelTypeId);
+
         builder.HasIndex(e => e.Brand);
 
         // Fulfilment loads a renewal order's lines by their source voucher, and the customer timeline
@@ -231,9 +236,5 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasForeignKey(e => new { e.FuelTypeId, e.BrandId })
             .HasPrincipalKey(e => new { e.Id, e.BrandId })
             .OnDelete(DeleteBehavior.Restrict);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
-        builder.HasIndex(e => e.FuelTypeId);
     }
 }

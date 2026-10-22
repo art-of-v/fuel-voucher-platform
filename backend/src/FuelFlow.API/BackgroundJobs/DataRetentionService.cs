@@ -183,6 +183,17 @@ public class DataRetentionService
             "devices", _context.Devices.Where(d => d.Status != DeviceStatus.Revoked && d.LastSeenAt < deviceCutoff),
             dryRun, cancellationToken);
 
+        // The outbox is purged by TWO queries rather than by one OR, for the same reason: the two
+        // halves are aged by two different columns, and only one of them can be an index range.
+        // The sets are disjoint, so the counts add up.
+        var outboxProcessedCount = await PurgeAsync(
+            "outbox_events", ProcessedOutboxEventsToPurge(_context.OutboxEvents, outboxCutoff),
+            dryRun, cancellationToken);
+
+        var outboxUnconsumedCount = await PurgeAsync(
+            "outbox_events", UnconsumedOutboxEventsToPurge(_context.OutboxEvents, outboxCutoff),
+            dryRun, cancellationToken);
+
         // __RESULTS__
         var results = new (string Table, int Count)[]
         {
@@ -210,11 +221,18 @@ public class DataRetentionService
             // keeping them as "unprocessed" meant the retention never touched them and the table
             // grew without bound: every order, every expiry and every payment left a row behind
             // for good, and the safety net that reads this table had to walk all of them.
-            ("outbox_events", await PurgeAsync("outbox_events",
-                _context.OutboxEvents.Where(o =>
-                    (o.Processed && o.ProcessedAtUtc != null && o.ProcessedAtUtc < outboxCutoff)
-                    || (o.CreatedAtUtc < outboxCutoff && !ConsumedOutboxEventTypes.All.Contains(o.EventType))),
-                dryRun, cancellationToken)),
+            //
+            // TWO QUERIES, NOT ONE, because of the planner - the same reason the devices above
+            // are split in two. A single OR over two different aging columns is one predicate the
+            // planner cannot serve with an index: it has to satisfy BOTH halves, so it reads the
+            // table. Each half on its own is a range on one column, and each has an index
+            // (ix_outbox_events_created_at_utc_id and ix_outbox_events_processed_at_utc).
+            //
+            // The two sets are DISJOINT - the second half says explicitly that the row was not
+            // already aged out by its processed time - so the counts add up and no row is deleted
+            // twice. The union is exactly what the old single OR selected, and that is pinned by
+            // a test rather than by this comment.
+            ("outbox_events", outboxProcessedCount + outboxUnconsumedCount),
 
             // Read notifications only; unread ones are kept indefinitely so a user never loses an
             // unseen message to retention.
@@ -329,6 +347,43 @@ public class DataRetentionService
                 total, breakdown);
         }
     }
+
+    /// <summary>
+    /// The outbox rows that were published, and have been published for longer than the window:
+    /// the work that was done, aged by when it was done.
+    /// </summary>
+    /// <remarks>
+    /// A query of its own, and not a predicate the caller composes, because the plan it is read
+    /// through is the point: the cutoff is on <c>processed_at_utc</c>, and the index that leads
+    /// that column is <c>ix_outbox_events_processed_at_utc</c>. Folded into the single OR this
+    /// used to be part of, the planner had to satisfy both halves of the OR at once and read the
+    /// whole table instead.
+    /// </remarks>
+    public static IQueryable<OutboxEvent> ProcessedOutboxEventsToPurge(
+        IQueryable<OutboxEvent> events, DateTime cutoff)
+        => events.Where(o =>
+            o.Processed && o.ProcessedAtUtc != null && o.ProcessedAtUtc < cutoff);
+
+    /// <summary>
+    /// The outbox rows nobody will ever read again: the events of the types that have no
+    /// consumer, aged by when they happened.
+    /// </summary>
+    /// <remarks>
+    /// The last clause is what makes the two sets disjoint: a row the first query already took -
+    /// published, and published for longer than the window - is not taken again here. The union of
+    /// the two queries is exactly what the single OR selected before the split, and the test that
+    /// pins that is in the integration suite rather than in this comment.
+    /// <para>
+    /// "Unprocessed work is never touched" still holds: the types that have a consumer are work
+    /// while they are unprocessed, and neither query matches them.
+    /// </para>
+    /// </remarks>
+    public static IQueryable<OutboxEvent> UnconsumedOutboxEventsToPurge(
+        IQueryable<OutboxEvent> events, DateTime cutoff)
+        => events.Where(o =>
+            o.CreatedAtUtc < cutoff
+            && !ConsumedOutboxEventTypes.All.Contains(o.EventType)
+            && (!o.Processed || o.ProcessedAtUtc == null || o.ProcessedAtUtc >= cutoff));
 
     /// <summary>
     /// Dry-run: returns the count of matching rows, deleting nothing. Live: deletes them in bounded

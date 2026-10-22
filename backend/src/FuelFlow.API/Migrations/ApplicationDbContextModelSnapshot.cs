@@ -2188,6 +2188,12 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("Processed")
                         .HasDatabaseName("ix_outbox_events_processed");
 
+                    b.HasIndex("ProcessedAtUtc")
+                        .HasDatabaseName("ix_outbox_events_processed_at_utc");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .HasDatabaseName("ix_outbox_events_created_at_utc_id");
+
                     b.ToTable("outbox_events", null, t =>
                         {
                             t.HasCheckConstraint("ck_outbox_event_type", "event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',\n               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated',\n               'VoucherIssued')");

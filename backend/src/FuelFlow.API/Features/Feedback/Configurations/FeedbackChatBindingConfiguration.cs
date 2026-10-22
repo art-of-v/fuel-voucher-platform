@@ -22,6 +22,8 @@ internal sealed class FeedbackChatBindingConfiguration : IEntityTypeConfiguratio
 
         builder.Property(e => e.BoundAtUtc).HasColumnName("bound_at_utc").IsRequired().HasComment("When the chat was bound.");
 
+        // Postgres does not index a foreign key column on its own, and the parent's delete check and
+        // every join down this column scan without one.
         builder.HasIndex(e => e.UserId);
 
         // --- F-14: the foreign key this column was missing -------------------------------------------------
@@ -32,9 +34,5 @@ internal sealed class FeedbackChatBindingConfiguration : IEntityTypeConfiguratio
             .WithMany()
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
-        builder.HasIndex(e => e.UserId);
     }
 }

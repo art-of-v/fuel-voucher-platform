@@ -206,6 +206,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                     "an error today - it becomes one when the column is promoted to NOT NULL, and that is a" +
                     "separate migration with a test that says so.");
 
+        // Postgres does not index a foreign key column on its own, and the parent's delete check and
+        // every join down this column scan without one.
         builder.HasIndex(e => e.PartyId);
 
         // --- F-14: the foreign key this column was missing -------------------------------------------------
@@ -216,10 +218,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .WithMany()
             .HasForeignKey(e => e.PartyId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
-        builder.HasIndex(e => e.PartyId);
 
         // The admin's customers list sorts by created_at_utc DESC, id - and no index on this table
         // led with that column, so the sort was a scan of the whole table. The list is a page now,
