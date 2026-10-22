@@ -16,4 +16,15 @@ public sealed class UpdatesOptions
     /// default: an unconfigured server never breaks an installed app, it just offers no update.
     /// </summary>
     public string PublicBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The deadline the CDN is given. An installed app asking "is there an update?" waits on
+    /// this, so a CDN that never answers is a 502 on the update check.
+    /// </summary>
+    public const int DefaultTimeoutSeconds = 15;
+
+    /// <summary>
+    /// How long the CDN is given to answer. Zero or less means the default.
+    /// </summary>
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 }

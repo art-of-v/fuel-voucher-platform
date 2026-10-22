@@ -19,6 +19,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Resilience;
 using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Hangfire;
@@ -103,9 +104,18 @@ try
     // writing the in-app row - so the sender the API registers has to be registered here too.
     // The push is best-effort by contract: a failure is logged and swallowed, and the master
     // switch (ExpoPush:Enabled) turns it off without a code change.
+    //
+    // The deadline and the policy are the API's, because the client is the API's: this worker
+    // runs the API's notification service, and a push server that never answers must not hold
+    // the worker's thread either.
     builder.Services.Configure<ExpoPushOptions>(
         builder.Configuration.GetSection(ExpoPushOptions.SectionName));
-    builder.Services.AddHttpClient<IExpoPushSender, ExpoPushClient>();
+    var expoPush = builder.Configuration
+        .GetSection(ExpoPushOptions.SectionName)
+        .Get<ExpoPushOptions>();
+    builder.Services.AddOutboundHttpClient<IExpoPushSender, ExpoPushClient>(
+        OutboundHttpClient.TimeoutOrDefault(expoPush?.TimeoutSeconds ?? ExpoPushOptions.DefaultTimeoutSeconds),
+        OutboundCallKind.Write);
 
     // The API and this worker share one Hangfire storage and both listen on the
     // "default" queue, so the worker can pick up jobs the API enqueued. That includes
@@ -124,8 +134,18 @@ try
 
     if (monobankOptions?.Enabled == true)
     {
-        builder.Services.AddHttpClient($"monobank-{MonobankMerchant.Live}");
-        builder.Services.AddHttpClient($"monobank-{MonobankMerchant.Sandbox}");
+        // The acquirer, with the deadline the API gives it and the same decision not to retry
+        // it: the invoice creation is a POST, and repeating that is how one basket becomes two
+        // invoices. The worker only ever reads the acquirer (the refund status sync), but it
+        // shares the client with the API's write path, so the declaration is the conservative one.
+        builder.Services.AddOutboundHttpClient(
+            $"monobank-{MonobankMerchant.Live}",
+            TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds),
+            OutboundCallKind.Write);
+        builder.Services.AddOutboundHttpClient(
+            $"monobank-{MonobankMerchant.Sandbox}",
+            TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds),
+            OutboundCallKind.Write);
     }
 
     builder.Services.AddScoped<RefundStatusSyncService>();

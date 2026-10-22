@@ -85,6 +85,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Resilience;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Services;
 using Scrutor;
@@ -158,7 +159,7 @@ internal static class ServiceSetup
         AddProviderServices(services);
         AddContractServices(services);
         AddAdminServices(services);
-        AddNotificationServices(services);
+        AddNotificationServices(services, config);
         AddSupportServices(services, config);
         AddFeedbackServices(services, config);
         AddSettlementServices(services, config);
@@ -166,7 +167,7 @@ internal static class ServiceSetup
         AddOkkoPriceServices(services, config);
         AddUpgWogPriceServices(services, config);
         AddMinfinPriceServices(services, config);
-        AddUpdateServices(services);
+        AddUpdateServices(services, config);
 
         services.Scan(scan => scan
             .FromAssembliesOf(typeof(ServiceSetup))
@@ -300,7 +301,14 @@ services.AddScoped<TermQuoteQueryHandler>();
         // startup guard refuses to boot in that state (see SecurityConfigurationValidator).
         if (HasSmsClubConfiguration(config))
         {
-            services.AddHttpClient<SmsClubSmsService>();
+            // The OTP path. A deadline on it: the brand is somebody else's server, and a request
+            // that waits a hundred seconds for an SMS that was never sent is a login that never
+            // happens. The send is a POST, so it is not retried - a second OTP code for one login
+            // is worse than no code.
+            var smsClub = config.GetSection(SmsClubOptions.SectionName).Get<SmsClubOptions>();
+            services.AddOutboundHttpClient<SmsClubSmsService>(
+                OutboundHttpClient.TimeoutOrDefault(smsClub?.TimeoutSeconds ?? SmsClubOptions.DefaultTimeoutSeconds),
+                OutboundCallKind.Write);
             services.AddScoped<ISmsService>(sp => sp.GetRequiredService<SmsClubSmsService>());
             return;
         }
@@ -341,10 +349,18 @@ services.AddScoped<TermQuoteQueryHandler>();
             // The checkout depends on it: the request that loses the race waits for the winner's
             // invoice, and that wait is bounded by what the acquirer can do to us. A call that hangs
             // for a hundred seconds would make the wait meaningless.
-            services.AddHttpClient($"monobank-{MonobankMerchant.Live}", client =>
-                client.Timeout = TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds));
-            services.AddHttpClient($"monobank-{MonobankMerchant.Sandbox}", client =>
-                client.Timeout = TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds));
+            //
+            // No retry: this client carries the invoice creation, and repeating that POST is how
+            // one basket becomes two invoices. The circuit breaker still applies, so a downed
+            // acquirer is refused in milliseconds instead of after the full timeout.
+            services.AddOutboundHttpClient(
+                $"monobank-{MonobankMerchant.Live}",
+                TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds),
+                OutboundCallKind.Write);
+            services.AddOutboundHttpClient(
+                $"monobank-{MonobankMerchant.Sandbox}",
+                TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds),
+                OutboundCallKind.Write);
         }
 
         services.AddScoped<ProcessMonobankWebhookCommandHandler>();
@@ -360,11 +376,10 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.Configure<OkkoPriceOptions>(config.GetSection(OkkoPriceOptions.SectionName));
 
         var okko = config.GetSection(OkkoPriceOptions.SectionName).Get<OkkoPriceOptions>();
-        services.AddHttpClient<IOkkoPriceClient, OkkoPriceClient>(client =>
-        {
-            var timeout = okko?.TimeoutSeconds ?? 30;
-            if (timeout > 0) client.Timeout = TimeSpan.FromSeconds(timeout);
-        });
+        // A read: the price page is fetched and parsed, and fetching it twice costs nothing.
+        services.AddOutboundHttpClient<IOkkoPriceClient, OkkoPriceClient>(
+            OutboundHttpClient.TimeoutOrDefault(okko?.TimeoutSeconds ?? OkkoPriceOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Read);
     }
 
     private static void AddUpgWogPriceServices(IServiceCollection services, IConfiguration config)
@@ -372,11 +387,9 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.Configure<UpgWogPriceOptions>(config.GetSection(UpgWogPriceOptions.SectionName));
 
         var upgWog = config.GetSection(UpgWogPriceOptions.SectionName).Get<UpgWogPriceOptions>();
-        services.AddHttpClient<IUpgWogPriceClient, UpgWogPriceClient>(client =>
-        {
-            var timeout = upgWog?.TimeoutSeconds ?? 30;
-            if (timeout > 0) client.Timeout = TimeSpan.FromSeconds(timeout);
-        });
+        services.AddOutboundHttpClient<IUpgWogPriceClient, UpgWogPriceClient>(
+            OutboundHttpClient.TimeoutOrDefault(upgWog?.TimeoutSeconds ?? UpgWogPriceOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Read);
     }
 
     private static void AddMinfinPriceServices(IServiceCollection services, IConfiguration config)
@@ -384,11 +397,9 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.Configure<MinfinPriceOptions>(config.GetSection(MinfinPriceOptions.SectionName));
 
         var minfin = config.GetSection(MinfinPriceOptions.SectionName).Get<MinfinPriceOptions>();
-        services.AddHttpClient<IMinfinPriceClient, MinfinPriceClient>(client =>
-        {
-            var timeout = minfin?.TimeoutSeconds ?? 30;
-            if (timeout > 0) client.Timeout = TimeSpan.FromSeconds(timeout);
-        });
+        services.AddOutboundHttpClient<IMinfinPriceClient, MinfinPriceClient>(
+            OutboundHttpClient.TimeoutOrDefault(minfin?.TimeoutSeconds ?? MinfinPriceOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Read);
     }
 
     private static void AddInfrastructureServices(IServiceCollection services)
@@ -458,7 +469,7 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         services.AddScoped<GetReconciliationQueryHandler>();
     }
 
-    private static void AddNotificationServices(IServiceCollection services)
+    private static void AddNotificationServices(IServiceCollection services, IConfiguration config)
     {
         services.AddScoped<GetNotificationsQueryHandler>();
         services.AddScoped<MarkNotificationReadCommandHandler>();
@@ -467,7 +478,14 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         // Typed client for the Expo Push service. Credential-free by default (see ExpoPushOptions);
         // the send is best-effort and fired from NotificationService when an in-app notification is
         // created.
-        services.AddHttpClient<IExpoPushSender, ExpoPushClient>();
+        //
+        // A deadline, because the push is fired on the request thread of whatever created the
+        // notification - a push server that never answers would hold that thread. No retry: a
+        // repeated push is a second notification on the customer's phone.
+        var expoPush = config.GetSection(ExpoPushOptions.SectionName).Get<ExpoPushOptions>();
+        services.AddOutboundHttpClient<IExpoPushSender, ExpoPushClient>(
+            OutboundHttpClient.TimeoutOrDefault(expoPush?.TimeoutSeconds ?? ExpoPushOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Write);
     }
 
     private static void AddSupportServices(IServiceCollection services, IConfiguration config)
@@ -486,26 +504,27 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         services.Configure<FeedbackClassifierOptions>(
             config.GetSection(FeedbackClassifierOptions.SectionName));
 
-        var feedback = config.GetSection(TelegramFeedbackOptions.SectionName)
+var feedback = config.GetSection(TelegramFeedbackOptions.SectionName)
             .Get<TelegramFeedbackOptions>();
-        services.AddHttpClient<ITelegramFeedbackClient, TelegramFeedbackClient>(client =>
-        {
-            var baseUrl = feedback?.BaseUrl;
-            if (!string.IsNullOrWhiteSpace(baseUrl))
-                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
-            var timeout = feedback?.TimeoutSeconds ?? 10;
-            if (timeout > 0)
-                client.Timeout = TimeSpan.FromSeconds(timeout);
-        });
+        // The feedback bot: the platform posts to it and reads its answers. A POST, so no retry -
+        // a repeated message is a second answer in the support channel.
+        services.AddOutboundHttpClient<ITelegramFeedbackClient, TelegramFeedbackClient>(
+            OutboundHttpClient.TimeoutOrDefault(feedback?.TimeoutSeconds ?? TelegramFeedbackOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Write,
+            client =>
+            {
+                var baseUrl = feedback?.BaseUrl;
+                if (!string.IsNullOrWhiteSpace(baseUrl))
+                    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+            });
 
-        var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
+var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
             .Get<FeedbackClassifierOptions>();
-        services.AddHttpClient<IFeedbackClassifier, GeminiFeedbackClassifier>(client =>
-        {
-            var timeout = classifier?.TimeoutSeconds ?? 20;
-            if (timeout > 0)
-                client.Timeout = TimeSpan.FromSeconds(timeout);
-        });
+        // The classifier asks a model to label a support message. A POST, so no retry: the answer
+        // is a label, and a second call buys nothing the first did not.
+        services.AddOutboundHttpClient<IFeedbackClassifier, GeminiFeedbackClassifier>(
+            OutboundHttpClient.TimeoutOrDefault(classifier?.TimeoutSeconds ?? FeedbackClassifierOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Write);
 
         // Scoped rather than singleton: the router writes through the request-scoped DbContext.
         services.AddScoped<FeedbackUpdateRouter>();
@@ -559,12 +578,18 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         services.AddScoped<BackfillBrandFuelCodesCommandHandler>();
     }
 
-    private static void AddUpdateServices(IServiceCollection services)
+    private static void AddUpdateServices(IServiceCollection services, IConfiguration config)
     {
         // Typed client for the self-hosted OTA manifest endpoint. It fetches pre-signed update
         // descriptors from public R2 over plain HTTPS — no S3 SDK and no credential, because update
         // integrity is enforced by the client-verified manifest signature, not the transport.
-        services.AddHttpClient<UpdateManifestSource>();
+        //
+        // A read, so it is retried: an installed app asking "is there an update?" while the CDN
+        // blinks should get an answer, not a 502.
+        var updates = config.GetSection(UpdatesOptions.SectionName).Get<UpdatesOptions>();
+        services.AddOutboundHttpClient<UpdateManifestSource>(
+            OutboundHttpClient.TimeoutOrDefault(updates?.TimeoutSeconds ?? UpdatesOptions.DefaultTimeoutSeconds),
+            OutboundCallKind.Read);
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services, IConfiguration configuration)

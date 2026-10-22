@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Resilience;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -122,11 +123,13 @@ public static class ObservabilitySetup
             return services;
         }
 
-        services.AddHttpClient<IAlertNotifier, TelegramAlertNotifier>(client =>
-        {
-            client.BaseAddress = new Uri(telegram.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(telegram.TimeoutSeconds);
-        });
+        // The alert path. The alert is a POST, so it is not retried - a repeated alert is a second
+        // message in the on-call channel - but it keeps the deadline and the circuit breaker, so
+        // a Telegram that is down does not hold the thread that is trying to tell us it is down.
+        services.AddOutboundHttpClient<IAlertNotifier, TelegramAlertNotifier>(
+            OutboundHttpClient.TimeoutOrDefault(telegram.TimeoutSeconds),
+            OutboundCallKind.Write,
+            client => client.BaseAddress = new Uri(telegram.BaseUrl));
 
         services.AddTransient<NotificationDispatcher>();
 

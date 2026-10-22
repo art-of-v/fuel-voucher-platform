@@ -91,7 +91,10 @@ public sealed class TelegramFeedbackOptions
 
     public string BaseUrl { get; set; } = "https://api.telegram.org";
 
-    public int TimeoutSeconds { get; set; } = 10;
+    /// <summary>The deadline Telegram is given on the feedback path.</summary>
+    public const int DefaultTimeoutSeconds = 10;
+
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 
     /// <summary>
     /// Whether the integration is provisioned: a token, the webhook secret, a signing key and a

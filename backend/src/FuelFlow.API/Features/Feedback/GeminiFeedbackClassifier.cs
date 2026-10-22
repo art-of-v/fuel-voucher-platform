@@ -22,7 +22,11 @@ public sealed class FeedbackClassifierOptions
 
     public string Model { get; set; } = "gemini-2.0-flash";
 
-    public int TimeoutSeconds { get; set; } = 20;
+    /// <summary>The deadline the model is given. A triage step that waits a hundred seconds is a
+    /// feedback message nobody reads.</summary>
+    public const int DefaultTimeoutSeconds = 20;
+
+    public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 
     public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(Model);
 }
