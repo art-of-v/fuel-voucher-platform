@@ -2,47 +2,34 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { SecurityService } from './securityService';
 import { TokenStorage } from './tokenStorage';
+import {
+  BASE_URL,
+  CLIENT_PLATFORM_HEADER,
+  NATIVE_CLIENT_PLATFORM,
+} from './apiConfig';
+import {
+  clearAppleAttestationKey,
+  getAttestationHeaders,
+  isAttestationProtected,
+} from '../security/appAttestation';
+import { ensureSslPinningInitialized } from '../security/sslPinning';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 
-// The backend sends the refresh token in the response body only to a client that says it is
-// native - the browser gets it in the HttpOnly cookie and never in the body, because a script
-// on the origin can read a response body and cannot read an HttpOnly cookie. React Native has
-// no cookie jar, so the body is the only place the token can live here.
-// Mirrors the backend's ClientPlatform (SharedKernel/Security/ClientPlatform.cs).
-const CLIENT_PLATFORM_HEADER = 'X-Client-Platform';
-const NATIVE_CLIENT_PLATFORM = 'mobile';
+const CLIENT_OS_HEADER = 'X-Client-OS';
+const APP_VERSION_HEADER = 'X-App-Version';
+const ATTESTATION_HEADERS = [
+  'X-Attestation-Provider',
+  'X-Attestation-Challenge',
+  'X-Attestation-Proof',
+  'X-Attestation-Key-Id',
+];
 
 let pendingRefreshPromise: Promise<boolean> | null = null;
+let lastSignatureTimestamp = 0;
 
-// Single committed production URL — mirrored in app.json (expo.extra.apiUrl) and the
-// eas.json build profiles, kept identical by scripts/check-api-config.mjs.
-const PRODUCTION_API_URL = 'https://api.palne.shop';
-
-function resolveApiBaseUrl(): string {
-  // 1. Build-time env — EAS build profiles (eas.json) or a local .env. Present in most builds.
-  const fromEnv = process.env.EXPO_PUBLIC_API_URL;
-  if (fromEnv) return fromEnv;
-
-  // 2. Embedded app config. expo.extra.apiUrl is compiled into every build path, including a
-  //    raw Xcode Archive that never saw the shell env at bundle time.
-  const fromExtra = Constants.expoConfig?.extra?.apiUrl;
-  if (typeof fromExtra === 'string' && fromExtra) return fromExtra;
-
-  // 3. Local dev servers only — unreachable from any store/TestFlight build.
-  if (__DEV__) {
-    return Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000';
-  }
-
-  // 4. Last resort: the known production backend. This function runs at module load (see
-  //    BASE_URL below), before React mounts, so it must NEVER throw — a throw here is an
-  //    uncatchable native SIGABRT at launch, not something ErrorBoundary can surface.
-  //    PRODUCTION_API_URL is the same value as steps 1–2, so this is a fallback, not a guess.
-  return PRODUCTION_API_URL;
-}
-
-export const BASE_URL = resolveApiBaseUrl();
+export { BASE_URL } from './apiConfig';
 
 async function fetchWithTimeout(
   url: string,
@@ -172,6 +159,7 @@ function isPublicEndpoint(endpoint: string): boolean {
 export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const url = `${BASE_URL}${endpoint}`;
   const method = (options.method || 'GET').toUpperCase();
+  const path = stripQuery(endpoint);
   const deviceId = await SecurityService.getDeviceId();
 
   const headers: Record<string, string> = {
@@ -180,6 +168,10 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     // Says what this client is, so the backend can put the refresh token in the body - the only
     // place a native app can keep it.
     [CLIENT_PLATFORM_HEADER]: NATIVE_CLIENT_PLATFORM,
+    ...(Platform.OS === 'ios' || Platform.OS === 'android'
+      ? { [CLIENT_OS_HEADER]: Platform.OS }
+      : {}),
+    ...(Constants.expoConfig?.version ? { [APP_VERSION_HEADER]: Constants.expoConfig.version } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -201,8 +193,11 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     : '';
 
   const needsSignature = forceSignature === 'true' || requiresSignature(endpoint);
+  const needsAttestation = isAttestationProtected(path);
 
+  await ensureSslPinningInitialized(BASE_URL);
   await applySignature(endpoint, method, bodyString, headers, needsSignature);
+  await applyAttestation(path, method, bodyString, headers, needsAttestation);
 
   const response = await fetchWithRetry(url, {
     ...options,
@@ -210,22 +205,48 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     credentials: 'include',
   });
 
-  if (response.status === 401 && !endpoint.includes('/api/auth/refresh')) {
+  if (
+    response.status === 401 &&
+    needsAttestation &&
+    headers['X-Attestation-Provider'] === 'apple' &&
+    isRetiredAppleKey(response)
+  ) {
+    // The server no longer knows this key (database restore, revocation, an old reinstall).
+    // Mint a fresh one and retry once; the challenge and counter are new with it. The first
+    // attempt already consumed its device-signature nonce (the middleware runs before
+    // attestation), so the retry must carry a fresh timestamp and signature as well.
+    await clearAppleAttestationKey();
+    await applySignature(endpoint, method, bodyString, headers, needsSignature);
+    await applyAttestation(path, method, bodyString, headers, needsAttestation);
+
+    return fetchWithRetry(url, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
+  }
+
+  if (
+    response.status === 401 &&
+    !endpoint.includes('/api/auth/refresh') &&
+    !isAttestationRejection(response)
+  ) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       const storedToken = await TokenStorage.getAccessToken();
       if (storedToken) {
         headers['Authorization'] = `Bearer ${storedToken}`;
       }
-      // Re-sign with a fresh timestamp: the first attempt may have consumed
-      // its nonce server-side, and a replayed timestamp is rejected.
+      // Re-sign and re-attest with fresh material: the first attempt may have
+      // consumed its nonce/challenge server-side, and replaying either is rejected.
       await applySignature(endpoint, method, bodyString, headers, needsSignature);
+      await applyAttestation(path, method, bodyString, headers, needsAttestation);
       const retryResponse = await fetchWithRetry(url, {
         ...options,
         headers,
         credentials: 'include',
       });
-      if (retryResponse.status === 401) {
+      if (retryResponse.status === 401 && !isAttestationRejection(retryResponse)) {
         await TokenStorage.clearTokens();
       }
       return retryResponse;
@@ -235,9 +256,60 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   return response;
 }
 
+function stripQuery(endpoint: string): string {
+  const queryStart = endpoint.indexOf('?');
+  return queryStart >= 0 ? endpoint.slice(0, queryStart) : endpoint;
+}
+
+function isAttestationRejection(response: Response): boolean {
+  // The backend sets this on every attestation refusal. Unlike the JSON body it can be read
+  // without consuming the response the caller is about to parse.
+  return Boolean(response.headers?.get?.('x-attestation-error'));
+}
+
+function isRetiredAppleKey(response: Response): boolean {
+  const code = response.headers?.get?.('x-attestation-error');
+  return code === 'ATTESTATION_KEY_UNKNOWN' || code === 'ATTESTATION_KEY_REVOKED';
+}
+
+async function applyAttestation(
+  path: string,
+  method: string,
+  bodyString: string,
+  headers: Record<string, string>,
+  needsAttestation: boolean,
+): Promise<void> {
+  for (const header of ATTESTATION_HEADERS) {
+    delete headers[header];
+  }
+
+  if (!needsAttestation) return;
+
+  try {
+    const proof = await getAttestationHeaders(method, path, bodyString);
+    if (proof) {
+      Object.assign(headers, proof);
+    }
+  } catch (error) {
+    // Attestation is defence in depth. A device that cannot produce a proof still sends the
+    // request: the server decides whether this rollout enforces it, and a client-side throw
+    // here would turn a verifier outage into an app-wide outage.
+    console.warn('[Attestation] proof unavailable:', error);
+  }
+}
+
 // Signs the request with a fresh timestamp (payload = METHOD + path + body +
 // timestamp). Unsigned endpoints only get the timestamp header; the signature
 // header is added when the endpoint requires it and device keys exist.
+function nextSignatureTimestamp(): string {
+  // The server's replay nonce is keyed by (device id, timestamp), so two requests inside the
+  // same millisecond would collide and be rejected as a replay. Keep timestamps strictly
+  // increasing even when a retry re-signs immediately.
+  const timestamp = Math.max(Date.now(), lastSignatureTimestamp + 1);
+  lastSignatureTimestamp = timestamp;
+  return timestamp.toString();
+}
+
 async function applySignature(
   endpoint: string,
   method: string,
@@ -245,7 +317,7 @@ async function applySignature(
   headers: Record<string, string>,
   needsSignature: boolean,
 ): Promise<void> {
-  const timestamp = Date.now().toString();
+  const timestamp = nextSignatureTimestamp();
   headers['x-timestamp'] = timestamp;
 
   if (!needsSignature) {

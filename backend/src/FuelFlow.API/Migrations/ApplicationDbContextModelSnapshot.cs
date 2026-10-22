@@ -144,6 +144,77 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("monobank_statement_entries", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Attestation.SharedModels.AttestationKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Counter")
+                        .HasColumnType("bigint")
+                        .HasColumnName("counter")
+                        .HasComment("The last accepted assertion counter. App Attest counters only move forward, so an assertion at or below this value is a replay.");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasComment("When the key was registered.");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("device_id")
+                        .HasComment("The device that registered the key. Attestation is device-bound, not account-bound; a logout revokes the session but does not delete this key.");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("environment")
+                        .HasComment("The App Attest environment the key was attested in: Production or Development.");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("key_id")
+                        .HasComment("The Apple App Attest key id, as the client reports it. Unique: an attestation registers exactly one server-side key.");
+
+                    b.Property<DateTime>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at")
+                        .HasComment("When an assertion from this key was last accepted.");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("public_key")
+                        .HasComment("The public key from the verified attestation, base64. Assertion signatures are checked against this server-owned value, not against anything the client sends.");
+
+                    b.Property<string>("Receipt")
+                        .HasColumnType("text")
+                        .HasColumnName("receipt")
+                        .HasComment("The attestation receipt, when the verifier supplies one. Audit data only.");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at")
+                        .HasComment("When an operator revoked the key. A revoked key is never accepted again.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId")
+                        .HasDatabaseName("ix_attestation_keys_device_id");
+
+                    b.HasIndex("KeyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_attestation_keys_key_id");
+
+                    b.ToTable("attestation_keys", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.Device", b =>
                 {
                     b.Property<Guid>("Id")

@@ -160,6 +160,9 @@ export const SecurityService = {
     await SecureStore.deleteItemAsync('device_id');
     await SecureStore.deleteItemAsync(PUBLIC_KEY_KEY);
     await SecureStore.deleteItemAsync('soft_private_key');
+    // Deliberately leave attestation_apple_key_id: App Attest proves the device/app, not the
+    // session, and the server binds the key to the device id. Deleting it here would force a new
+    // Apple attestation on every login and can lock the auth endpoints if Apple throttles.
     await TokenStorage.clearTokens();
   },
 

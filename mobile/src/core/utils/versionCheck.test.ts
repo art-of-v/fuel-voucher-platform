@@ -5,10 +5,12 @@ import {
   fetchAppVersion,
 } from './versionCheck';
 
-// `versionCheck` pulls in `BASE_URL` from `apiClient`, which reaches `react-native-device-info`
-// and its `new NativeEventEmitter()`. Same stub as `app/_layout.test.tsx`: the module under test
-// needs one constant from it, and none of these tests exercise the HTTP client.
-jest.mock('../api/apiClient', () => ({ BASE_URL: 'https://test.local' }));
+// `versionCheck` pulls in `BASE_URL` from the config module and asks the pinning module to
+// initialize before its direct fetch. Neither is under test here.
+jest.mock('../api/apiConfig', () => ({ BASE_URL: 'https://test.local' }));
+jest.mock('../security/sslPinning', () => ({
+  ensureSslPinningInitialized: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Read lazily via a getter: Jest hoists `jest.mock` above this file's statements, so a plain
 // `const` captured in the factory would be read before it is assigned. Deferring the read to

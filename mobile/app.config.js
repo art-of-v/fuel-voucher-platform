@@ -12,12 +12,32 @@ const base = require('./app.json');
 module.exports = () => {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   const android = base.expo.android ?? {};
+  const ios = base.expo.ios ?? {};
+
+  // App Attest rejects a build whose entitlement does not match the provisioning profile.
+  // EAS production sets this to "production"; local development builds can set "development".
+  // Anything else falls back to production rather than emitting an invalid entitlement.
+  const appAttestEnvironment =
+    process.env.APP_ATTEST_ENVIRONMENT === 'development' ? 'development' : 'production';
+  const googleCloudProjectNumber =
+    process.env.EXPO_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER ?? process.env.GOOGLE_CLOUD_PROJECT_NUMBER;
 
   return {
     ...base.expo,
+    ios: {
+      ...ios,
+      entitlements: {
+        ...ios.entitlements,
+        'com.apple.developer.devicecheck.appattest-environment': appAttestEnvironment,
+      },
+    },
     android: {
       ...android,
       ...(apiKey ? { config: { ...android.config, googleMaps: { apiKey } } } : {}),
+    },
+    extra: {
+      ...base.expo.extra,
+      ...(googleCloudProjectNumber ? { googleCloudProjectNumber } : {}),
     },
   };
 };

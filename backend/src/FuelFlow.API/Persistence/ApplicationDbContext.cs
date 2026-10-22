@@ -1,3 +1,4 @@
+using FuelFlow.Features.Attestation.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
@@ -85,6 +86,9 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<StaffTwoFactor> StaffTwoFactors => Set<StaffTwoFactor>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Device> Devices => Set<Device>();
+    // Apple App Attest keys the server has verified. One row per attested key; the assertion
+    // counter on the row is the replay guard.
+    public DbSet<AttestationKey> AttestationKeys => Set<AttestationKey>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderEvent> OrderEvents => Set<OrderEvent>();
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
