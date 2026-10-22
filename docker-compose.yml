@@ -1,21 +1,54 @@
+# The LOCAL full stack: Postgres, Redis, the API and the admin SPA.
+#
+# This is the file the README documents as the quick start, so it has to actually come up on a
+# machine that has followed `.env.example` (copy it to `.env` first - every value below comes
+# from there). It used not to. The file was broken in five ways at once:
+#
+#   1. the `mobile-app` service built `mobile/Dockerfile`, which does not exist - a React Native
+#      app has no server image to build, and `docker compose up --build` died at build time;
+#   2. the API's connection string named `fuel_db_dotnet` with the password `postgres`, while the
+#      container was created with `POSTGRES_DB` and `POSTGRES_PASSWORD` - two different answers,
+#      so the API could never authenticate to the database it was wired to;
+#   3. the healthcheck asked for a third answer (`-d fuel_db`);
+#   4. the API was started without `QrCipher__Key`, which it refuses to start without - the
+#      composition root throws during DI resolution;
+#   5. the admin's nginx had no backend to proxy to (`BACKEND_HOST` was never set), so the
+#      template's `proxy_pass http://${BACKEND_HOST}:8080` had no host and nginx refused to
+#      start.
+#
+# `scripts/check-local-stack.sh` brings this whole file up in CI and asserts that the API answers
+# `/health/ready`, so the next break in it is a red build and not a surprise on a new machine.
+#
+# The values the application cannot start without carry the `:?` guard, so a missing one is a
+# loud error while the file is parsed - not a crash-loop discovered five minutes later.
+#
+# Ports are published on 127.0.0.1 only. The API runs with `Auth:DevBypass` on (the
+# Development default), which turns the OTP codes into log lines and every rate limit off: a
+# stack reachable from the LAN is a stack anybody on the LAN can log into as anybody.
+
+name: fuelflow-local
+
 services:
   admin-database:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     container_name: fuel-admin-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d fuel_db" ]
+      # The SAME database and user the container was created with. The check used to ask for
+      # `-d fuel_db` while the container created whatever POSTGRES_DB said, so a machine that
+      # renamed the database had a database that was up and a healthcheck that never passed.
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
@@ -37,19 +70,36 @@ services:
     container_name: fuel-dotnet-backend
     restart: unless-stopped
     ports:
-      - "5000:8080"
+      - "127.0.0.1:5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - Database__ConnectionString=Host=admin-database;Port=5432;Database=fuel_db_dotnet;Username=postgres;Password=postgres;SSL Mode=Disable;Trust Server Certificate=true;
+      # The SAME database the container above was created with. The string used to be hardcoded
+      # (`fuel_db_dotnet` / `postgres`), so it disagreed with POSTGRES_DB and POSTGRES_PASSWORD
+      # twice over and the API could not authenticate to the database it was wired to.
+      - Database__ConnectionString=Host=admin-database;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true;
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
-      - Monobank__Token=${MONOBANK_API_TOKEN}
-      - Monobank__WebhookUrl=${MONOBANK_WEBHOOK_URL}
-      - Monobank__Enabled=true
+      # The key that encrypts the voucher QR payload at rest. The application refuses to start
+      # without it - and a key that defaults is a key that everybody has.
+      - QrCipher__Key=${QrCipher__Key:?set QrCipher__Key in .env (openssl rand -base64 32)}
+      # The Loki sink fails CLOSED: enabled without credentials, the composition root throws at
+      # startup. This stack has no Loki to push to (the observability stack is a separate compose
+      # file under `deploy/`), so the sink is off - stated here as well as in the Development
+      # configuration, so the local stack does not depend on that file's default.
+      - Observability__Loki__Enabled=false
+      # Monobank is OFF unless the operator asks for it. With the integration on and no token
+      # every checkout fails at the acquirer, and the local stack ships the in-process mock
+      # instead - so a fresh checkout works without anybody buying a sandbox merchant first.
+      - Monobank__Enabled=${MONOBANK_ENABLED:-false}
+      - Monobank__Token=${MONOBANK_API_TOKEN:-}
+      - Monobank__PublicKey=${MONOBANK_PUBLIC_KEY:-}
+      - Monobank__WebhookUrl=${MONOBANK_WEBHOOK_URL:-}
       - Monobank__BaseUrl=https://api.monobank.ua
       - Monobank__RedirectUrl=fuelflow://payment-result
     depends_on:
       admin-database:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   admin-frontend:
@@ -59,22 +109,21 @@ services:
     container_name: fuel-admin-frontend
     restart: unless-stopped
     ports:
-      - "5002:5000"
+      - "127.0.0.1:5002:5000"
+    environment:
+      # The admin image serves the SPA with nginx and proxies /api to the backend. The host name
+      # is substituted into the nginx template at container start - without it the template's
+      # `proxy_pass http://${BACKEND_HOST}:8080` has no host and nginx refuses to start.
+      BACKEND_HOST: dotnet-backend
+      # envsubst must not eat nginx's own $variables in the template, so the filter names the one
+      # variable that IS meant to be substituted.
+      NGINX_ENVSUBST_FILTER: "^BACKEND_HOST$"
     depends_on:
       - dotnet-backend
 
-  mobile-app:
-    build:
-      context: ./mobile
-      dockerfile: Dockerfile
-    container_name: fuel-mobile-app
-    restart: unless-stopped
-    environment:
-      EXPO_PUBLIC_API_URL: http://dotnet-backend:8080
-    ports:
-      - "5003:5000"
-    depends_on:
-      - dotnet-backend
+  # The mobile app is deliberately NOT here. It is an Expo app: it runs on a device or a
+  # simulator (`npm start` in `mobile/`), it has no server image to build, and a compose service
+  # for it could only ever have been a copy of a file that does not exist.
 
 volumes:
   postgres_data:

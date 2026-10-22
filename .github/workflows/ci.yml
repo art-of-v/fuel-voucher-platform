@@ -53,6 +53,7 @@ jobs:
       deploy: ${{ steps.filter.outputs.deploy }}
       migrations: ${{ steps.filter.outputs.migrations }}
       scripts: ${{ steps.filter.outputs.scripts }}
+      compose: ${{ steps.filter.outputs.compose }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -76,6 +77,12 @@ jobs:
           fi
           echo "Changed files:"; echo "$changed"
           backend=false; admin=false; mobile=false; website=false; deploy=false; scripts=false; other=false
+          # The LOCAL stack (the root docker-compose.yml). A separate flag, because the file is
+          # read by nothing else in this repository: the backend suites do not parse it, the
+          # deploy scripts test the PRODUCTION compose file, and the admin suite does not know
+          # the container exists. It used to be broken in five ways at once while every suite
+          # stayed green - so it gets a job of its own that brings it up for real.
+          compose=false
           # A migration is a data-shaped change, not a backend code change: it can pass every backend
           # test, pass staging, and still be wrong against production's rows. On 2026-10-15 that is
           # what happened twice - the offer split took the API down, then came back and took it down
@@ -86,6 +93,20 @@ jobs:
             if [ -z "$f" ]; then continue; fi
             case "$f" in
             backend/src/FuelFlow.API/Migrations/*) migrations=true ;;
+            # The images the LOCAL stack builds. A Dockerfile change cannot break a component
+            # suite, but it can break the compose stack - and the local-stack job builds both
+            # images, so it is the gate for these two files. The component flag stays on, so a
+            # change to a Dockerfile does not cost less coverage than it does today.
+            backend/src/FuelFlow.API/Dockerfile) compose=true; backend=true ;;
+            admin/Dockerfile) compose=true; admin=true ;;
+            # The root compose file and the .env it reads. Nothing else in the repository
+            # consumes either of them, so they arm the local-stack job ALONE: running the
+            # whole matrix for a compose fix costs twenty minutes to learn nothing. The
+            # local-stack job builds the API image and boots the API, so a compile error is
+            # caught there too.
+            docker-compose.yml|.env.example) compose=true ;;
+            # The script the local-stack job runs.
+            scripts/check-local-stack.sh) compose=true; scripts=true ;;
             # The Grafana provisioning. It is not backend code, and the backend suite cannot
             # see it - a contact point whose chat id is a YAML number takes the whole
             # alerting provisioning down on the box, and the rules go with it. The deploy
@@ -97,7 +118,7 @@ jobs:
             website/*) website=true ;;
             deploy/*)  deploy=true; other=true ;;
             # The repo-root fetchers (scripts/fetch-*-stations.mjs and friends). Nothing outside
-            # scripts/ imports them, so a change here cannot break a component's suite — what it
+            # scripts/ imports them, so a change there cannot break a component's suite — what it
             # needs is the scripts job below. Used to fall through to `*)` and run the full matrix.
             scripts/*) scripts=true ;;
             *)         other=true ;;
@@ -107,7 +128,14 @@ jobs:
           if [ "$allchanged" = "1" ] || [ "$other" = "true" ]; then
             backend=true; admin=true; mobile=true; website=true; migrations=true; scripts=true
           fi
-          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website" "deploy=$deploy" "migrations=$migrations" "scripts=$scripts"; do
+          # The fail-open path - the diff could not be read, so nothing at all is known about
+          # what changed - runs the local stack too. The `other` arm above does NOT: an
+          # unclassified file (a README, the CI configuration itself) cannot change what the
+          # compose file does, and the local-stack job builds two images.
+          if [ "$allchanged" = "1" ]; then
+            compose=true
+          fi
+          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website" "deploy=$deploy" "migrations=$migrations" "scripts=$scripts" "compose=$compose"; do
             echo "$kv" >> "$GITHUB_OUTPUT"; echo "$kv"
           done
 
@@ -634,6 +662,38 @@ jobs:
       # on the runner already.
       - name: Test the change detector
         run: bash scripts/changes-detector.test.sh
+
+  # THE LOCAL STACK, brought up for real.
+  #
+  # The root `docker-compose.yml` is the README's documented quick start, and it was broken in five
+  # ways at once - a service that built a `mobile/Dockerfile` that does not exist, an API pointed
+  # at a database the container never created, a healthcheck asking for a third database name, an
+  # API started without the QR cipher key it refuses to start without, and an admin nginx with no
+  # backend to proxy to. Every other job in this file stayed green through all of it: the backend
+  # suites do not read the file, the deploy scripts test the PRODUCTION compose file, and the
+  # admin suite does not know the container exists. The file a new developer's first command reads
+  # was the one file nothing checked.
+  #
+  # This job brings the stack up from the file itself and asserts that the API answers
+  # /health/ready (the readiness check covers the database AND Redis, and the API refuses to boot
+  # without its key) and that the admin SPA is served. The `.env` it uses is built from
+  # `.env.example`, so the example is proved to be enough as well.
+  #
+  # It is expensive - it builds the API image (which compiles the backend) and the admin image -
+  # so it runs only when the compose file, its .env, one of the two Dockerfiles or the script
+  # itself changes. A change to the backend source does not need it: that is what the backend
+  # suites are for.
+  local-stack:
+    name: Local stack (docker compose)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.compose == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Bring the local stack up and assert that it works
+        run: bash scripts/check-local-stack.sh
 
   # ------------------------------------------------------------------------------
   # Migration dry run against production's DATA, on the production BOX.
@@ -1303,7 +1363,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, dryrun-dump, dryrun-migrate, dryrun-staging-migrate, fromzero-schema]
+    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, local-stack, dryrun-dump, dryrun-migrate, dryrun-staging-migrate, fromzero-schema]
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed

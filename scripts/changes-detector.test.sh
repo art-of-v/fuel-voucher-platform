@@ -87,7 +87,7 @@ detect() {
     > "$WORK/log" 2>&1 || { echo "detector exited non-zero"; cat "$WORK/log"; return 1; }
 
   local flag v out=""
-  for flag in backend admin mobile website deploy migrations scripts; do
+  for flag in backend admin mobile website deploy migrations scripts compose; do
     v="$(grep -o "^$flag=.*" "$WORK/out" | head -1)"
     [ -n "$v" ] || { echo "detector wrote no '$flag' flag"; return 1; }
     [ -n "$out" ] && out="$out "
@@ -108,18 +108,24 @@ check() {
 
 echo "changes detector (real block extracted from $CI_YML)"
 
-# backend admin mobile website deploy migrations scripts
+# backend admin mobile website deploy migrations scripts compose
 #
 # NOTE `deploy` is false in the fail-open fallback: that block sets the component flags plus
 # migrations and scripts, but not deploy. So a repo-root or deploy/ change runs every COMPONENT
 # suite yet still skips the deploy-scripts job - only a deploy/ path arms that one.
-ALL="true true true true false true true"
+#
+# `compose` is the LOCAL stack (the root docker-compose.yml). It is false for everything that
+# cannot change what that file does - a repo-root file, a deploy/ file, a source change - and
+# true only for the compose file, its .env, the two Dockerfiles it builds and the script that
+# brings it up. The unclassified-file arm deliberately does NOT arm it: an unreadable diff arms
+# everything (the fail-open path), but a file nobody classified is not a compose change.
+ALL="true true true true false true true false"
 
 # scripts/ gets its own job and no component suite: nothing outside scripts/ imports those
 # fetchers, so a change there cannot break backend, admin, mobile or website.
 check "scripts-only runs the scripts job and nothing else" \
   "$(printf 'scripts/fetch-upg-stations.mjs\nscripts/fetch-upg-stations.test.mjs\nscripts/lib/station-csv.mjs')" \
-  "false false false false false false true"
+  "false false false false false false true false"
 
 # The fail-open default: anything unclassified is treated as shared and runs the full matrix.
 check "a repo-root file still runs everything" \
@@ -129,7 +135,7 @@ check "a repo-root file still runs everything" \
 # deploy/ sets its own flag AND `other`, so it gets every component suite plus the deploy job.
 check "deploy/ runs every component suite and the deploy job" \
   "deploy/disk-check.sh" \
-  "true true true true true true true"
+  "true true true true true true true false"
 
 # The Migrations/ arm deliberately shadows the `backend/*` arm that follows it, so a migration-only
 # PR does NOT run the backend unit/integration suites. That is not a hole: dryrun-migrate runs
@@ -138,15 +144,41 @@ check "deploy/ runs every component suite and the deploy job" \
 # future edit to the case arms cannot quietly drop either half.
 check "a migration runs the dry run, not the backend suites" \
   "backend/src/FuelFlow.API/Migrations/20260101_Seed.cs" \
-  "false false false false false true false"
+  "false false false false false true false false"
 
 check "backend source runs only backend" \
   "backend/src/FuelFlow.API/Program.cs" \
-  "true false false false false false false"
+  "true false false false false false false false"
 
 check "admin + scripts together run both" \
   "$(printf 'admin/src/lib/i18n.ts\nscripts/fetch-upg-stations.mjs')" \
-  "false true false false false false true"
+  "false true false false false false true false"
+
+# The LOCAL stack. Nothing else in the repository reads the root compose file, so a change to it
+# runs the local-stack job ALONE - the whole matrix for a compose fix would cost twenty minutes
+# to learn nothing. The job builds the API image and boots the API, so a compile error is caught
+# there too.
+check "the root compose file runs the local stack and nothing else" \
+  "docker-compose.yml" \
+  "false false false false false false false true"
+
+check "the .env the compose file reads runs the local stack and nothing else" \
+  ".env.example" \
+  "false false false false false false false true"
+
+# A Dockerfile the local stack builds arms the local-stack job AND its component suite: the
+# component suite keeps today's coverage, and the job is what sees the image actually build.
+check "the backend Dockerfile runs the local stack and the backend suite" \
+  "backend/src/FuelFlow.API/Dockerfile" \
+  "true false false false false false false true"
+
+check "the admin Dockerfile runs the local stack and the admin suite" \
+  "admin/Dockerfile" \
+  "false true false false false false false true"
+
+check "the local-stack script runs the local stack and the scripts job" \
+  "scripts/check-local-stack.sh" \
+  "false false false false false false true true"
 
 echo
 if [ "$fail" -eq 0 ]; then
