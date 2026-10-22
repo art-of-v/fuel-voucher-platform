@@ -196,6 +196,21 @@ public sealed class DatabaseRoleTests
     }
 
     [Fact]
+    public void Validate_DoesNotThrow_When_The_Schema_Is_Managed_By_Hand()
+    {
+        // A deployment that manages the schema by hand has no migration to run, so it has
+        // no second connection string - and refusing it to start over a connection it will
+        // never open would be a refusal of the wrong thing.
+        var settings = ValidProductionBaseline();
+        settings.Remove("Database:MigrationConnectionString");
+        settings["RunMigrationsOnBoot"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
     public void Validate_Ignores_The_Roles_Outside_Production()
     {
         // Staging is a disposable box behind an HTTP Basic credential and it connects as

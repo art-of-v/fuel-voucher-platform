@@ -64,6 +64,12 @@ public sealed class PlaceholderSecretGuardTests
         ["Database:ConnectionString"] =
             "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;"
             + "Password=dummy-database-password;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
+        // The schema migration has its own connection, and it is a role of its own: the
+        // application's traffic may not change the schema, and the migration may not do the
+        // traffic's work. A Production configuration that passes every guard has both.
+        ["Database:MigrationConnectionString"] =
+            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_migrator;"
+            + "Password=dummy-database-password;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
         ["ConnectionStrings:Redis"] = "redis:6379,password=dummy-redis-password",
         ["Monobank:Enabled"] = "true",
         ["Monobank:PublicKey"] = ReadableMonobankKey(),
