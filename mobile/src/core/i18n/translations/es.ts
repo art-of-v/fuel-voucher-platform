@@ -193,6 +193,8 @@ export const es: Record<string, string> = {
   'payment.openMonobank': 'Pagar con mono',
   'payment.missingUrl':
     'No se proporcionó ningún enlace de pago. Vuelve a tu pedido e inténtalo de nuevo.',
+  'payment.refusedUrl':
+    'Este enlace de pago no es seguro, así que no lo abrimos. Vuelve a tu pedido e inténtalo de nuevo.',
   'payment.cantRenderTitle': 'No se puede abrir el pago',
   'payment.cantRenderBody':
     'No se pudo mostrar la página de pago en la aplicación. ¿Abrirla en la aplicación de Monobank?',

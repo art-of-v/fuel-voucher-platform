@@ -12,6 +12,7 @@ import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { formatMoney } from '../src/core/utils/currency';
 import { Haptics } from '../src/core/utils/haptics';
+import { isFrameLoadableUrl, isOpenableUrl } from '../src/features/payments/linkPolicy';
 import { isAppDeepLink } from '../src/features/payments/paymentSession';
 
 /**
@@ -36,6 +37,11 @@ import { isAppDeepLink } from '../src/features/payments/paymentSession';
  *     loads is an empty screen on a checkout where the customer has already committed money.
  *     Every failure path falls back to the appUrl deep link, which resolves to the Monobank
  *     app or, failing that, the web.
+ *  4. What the page may ask of the app. The frame is a remote page we do not control, on
+ *     the one screen where the customer types a card, and it has two ways to talk to the app:
+ *     a navigation and a `postMessage`. Both are gated - the frame loads HTTPS only, and a
+ *     link the frame asks us to open is opened only if we would have opened it ourselves.
+ *     The rules live in `src/features/payments/linkPolicy.ts`.
  *
  * WHAT IT DELIBERATELY DOES NOT DO
  * It does not decide whether the payment succeeded. The webhook does that, asynchronously,
@@ -73,9 +79,19 @@ export default function PaymentScreen() {
     amount?: string | string[];
   }>();
 
-  const pageUrl = first(params.url);
+  const rawPageUrl = first(params.url);
   const appUrl = first(params.appUrl);
   const amount = first(params.amount);
+
+  /**
+   * The page URL arrives as a route parameter, and a route parameter can be written by
+   * anything that can open our scheme - so it is checked before the frame is handed it.
+   * Plain HTTP is refused: the frame loads HTTPS only, and on Android the FIRST load of a
+   * WebView is not gated by `onShouldStartLoadWithRequest` at all (the page is loaded by
+   * the app itself, not by the page), so this check is the only thing standing between a
+   * crafted `fuelflow://pay?url=http://…` and a payment form served over plain HTTP.
+   */
+  const pageUrl = rawPageUrl && isFrameLoadableUrl(rawPageUrl) ? rawPageUrl : undefined;
 
   const [failed, setFailed] = useState(false);
   // True until the frame's first paint, and again on every in-frame navigation: 3DS and the
@@ -88,16 +104,29 @@ export default function PaymentScreen() {
     router.replace('/my-codes');
   }, [router]);
 
+  /**
+   * Monobank's own link to its app for this invoice - the `appUrl` the backend got from
+   * Monobank's API (`https://mbnk.app/or/<id>`, a universal link that opens the app).
+   *
+   * It is a route parameter like any other, so it is checked like one: a link we would
+   * refuse to open is not a link we hand to the OS either.
+   */
+  const monobankAppLink = isOpenableUrl(appUrl) ? appUrl : undefined;
+
+  /**
+   * What the "pay via mono" button opens: the Monobank app when we have its link, the page
+   * we are already showing otherwise.
+   *
+   * The fallback is not a corner case - `appUrl` is NOT persisted with the order, so an
+   * order re-opened from the wallet arrives here without one, and the page we are already
+   * showing is then the only route to the payment.
+   */
+  const openableTarget = monobankAppLink ?? pageUrl;
+
   const openMonobankApp = useCallback(async () => {
-    if (!appUrl) {
-      // No deep link - an order re-opened from the wallet, where appUrl is not persisted. The
-      // page we are already showing is the only route, so send the customer to it externally
-      // rather than doing nothing.
-      if (pageUrl) await Linking.openURL(pageUrl);
-      return;
-    }
-    await Linking.openURL(appUrl);
-  }, [appUrl, pageUrl]);
+    if (!openableTarget) return;
+    await Linking.openURL(openableTarget);
+  }, [openableTarget]);
 
   const fallbackToMonobankApp = useCallback(() => {
     Alert.alert(t('payment.cantRenderTitle'), t('payment.cantRenderBody'), [
@@ -124,6 +153,38 @@ export default function PaymentScreen() {
     return () => sub.remove();
   }, [router, t]);
 
+  /**
+   * Opens a link the frame asked us to open - and only a link we would have opened ourselves.
+   *
+   * The frame is a remote page: it can post anything, including a URL that is not a payment
+   * link at all. So the value is checked before it reaches the OS. Two cases are not the
+   * frame's to decide:
+   *
+   *  - our own deep link is ours to ROUTE, not to hand to the OS - `Linking.openURL` on
+   *    `fuelflow://…` would relaunch the app on a URL the page chose, and the app's own
+   *    hand-off (the wallet, which reads the settled status) is the right answer;
+   *  - anything that is not HTTPS is refused: on Android an `intent://` URI reaches an
+   *    arbitrary exported activity, `tel:`/`sms:` open other apps, and the customer is one
+   *    field away from typing a card.
+   *
+   * Monobank's own link to its app is preferred over the URL the page posted: it is the
+   * link Monobank's API issued for THIS invoice, and it is the same link the button below
+   * opens. The posted URL is the page's own - and the page is not trusted - so it is used
+   * only when it is HTTPS and we have nothing better.
+   */
+  const openFromFrame = useCallback(
+    async (url: string) => {
+      if (isAppDeepLink(url, collectSchemes())) {
+        finish();
+        return;
+      }
+      const target = monobankAppLink ?? (isOpenableUrl(url) ? url : undefined);
+      if (!target) return;
+      await Linking.openURL(target);
+    },
+    [finish, monobankAppLink],
+  );
+
   const onMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
       let payload: MonobankFrameMessage;
@@ -143,10 +204,10 @@ export default function PaymentScreen() {
       // to switch apps itself - a page inside a WebView cannot.
       if (payload.message === 'monopay-link' && payload.value) {
         void Haptics.selectionAsync();
-        void Linking.openURL(payload.value);
+        void openFromFrame(payload.value);
       }
     },
-    [finish],
+    [finish, openFromFrame],
   );
 
   const onShouldStartLoadWithRequest = useCallback(
@@ -158,14 +219,21 @@ export default function PaymentScreen() {
         finish();
         return false;
       }
-      return true;
+      // HTTPS, and nothing else. Plain HTTP, an `intent://` URI, a `tel:` number, a `data:`
+      // document - the page in the frame gets to render a payment form, not to drive the
+      // customer's phone. 3DS is on HTTPS at the bank's site, so the flow it belongs to
+      // still passes.
+      return isFrameLoadableUrl(request.url);
     },
     [finish],
   );
 
   if (!pageUrl) {
-    // Unreachable by navigation - /pay with no url. Say so rather than render an empty screen
-    // that looks like a hung payment.
+    // Unreachable by navigation - /pay with no url - or a url we refuse to load (plain HTTP,
+    // another scheme). Say so rather than render an empty screen that looks like a hung
+    // payment, and say WHICH of the two it is: a missing link is a navigation bug, a refused
+    // one is a link this app was never asked to show.
+    const refused = rawPageUrl !== undefined;
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: tokens.colors.background }}>
         <ScreenHeader title={t('payment.title')} />
@@ -177,8 +245,12 @@ export default function PaymentScreen() {
             padding: tokens.spacing['2xl'],
           }}
         >
-          <Text tone="muted" center testID="payment-missing-url">
-            {t('payment.missingUrl')}
+          <Text
+            tone="muted"
+            center
+            testID={refused ? 'payment-refused-url' : 'payment-missing-url'}
+          >
+            {t(refused ? 'payment.refusedUrl' : 'payment.missingUrl')}
           </Text>
         </View>
       </SafeAreaView>
@@ -222,7 +294,20 @@ export default function PaymentScreen() {
           <WebView
             source={{ uri: pageUrl }}
             style={{ flex: 1, backgroundColor: tokens.colors.background }}
-            originWhitelist={['https://*', 'http://*']}
+            /*
+             * `['*']` on purpose, and it looks wrong until you know what the whitelist is.
+             *
+             * In react-native-webview the whitelist is not a restriction - it decides WHO
+             * opens a URL: one that is not on the list is handed to the operating system
+             * (`Linking.openURL`) instead of being loaded here. So the narrow list would be
+             * the wrong way round - `['https://*']` would make THIS APP the thing that opens
+             * `intent://…` and `tel:…` for the page in the frame.
+             *
+             * With `['*']` every navigation reaches `onShouldStartLoadWithRequest` below, and
+             * that is the single gate: HTTPS loads, everything else is refused. Nothing is
+             * opened behind the app's back.
+             */
+            originWhitelist={['*']}
             onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
             onMessage={onMessage}
             onError={fallbackToMonobankApp}
