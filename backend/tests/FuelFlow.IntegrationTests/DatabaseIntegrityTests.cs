@@ -273,11 +273,11 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// guard follows the knobs, which are what the price is made of.
     /// </remarks>
     [Theory]
-    [InlineData(-1, null, null)]   // the cost we pay is negative
-    [InlineData(null, -1, null)]   // the margin is negative: we pay the customer for the fuel
-    [InlineData(null, null, -1)]   // the column price is negative
+    [InlineData(-1, 0, 0)]   // the cost we pay is negative
+    [InlineData(0, -1, 0)]   // the margin is negative: we pay the customer for the fuel
+    [InlineData(0, 0, -1)]   // the column price is negative
     public async Task A_Negative_Fuel_Type_Price_Is_Refused(
-        double? cost, double? margin, double? pumpPrice)
+        double cost, double margin, double pumpPrice)
     {
         await using var context = CreateContext();
         context.FuelTypes.Add(new FuelTypeEntity
@@ -285,9 +285,11 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             Id = ToUuid($"ft-neg-{cost}-{margin}-{pumpPrice}"),
             BrandId = BrandIds.Okko,
             Name = $"Negative {cost}/{margin}/{pumpPrice}",
-            SupplierPricePerLiter = cost is null ? null : (decimal)cost.Value,
-            MarginUahPerLiter = margin is null ? null : (decimal)margin.Value,
-            PumpPricePerLiter = pumpPrice is null ? null : (decimal)pumpPrice.Value,
+            // Zero means "not stated" here: a zero is a number the constraints allow, and this
+            // test is about the negative one.
+            SupplierPricePerLiter = cost == 0 ? null : (decimal?)cost,
+            MarginUahPerLiter = margin == 0 ? null : (decimal?)margin,
+            PumpPricePerLiter = pumpPrice == 0 ? null : (decimal?)pumpPrice,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
