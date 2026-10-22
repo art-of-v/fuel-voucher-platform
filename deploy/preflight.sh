@@ -271,7 +271,11 @@ check_placeholder_secrets() {
     warn "$file: no env template is available here, so the verbatim template check could not run (the placeholder pattern is still checked)"
   fi
 
-  for var in JWT_SECRET QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
+  # The database has more than one password since the three-role layout (app PR #1492): the
+  # superuser's, the traffic role's and the migrator's. All of them are secrets, so all of them
+  # are checked - and a variable the env file does not carry is skipped, so the list can name a
+  # role that a given deployment does not use.
+  for var in JWT_SECRET QR_CIPHER_KEY POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_READONLY_PASSWORD REDIS_PASSWORD; do
     value="$(grep -E "^${var}=" "$file" | head -1 | cut -d= -f2- || true)"
     if [[ -z "$value" ]]; then
       continue
