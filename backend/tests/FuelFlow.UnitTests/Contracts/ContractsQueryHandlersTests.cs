@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Contracts.GetAdminContracts;
 using FuelFlow.Features.Contracts.GetSignedContracts;
@@ -222,16 +223,103 @@ public sealed class ContractsQueryHandlersTests : IDisposable
         var handler = new GetSignedContractsQueryHandler(_context);
         var query = new GetSignedContractsQuery();
 
-        var signedContracts = await handler.HandleAsync(query);
+        var page = await handler.HandleAsync(query);
 
-        signedContracts.Should().HaveCount(2);
-        signedContracts[0].Id.Should().Be(later.Id);
-        signedContracts[1].Id.Should().Be(earlier.Id);
-        signedContracts.Should().OnlyContain(uc => uc.ContractId == contract.Id);
-        signedContracts[0].CompanyName.Should().Be(legalEntity.Name);
-        signedContracts[0].CustomerName.Should().Be(user.PhoneNumber);
-        signedContracts[0].SignatureData.Should().Be("sig-2");
-        signedContracts[0].Expired.Should().BeFalse();
+        page.TotalCount.Should().Be(2);
+        page.Items.Should().HaveCount(2);
+        page.Items[0].Id.Should().Be(later.Id);
+        page.Items[1].Id.Should().Be(earlier.Id);
+        page.Items.Should().OnlyContain(uc => uc.ContractId == contract.Id);
+        page.Items[0].CompanyName.Should().Be(legalEntity.Name);
+        page.Items[0].CustomerName.Should().Be(user.PhoneNumber);
+        page.Items[0].Expired.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetSignedContracts_ShouldCarryNoSignatureImage()
+    {
+        // The image is a capability of its own (planning #622, S-13): a signature cannot be
+        // revoked and cannot be rotated, so the list must not carry it - otherwise one call is a
+        // harvest of every customer's handwriting.
+        var user = CreateUser(UserId, "+380991111111");
+        var legalEntity = CreateLegalEntity(Guid.NewGuid(), user.Id);
+        var brand = CreateBrand();
+        var contract = new Contract
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            LegalEntityId = legalEntity.Id,
+            BrandId = brand.Id,
+            CreatedAtUtc = TestClock.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
+        };
+
+        _context.Users.Add(user);
+        _context.LegalEntities.Add(legalEntity);
+        _context.Brands.Add(brand);
+        _context.Contracts.Add(contract);
+        _context.UserContracts.Add(new UserContract
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            ContractId = contract.Id,
+            SignatureData = "sig-1",
+            SignedAtUtc = TestClock.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new GetSignedContractsQueryHandler(_context);
+
+        var page = await handler.HandleAsync(new GetSignedContractsQuery());
+
+        var json = JsonSerializer.Serialize(page.Items);
+        json.Should().NotContain("signatureData");
+        json.Should().NotContain("sig-1", "the image itself must not travel with the row");
+    }
+
+    [Fact]
+    public async Task GetSignedContracts_ShouldBeAPageAndNotTheWholeTable()
+    {
+        var user = CreateUser(UserId, "+380991111111");
+        var legalEntity = CreateLegalEntity(Guid.NewGuid(), user.Id);
+        var brand = CreateBrand();
+        var contract = new Contract
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            LegalEntityId = legalEntity.Id,
+            BrandId = brand.Id,
+            CreatedAtUtc = TestClock.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
+        };
+
+        _context.Users.Add(user);
+        _context.LegalEntities.Add(legalEntity);
+        _context.Brands.Add(brand);
+        _context.Contracts.Add(contract);
+
+        for (var i = 0; i < 3; i++)
+        {
+            _context.UserContracts.Add(new UserContract
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                ContractId = contract.Id,
+                SignatureData = $"sig-{i}",
+                SignedAtUtc = TestClock.UtcNow.AddMinutes(-i)
+            });
+        }
+
+        await _context.SaveChangesAsync();
+
+        var handler = new GetSignedContractsQueryHandler(_context);
+
+        var page = await handler.HandleAsync(new GetSignedContractsQuery(Page: 1, Limit: 2));
+
+        page.Items.Should().HaveCount(2, "the list is a page, not the whole table");
+        page.TotalCount.Should().Be(3, "the count is the size of the table, not of the page");
+        page.PageSize.Should().Be(2);
+        page.Page.Should().Be(1);
     }
 
     [Fact]
@@ -240,8 +328,9 @@ public sealed class ContractsQueryHandlersTests : IDisposable
         var handler = new GetSignedContractsQueryHandler(_context);
         var query = new GetSignedContractsQuery();
 
-        var signedContracts = await handler.HandleAsync(query);
+        var page = await handler.HandleAsync(query);
 
-        signedContracts.Should().BeEmpty();
+        page.Items.Should().BeEmpty();
+        page.TotalCount.Should().Be(0);
     }
 }

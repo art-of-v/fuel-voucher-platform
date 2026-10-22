@@ -99,4 +99,22 @@ internal static class AuthPolicies
     /// </para>
     /// </remarks>
     public const string SettlementCode = "SettlementCode";
+
+    /// <summary>
+    /// See a customer's handwritten signature - the image the customer drew on the contract.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A signature is the one artefact that cannot be rotated: the customer drew it once, it cannot
+    /// be revoked, and a leaked copy of a person's handwriting is not repairable. So it is a
+    /// capability of its own, narrower than the staff surface, the same way the redeemable voucher
+    /// payload is (planning #622, S-13).
+    /// </para>
+    /// <para>
+    /// The list behind it carries no image at all - the image is served per record, and opening it
+    /// writes an audit row naming the operator. A capability that only says "may look" is a
+    /// capability that nobody can answer for afterwards.
+    /// </para>
+    /// </remarks>
+    public const string SignaturePayload = "SignaturePayload";
 }

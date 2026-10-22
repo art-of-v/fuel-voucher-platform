@@ -8,13 +8,19 @@ namespace FuelFlow.Features.Contracts.GetSignedContracts;
 /// <b>A projection, not the entity.</b> The endpoint answered with the EF entity graph, and the
 /// admin client read three fields that were never there - <c>userName</c>, <c>companyName</c>
 /// and <c>contractTitle</c> - so the signed list showed empty cells for every row. What a
-/// signature is: whose it is, which contract it is on, when, against which version of the terms,
-/// and the signature itself.
+/// signature is: whose it is, which contract it is on, when, and against which version of the
+/// terms.
 /// </para>
 /// <para>
 /// <b>The version that was signed</b> is not the version the contract points at now: a new
 /// version of the terms does not rewrite what the customer read, and the audit trail asks which
 /// one it was.
+/// </para>
+/// <para>
+/// <b>The image is not here.</b> A customer's handwritten signature cannot be revoked and cannot
+/// be rotated, so it is a capability of its own (<c>AuthPolicies.SignaturePayload</c>): the list
+/// carries the row, and the image is served per record, with an audit row naming whoever opened
+/// it (planning #622, S-13).
 /// </para>
 /// </remarks>
 public sealed class AdminSignedContractDto
@@ -54,7 +60,4 @@ public sealed class AdminSignedContractDto
 
     /// <summary>The version of the provider's text the customer actually signed.</summary>
     public short TermsVersion { get; init; }
-
-    /// <summary>The signature image, as the customer drew it.</summary>
-    public string? SignatureData { get; init; }
 }

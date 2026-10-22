@@ -15,6 +15,13 @@ vi.mock("@/lib/i18n", () => ({
     setLanguage: vi.fn(),
   }),
 }));
+// The signed contracts are behind a capability on the server (AuthPolicies.SignaturePayload):
+// the Admin tier holds it, and the button is hidden for anybody else - so the tab is rendered
+// as an Admin here.
+vi.mock("@/lib/session-store", () => ({
+  useSession: (selector: (state: { user: { role: string } | null }) => unknown) =>
+    selector({ user: { role: "Admin" } }),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { apiRequest } from "@/lib/api-client";
@@ -47,6 +54,14 @@ const CONTRACT = {
   signedAtUtc: null,
 };
 
+/**
+ * A signature, as the LIST answers with it: the row, and no image.
+ *
+ * <p>
+ * The image is not on the list - a handwritten signature is a capability of its own, served per
+ * record, and opening it is recorded (planning #622, S-13). The fixture deliberately does not
+ * carry a <c>signatureData</c> field, so the test cannot pass by reading one.
+ */
 const SIGNED = {
   id: "uc-1",
   contractId: "c-1",
@@ -60,7 +75,23 @@ const SIGNED = {
   expiresAtUtc: "2026-12-31T00:00:00Z",
   expired: false,
   termsVersion: 2,
+};
+
+/** The image, as the DETAIL answers with it. */
+const SIGNATURE = {
+  ...SIGNED,
   signatureData: '["M0,0 L10,10"]',
+};
+
+/** The list is a page, so the list endpoint answers with a page. */
+const SIGNED_PAGE = {
+  items: [SIGNED],
+  totalCount: 1,
+  page: 1,
+  pageSize: 50,
+  totalPages: 1,
+  hasPreviousPage: false,
+  hasNextPage: false,
 };
 
 const BRANDS = [
@@ -96,7 +127,8 @@ function cellTexts(): string[] {
 beforeEach(() => {
   mockedApiRequest.mockReset();
   mockedApiRequest.mockImplementation((_method: string, url: string) => {
-    if (url.includes("signed-contracts")) return Promise.resolve([SIGNED]);
+    if (url.includes("signed-contracts/uc-1")) return Promise.resolve(SIGNATURE);
+    if (url.includes("signed-contracts")) return Promise.resolve(SIGNED_PAGE);
     if (url.includes("legal-entity/contracts"))
       return Promise.resolve([CONTRACT]);
     if (url.includes("/api/admin/brands")) return Promise.resolve(BRANDS);
@@ -124,7 +156,8 @@ describe("ContractsTab", () => {
     expect(cellTexts()).toContain("2");
   });
 
-  it("shows who signed what, and lets the operator look at the signature", async () => {
+  it("shows who signed what, and fetches the image only when the operator asks for it", async () => {
+    const user = userEvent.setup();
     renderTab();
 
     await waitFor(() =>
@@ -134,9 +167,19 @@ describe("ContractsTab", () => {
     expect(
       cellTexts().filter((c) => c === "+380991234567").length,
     ).toBeGreaterThan(0);
-    expect(cellTexts().filter((c) => c === "ACMELLC").length).toBeGreaterThan(
-      0,
-    );
+    expect(cellTexts().filter((c) => c === "ACMELLC").length).toBeGreaterThan(0);
+
+    // The list carries no image, so the per-record endpoint has not been asked yet.
+    const imageCall = () =>
+      mockedApiRequest.mock.calls.find((c) =>
+        String(c[1]).includes("signed-contracts/uc-1"),
+      );
+    expect(imageCall()).toBeUndefined();
+
+    // Opening the signature asks for the image - and that call is the one the server records.
+    await user.click(screen.getByText("contracts.view"));
+
+    await waitFor(() => expect(imageCall()).toBeDefined());
   });
 
   it("publishes the document the operator handed over", async () => {

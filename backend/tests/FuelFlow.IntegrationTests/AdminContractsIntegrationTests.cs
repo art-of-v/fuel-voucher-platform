@@ -124,9 +124,10 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
         });
 
         var staff = await StaffClientAsync("+380000000306");
-        var signedContracts = await staff.GetFromJsonAsync<JsonElement>(
+        var page = await staff.GetFromJsonAsync<JsonElement>(
             "/api/admin/legal-entity/contracts/signed-contracts");
-        var row = signedContracts.EnumerateArray().Should().ContainSingle().Subject;
+        var rows = page.GetProperty("items");
+        var row = rows.EnumerateArray().Should().ContainSingle().Subject;
 
         row.GetProperty("brandName").GetString().Should().Be("OKKO");
         row.GetProperty("companyName").GetString().Should().Be("ACME LLC");
@@ -134,12 +135,51 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
         row.GetProperty("contractId").GetGuid().Should().Be(contractId);
         // The version that was signed - what the customer actually read.
         row.GetProperty("termsVersion").GetInt32().Should().Be(1);
-        row.GetProperty("signatureData").GetString().Should().Be("[\"M0,0 L10,10\"]");
         row.GetProperty("signedAtUtc").ValueKind.Should().Be(JsonValueKind.String);
 
         // The three fields the tab read and the server never returned.
         row.TryGetProperty("userName", out _).Should().BeFalse();
         row.TryGetProperty("contractTitle", out _).Should().BeFalse();
+
+        // The image is not on the list: a signature cannot be revoked and cannot be rotated, so
+        // it is a capability of its own and it is served per record (planning #622, S-13).
+        row.TryGetProperty("signatureData", out _).Should().BeFalse(
+            "one list call must not hand out every customer's handwriting");
+    }
+
+    [Fact]
+    public async Task The_Signature_Itself_Is_Served_Per_Record()
+    {
+        await ResetAsync();
+        await SeedProviderTextAsync("okko", "Terms of OKKO, version 1.", 30);
+
+        var customer = await AuthenticatedClientAsync("+380000000310");
+        await customer.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "ACME LLC",
+            Edrpou = "12345678"
+        });
+
+        var contracts = await customer.GetFromJsonAsync<JsonElement>("/api/legal-entity/contracts");
+        var contractId = contracts.EnumerateArray().Should().ContainSingle().Subject.GetProperty("id").GetGuid();
+        await customer.PostAsJsonAsync("/api/legal-entity/sign", new
+        {
+            contractId,
+            signatureData = "[\"M0,0 L10,10\"]"
+        });
+
+        var staff = await StaffClientAsync("+380000000311");
+        var page = await staff.GetFromJsonAsync<JsonElement>(
+            "/api/admin/legal-entity/contracts/signed-contracts");
+        var signatureId = page.GetProperty("items").EnumerateArray()
+            .Should().ContainSingle().Subject.GetProperty("id").GetGuid();
+
+        var detail = await staff.GetFromJsonAsync<JsonElement>(
+            $"/api/admin/legal-entity/contracts/signed-contracts/{signatureId}");
+
+        detail.GetProperty("signatureData").GetString().Should().Be("[\"M0,0 L10,10\"]");
+        detail.GetProperty("contractId").GetGuid().Should().Be(contractId);
+        detail.GetProperty("customerName").GetString().Should().Be("+380000000310");
     }
 
     [Fact]

@@ -5,7 +5,13 @@ import { toast } from "sonner";
 
 import { useI18n } from "@/lib/i18n";
 import { apiRequest } from "@/lib/api-client";
+import { useSession } from "@/lib/session-store";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import type {
+  AdminSignedContract,
+  AdminSignedContractSignature,
+  PagedResult,
+} from "@/lib/api-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,23 +40,6 @@ type AdminContract = {
   signedAtUtc: string | null;
 };
 
-/** A signature, as `GET /api/admin/legal-entity/contracts/signed-contracts` answers. */
-type AdminSignedContract = {
-  id: string;
-  contractId: string;
-  brandId: string | null;
-  brandName: string | null;
-  companyId: string | null;
-  companyName: string | null;
-  userId: string;
-  customerName: string | null;
-  signedAtUtc: string;
-  expiresAtUtc: string | null;
-  expired: boolean;
-  termsVersion: number;
-  signatureData: string | null;
-};
-
 type Brand = { id: string; name: string };
 
 /** One version of a provider's text, as `GET /api/admin/contract-versions` answers. */
@@ -66,14 +55,19 @@ type ContractVersion = {
 /** The term of a contract, in days, when the operator has not said otherwise. */
 const DEFAULT_TERM_DAYS = 365;
 
+/** The signed contracts table shows fifty rows at a time; the endpoint is paged to match. */
+const SIGNED_PAGE_SIZE = 50;
+
 export default function ContractsTab() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const user = useSession((s) => s.user);
 
   const [brandId, setBrandId] = useState<string>("");
   const [termDays, setTermDays] = useState<string>(String(DEFAULT_TERM_DAYS));
   const [file, setFile] = useState<File | null>(null);
-  const [signature, setSignature] = useState<string | null>(null);
+  const [signedPage, setSignedPage] = useState(1);
+  const [signatureId, setSignatureId] = useState<string | null>(null);
 
   const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: ["/api/admin/brands"],
@@ -83,9 +77,35 @@ export default function ContractsTab() {
     queryKey: ["/api/admin/legal-entity/contracts"],
   });
 
-  const { data: signedContracts = [] } = useQuery<AdminSignedContract[]>({
-    queryKey: ["/api/admin/legal-entity/contracts/signed-contracts"],
+  // The signed contracts are a PAGE, and the list carries no signature image: the image is
+  // fetched per record, on demand, by the query below.
+  const { data: signedContractsPage } = useQuery<PagedResult<AdminSignedContract>>({
+    queryKey: ["/api/admin/legal-entity/contracts/signed-contracts", signedPage],
+    queryFn: () =>
+      apiRequest<void, PagedResult<AdminSignedContract>>(
+        "GET",
+        `/api/admin/legal-entity/contracts/signed-contracts?page=${signedPage}&limit=${SIGNED_PAGE_SIZE}`,
+      ),
   });
+
+  const signedContracts = signedContractsPage?.items ?? [];
+  const signedTotalPages = signedContractsPage?.totalPages ?? 0;
+
+  // The image itself. It is behind the SignaturePayload capability on the server, and the row
+  // it writes says who opened it - so it is fetched when the operator asks for it, not with the
+  // list.
+  const { data: signature, isLoading: isSignatureLoading } =
+    useQuery<AdminSignedContractSignature | null>({
+      queryKey: ["/api/admin/legal-entity/contracts/signed-contracts", signatureId],
+      queryFn: async () => {
+        if (!signatureId) return null;
+        return await apiRequest<void, AdminSignedContractSignature>(
+          "GET",
+          `/api/admin/legal-entity/contracts/signed-contracts/${signatureId}`,
+        );
+      },
+      enabled: !!signatureId,
+    });
 
   const { data: versions = [] } = useQuery<ContractVersion[]>({
     queryKey: ["/api/admin/contract-versions", brandId],
@@ -141,6 +161,14 @@ export default function ContractsTab() {
 
   const brandName = (id: string | null) =>
     brands.find((b) => b.id === id)?.name ?? id ?? "-";
+
+  // Whether this actor may open a signature. A handwritten signature is a biometric artefact
+  // that cannot be revoked and cannot be rotated, so the server holds a capability of its own
+  // for it (AuthPolicies.SignaturePayload) and refuses a Manager outright. The button is
+  // hidden as well, rather than opening a modal with nothing in it.
+  const actorRole = user?.role ?? "";
+  const canSeeSignature =
+    actorRole === "Admin" || actorRole === "ProductOwner";
 
   return (
     <div className="space-y-6">
@@ -328,9 +356,14 @@ export default function ContractsTab() {
         </div>
       </div>
 
-      {/* Every signature. */}
+      {/* Every signature - a page of them, and the image is behind a capability. */}
       <div className="glass-panel p-6">
-        <h2 className="text-xl font-bold mb-4">{t("contracts.signedTitle")}</h2>
+        <h2 className="text-xl font-bold mb-1">{t("contracts.signedTitle")}</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          {canSeeSignature
+            ? t("contracts.signatureHint")
+            : t("contracts.signatureRestricted")}
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted">
@@ -358,11 +391,11 @@ export default function ContractsTab() {
                     {sc.expiresAtUtc ? formatDate(sc.expiresAtUtc) : "-"}
                   </td>
                   <td className="p-4">
-                    {sc.signatureData ? (
+                    {canSeeSignature ? (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSignature(sc.signatureData)}
+                        onClick={() => setSignatureId(sc.id)}
                       >
                         <FileSignature className="w-4 h-4 mr-2" />
                         {t("contracts.view")}
@@ -386,12 +419,40 @@ export default function ContractsTab() {
             </tbody>
           </table>
         </div>
+
+        {signedTotalPages > 1 && (
+          <div className="flex items-center justify-end gap-3 mt-4">
+            <span className="text-sm text-muted-foreground">
+              {t(
+                "contracts.signaturesPage",
+                String(signedPage),
+                String(signedTotalPages),
+              )}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={signedPage <= 1}
+              onClick={() => setSignedPage((p) => Math.max(1, p - 1))}
+            >
+              {"<"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={signedPage >= signedTotalPages}
+              onClick={() => setSignedPage((p) => p + 1)}
+            >
+              {">"}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {signature && (
+      {signatureId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
-          onClick={() => setSignature(null)}
+          onClick={() => setSignatureId(null)}
         >
           <div
             className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200"
@@ -406,19 +467,26 @@ export default function ContractsTab() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSignature(null)}
+                onClick={() => setSignatureId(null)}
               >
                 <X className="w-5 h-5" />
               </Button>
             </div>
 
             <div className="bg-white rounded-lg p-4 mb-6">
-              <SignatureViewer data={signature} />
+              {isSignatureLoading && (
+                <p className="text-sm text-muted-foreground text-center">
+                  {t("common.loading")}
+                </p>
+              )}
+              {signature?.signatureData && (
+                <SignatureViewer data={signature.signatureData} />
+              )}
             </div>
 
             <Button
               className="w-full font-bold"
-              onClick={() => setSignature(null)}
+              onClick={() => setSignatureId(null)}
             >
               {t("common.close")}
             </Button>
