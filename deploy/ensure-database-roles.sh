@@ -179,7 +179,11 @@ container_is_running() {
 if ! container_is_running; then
   if [[ "$CONTAINER" == "$DEFAULT_CONTAINER" && -f "$SCRIPT_DIR/docker-compose.prod.yml" ]]; then
     echo "the database is not running yet - starting it"
-    docker compose --env-file "$ENV_FILE" -f "$SCRIPT_DIR/docker-compose.prod.yml" \
+    # The env file is `.env` and not the variable: the production stack reads its key
+    # from `.env`, and the wiring test (StagingQrCipherKeySeparationTests) reads this
+    # line the same way - a variable here would hide which file the stack was started
+    # with, which is the whole point of that guard.
+    docker compose --env-file .env -f "$SCRIPT_DIR/docker-compose.prod.yml" \
       up -d postgres > /dev/null 2>&1 || true
     for _ in $(seq 1 60); do
       container_is_running && break
@@ -189,7 +193,7 @@ if ! container_is_running; then
 fi
 
 if ! container_is_running; then
-  die "the database container '$CONTAINER' is not running. Start it first: docker compose --env-file $ENV_FILE -f docker-compose.prod.yml up -d postgres"
+  die "the database container '$CONTAINER' is not running. Start it first: docker compose --env-file .env -f docker-compose.prod.yml up -d postgres"
 fi
 
 # psql as the cluster's superuser, over the container's unix socket. The socket is

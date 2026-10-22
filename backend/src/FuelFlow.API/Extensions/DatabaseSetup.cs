@@ -156,8 +156,12 @@ internal static class DatabaseSetup
             }
             else
             {
+                // The cap, like every other pool this process opens - the migration opens
+                // one connection and holds it for the length of the migration, and the
+                // server's max_connections budget is not a thing one pool may ignore.
+                var cappedMigrationConnectionString = DatabaseConnectionPool.WithPoolSettings(migrationConnectionString, DatabaseConnectionPool.ResolveMaxPoolSize(app.Configuration));
                 var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-                    .UseNpgsql(migrationConnectionString,
+                    .UseNpgsql(cappedMigrationConnectionString,
                         b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
                     .Options;
 
