@@ -83,7 +83,7 @@ public sealed class QaTestAccessTests : IDisposable
         return new SendCodeCommandHandler(
             _context, smsMock.Object, IdentityPhone(),
             new Mock<ILogger<SendCodeCommandHandler>>().Object, AuthOpts(codeHash), emailMock.Object,
-            qa);
+            new AuditEventService(_context), qa);
     }
 
     private VerifyCodeCommandHandler BuildVerify(QaTestAccessService qa)
@@ -106,6 +106,8 @@ public sealed class QaTestAccessTests : IDisposable
 
         return new VerifyCodeCommandHandler(
             _context, tokenServiceMock.Object, IdentityPhone(), jwtOptionsMock.Object,
+            AuthOpts(null),
+            StaffTwoFactorTestFactory.Build(_context),
             new Mock<ILogger<VerifyCodeCommandHandler>>().Object, new AuditEventService(_context),
             qaTestAccess: qa);
     }

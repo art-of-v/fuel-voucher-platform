@@ -82,6 +82,7 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<VerificationCode> VerificationCodes => Set<VerificationCode>();
+    public DbSet<StaffTwoFactor> StaffTwoFactors => Set<StaffTwoFactor>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<Order> Orders => Set<Order>();

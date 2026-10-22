@@ -269,6 +269,12 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<OtpVerificationService>();
         services.AddScoped<AdminSendCodeCommandHandler>();
         services.AddScoped<AdminVerifyCodeCommandHandler>();
+        // The second factor of a staff sign-in: the challenge the first factor hands out, the
+        // enrolment of the secret, and the check of the code. Scoped: it reads and writes the
+        // per-request DbContext.
+        services.AddScoped<FuelFlow.Features.Auth.TwoFactor.StaffTwoFactorService>();
+        services.AddScoped<FuelFlow.Features.Auth.TwoFactor.VerifyTwoFactorCommandHandler>();
+        services.AddScoped<FuelFlow.Features.Auth.TwoFactor.RevokeTwoFactorCommandHandler>();
         services.AddScoped<RefreshTokenCommandHandler>();
         services.AddScoped<RegisterDeviceCommandHandler>();
         services.AddScoped<GenerateChallengeCommandHandler>();

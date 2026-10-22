@@ -184,6 +184,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["POST /api/admin/users/{id}/ban"] = AuthPolicies.UserAdministration,
         ["POST /api/admin/users/{id}/role"] = AuthPolicies.UserAdministration,
         ["POST /api/admin/users/{id}/unban"] = AuthPolicies.UserAdministration,
+        // Taking a staff member's second factor away is account administration, not routine
+        // staff work: it ends that account's sessions, and a Manager has no business doing that
+        // to an Admin. The same tier that may ban may unban a phone.
+        ["POST /api/admin/users/{id}/two-factor/revoke"] = AuthPolicies.UserAdministration,
 
         // ---- the QA test access ------------------------------------------------------
         ["PUT /api/admin/qa-test-access"] = AuthPolicies.QaTestAccess,

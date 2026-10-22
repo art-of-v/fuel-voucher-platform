@@ -516,7 +516,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             phoneNumberServiceMock.Object,
             new Mock<ILogger<SendCodeCommandHandler>>().Object,
             authOptionsMock.Object,
-            UnconfiguredEmailSender());
+            UnconfiguredEmailSender(),
+            new AuditEventService(_context));
 
         var response = await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
 
@@ -549,7 +550,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             phoneNumberServiceMock.Object,
             new Mock<ILogger<SendCodeCommandHandler>>().Object,
             authOptionsMock.Object,
-            UnconfiguredEmailSender());
+            UnconfiguredEmailSender(),
+            new AuditEventService(_context));
 
         var response = await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
 
@@ -573,22 +575,29 @@ public sealed class AuthCommandHandlersTests : IDisposable
     }
 
     private SendCodeCommandHandler BuildSendCodeHandler(
-        Mock<ISmsService> smsMock, IEmailSender emailSender, bool adminOtpViaEmail = true)
+        Mock<ISmsService> smsMock, IEmailSender emailSender, bool adminOtpViaEmail = true,
+        bool breakGlassAcknowledged = true)
     {
         var phoneMock = new Mock<IPhoneNumberService>();
         phoneMock.Setup(x => x.Normalize(It.IsAny<string>())).Returns((string phone) => phone);
         var authMock = new Mock<IOptions<AuthOptions>>();
-        authMock.Setup(o => o.Value).Returns(new AuthOptions { DevBypass = false, AdminOtpViaEmail = adminOtpViaEmail });
+        authMock.Setup(o => o.Value).Returns(new AuthOptions
+        {
+            DevBypass = false,
+            AdminOtpViaEmail = adminOtpViaEmail,
+            AdminOtpViaEmailBreakGlassAcknowledged = breakGlassAcknowledged
+        });
         return new SendCodeCommandHandler(
             _context, smsMock.Object, phoneMock.Object,
-            new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailSender);
+            new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailSender,
+            new AuditEventService(_context));
     }
 
-    private async Task SeedUserWithRole(string phone, string roleName, string? email, bool isActive = true)
+    private async Task SeedUserWithRole(string phone, string roleName, string? email, bool isActive = true, bool withSecondFactor = false)
     {
         var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
-        _context.Users.Add(new User
+        var user = new User
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
@@ -598,14 +607,28 @@ public sealed class AuthCommandHandlersTests : IDisposable
             IsDeleted = false,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
-        });
+        };
+        _context.Users.Add(user);
+
+        if (withSecondFactor)
+        {
+            _context.StaffTwoFactors.Add(new StaffTwoFactor
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                SecretCiphertext = TestQrCipher.Instance.Encrypt("JBSWY3DPEHPK3PXP"),
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            });
+        }
+
         await _context.SaveChangesAsync();
     }
 
     [Fact]
-    public async Task SendCode_AdminWithConfiguredEmail_EmailsCode_AndDoesNotSms()
+    public async Task SendCode_StaffWithASecondFactor_EmailsTheCode_ThroughTheBreakGlass()
     {
-        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop", withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
 
         string? sentTo = null;
@@ -624,6 +647,64 @@ public sealed class AuthCommandHandlersTests : IDisposable
         sentBody.Should().MatchRegex(@"code is \d{6}\.");
         smsMock.Verify(x => x.SendVerificationCodeAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_TheBreakGlass_IsRecordedAsASecurityEvent()
+    {
+        // A break-glass that leaves no trace is not a break-glass, it is a second default.
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop", withSecondFactor: true);
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+        emailMock
+            .Setup(e => e.SendAsync(It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        var events = await _context.Set<AuditEventOutbox>().ToListAsync();
+        events.Should().Contain(e => e.EventType == "StaffOtpViaEmailBreakGlass");
+    }
+
+    [Fact]
+    public async Task SendCode_StaffWithoutASecondFactor_DoesNotGetTheBreakGlass()
+    {
+        // The break-glass weakens the FIRST factor, so it is only offered to an account that
+        // still has to prove a second one. For an account without a factor the mailbox would be
+        // the whole sign-in.
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        emailMock.Verify(e => e.SendAsync(
+            It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SendCode_TheBreakGlass_WithoutTheAcknowledgement_IsNotOpen()
+    {
+        // Production refuses to start in this state (SecurityConfigurationValidator), and the
+        // channel itself does not open either - the two cannot drift apart.
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop", withSecondFactor: true);
+        var smsMock = new Mock<ISmsService>();
+        var emailMock = new Mock<IEmailSender>();
+        emailMock.SetupGet(e => e.IsConfigured).Returns(true);
+
+        var handler = BuildSendCodeHandler(smsMock, emailMock.Object, breakGlassAcknowledged: false);
+        await handler.HandleAsync(new SendCodeCommand("+380991234567"), CancellationToken.None);
+
+        smsMock.Verify(x => x.SendVerificationCodeAsync(
+            "+380991234567", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        emailMock.Verify(e => e.SendAsync(
+            It.IsAny<string>(), It.IsAny<EmailMessage>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -646,7 +727,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [Fact]
     public async Task SendCode_AdminWithoutEmail_FallsBackToSms()
     {
-        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, null);
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, null, withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
@@ -663,8 +744,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [InlineData("Manager")]
     public async Task SendCode_NonAdminStaffWithEmail_EmailsCode_AndDoesNotSms(string staffRole)
     {
-        // §3/§15: the email channel is for ALL Staff with an email on file, not just Admin.
-        await SeedUserWithRole("+380991234567", staffRole, "staff@palne.shop");
+        // The break-glass is for every Staff role with an email on file, not just Admin.
+        await SeedUserWithRole("+380991234567", staffRole, "staff@palne.shop", withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
 
         string? sentTo = null;
@@ -687,7 +768,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     public async Task SendCode_StaffWithoutEmail_SendsSms()
     {
         // Email removed from a staff account → next authentication falls back to SMS (§3).
-        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, null);
+        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, null, withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
@@ -706,7 +787,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     {
         // IsActive gates purchasing, not the auth channel: an inactive staff member with an
         // email still authenticates by email.
-        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, "staff@palne.shop", isActive: false);
+        await SeedUserWithRole("+380991234567", SeedRoles.ManagerName, "staff@palne.shop", isActive: false, withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
 
         string? sentTo = null;
@@ -728,7 +809,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [Fact]
     public async Task SendCode_EmailNotConfigured_AdminFallsBackToSms()
     {
-        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop", withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
 
         var handler = BuildSendCodeHandler(smsMock, UnconfiguredEmailSender());
@@ -741,7 +822,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [Fact]
     public async Task SendCode_AdminEmailSendThrows_FallsBackToSms()
     {
-        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop", withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);
@@ -759,7 +840,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
     [Fact]
     public async Task SendCode_AdminOtpViaEmailDisabled_UsesSmsEvenForAdmin()
     {
-        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop");
+        await SeedUserWithRole("+380991234567", AuthOptions.AdminRoleName, "admin@palne.shop", withSecondFactor: true);
         var smsMock = new Mock<ISmsService>();
         var emailMock = new Mock<IEmailSender>();
         emailMock.SetupGet(e => e.IsConfigured).Returns(true);

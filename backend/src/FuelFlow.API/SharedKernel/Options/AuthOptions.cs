@@ -11,13 +11,60 @@ public sealed class AuthOptions
     public bool DevBypass { get; set; } = false;
 
     /// <summary>
-    /// When true (default), admin-role users receive their sign-in OTP by email over the
-    /// configured support SMTP account instead of a paid SMS. Delivery falls back to SMS
-    /// whenever email is unconfigured, the account has no email, or the send throws, so an
-    /// admin can never be locked out by the email path. Set Auth__AdminOtpViaEmail=false to
-    /// force SMS for everyone.
+    /// When true, staff-role users receive their sign-in OTP by email over the configured support
+    /// SMTP account instead of a paid SMS. Delivery falls back to SMS whenever email is
+    /// unconfigured, the account has no email, or the send throws, so a staff member is never
+    /// locked out by the email path.
+    /// <para>
+    /// <b>The default is false.</b> A mailbox is the weakest channel the platform has: it is the
+    /// one an attacker can influence (forwarding rules, spam-folder rules, a provider breach) and
+    /// the one a phishing campaign reaches. Staff OTPs therefore go to the SIM, which needs the
+    /// handset itself.
+    /// </para>
+    /// <para>
+    /// Turning it on is a break-glass, not a setting: it is meant for the day the SMS gateway is
+    /// down. It requires an explicit acknowledgement in Production
+    /// (<see cref="AdminOtpViaEmailBreakGlassAcknowledged"/>), every use of it is recorded as a
+    /// security event, and it is not offered to an account that already has a second factor -
+    /// a weaker channel must not become available to the accounts that do not need it.
+    /// </para>
     /// </summary>
-    public bool AdminOtpViaEmail { get; set; } = true;
+    public bool AdminOtpViaEmail { get; set; } = false;
+
+    /// <summary>
+    /// The owner's explicit acknowledgement that Production runs with the weaker email channel.
+    /// </summary>
+    /// <remarks>
+    /// The break-glass is a decision, and a decision has to be written down rather than inferred
+    /// from an environment variable that somebody set during an outage and nobody removed. The
+    /// Production configuration validator refuses to start when <see cref="AdminOtpViaEmail"/> is
+    /// on and this is not, so the two cannot drift apart silently.
+    /// </remarks>
+    public bool AdminOtpViaEmailBreakGlassAcknowledged { get; set; } = false;
+
+    /// <summary>
+    /// Whether a staff sign-in has to prove a second factor.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The default is true, and Production refuses to start when it is false: a staff account
+    /// that can move money must not be reachable with a single factor. The switch exists for the
+    /// local development loop and for the moment a deployment has to be rolled back - not as a
+    /// way to run the platform.
+    /// </para>
+    /// <para>
+    /// <see cref="DevBypass"/> switches the second factor off as well, because it switches
+    /// everything else off: a development process that demands an authenticator app cannot be
+    /// developed without one.
+    /// </para>
+    /// </remarks>
+    public bool StaffSecondFactorRequired { get; set; } = true;
+
+    /// <summary>
+    /// The issuer shown next to the entry in the authenticator app. It is the name of the
+    /// product, and it is what the user checks before typing a code into it.
+    /// </summary>
+    public string StaffTotpIssuer { get; set; } = "FuelFlow";
 
     /// <summary>
     /// Canonical public origin (scheme + host, e.g. <c>https://api.palne.shop</c>) that

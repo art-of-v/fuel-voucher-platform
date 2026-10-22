@@ -615,6 +615,13 @@ export const uk: Record<string, string> = {
     'Щоб увійти, установіть код-пароль (блокування екрана) у Налаштуваннях, потім спробуйте ще раз.',
   'phoneAuth.tooManyAttempts': 'Забагато спроб. Зачекайте хвилину та спробуйте ще раз.',
 
+  /* Другий фактор для входу співробітника. */
+  'phoneAuth.twoFactorTitle': 'ДВОФАКТОРНИЙ КОД',
+  'phoneAuth.twoFactorHint': 'Введіть код із застосунку автентифікації',
+  'phoneAuth.twoFactorEnrollHint':
+    'Додайте цей ключ у застосунок автентифікації, потім введіть код, який він показує:',
+  'phoneAuth.twoFactorCodeLabel': '6-ЗНАЧНИЙ КОД',
+
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Пропустити',
   'onboarding.next': 'Далі',

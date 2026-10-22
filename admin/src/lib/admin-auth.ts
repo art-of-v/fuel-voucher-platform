@@ -103,6 +103,37 @@ export function isLoggedIn(): boolean {
 // gets no SMS/email (send-code silently succeeds without sending) and cannot complete verify.
 // The shared /api/auth/send-code + /api/auth/verify (which auto-register unknown phones) are
 // NOT reachable from the admin domain - they're off the reverse-proxy allow-list.
+
+/**
+ * What a staff sign-in needs next.
+ *
+ * <p>
+ * A staff sign-in has two factors. The first (the code that arrives by SMS) does not mint a
+ * session: the backend answers with a challenge instead, and the second factor - the code from
+ * the authenticator app - turns that challenge into a session.
+ * </p>
+ */
+export interface AdminTwoFactor {
+  /** "required" - the account has a secret; "enroll" - it has none yet and needs one. */
+  status: "required" | "enroll";
+  /** The opaque token that ties the attempt to the verified first factor. */
+  challenge: string;
+  /** The secret to enrol in the authenticator app, when the status is "enroll". */
+  enrollmentSecret?: string | null;
+  /** The otpauth:// URI to scan, when the status is "enroll". */
+  provisioningUri?: string | null;
+}
+
+/** The answer of the verify endpoint: a session, or the challenge that is still missing. */
+export interface AdminVerifyResponse {
+  accessToken: string | null;
+  refreshToken?: string | null;
+  expiresIn: number;
+  deviceRegistrationNonce: string;
+  /** Present (and non-null) when the sign-in is not finished yet. */
+  twoFactor?: AdminTwoFactor | null;
+}
+
 export async function sendCode(phoneNumber: string): Promise<void> {
   const res = await fetchWithTimeout(getApiUrl("/api/auth/admin/send-code"), {
     method: "POST",
@@ -115,16 +146,59 @@ export async function sendCode(phoneNumber: string): Promise<void> {
 export async function verifyCode(
   phoneNumber: string,
   code: string,
-): Promise<void> {
+): Promise<AdminVerifyResponse> {
   const res = await fetchWithTimeout(getApiUrl("/api/auth/admin/verify"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phoneNumber, code }),
     credentials: "include",
   });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  storeTokens(data.accessToken);
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  const data = (await res.json()) as AdminVerifyResponse;
+  // A staff sign-in that is not finished carries no token - there is nothing to store yet.
+  if (data.accessToken) storeTokens(data.accessToken);
+  return data;
+}
+
+/**
+ * The second step of a staff sign-in: the code from the authenticator app redeems the
+ * challenge and mints the session.
+ */
+export async function verifyTwoFactor(
+  challenge: string,
+  code: string,
+): Promise<void> {
+  const res = await fetchWithTimeout(getApiUrl("/api/auth/two-factor/verify"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge, code }),
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  const data = (await res.json()) as { accessToken?: string };
+  if (data.accessToken) storeTokens(data.accessToken);
+}
+
+/**
+ * The sentence the API refused with.
+ *
+ * <p>
+ * Every failure leaves the API as one problem document
+ * (<c>backend/src/FuelFlow.API/SharedKernel/Errors/ApiError.cs</c>): the sentence is in
+ * <c>detail</c>, the status in <c>title</c>. The raw body would put a JSON blob in front of
+ * the operator where a sentence belongs.
+ * </p>
+ */
+async function readErrorMessage(response: Response): Promise<string> {
+  const text = await response.text();
+  try {
+    const parsed = JSON.parse(text) as { detail?: string; title?: string };
+    const detail = parsed?.detail ?? parsed?.title;
+    if (typeof detail === "string" && detail) return detail;
+  } catch {
+    // Not a document - the raw text is the best answer there is.
+  }
+  return text;
 }
 
 export interface CurrentUser {

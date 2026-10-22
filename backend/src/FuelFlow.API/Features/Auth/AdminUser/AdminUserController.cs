@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
 using FuelFlow.Features.Auth.EmailChange;
+using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
@@ -28,6 +29,7 @@ public sealed class AdminUserController : ControllerBase
     private readonly SetUserBannedCommandHandler _setBannedHandler;
     private readonly SetUserEmailCommandHandler _setEmailHandler;
     private readonly DeleteUserCommandHandler _deleteUserHandler;
+    private readonly RevokeTwoFactorCommandHandler _revokeTwoFactorHandler;
     private readonly AuthOptions _authOptions;
 
     public AdminUserController(
@@ -38,6 +40,7 @@ public sealed class AdminUserController : ControllerBase
         SetUserBannedCommandHandler setBannedHandler,
         SetUserEmailCommandHandler setEmailHandler,
         DeleteUserCommandHandler deleteUserHandler,
+        RevokeTwoFactorCommandHandler revokeTwoFactorHandler,
         IOptions<AuthOptions> authOptions)
     {
         _handler = handler;
@@ -47,6 +50,7 @@ public sealed class AdminUserController : ControllerBase
         _setBannedHandler = setBannedHandler;
         _setEmailHandler = setEmailHandler;
         _deleteUserHandler = deleteUserHandler;
+        _revokeTwoFactorHandler = revokeTwoFactorHandler;
         _authOptions = authOptions.Value;
     }
 
@@ -182,6 +186,32 @@ public sealed class AdminUserController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Unban(string id, CancellationToken cancellationToken) =>
         await SetBannedInternal(id, false, cancellationToken);
+
+    [HttpPost("{id}/two-factor/revoke")]
+    [Authorize(Policy = AuthPolicies.UserAdministration)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeTwoFactor(string id, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out var userId))
+            return ApiError.BadRequest("Invalid user id");
+
+        var (actingId, _, actingName) = GetActor();
+        if (!actingId.HasValue)
+            return ApiError.Unauthorized("Unauthorized");
+
+        var result = await _revokeTwoFactorHandler.HandleAsync(
+            new RevokeTwoFactorCommand(userId, actingId.Value, actingName),
+            cancellationToken);
+
+        if (result.NotFound)
+            return ApiError.NotFound(result.Error);
+        if (!result.Success)
+            return ApiError.BadRequest(result.Error);
+
+        return NoContent();
+    }
 
     [HttpDelete("{id}")]
     [Authorize(Policy = AuthPolicies.UserAdministration)]

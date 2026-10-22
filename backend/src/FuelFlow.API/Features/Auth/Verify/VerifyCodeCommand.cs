@@ -1,5 +1,6 @@
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.Features.Brands;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -21,15 +22,23 @@ public sealed record VerifyCodeCommand(string PhoneNumber, string Code);
 /// What a successful verification hands back.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The refresh token is nullable because it is not for every caller: it travels in the body only
 /// for the native mobile app, which has no cookie jar to keep it in. A browser gets the
 /// <c>HttpOnly</c> cookie and no token in the body — see <c>ClientPlatform</c>.
+/// </para>
+/// <para>
+/// The access token is nullable for the same kind of reason: a staff sign-in answers with a
+/// <see cref="TwoFactorChallengeResponse"/> instead of a session, because the first factor is not
+/// enough. A response without a token and without a challenge is not a thing this API produces.
+/// </para>
 /// </remarks>
 public sealed record VerifyCodeResponse(
-    string AccessToken,
+    string? AccessToken,
     string? RefreshToken,
     int ExpiresIn,
-    string DeviceRegistrationNonce
+    string DeviceRegistrationNonce,
+    TwoFactorChallengeResponse? TwoFactor = null
 );
 
 public sealed class VerifyCodeCommandHandler
@@ -56,6 +65,8 @@ public sealed class VerifyCodeCommandHandler
     private readonly IJwtTokenService _tokenService;
     private readonly IPhoneNumberService _phoneNumberService;
     private readonly JwtOptions _jwtOptions;
+    private readonly AuthOptions _authOptions;
+    private readonly StaffTwoFactorService _twoFactor;
     private readonly ILogger<VerifyCodeCommandHandler> _logger;
     private readonly AuditEventService _eventService;
     private readonly NotificationDispatcher? _notifications;
@@ -68,6 +79,8 @@ public sealed class VerifyCodeCommandHandler
         IJwtTokenService tokenService,
         IPhoneNumberService phoneNumberService,
         IOptions<JwtOptions> jwtOptions,
+        IOptions<AuthOptions> authOptions,
+        StaffTwoFactorService twoFactor,
         ILogger<VerifyCodeCommandHandler> logger,
         AuditEventService eventService,
         IConnectionMultiplexer? redis = null,
@@ -79,6 +92,11 @@ public sealed class VerifyCodeCommandHandler
         _tokenService = tokenService;
         _phoneNumberService = phoneNumberService;
         _jwtOptions = jwtOptions.Value;
+        // A missing options object must not turn the second factor off: the defaults are the safe
+        // ones (StaffSecondFactorRequired is true), so falling back to them fails towards a
+        // stricter sign-in rather than a looser one.
+        _authOptions = authOptions.Value ?? new AuthOptions();
+        _twoFactor = twoFactor;
         _logger = logger;
         _eventService = eventService;
         _redis = redis;
@@ -226,6 +244,95 @@ public sealed class VerifyCodeCommandHandler
             isNewUser = true;
         }
 
+        // A staff account does not get a session from the first factor alone. The mailbox is the
+        // weakest channel the platform has - it is the one an attacker can influence and the one
+        // a phishing campaign reaches - and the staff tier can move money. So the sign-in stops
+        // here and continues at the second factor: the client is handed a challenge and comes
+        // back with a code from the authenticator app.
+        //
+        // This runs on EVERY path that can mint a staff session, not only the admin one: the
+        // shared /verify endpoint resolves the same account, and without this it would hand a
+        // staff token to whoever proved possession of the mailbox.
+        if (SeedRoles.IsStaff(user.Role?.Name) && IsSecondFactorRequired())
+        {
+            // The OTP is spent by now, and the burn has to be committed: a challenge is not a
+            // licence to try the same code again.
+            await _context.SaveChangesAsync(cancellationToken);
+
+            var challenge = await _twoFactor.IssueChallengeAsync(user, cancellationToken);
+
+            await RecordSecondFactorPendingAsync(user, challenge, cancellationToken);
+
+            return new VerifyCodeResponse(
+                null,
+                null,
+                0,
+                string.Empty,
+                new TwoFactorChallengeResponse(
+                    challenge.Status == TwoFactorStatus.Enroll ? "enroll" : "required",
+                    challenge.Challenge,
+                    challenge.EnrollmentSecret,
+                    challenge.ProvisioningUri));
+        }
+
+        return await IssueSessionAsync(user, isNewUser, cancellationToken);
+    }
+
+    /// <summary>
+    /// Whether a staff sign-in has to prove a second factor.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="AuthOptions.DevBypass"/> switches it off together with everything else: it
+    /// already means "this process is not a real environment" - the OTP is a constant, the rate
+    /// limits are gone and the SMS never leaves the machine. Demanding an authenticator app in
+    /// that environment would mean the development loop needs a phone.
+    /// </remarks>
+    private bool IsSecondFactorRequired() =>
+        _authOptions.StaffSecondFactorRequired && !_authOptions.DevBypass;
+
+    /// <summary>
+    /// Records that the first factor of a staff sign-in was proven and the second factor is
+    /// outstanding. A completed login is recorded when the session is minted; this is the other
+    /// half of the story - an OTP that was accepted for an account that can move money, without
+    /// a login behind it.
+    /// </summary>
+    private async Task RecordSecondFactorPendingAsync(
+        User user,
+        StaffTwoFactorChallenge challenge,
+        CancellationToken cancellationToken)
+    {
+        var roleName = user.Role?.Name;
+
+        _eventService.RecordEvent(
+            "Auth",
+            user.Id.ToString(),
+            "StaffSecondFactorPending",
+            null,
+            JsonSerializer.Serialize(new { user.Id, user.PhoneNumber, Role = roleName, Status = challenge.Status.ToString() }),
+            user.Id,
+            user.PhoneNumber,
+            $"{roleName} proved the first factor; the second factor is outstanding ({user.PhoneNumber})",
+            user.Id.ToString());
+
+        // An audit row is committed on its own: no business write shares this transaction.
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Mints the session for an account whose first factor has been proven: the access token,
+    /// the refresh token, the device registration nonce and the staff-login audit row.
+    /// </summary>
+    /// <remarks>
+    /// Public because the second factor completes the same way the first one started: the
+    /// staff sign-in is verified in two steps, and the step that proves the second factor hands
+    /// the account over to exactly this code, so both steps mint the same session in the same
+    /// shape.
+    /// </remarks>
+    public async Task<VerifyCodeResponse> IssueSessionAsync(
+        User user,
+        bool isNewUser,
+        CancellationToken cancellationToken)
+    {
         // OTP verification registers/logs in the user but does NOT activate them.
         // is_active=false users can use all features EXCEPT payments.
         // Activation (is_active=true) is a separate admin/business operation, with the QA

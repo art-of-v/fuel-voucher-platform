@@ -726,6 +726,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "users.emailChangeSent": "Confirmation link sent to the new address",
     "users.emailCleared": "Email cleared",
     "users.emailChangeFailed": "Failed to change email",
+    "users.revokeTwoFactor": "Revoke 2FA",
+    "users.revokeTwoFactorTitle":
+      "Takes the second factor away. The staff member signs in again and enrols a new one.",
+    "users.twoFactorRevoked": "Second factor revoked",
+    "users.twoFactorRevokeFailed": "Failed to revoke the second factor",
 
     // Purchases
     "table.client": "Client",
@@ -1849,6 +1854,11 @@ export const translations: Record<Language, Record<string, string>> = {
       "Посилання для підтвердження надіслано на нову адресу",
     "users.emailCleared": "Email очищено",
     "users.emailChangeFailed": "Не вдалося змінити email",
+    "users.revokeTwoFactor": "Відібрати 2FA",
+    "users.revokeTwoFactorTitle":
+      "Другий фактор буде відібрано. Співробітник увійде знову і прив'яже новий.",
+    "users.twoFactorRevoked": "Другий фактор відібрано",
+    "users.twoFactorRevokeFailed": "Не вдалося відібрати другий фактор",
 
     // Purchases
     "table.client": "Клієнт",
@@ -2869,6 +2879,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "users.emailChangeSent": "Bestätigungslink an die neue Adresse gesendet",
     "users.emailCleared": "E-Mail entfernt",
     "users.emailChangeFailed": "E-Mail konnte nicht geändert werden",
+    "users.revokeTwoFactor": "2FA widerrufen",
+    "users.revokeTwoFactorTitle":
+      "Nimmt den zweiten Faktor weg. Das Team meldet sich erneut an und richtet einen neuen ein.",
+    "users.twoFactorRevoked": "Zweiter Faktor widerrufen",
+    "users.twoFactorRevokeFailed":
+      "Der zweite Faktor konnte nicht widerrufen werden",
 
     // Purchases
     "table.client": "Kunde",
@@ -3998,6 +4014,11 @@ export const translations: Record<Language, Record<string, string>> = {
       "Enlace de confirmación enviado a la nueva dirección",
     "users.emailCleared": "Correo borrado",
     "users.emailChangeFailed": "No se pudo cambiar el correo",
+    "users.revokeTwoFactor": "Revocar 2FA",
+    "users.revokeTwoFactorTitle":
+      "Elimina el segundo factor. El miembro del equipo vuelve a iniciar sesión y registra uno nuevo.",
+    "users.twoFactorRevoked": "Segundo factor revocado",
+    "users.twoFactorRevokeFailed": "No se pudo revocar el segundo factor",
 
     // Purchases
     "table.client": "Cliente",

@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const refreshAccessToken = vi.fn();
 const fetchCurrentUser = vi.fn();
 const verifyCode = vi.fn();
+const verifyTwoFactor = vi.fn();
 const clearTokens = vi.fn();
 
 vi.mock("./admin-auth", () => ({
   refreshAccessToken: () => refreshAccessToken(),
   fetchCurrentUser: () => fetchCurrentUser(),
-  verifyCode: () => verifyCode(),
+  verifyCode: (...args: unknown[]) => verifyCode(...args),
+  verifyTwoFactor: (...args: unknown[]) => verifyTwoFactor(...args),
   clearTokens: () => clearTokens(),
   getStoredAccessToken: () => "token",
   sendCode: vi.fn(),
@@ -16,7 +18,13 @@ vi.mock("./admin-auth", () => ({
   REFRESH_RATE_LIMIT_FALLBACK_SECONDS: 60,
 }));
 
-import { bootSession, ensureAccessToken, signOut } from "./session";
+import {
+  bootSession,
+  ensureAccessToken,
+  signInWithCode,
+  signInWithTwoFactor,
+  signOut,
+} from "./session";
 import { hasSessionMarker, useSession } from "./session-store";
 
 function refreshed() {
@@ -138,6 +146,71 @@ describe("session lifecycle", () => {
     // Single-flight (N concurrent callers -> one HTTP request) is enforced inside
     // admin-auth's own refreshAccessToken and covered in admin-auth.test.ts. It cannot be
     // asserted here because this file mocks that function out.
+  });
+
+  /**
+   * A staff sign-in has two factors. The first one does not sign anybody in: the backend
+   * answers with a challenge, and the panel asks for the code from the authenticator app.
+   */
+  describe("signInWithCode", () => {
+    beforeEach(() => {
+      verifyCode.mockReset();
+      verifyTwoFactor.mockReset();
+      fetchCurrentUser.mockReset();
+    });
+
+    it("reports the challenge instead of signing anybody in", async () => {
+      verifyCode.mockResolvedValue({
+        accessToken: null,
+        twoFactor: {
+          status: "enroll",
+          challenge: "the-challenge",
+          enrollmentSecret: "JBSWY3DPEHPK3PXP",
+        },
+      });
+
+      const outcome = await signInWithCode("+380991112233", "123456");
+
+      expect(outcome).toMatchObject({
+        status: "two_factor",
+        challenge: "the-challenge",
+        needsEnrollment: true,
+      });
+      // No session was adopted, and no round trip was spent on the user that does not exist yet.
+      expect(fetchCurrentUser).not.toHaveBeenCalled();
+      expect(useSession.getState().status).not.toBe("authenticated");
+    });
+
+    it("signs a customer in when there is no second factor", async () => {
+      verifyCode.mockResolvedValue({ accessToken: "access", twoFactor: null });
+      fetchCurrentUser.mockResolvedValue({
+        id: "u1",
+        phone: "+380",
+        role: "Admin",
+      });
+
+      const outcome = await signInWithCode("+380991112233", "123456");
+
+      expect(outcome.status).toBe("signed_in");
+      expect(useSession.getState().status).toBe("authenticated");
+    });
+  });
+
+  describe("signInWithTwoFactor", () => {
+    it("exchanges the challenge for a session", async () => {
+      verifyTwoFactor.mockResolvedValue(undefined);
+      fetchCurrentUser.mockResolvedValue({
+        id: "u1",
+        phone: "+380",
+        role: "Admin",
+      });
+
+      const user = await signInWithTwoFactor("the-challenge", "123456");
+
+      expect(verifyTwoFactor).toHaveBeenCalledWith("the-challenge", "123456");
+      expect(user.role).toBe("Admin");
+      expect(useSession.getState().status).toBe("authenticated");
+    });
   });
 
   describe("signOut", () => {

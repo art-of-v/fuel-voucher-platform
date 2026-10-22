@@ -609,6 +609,13 @@ export const en: Record<string, string> = {
     'To sign in, set a device passcode (screen lock) in Settings, then try again.',
   'phoneAuth.tooManyAttempts': 'Too many attempts. Please wait a minute and try again.',
 
+  /* The second factor of a staff sign-in. */
+  'phoneAuth.twoFactorTitle': 'TWO-FACTOR CODE',
+  'phoneAuth.twoFactorHint': 'Enter the code from your authenticator app',
+  'phoneAuth.twoFactorEnrollHint':
+    'Add this key to your authenticator app, then enter the code it shows:',
+  'phoneAuth.twoFactorCodeLabel': '6-DIGIT CODE',
+
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Skip',
   'onboarding.next': 'Next',

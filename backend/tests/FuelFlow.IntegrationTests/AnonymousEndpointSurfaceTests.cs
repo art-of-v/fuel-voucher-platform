@@ -72,6 +72,13 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // has no token yet. Non-staff callers are rejected inside the handler, not by [Authorize].
         "POST /api/auth/admin/send-code",
         "POST /api/auth/admin/verify",
+        // The second step of a staff sign-in: the code from the authenticator app turns the
+        // outstanding challenge into a session. Anonymous for the same reason as the two above -
+        // the caller has no token yet. What stands in for the session is the challenge itself:
+        // a random token that exists only because the first factor was verified, expires in five
+        // minutes, is consumed by the first attempt that uses it, and is capped at five wrong
+        // codes. A reviewed decision, not a missing [Authorize].
+        "POST /api/auth/two-factor/verify",
         "POST /api/auth/refresh",
         // Session logout: clears the httpOnly refresh cookie and revokes its token.
         // Path is under /refresh so the cookie (scoped to /api/auth/refresh) is sent

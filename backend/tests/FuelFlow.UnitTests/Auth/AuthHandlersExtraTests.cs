@@ -64,11 +64,16 @@ public sealed class AuthHandlersExtraTests : IDisposable
             RefreshTokenExpirationDays = 7
         });
 
+        var authMock = new Mock<IOptions<AuthOptions>>();
+        authMock.Setup(o => o.Value).Returns(new AuthOptions { DevBypass = false });
+
         return new VerifyCodeCommandHandler(
             _context,
             tokenServiceMock.Object,
             phoneNumberServiceMock.Object,
             jwtOptionsMock.Object,
+            authMock.Object,
+            StaffTwoFactorTestFactory.Build(_context),
             new Mock<ILogger<VerifyCodeCommandHandler>>().Object,
             new AuditEventService(_context));
     }
