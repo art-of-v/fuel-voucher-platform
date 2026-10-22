@@ -32,6 +32,7 @@ const mockLogin = jest.fn();
 const mockLogout = jest.fn();
 const mockUnlockApp = jest.fn();
 const mockReplace = jest.fn();
+const mockRouter = { replace: mockReplace, push: jest.fn(), back: jest.fn() };
 const mockPush = jest.fn();
 const mockHasKeys = jest.fn();
 const mockApiFetch = jest.fn();
@@ -40,17 +41,19 @@ let mockAuth: Record<string, unknown> = {};
 let mockStore: Record<string, unknown> = {};
 let mockPathname = '/my-codes';
 
-jest.mock('expo-router', () => ({
-  Stack: { Screen: () => null },
-  Tabs: { Screen: () => null },
-  useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: jest.fn() }),
-  usePathname: () => mockPathname,
-  useLocalSearchParams: () => ({}),
-  useGlobalSearchParams: () => ({}),
-  useSegments: () => [],
-  useFocusEffect: () => {},
-  useIsFocused: () => true,
-}));
+jest.mock('expo-router', () => {
+  return {
+    Stack: { Screen: () => null },
+    Tabs: { Screen: () => null },
+    useRouter: () => mockRouter,
+    usePathname: () => mockPathname,
+    useLocalSearchParams: () => ({}),
+    useGlobalSearchParams: () => ({}),
+    useSegments: () => [],
+    useFocusEffect: () => {},
+    useIsFocused: () => true,
+  };
+});
 
 jest.mock('../src/core/i18n', () => ({
   __esModule: true,

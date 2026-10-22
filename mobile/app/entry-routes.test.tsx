@@ -26,6 +26,7 @@ import StationDetailScreen from './station/[id]';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+const mockRouter = { replace: mockReplace, push: mockPush, back: jest.fn() };
 const mockLogin = jest.fn();
 const mockCompleteOnboarding = jest.fn();
 const mockSelectStation = jest.fn();
@@ -43,7 +44,7 @@ jest.mock('expo-router', () => {
   const { Text: RNText } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
     __esModule: true,
-    useRouter: () => ({ replace: mockReplace, push: mockPush, back: jest.fn() }),
+    useRouter: () => mockRouter,
     useLocalSearchParams: () => mockParams,
     useFocusEffect: () => {},
     Redirect: ({ href }: { href: string }) => R.createElement(RNText, { testID: 'redirect' }, href),
