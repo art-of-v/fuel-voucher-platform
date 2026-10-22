@@ -82,8 +82,9 @@ internal static class DatabaseRoleValidator
     /// is in it, which on a shared cluster is somebody else's data.
     /// </description></item>
     /// <item><description>
-    /// <b>BYPASSRLS</b> - reads past the row-level security the tables carry. There is no
-    /// RLS on the tables today, so this one bites the day somebody adds it.
+    /// <b>BYPASSRLS</b> - reads past the row-level security the tables carry. The policies on
+    /// <c>orders</c>, <c>fuel_vouchers</c> and <c>user_contracts</c> are the tenant boundary, so
+    /// a role that bypasses them sees every company's rows.
     /// </description></item>
     /// </list>
     /// </remarks>

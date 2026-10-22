@@ -27,6 +27,9 @@ internal static class PipelineSetup
         app.UseMiddleware<SessionValidationMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<DeviceSignatureMiddleware>();
+        // After DeviceSignatureMiddleware: that middleware can add the device's identity, and the
+        // scope must be resolved from the principal the request actually ends up with.
+        app.UseMiddleware<TenantScopeMiddleware>();
         app.MapControllers();
 
         var observability = app.Configuration

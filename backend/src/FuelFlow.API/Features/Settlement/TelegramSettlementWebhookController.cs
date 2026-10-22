@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using FuelFlow.API.Extensions;
 using FuelFlow.Features.Feedback;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +35,7 @@ namespace FuelFlow.Features.Settlement;
 [ApiController]
 [Route("api/telegram/settlement/webhook")]
 [AllowAnonymous]
+[SystemScope]
 public sealed class TelegramSettlementWebhookController : ControllerBase
 {
     internal const string SecretHeader = "X-Telegram-Bot-Api-Secret-Token";
