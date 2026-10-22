@@ -47,7 +47,7 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
     if (paths.length > 0) {
       onCapture(JSON.stringify(paths));
     }
-  }, [paths]);
+  }, [onCapture, paths]);
 
   const clear = () => {
     setPaths([]);

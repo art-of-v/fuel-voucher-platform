@@ -208,7 +208,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             new VerifyCodeCommand(phoneNumber, "000000"));
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
-        var refreshRequest = new RefreshTokenCommand(verifyResult!.RefreshToken);
+        var refreshRequest = new RefreshTokenCommand(verifyResult!.RefreshToken!);
         var response = await client.PostAsNativeAsync("/api/auth/refresh", refreshRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -247,7 +247,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var refreshToken = await context.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.Token == SecretsHasher.Hash(verifyResult!.RefreshToken));
+                .FirstOrDefaultAsync(rt => rt.Token == SecretsHasher.Hash(verifyResult!.RefreshToken!));
 
             refreshToken.Should().NotBeNull();
             refreshToken!.IsRevoked = true;
@@ -256,7 +256,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             await context.SaveChangesAsync();
         }
 
-        var refreshRequest = new RefreshTokenCommand(verifyResult!.RefreshToken);
+        var refreshRequest = new RefreshTokenCommand(verifyResult!.RefreshToken!);
         var response = await client.PostAsNativeAsync("/api/auth/refresh", refreshRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -281,11 +281,11 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         // The SPA sends the cookie; here we pass the token in the body (the test client
         // does not persist cookies), which /logout accepts identically.
         var logoutResponse = await client.PostAsJsonAsync("/api/auth/refresh/logout",
-            new RefreshTokenCommand(verifyResult!.RefreshToken));
+            new RefreshTokenCommand(verifyResult!.RefreshToken!));
         logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var refreshResponse = await client.PostAsNativeAsync("/api/auth/refresh",
-            new RefreshTokenCommand(verifyResult.RefreshToken));
+            new RefreshTokenCommand(verifyResult.RefreshToken!));
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -314,12 +314,12 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
         await client.PostAsNativeAsync("/api/auth/refresh",
-            new RefreshTokenCommand(verifyResult!.RefreshToken));
+            new RefreshTokenCommand(verifyResult!.RefreshToken!));
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var oldRefreshToken = await context.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.Token == SecretsHasher.Hash(verifyResult.RefreshToken));
+            .FirstOrDefaultAsync(rt => rt.Token == SecretsHasher.Hash(verifyResult.RefreshToken!));
 
         oldRefreshToken.Should().NotBeNull();
         oldRefreshToken!.IsRevoked.Should().BeTrue();
@@ -341,7 +341,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
         var refreshResponse = await client.PostAsNativeAsync("/api/auth/refresh",
-            new RefreshTokenCommand(verifyResult!.RefreshToken));
+            new RefreshTokenCommand(verifyResult!.RefreshToken!));
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var refreshResult = await refreshResponse.Content.ReadFromJsonAsync<RefreshTokenResponse>();
 

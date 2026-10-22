@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 
 import MyCodesScreen from './my-codes';
+import { shareOrderReceipt } from '../src/features/vouchers/api/getOrderReceipt';
 
 /**
  * What this suite covers, and why not "it renders".
@@ -91,7 +92,6 @@ jest.mock('../src/features/vouchers/api/getOrderReceipt', () => ({
   shareOrderReceipt: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { shareOrderReceipt } from '../src/features/vouchers/api/getOrderReceipt';
 const shareReceiptMock = shareOrderReceipt as jest.MockedFunction<typeof shareOrderReceipt>;
 
 // A module mock must return an object carrying the named exports the screen imports.

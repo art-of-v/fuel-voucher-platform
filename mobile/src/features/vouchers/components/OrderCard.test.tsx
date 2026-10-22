@@ -23,7 +23,9 @@ jest.mock('../../../core/i18n', () => ({
 
 // The swipe reveal reaches for the worklets native module and cannot load under Jest.
 jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const { View } = require('react-native');
   const Swipeable = React.forwardRef(function Swipeable(
     { children }: { children: React.ReactNode },

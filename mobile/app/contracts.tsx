@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FileText, CheckCircle2, Eye, PenTool, X, Landmark } from 'lucide-react-native';
@@ -268,7 +267,7 @@ export default function ContractsScreen() {
         }
       })
       .catch(console.error);
-  }, []);
+  }, [router, t]);
 
   const isLoading = loadingStations || loadingContracts || loadingSigned;
 

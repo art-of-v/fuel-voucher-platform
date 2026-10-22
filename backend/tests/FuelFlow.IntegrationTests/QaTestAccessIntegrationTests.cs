@@ -337,14 +337,14 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
         var tokens = await verify.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
         // The refresh token works while enabled...
-        var okRefresh = await client.PostAsNativeAsync("/api/auth/refresh", new RefreshTokenCommand(tokens!.RefreshToken));
+        var okRefresh = await client.PostAsNativeAsync("/api/auth/refresh", new RefreshTokenCommand(tokens!.RefreshToken!));
         okRefresh.StatusCode.Should().Be(HttpStatusCode.OK);
         var refreshed = await okRefresh.Content.ReadFromJsonAsync<RefreshTokenResponse>();
 
         // ...then the admin disables QA, which revokes the QA session.
         await SetSwitchAsync(false);
 
-        var deniedRefresh = await client.PostAsNativeAsync("/api/auth/refresh", new RefreshTokenCommand(refreshed!.RefreshToken));
+        var deniedRefresh = await client.PostAsNativeAsync("/api/auth/refresh", new RefreshTokenCommand(refreshed!.RefreshToken!));
         deniedRefresh.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 

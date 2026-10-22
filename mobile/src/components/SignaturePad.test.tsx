@@ -19,7 +19,9 @@ import { SignaturePad } from './SignaturePad';
 const handlers: Record<string, (e: { x: number; y: number }) => void> = {};
 
 jest.mock('react-native-gesture-handler', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const R = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const { View } = require('react-native');
   const chainable = (name: string) => ({
     [name]: (fn: (e: { x: number; y: number }) => void) => {
@@ -53,7 +55,7 @@ jest.mock('react-native-gesture-handler', () => {
 
 const point = (x: number, y: number) => ({ x, y });
 
-function drawStroke(...pts: Array<{ x: number; y: number }>) {
+function drawStroke(...pts: { x: number; y: number }[]) {
   act(() => {
     handlers.onStart(point(10, 10));
     for (const p of pts.slice(1)) handlers.onUpdate(p);

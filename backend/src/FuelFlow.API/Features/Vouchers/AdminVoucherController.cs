@@ -48,6 +48,7 @@ public sealed class AdminVoucherController : ControllerBase
         _deleteHandler = deleteHandler;
         _bulkActionHandler = bulkActionHandler;
         _unarchiveHandler = unarchiveHandler;
+        _lifecycleHandler = lifecycleHandler;
     }
 
     [HttpGet]

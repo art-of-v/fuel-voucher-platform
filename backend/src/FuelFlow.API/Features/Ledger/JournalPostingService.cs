@@ -158,22 +158,27 @@ public sealed class JournalPostingService
         if (creditRule is null)
             throw new LedgerUnmappedEventException(sourceEvent, "credit");
 
+        var debitAccount = debitRule.Account
+            ?? throw new LedgerPostingException($"The debit rule for {sourceEvent} names no account.");
+        var creditAccount = creditRule.Account
+            ?? throw new LedgerPostingException($"The credit rule for {sourceEvent} names no account.");
+
         // A header account ("1000 Assets") is a grouping, not a place to post. Nothing in the schema
         // stops a line naming one, which is why ChartOfAccount.IsPostable exists - and this is
         // where it is enforced.
-        foreach (var rule in new[] { debitRule, creditRule })
+        foreach (var account in new[] { debitAccount, creditAccount })
         {
-            if (!rule.Account.IsPostable)
+            if (!account.IsPostable)
                 throw new LedgerPostingException(
-                    $"Account {rule.Account.Code} '{rule.Account.NameUkr}' is a header; " +
+                    $"Account {account.Code} '{account.NameUkr}' is a header; " +
                     $"{sourceEvent} must map to a postable account.");
-            if (!rule.Account.IsActive)
+            if (!account.IsActive)
                 throw new LedgerPostingException(
-                    $"Account {rule.Account.Code} '{rule.Account.NameUkr}' is inactive; " +
+                    $"Account {account.Code} '{account.NameUkr}' is inactive; " +
                     $"{sourceEvent} cannot post to it.");
         }
 
-        return (debitRule.Account, creditRule.Account);
+        return (debitAccount, creditAccount);
     }
 
     /// <summary>
@@ -291,7 +296,7 @@ public sealed class JournalPostingService
                      && e.SourceId != null
                      && sourceIds.Contains(e.SourceId.Value))
             .ToListAsync(cancellationToken);
-        var existingBySourceId = existing.ToDictionary(e => e.SourceId);
+        var existingBySourceId = existing.ToDictionary(e => e.SourceId!.Value);
 
         var pending = requests.Where(r => !existingBySourceId.ContainsKey(r.SourceId)).ToList();
         if (pending.Count == 0)

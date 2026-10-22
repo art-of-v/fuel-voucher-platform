@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRefreshOnFocus } from '../src/core/hooks/useRefreshOnFocus';
 import { View, Text, Pressable, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { Wallet, PiggyBank, Fuel, Ticket, Calendar } from 'lucide-react-native';
@@ -142,11 +142,7 @@ export default function SavingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadSavings();
-  }, [period]);
-
-  const loadSavings = async () => {
+  const loadSavings = useCallback(async () => {
     try {
       setLoading(true);
       const now = new Date();
@@ -182,7 +178,11 @@ export default function SavingsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
+
+  useEffect(() => {
+    void loadSavings();
+  }, [loadSavings]);
 
   const periodFilters: { key: PeriodFilter; label: string }[] = [
     { key: 'all', label: t('savings.allTime') },

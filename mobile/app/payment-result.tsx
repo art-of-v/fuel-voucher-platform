@@ -6,7 +6,7 @@ export default function PaymentResultScreen() {
 
   useEffect(() => {
     router.replace('/my-codes');
-  }, []);
+  }, [router]);
 
   return null;
 }

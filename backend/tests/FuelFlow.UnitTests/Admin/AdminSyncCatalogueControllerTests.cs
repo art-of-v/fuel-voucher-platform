@@ -35,7 +35,7 @@ public sealed class AdminSyncCatalogueControllerTests
         // about this endpoint. The service is read off the job's own Type.
         var enqueued = jobs.Invocations
             .Where(i => i.Arguments.Count > 0 && i.Arguments[0] is Hangfire.Common.Job job)
-            .Select(i => ((Hangfire.Common.Job)i.Arguments[0]).Type)
+            .Select(i => ((Hangfire.Common.Job)i.Arguments[0]!).Type)
             .ToList();
 
         enqueued.Should().BeEquivalentTo(

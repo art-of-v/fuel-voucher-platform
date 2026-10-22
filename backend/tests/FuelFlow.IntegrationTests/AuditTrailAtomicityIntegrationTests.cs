@@ -107,7 +107,7 @@ public sealed class AuditTrailAtomicityIntegrationTests : IClassFixture<TestData
         using (var ctx = CreateContext())
         {
             var result = await Handler(ctx).HandleAsync(Deactivate(voucherId, adminId), CancellationToken.None);
-            result.Success.Should().BeTrue();
+            result!.Success.Should().BeTrue();
         }
 
         using var verify = CreateContext();
@@ -160,7 +160,7 @@ public sealed class AuditTrailAtomicityIntegrationTests : IClassFixture<TestData
         using (var ctx = CreateContext(batches))
         {
             var result = await Handler(ctx).HandleAsync(Deactivate(voucherId, adminId), CancellationToken.None);
-            result.Success.Should().BeTrue();
+            result!.Success.Should().BeTrue();
         }
 
         var withAudit = batches.Batches.Where(b => b.HasAuditRow).ToList();

@@ -3,6 +3,16 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!--
+      The reviewed baseline for test-only warnings (planning #687). EF1002/EF1003 flag raw SQL
+      built with string interpolation or concatenation. In this suite those strings are test
+      fixtures against a throwaway PostgreSQL container: table names, constraint names and
+      literal ids that EF cannot parameterise (a parameterised table name is still not a table
+      name), and no value comes from user input. The warnings that were NOT in this family were
+      fixed rather than baselined. Owner: Artem. Removal date: 2027-01-31, when the fixtures
+      that build identifiers move to quoted literals or Npgsql parameters.
+    -->
+    <NoWarn>$(NoWarn);EF1002;EF1003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

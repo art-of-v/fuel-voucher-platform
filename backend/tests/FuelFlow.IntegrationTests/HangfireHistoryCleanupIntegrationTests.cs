@@ -5,6 +5,7 @@ using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.Testing;
 using Hangfire.PostgreSql;
+using Hangfire.PostgreSql.Factories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
@@ -257,7 +258,9 @@ public sealed class HangfireHistoryCleanupIntegrationTests : IClassFixture<TestD
     {
         // The storage is not disposable and holds no connection of its own; constructing it is what
         // installs the schema.
-        _ = new PostgreSqlStorage(_fixture.ConnectionString);
+        var options = new PostgreSqlStorageOptions();
+        _ = new PostgreSqlStorage(
+            new NpgsqlConnectionFactory(_fixture.ConnectionString, options), options);
 
         await RemoveSettingAsync(AppSettingKeys.HangfireCleanupEnabled);
         await RemoveSettingAsync(AppSettingKeys.HangfireCleanupRetentionDays);

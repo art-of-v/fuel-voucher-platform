@@ -165,7 +165,7 @@ public sealed class CheckConstraintColumnDriftTests : IClassFixture<TestDatabase
             .GetEntityTypes()
             .SelectMany(entity => entity.GetCheckConstraints()
                 .Select(c => (table: entity.GetTableName() ?? entity.ClrType.Name,
-                              constraint: c.Name,
+                              constraint: c.Name ?? string.Empty,
                               expression: c.Sql ?? string.Empty)))
             .ToList();
     }

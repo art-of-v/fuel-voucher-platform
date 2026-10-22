@@ -29,7 +29,8 @@ internal sealed class FuelNominalConfiguration : IEntityTypeConfiguration<FuelNo
         // A named value, not a boolean: a rehearsal row that cannot be called anything else cannot be
         // published as live by a caller who guessed wrong, which is how two 1 UAH rows reached
         // customers before the pool was tracked at all.
-        builder.HasCheckConstraint("ck_fuel_nominals_data_kind", "data_kind IN ('real', 'qa')");
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_fuel_nominals_data_kind", "data_kind IN ('real', 'qa')"));
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")

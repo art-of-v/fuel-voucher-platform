@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useFonts,
   Inter_400Regular,
@@ -73,7 +73,18 @@ export function AuthSync() {
         router.replace('/landing');
       }
     }
-  }, [isLoading, isFetching, isFetched, isError, hookAuth, storeAuth, pathname]);
+  }, [
+    isLoading,
+    isFetching,
+    isFetched,
+    isError,
+    hookAuth,
+    storeAuth,
+    pathname,
+    login,
+    logout,
+    router,
+  ]);
 
   // Once authenticated, register this device for push notifications. Best-effort
   // and de-duped internally (see push.ts) — a failure never blocks the app, and
@@ -102,13 +113,7 @@ export function AppLockGuard({ children, tokens }: { children: React.ReactNode; 
   const [isPrompting, setIsPrompting] = useState(false);
   const isLanding = pathname === '/landing';
 
-  useEffect(() => {
-    if (isAuthenticated && !isAppUnlocked && !isLanding) {
-      handleBiometric();
-    }
-  }, [isAuthenticated, isAppUnlocked, isLanding]);
-
-  const handleBiometric = async () => {
+  const handleBiometric = useCallback(async () => {
     if (isPromptingRef.current) return;
     isPromptingRef.current = true;
     setIsPrompting(true);
@@ -142,7 +147,13 @@ export function AppLockGuard({ children, tokens }: { children: React.ReactNode; 
       isPromptingRef.current = false;
       setIsPrompting(false);
     }
-  };
+  }, [router, unlockApp]);
+
+  useEffect(() => {
+    if (isAuthenticated && !isAppUnlocked && !isLanding) {
+      void handleBiometric();
+    }
+  }, [isAuthenticated, isAppUnlocked, isLanding, handleBiometric]);
 
   if (isAuthenticated && !isAppUnlocked && !isLanding) {
     /*

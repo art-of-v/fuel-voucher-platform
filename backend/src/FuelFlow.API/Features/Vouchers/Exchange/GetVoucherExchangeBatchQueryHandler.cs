@@ -134,7 +134,7 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                     NewVoucherId = r.NewVoucherId,
                     NewVoucherNumber = r.NewNumber,
                     FuelTypeId = r.FuelTypeId,
-                    Brand = r.Brand,
+                    Brand = r.Brand ?? string.Empty,
                     /// <summary>This pair's own share of the batch surcharge — not the batch total.</summary>
                     SurchargeShareUah = r.SurchargeUah ?? 0m,
                     NewCostPerLiter = r.CostPerLiterApplied

@@ -19,7 +19,9 @@ jest.mock('../../../core/i18n', () => ({
 // contributes nothing but a host view here. Stubbing just that wrapper keeps the real
 // card — and the toggles the branch drives — under test.
 jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const { View } = require('react-native');
   const Swipeable = React.forwardRef(function Swipeable(
     { children }: { children: React.ReactNode },

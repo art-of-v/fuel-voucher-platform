@@ -79,7 +79,7 @@ export function GlowText({
     return () => {
       if (anim) anim.stop();
     };
-  }, [animation, animatedValue]);
+  }, [animation, animatedValue, opacityAnim]);
 
   const shadowRads: Record<string, number[]> = {
     none: [],

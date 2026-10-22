@@ -486,7 +486,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         var handler = new DeleteVoucherCommandHandler(_context, _eventService);
         var result = await handler.HandleAsync(new DeleteVoucherCommand(voucher.Id, UserId, "Admin User"));
 
-        result.Success.Should().BeTrue();
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
 
         var archived = _context.VoucherEvents.Single(e => e.VoucherId == voucher.Id);
         archived.EventType.Should().Be(VoucherEventTypes.Archived);

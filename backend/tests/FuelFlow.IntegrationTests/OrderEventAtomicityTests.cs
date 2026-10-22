@@ -6,7 +6,6 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Xunit;
 
 namespace FuelFlow.IntegrationTests;
