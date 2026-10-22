@@ -40,8 +40,11 @@ internal sealed class OutboxEventConfiguration : IEntityTypeConfiguration<Outbox
             .HasColumnName("created_at_utc")
             .IsRequired().HasComment("When the event was written.");
 
+        // The processed flag on its own - the plain one. Every reader of this table asks about
+        // MORE than the flag (the dispatchers and the reconciliation report want the consumed
+        // types, the purge wants the age), and each of them reads through an index of its own:
+        // the partial one below, and the two at the end of this file.
         builder.HasIndex(e => e.Processed);
-        builder.HasIndex(e => e.CreatedAtUtc);
 
         // The safety net's own index: the events that are waiting for a consumer, and only those.
         //
@@ -80,6 +83,30 @@ internal sealed class OutboxEventConfiguration : IEntityTypeConfiguration<Outbox
                 "processed = false AND event_type IN ("
                 + string.Join(", ", ConsumedOutboxEventTypes.All.Select(t => $"'{t}'"))
                 + ")");
+
+        // The retention purge's index: the events that are the record of something that happened,
+        // aged by when it happened.
+        //
+        // WHY IT IS A DIFFERENT INDEX, AND WHY IT IS COMPOSITE. The purge asks for the events
+        // that are OLD and that nobody consumes - `created_at_utc < cutoff AND event_type NOT IN
+        // (the consumed types)`. The index above holds the opposite set (`event_type IN (the
+        // consumed types)`), and a partial index cannot serve a predicate that contradicts its
+        // filter: the planner saw that the query and the index's filter contradict each other
+        // and used neither. So the purge had no index at all and read the whole table, every
+        // night, to delete a few thousand rows out of two hundred thousand.
+        //
+        // EF Core cannot declare two indexes over the SAME columns either: a second HasIndex
+        // over the same property set returns the FIRST index and edits it, which is how the
+        // plain created_at_utc index became the partial one above and left nothing behind. A
+        // composite is therefore the only way this model can carry a second index on that
+        // column - and the id is free, because the row is deleted by its key anyway.
+        builder.HasIndex(e => new { e.CreatedAtUtc, e.Id });
+
+        // The retention purge's other index: the events that were PUBLISHED, aged by when they
+        // were published. The purge asks for `processed AND processed_at_utc < cutoff`, and the
+        // cutoff is on processed_at_utc - a column no index led, so this branch had nothing to
+        // read through either.
+        builder.HasIndex(e => e.ProcessedAtUtc);
 
         // The value set OutboxEventType defines. A dispatcher switching on a typo'd value would
         // silently never fire, which is the worst shape a queue failure can take.

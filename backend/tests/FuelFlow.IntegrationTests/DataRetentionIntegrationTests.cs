@@ -106,7 +106,8 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             SELECT want.tablename || '.' || want.col
               FROM (VALUES ('push_tokens', 'last_seen_at_utc'),
                            ('notifications', 'is_read'),
-                           ('devices', 'last_seen_at')) AS want(tablename, col)
+                           ('devices', 'last_seen_at'),
+                           ('outbox_events', 'processed_at_utc')) AS want(tablename, col)
               JOIN pg_class t ON t.relname = want.tablename
               JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = current_schema()
               JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = want.col
@@ -129,8 +130,98 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         {
             "push_tokens.last_seen_at_utc",
             "notifications.is_read",
-            "devices.last_seen_at"
+            "devices.last_seen_at",
+            "outbox_events.processed_at_utc"
         }, "every prune column has to lead an index, or the nightly DELETE reads the whole table");
+    }
+
+    /// <summary>
+    /// The outbox is purged by TWO queries rather than by the one OR they read as, because the two
+    /// halves are aged by two different columns and only one of them can be an index range.
+    /// </summary>
+    /// <remarks>
+    /// Splitting a predicate is only safe if it selects exactly the same rows, and the outbox has
+    /// more shapes than the devices do: a row can be published or not, can carry a published time
+    /// or not, and can be of a type somebody consumes or of a type nobody ever will. Every shape
+    /// the two halves treat differently is seeded here - including the two the system's own
+    /// writers never produce (a row that says published and carries no time, and a row that says
+    /// not published and carries one), because a split that quietly drops them is a split that
+    /// changes what the retention keeps.
+    /// </remarks>
+    [Fact]
+    public async Task Cleanup_SplitOutboxPredicate_MatchesWhatTheCombinedOrWouldDelete()
+    {
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            seed.Users.Add(CreateUser(UserId));
+            seed.OutboxEvents.AddRange(OutboxShapes());
+        });
+
+        var cutoff = TestClock.UtcNow.AddDays(-DataRetentionService.OutboxEventRetentionDays);
+
+        using var context = CreateContext();
+
+        var combined = await context.OutboxEvents
+            .Where(o =>
+                (o.Processed && o.ProcessedAtUtc != null && o.ProcessedAtUtc < cutoff)
+                || (o.CreatedAtUtc < cutoff && !ConsumedOutboxEventTypes.All.Contains(o.EventType)))
+            .Select(o => o.Id)
+            .ToListAsync();
+
+        var published = await DataRetentionService
+            .ProcessedOutboxEventsToPurge(context.OutboxEvents, cutoff)
+            .Select(o => o.Id)
+            .ToListAsync();
+
+        var unconsumed = await DataRetentionService
+            .UnconsumedOutboxEventsToPurge(context.OutboxEvents, cutoff)
+            .Select(o => o.Id)
+            .ToListAsync();
+
+        combined.Should().NotBeEmpty("otherwise this test proves nothing about the fixtures");
+        published.Should().NotBeEmpty("the published half has to have rows in it");
+        unconsumed.Should().NotBeEmpty("the unconsumed half has to have rows in it");
+
+        published.Intersect(unconsumed).Should().BeEmpty(
+            "the two sets are disjoint, so the two counts add up and no row is deleted twice");
+
+        published.Concat(unconsumed).Should().BeEquivalentTo(combined,
+            "the two-statement form must select exactly what the OR selected");
+    }
+
+    /// <summary>
+    /// One row per shape the two halves of the purge treat differently.
+    /// </summary>
+    private static IEnumerable<OutboxEvent> OutboxShapes()
+    {
+        var now = TestClock.UtcNow;
+        var old = now.AddDays(-40);
+        var recent = now.AddDays(-5);
+
+        // Published, published long ago: the published half takes it.
+        yield return NewOutbox(OutboxEventType.OrderCreated, processed: true, processedAtUtc: old, createdAtUtc: old);
+        // Published, published long ago, but written yesterday.
+        yield return NewOutbox(OutboxEventType.OrderFulfilled, processed: true, processedAtUtc: old, createdAtUtc: recent);
+        // Published, published recently: done, but not old enough to go.
+        yield return NewOutbox(OutboxEventType.VoucherIssued, processed: true, processedAtUtc: recent, createdAtUtc: old);
+        // Published and carrying no time at all - a shape the schema allows and the code never writes.
+        yield return NewOutbox(OutboxEventType.OrderCreated, processed: true, processedAtUtc: null, createdAtUtc: old);
+        // Not published, and of a type somebody consumes: work that is still waiting, never touched.
+        yield return NewOutbox(OutboxEventType.OrderCreated, processed: false, processedAtUtc: null, createdAtUtc: old);
+        // Not published, and of a type nobody consumes: the record of something that happened.
+        yield return NewOutbox(OutboxEventType.OrderCancelled, processed: false, processedAtUtc: null, createdAtUtc: old);
+        // Published, of a type nobody consumes, published long ago.
+        yield return NewOutbox(OutboxEventType.PaymentCompleted, processed: true, processedAtUtc: old, createdAtUtc: old);
+        // Published, of a type nobody consumes, published recently but written long ago.
+        yield return NewOutbox(OutboxEventType.VoucherExpired, processed: true, processedAtUtc: recent, createdAtUtc: old);
+        // Published, of a type nobody consumes, published but carrying no time.
+        yield return NewOutbox(OutboxEventType.VoucherUsed, processed: true, processedAtUtc: null, createdAtUtc: old);
+        // Not published, of a type nobody consumes, written recently: too young to go.
+        yield return NewOutbox(OutboxEventType.VoucherActivated, processed: false, processedAtUtc: null, createdAtUtc: recent);
+        // Not published, of a type nobody consumes, written long ago, and carrying a published time -
+        // the other shape the code never writes, and the one a naive split drops.
+        yield return NewOutbox(OutboxEventType.OrderCancelled, processed: false, processedAtUtc: old, createdAtUtc: old);
     }
 
     [Fact]
@@ -533,9 +624,13 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         CreatedAtUtc = createdAtUtc
     };
 
-    private static OutboxEvent NewOutbox(bool processed, DateTime? processedAtUtc, DateTime createdAtUtc) => new()
+    private static OutboxEvent NewOutbox(bool processed, DateTime? processedAtUtc, DateTime createdAtUtc)
+        => NewOutbox(OutboxEventType.OrderCreated, processed, processedAtUtc, createdAtUtc);
+
+    private static OutboxEvent NewOutbox(
+        OutboxEventType eventType, bool processed, DateTime? processedAtUtc, DateTime createdAtUtc) => new()
     {
-        EventType = OutboxEventType.OrderCreated,
+        EventType = eventType,
         Payload = "{}",
         Processed = processed,
         ProcessedAtUtc = processedAtUtc,
