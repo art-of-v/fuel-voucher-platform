@@ -28,7 +28,8 @@ public sealed class RequestSizeLimitMiddlewareTests
         await InvokeAsync(context);
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status413PayloadTooLarge);
-        (await BodyOf(context)).Should().Contain("too large");
+        (await BodyOf(context)).Should().Contain("must not exceed",
+            "the refusal says which ceiling the body crossed");
     }
 
     [Fact]

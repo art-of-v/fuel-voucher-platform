@@ -81,6 +81,16 @@ public sealed class RequestBodyCeilingTests : IClassFixture<TestDatabaseFixture>
             new StringContent(body, Encoding.UTF8, "application/json"));
 
         response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+
+        // The refusal is the one envelope every other failure of this API uses, so a client
+        // reads it the way it reads everything else.
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+
+        var document = await response.Content.ReadFromJsonAsync<JsonElement>();
+        document.GetProperty("status").GetInt32().Should().Be(413);
+        document.GetProperty("title").GetString().Should().Be("Payload Too Large");
+        document.GetProperty("code").GetString().Should().Be("request_body_too_large");
+        document.GetProperty("instance").GetString().Should().Be("/api/support/messages");
     }
 
     /// <summary>

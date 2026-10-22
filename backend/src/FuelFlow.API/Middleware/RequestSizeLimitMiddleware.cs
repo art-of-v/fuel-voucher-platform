@@ -1,5 +1,5 @@
+using FuelFlow.SharedKernel.Errors;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.Mvc;
 
 namespace FuelFlow.Middleware;
 
@@ -67,7 +67,7 @@ internal sealed class RequestSizeLimitMiddleware
     }
 
     /// <summary>
-    /// Answers 413 with the reason, in the same shape every other error of this API uses.
+    /// Answers 413 with the reason, in the same envelope every other failure of this API uses.
     /// </summary>
     private async Task RefuseAsync(HttpContext context, long limit)
     {
@@ -83,15 +83,16 @@ internal sealed class RequestSizeLimitMiddleware
             context.Request.Path,
             limit);
 
-        context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
-
-        await context.Response.WriteAsJsonAsync(
-            new ProblemDetails
-            {
-                Status = StatusCodes.Status413PayloadTooLarge,
-                Title = "The request body is too large",
-                Detail = $"The request body must not exceed {limit} bytes.",
-                Extensions = { ["traceId"] = context.TraceIdentifier }
-            });
+        await ApiErrorResponse.WriteAsync(
+            context,
+            StatusCodes.Status413PayloadTooLarge,
+            $"The request body must not exceed {limit} bytes.",
+            RequestBodyTooLargeCode);
     }
+
+    /// <summary>
+    /// The machine code that travels with the refusal, so a client can tell "your body is too
+    /// big" from every other failure without reading the sentence.
+    /// </summary>
+    private const string RequestBodyTooLargeCode = "request_body_too_large";
 }
