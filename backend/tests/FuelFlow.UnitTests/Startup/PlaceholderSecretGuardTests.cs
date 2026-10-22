@@ -43,14 +43,28 @@ namespace FuelFlow.UnitTests.Startup;
 public sealed class PlaceholderSecretGuardTests
 {
     /// <summary>
-    /// The production env template, and the variable each guarded secret is deployed through.
+    /// The production env template.
     /// </summary>
-    private static readonly (string Template, string Variable)[] GuardedSecrets =
+    private const string ProductionTemplate = "deploy/.env.production.example";
+
+    /// <summary>
+    /// The variables the env template ships a placeholder for, and the setting each one reaches.
+    /// </summary>
+    /// <remarks>
+    /// The database has more than one password since the three-role layout (app PR #1492): the
+    /// superuser's, the traffic role's and the migrator's. The list therefore names the
+    /// VARIABLES rather than the roles, and a variable the template does not carry is skipped -
+    /// so the test follows the template instead of going stale with it, and a template that
+    /// changes which password the application opens its connection with cannot leave a hole here.
+    /// </remarks>
+    private static readonly (string Variable, string Setting)[] GuardedVariables =
     [
-        ("deploy/.env.production.example", "JWT_SECRET"),
-        ("deploy/.env.production.example", "QR_CIPHER_KEY"),
-        ("deploy/.env.production.example", "POSTGRES_PASSWORD"),
-        ("deploy/.env.production.example", "REDIS_PASSWORD"),
+        ("JWT_SECRET", "Jwt:Secret"),
+        ("QR_CIPHER_KEY", "QrCipher:Key"),
+        ("POSTGRES_PASSWORD", "Database:ConnectionString"),
+        ("POSTGRES_APP_PASSWORD", "Database:ConnectionString"),
+        ("POSTGRES_MIGRATOR_PASSWORD", "Database:ConnectionString"),
+        ("REDIS_PASSWORD", "ConnectionStrings:Redis"),
     ];
 
     /// <summary>
@@ -62,14 +76,14 @@ public sealed class PlaceholderSecretGuardTests
         ["Jwt:Secret"] = "a-configured-jwt-secret-of-at-least-32-characters",
         ["QrCipher:Key"] = Convert.ToBase64String(RandomKeyBytes()),
         ["Database:ConnectionString"] =
-            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;"
+            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_app;"
             + "Password=dummy-database-password;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
         // The schema migration has its own connection, and it is a role of its own: the
         // application's traffic may not change the schema, and the migration may not do the
         // traffic's work. A Production configuration that passes every guard has both.
         ["Database:MigrationConnectionString"] =
             "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_migrator;"
-            + "Password=dummy-database-password;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
+            + "Password=dummy-migration-password;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
         ["ConnectionStrings:Redis"] = "redis:6379,password=dummy-redis-password",
         ["Monobank:Enabled"] = "true",
         ["Monobank:PublicKey"] = ReadableMonobankKey(),
@@ -99,16 +113,26 @@ public sealed class PlaceholderSecretGuardTests
     [Fact]
     public void Every_Secret_The_Template_Ships_Is_Refused_In_Production()
     {
-        foreach (var (template, variable) in GuardedSecrets)
+        var covered = 0;
+
+        foreach (var (variable, _) in GuardedVariables)
         {
+            var value = TemplateValueOrNull(ProductionTemplate, variable);
+            if (value is null) continue;
+
+            covered++;
             var settings = ValidProductionBaseline();
-            ApplyTemplateValue(settings, variable, TemplateValue(template, variable));
+            ApplyTemplateValue(settings, variable, value);
 
             var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Production"));
 
             act.Should().Throw<InvalidOperationException>(
                 $"{variable} is still the placeholder the template ships, and Production booted on it");
         }
+
+        covered.Should().BeGreaterThanOrEqualTo(3,
+            "the template ships the JWT key, the QR cipher key, the database password and the Redis "
+            + "password - and the guard has to cover the ones it ships, or the test proves nothing");
     }
 
     [Fact]
@@ -117,16 +141,27 @@ public sealed class PlaceholderSecretGuardTests
         // Staging is a second stack on the same host, deployed from the same kind of template. A
         // placeholder that is refused in Production and accepted in Staging is one that gets
         // copied into Production by the next person who reads the wrong file.
-        foreach (var (template, variable) in GuardedSecrets)
+        foreach (var (variable, _) in GuardedVariables)
         {
+            var value = TemplateValueOrNull(ProductionTemplate, variable);
+            if (value is null) continue;
+
             var settings = ValidProductionBaseline();
-            ApplyTemplateValue(settings, variable, TemplateValue(template, variable));
+            ApplyTemplateValue(settings, variable, value);
 
             var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Staging"));
 
             act.Should().Throw<InvalidOperationException>(
                 $"{variable} is still the placeholder the template ships, and Staging booted on it");
         }
+    }
+
+    [Fact]
+    public void The_Template_Still_Ships_The_Jwt_Key_As_A_Placeholder()
+    {
+        // If the template stopped shipping a placeholder for the JWT key, this file's premise
+        // would be a stale document - and the guard would be guarding nothing.
+        TemplateValue(ProductionTemplate, "JWT_SECRET").Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -153,14 +188,32 @@ public sealed class PlaceholderSecretGuardTests
         // live.
         var settings = ValidProductionBaseline();
         settings["Database:ConnectionString"] =
-            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;Password="
+            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_app;Password="
             + TemplateValue("deploy/.env.production.example", "POSTGRES_PASSWORD")
             + ";SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Production"));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*POSTGRES_PASSWORD*");
+            .WithMessage("*Database:ConnectionString*");
+    }
+
+    [Fact]
+    public void The_Migration_Password_Is_Refused_Wherever_It_Arrives()
+    {
+        // The schema migration has its own role since the three-role layout, and its own password.
+        // A role that can change the schema is a role that can change the data in it, so its
+        // password is a secret of the same class as the traffic role's.
+        var settings = ValidProductionBaseline();
+        settings["Database:MigrationConnectionString"] =
+            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_migrator;Password="
+            + TemplateValue("deploy/.env.production.example", "POSTGRES_PASSWORD")
+            + ";SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Production"));
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Database:MigrationConnectionString*");
     }
 
     [Fact]
@@ -173,7 +226,7 @@ public sealed class PlaceholderSecretGuardTests
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Production"));
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*REDIS_PASSWORD*");
+            .WithMessage("*ConnectionStrings:Redis*");
     }
 
     [Fact]
@@ -278,8 +331,17 @@ public sealed class PlaceholderSecretGuardTests
                 settings["QrCipher:Key"] = value;
                 break;
             case "POSTGRES_PASSWORD":
+            case "POSTGRES_APP_PASSWORD":
+                // Whichever role's password the compose file puts in the connection string is
+                // the password the application opens the database with, and it is the same
+                // connection string the guard reads.
                 settings["Database:ConnectionString"] =
-                    "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;Password="
+                    "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_app;Password="
+                    + value + ";SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt";
+                break;
+            case "POSTGRES_MIGRATOR_PASSWORD":
+                settings["Database:MigrationConnectionString"] =
+                    "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_migrator;Password="
                     + value + ";SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt";
                 break;
             case "REDIS_PASSWORD":
@@ -288,6 +350,24 @@ public sealed class PlaceholderSecretGuardTests
             default:
                 throw new ArgumentOutOfRangeException(nameof(variable), variable, "unknown variable");
         }
+    }
+
+    /// <summary>
+    /// The value the env template ships for a variable, or null when the template does not carry
+    /// that variable.
+    /// </summary>
+    private static string? TemplateValueOrNull(string template, string variable)
+    {
+        var path = Path.Combine(RepositoryRoot(), template.Replace('/', Path.DirectorySeparatorChar));
+        File.Exists(path).Should().BeTrue("the env template is at " + path);
+
+        var match = Regex.Match(
+            File.ReadAllText(path),
+            $"^{variable}=(?<value>.+)$",
+            RegexOptions.Multiline,
+            TimeSpan.FromSeconds(5));
+
+        return match.Success ? match.Groups["value"].Value.Trim() : null;
     }
 
     /// <summary>

@@ -342,7 +342,7 @@ internal static class SecurityConfigurationValidator
     /// <remarks>
     /// <para>
     /// The finding this answers is planning #620 (S-11). The template
-    /// <c>deploy/.env.production.example</c> ships four placeholder secrets, and the application
+    /// <c>deploy/.env.production.example</c> ships placeholder secrets, and the application
     /// accepted every one of them as a real value:
     /// <c>POSTGRES_PASSWORD=CHANGE_ME_openssl_rand_base64_36</c>,
     /// <c>REDIS_PASSWORD=CHANGE_ME_openssl_rand_hex_32</c>,
@@ -359,11 +359,12 @@ internal static class SecurityConfigurationValidator
     /// is edited to hide the placeholder does not defeat the check.
     /// </para>
     /// <para>
-    /// Two of the four secrets are not settings of their own: the database password and the Redis
-    /// password reach the application inside the connection strings that carry them, so they are
-    /// read from there. That is the only place the application can see them - and it is enough,
-    /// because a placeholder password that reaches the connection string is a placeholder password
-    /// that is live.
+    /// The passwords are not settings of their own: the database password and the Redis password
+    /// reach the application inside the connection strings that carry them, so they are read from
+    /// there. That is the only place the application can see them - and it is enough, because a
+    /// placeholder password that reaches the connection string is a placeholder password that is
+    /// live. Both database connections are read: the traffic's and the migration's, because the
+    /// role that can change the schema is a role that can change the data in it.
     /// </para>
     /// </remarks>
     private static void ValidatePlaceholderSecrets(IConfiguration configuration)
@@ -384,13 +385,19 @@ internal static class SecurityConfigurationValidator
 
         RefusePlaceholder(
             DatabasePassword(configuration["Database:ConnectionString"]),
-            "POSTGRES_PASSWORD (inside Database:ConnectionString)",
-            "it is the credential the application opens the database with, and the database holds "
-            + "the money, the personal data and the voucher ciphertext.");
+            "the database password inside Database:ConnectionString (POSTGRES_APP_PASSWORD)",
+            "it is the credential the application's traffic opens the database with, and the "
+            + "database holds the money, the personal data and the voucher ciphertext.");
+
+        RefusePlaceholder(
+            DatabasePassword(configuration["Database:MigrationConnectionString"]),
+            "the database password inside Database:MigrationConnectionString (POSTGRES_MIGRATOR_PASSWORD)",
+            "it is the credential the schema migration opens the database with, and a role that "
+            + "can change the schema is a role that can change the data in it.");
 
         RefusePlaceholder(
             RedisPassword(configuration["ConnectionStrings:Redis"]),
-            "REDIS_PASSWORD (inside ConnectionStrings:Redis)",
+            "the Redis password inside ConnectionStrings:Redis (REDIS_PASSWORD)",
             "it is the credential the application opens Redis with, and Redis holds the cached "
             + "sessions.");
     }
