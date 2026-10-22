@@ -3633,6 +3633,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("processed_at_utc")
                         .HasComment("When processing finished. NULL while a delivery is still outstanding.");
 
+                    b.Property<DateTime?>("ProcessingStartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processing_started_at_utc")
+                        .HasComment("When the current attempt started, held as a lease. A redelivery may claim the row once this is NULL or older than the lease; a fresh value means an attempt is in flight.");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -3707,6 +3712,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_webhook_events_event_id_length", "length(provider_event_id) = 64");
 
                             t.HasCheckConstraint("ck_webhook_events_processed", "status NOT IN ('Processed','Ignored') OR processed_at_utc IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_webhook_events_settled_has_no_claim", "status NOT IN ('Processed','Ignored') OR processing_started_at_utc IS NULL");
 
                             t.HasCheckConstraint("ck_webhook_events_status", "status IN ('Received','Processed','Ignored','Failed')");
                         });

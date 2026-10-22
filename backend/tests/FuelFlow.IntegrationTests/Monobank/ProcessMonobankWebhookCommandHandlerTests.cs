@@ -9,6 +9,7 @@ using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
@@ -18,6 +19,7 @@ using Hangfire.Common;
 using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -468,10 +470,18 @@ LineItems =
         await _context.SaveChangesAsync();
 
         await _handler.HandleAsync(WebhookCommand("INV-REPLAY2", "success"));
-        await _handler.HandleAsync(WebhookCommand("INV-REPLAY2", "success"));
+        var replay = await _handler.HandleAsync(WebhookCommand("INV-REPLAY2", "success"));
+
+        replay.Message.Should().Contain("already recorded");
 
         var count = await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id);
         count.Should().Be(2, "a replay returns the existing entries rather than adding more");
+
+        // The new guard has to keep refusing exactly this: a delivery that already moved the money.
+        var delivery = await _context.WebhookEvents.AsNoTracking().SingleAsync(e => e.InvoiceId == "INV-REPLAY2");
+        delivery.Status.Should().Be(WebhookReceiptStatus.Processed);
+        delivery.Attempts.Should().Be(2, "the replay is still counted, even though it is refused");
+        delivery.ProcessingStartedAtUtc.Should().BeNull("no attempt is running once the delivery is settled");
     }
 
     // ---------------------------------------------------------------- the money step is one unit of work
@@ -551,9 +561,10 @@ LineItems =
         // delivery for this invoice finds an order that is still waiting for its fuel, and it books
         // the money exactly once. Nothing to undo and nothing to double.
         //
-        // A later delivery, not the same one: a delivery carries (invoice, status, modifiedDate) as
-        // its identity, so a redelivery of the failed one is refused by the unique index before it
-        // is ever processed. That is a separate defect, and it has its own issue.
+        // A later delivery, not the same one: it carries a different modifiedDate, so it is a new
+        // identity and takes the ordinary insert path. This is what the reconciliation poller sends
+        // when the invoice has moved on since the failed callback. The retry of the very same event
+        // is the other case, covered by AFailedDelivery_IsProcessedAgain_.
         var order = BuildOrder("INV-RETRY", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -594,7 +605,190 @@ LineItems =
             Times.Once);
     }
 
+    [Fact]
+    public async Task AFailedDelivery_IsProcessedAgain_WhenTheAcquirerRetriesTheSameEvent()
+    {
+        // #634. The unique index refuses a second row, not a retry of the first. Before the lease,
+        // this redelivery - byte for byte the same event - was acknowledged and dropped, so the
+        // order the rollback had just restored to PendingPayment could never be paid: the row was
+        // Failed and nothing would ever act on it again.
+        var order = BuildOrder("INV-SAME-RETRY", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await SeedPaymentAsync(order);
+        CloseTheAccountingPeriod(order.UserId);
+
+        var delivery = WebhookCommand("INV-SAME-RETRY", "success");
+
+        var act = async () => await _handler.HandleAsync(delivery);
+        await act.Should().ThrowAsync<LedgerPeriodClosedException>();
+
+        var failed = await _context.WebhookEvents.SingleAsync();
+        failed.Status.Should().Be(WebhookReceiptStatus.Failed);
+        failed.ProcessingStartedAtUtc.Should().BeNull("a finished attempt releases its lease");
+
+        // The accountant opens the month again, and Monobank redelivers the very same event.
+        var period = await _context.AccountingPeriods.SingleAsync();
+        period.Status = PeriodStatus.Open;
+        period.ClosedAtUtc = null;
+        period.ClosedByUserId = null;
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(delivery);
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingFulfillment);
+        updated.LastWebhookModifiedDateUtc.Should().Be(delivery.ModifiedDate, "the retry is the delivery that advanced it");
+
+        (await _context.OutboxEvents.CountAsync()).Should().Be(1, "the handover to fulfilment happens once");
+        (await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id)).Should().Be(2,
+            "the gross and the VAT are posted once, not twice");
+        (await _context.Payments.AsNoTracking().SingleAsync()).Status.Should().Be(PaymentStatus.Succeeded);
+
+        var retried = await _context.WebhookEvents.AsNoTracking().SingleAsync();
+        retried.Status.Should().Be(WebhookReceiptStatus.Processed);
+        retried.Attempts.Should().Be(2, "the retry was counted on the row it took over");
+        retried.ProcessingStartedAtUtc.Should().BeNull();
+        retried.ProcessedAtUtc.Should().NotBeNull();
+
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ARedelivery_WhileAnAttemptHoldsTheLease_IsAcknowledgedButNotProcessed()
+    {
+        // Two deliveries of the same event can overlap: Monobank retries while the first request is
+        // still running. The second must not run the money step a second time. The fresh lease is
+        // what tells it "in flight", as opposed to "the process that took it died".
+        var order = BuildOrder("INV-INFLIGHT", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var command = WebhookCommand("INV-INFLIGHT", "success");
+        var inFlight = await RecordArrivalAsync(command);
+
+        var response = await _handler.HandleAsync(command);
+
+        response.Success.Should().BeTrue(
+            "Monobank must not be told to retry a delivery that is already being handled");
+        response.Message.Should().Contain("already being processed");
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment, "the running attempt has not decided anything yet");
+
+        (await _context.OutboxEvents.CountAsync()).Should().Be(0);
+        (await _context.JournalEntries.CountAsync()).Should().Be(0);
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never);
+
+        var receipt = await _context.WebhookEvents.AsNoTracking().SingleAsync();
+        receipt.Status.Should().Be(WebhookReceiptStatus.Received, "the running attempt is still the owner");
+        receipt.Attempts.Should().Be(2, "the refused delivery is still counted, and the lease is not touched");
+        receipt.ProcessingStartedAtUtc.Should().Be(inFlight.ProcessingStartedAtUtc, "the owner keeps its lease");
+    }
+
+    [Fact]
+    public async Task AReceivedDelivery_WhoseAttemptDied_IsRetriedOnceTheLeaseExpires()
+    {
+        // A process that dies mid-attempt leaves Received with its lease still set, and nobody
+        // answers Monobank. Without the expiry the row would look in flight forever; with it the
+        // next delivery - a redelivery or the reconciliation poll - takes the same row and finishes
+        // the work, which is the state the issue asked the design to answer.
+        var order = BuildOrder("INV-CRASH", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        await SeedPaymentAsync(order);
+
+        var command = WebhookCommand("INV-CRASH", "success");
+        var crashed = await RecordArrivalAsync(command);
+
+        crashed.ProcessingStartedAtUtc = TestClock.UtcNow.AddMinutes(-6);
+        await _context.SaveChangesAsync();
+
+        var response = await _handler.HandleAsync(command);
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingFulfillment);
+
+        (await _context.OutboxEvents.CountAsync()).Should().Be(1);
+        (await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id)).Should().Be(2);
+
+        var recovered = await _context.WebhookEvents.AsNoTracking().SingleAsync();
+        recovered.Status.Should().Be(WebhookReceiptStatus.Processed);
+        recovered.Attempts.Should().Be(2);
+        recovered.ProcessingStartedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task TwoDeliveriesOfTheSameEvent_ProcessItOnce()
+    {
+        // The real race: two requests in flight together, each with its own context and tracker.
+        // The claim is one conditional UPDATE, so the database picks exactly one; the other is
+        // refused as in flight or as already acted on, depending on how far the winner has got.
+        var order = BuildOrder("INV-RACE", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        await SeedPaymentAsync(order);
+
+        await using var secondContext = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseNpgsql(_context.Database.GetConnectionString())
+                .Options, TestQrCipher.Instance);
+
+        var secondHandler = new ProcessMonobankWebhookCommandHandler(
+            secondContext,
+            NullLogger<ProcessMonobankWebhookCommandHandler>.Instance,
+            _backgroundJobClientMock.Object,
+            new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
+            new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
+            FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
+            TestJournal.For(secondContext));
+
+        var command = WebhookCommand("INV-RACE", "success");
+
+        var responses = await Task.WhenAll(
+            _handler.HandleAsync(command),
+            secondHandler.HandleAsync(command));
+
+        responses.Count(r => r.NewStatus == OrderStatus.PendingFulfillment.ToString()).Should().Be(1,
+            "exactly one delivery owns the process, however close together they arrive");
+
+        var updated = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+        updated.Status.Should().Be(OrderStatus.PendingFulfillment);
+
+        (await _context.OutboxEvents.CountAsync()).Should().Be(1);
+        (await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id)).Should().Be(2);
+        (await _context.Payments.AsNoTracking().SingleAsync()).Status.Should().Be(PaymentStatus.Succeeded);
+        (await _context.WebhookEvents.AsNoTracking().SingleAsync()).Attempts.Should().Be(2);
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Once);
+    }
+
     // ---------------------------------------------------------------- fixtures
+
+    /// <summary>
+    /// Puts a delivery on file with a fresh lease and no processing behind it - the state a request
+    /// leaves if its process dies between storing the delivery and acting on it.
+    /// </summary>
+    private async Task<WebhookEvent> RecordArrivalAsync(ProcessMonobankWebhookCommand command)
+    {
+        var recorded = await WebhookEventRecorder.RecordAsync(
+            _context, command, NullLogger.Instance, CancellationToken.None);
+
+        recorded.Decision.Should().Be(WebhookRecordDecision.Process);
+        return recorded.Stored!;
+    }
 
     /// <summary>
     /// The capture the checkout wrote for the invoice: the row the webhook moves to "succeeded".
