@@ -89,6 +89,9 @@ public sealed class AdminBrandStationController : ControllerBase
     [HttpPost("import")]
     [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     [RequestSizeLimit(20 * 1024 * 1024)]
+    // The multipart reader's ceiling is global, so a route that accepts a file this size raises
+    // that one too - otherwise the reader refuses the body the route accepts.
+    [RequestFormLimits(MultipartBodyLengthLimit = 20 * 1024 * 1024)]
     public async Task<IActionResult> Import(IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)

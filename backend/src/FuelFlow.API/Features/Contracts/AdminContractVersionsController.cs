@@ -123,6 +123,9 @@ public sealed class AdminContractVersionsController : ControllerBase
     [HttpPost("upload")]
     [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     [RequestSizeLimit(20 * 1024 * 1024)]
+    // The multipart reader's ceiling is global, so a route that accepts a file this size raises
+    // that one too - otherwise the reader refuses the body the route accepts.
+    [RequestFormLimits(MultipartBodyLengthLimit = 20 * 1024 * 1024)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

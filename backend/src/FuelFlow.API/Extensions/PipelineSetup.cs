@@ -17,6 +17,10 @@ internal static class PipelineSetup
         app.UseMiddleware<RequestLoggingMiddleware>();
         app.UseExceptionHandler();
         app.UseCors();
+        // The request-body ceiling. After CORS, so a refusal carries the headers a browser
+        // needs to read the status; before the rate limiter, so an oversized body is refused
+        // before it costs anything.
+        app.UseMiddleware<RequestSizeLimitMiddleware>();
         app.UseResponseCaching();
         app.UseAuthentication();
         app.UseRateLimiter();
