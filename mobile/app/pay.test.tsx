@@ -5,17 +5,19 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import PaymentScreen from './pay';
 
 /**
- * What this suite covers, and why these three cases and not "it renders".
+ * What this suite covers, and why these cases and not "it renders".
  *
  * `/pay` is the screen the customer is looking at once their money is committed, on a page
  * this app does not control. A bug here does not look wrong - it looks like a payment that
- * silently did nothing. Three failures account for most of that:
+ * silently did nothing. Four failures account for most of that:
  *
  *  - the frame never loads, leaving an empty screen with no way forward;
  *  - the post-payment redirect is followed INSIDE the WebView, so the app never hands off to
  *    the wallet and the customer is left on a dead page (the redirect is a `fuelflow://` deep
  *    link, which a WebView cannot follow);
- *  - the screen is entered with no URL at all, which must say so rather than render nothing.
+ *  - the screen is entered with no URL at all, which must say so rather than render nothing;
+ *  - the page in the frame gets to drive the app - it navigates, and it posts a link for the
+ *    app to open. Both channels are gated, and the gate is what the last four cases test.
  *
  * Deliberately NOT covered: whether Monobank's widget actually renders inside a WKWebView.
  * That needs a device, and it is the one thing in this screen no unit test can answer.
@@ -121,6 +123,127 @@ describe('Payment screen', () => {
     expect(mockAlert).not.toHaveBeenCalled();
   });
 
+  it('refuses a page in the frame that is not HTTPS', () => {
+    // The frame is a remote page on the one screen where the customer types a card. It gets
+    // to render a payment form; it does not get to serve plain HTTP, dispatch an intent to
+    // another app, or dial a number.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    const handler = webViewProps?.onShouldStartLoadWithRequest as (r: { url: string }) => boolean;
+
+    expect(handler({ url: 'http://pay.monobank.ua/frame/inv-2' })).toBe(false);
+    expect(handler({ url: 'intent://evil#Intent;component=com.evil/.Main;end' })).toBe(false);
+    expect(handler({ url: 'tel:+380501234567' })).toBe(false);
+    expect(handler({ url: 'sms:380501234567' })).toBe(false);
+    expect(handler({ url: 'javascript:alert(1)' })).toBe(false);
+    expect(handler({ url: 'data:text/html,<script>alert(1)</script>' })).toBe(false);
+
+    // 3DS happens on the bank's own HTTPS site, so the flow the frame belongs to still
+    // passes - a guard that refused everything would break the payment it protects.
+    expect(handler({ url: 'https://bank.gov.ua/3ds/challenge' })).toBe(true);
+  });
+
+  it('opens nothing when the frame posts a link the app may not open', () => {
+    // `monopay-link` is the one message the frame posts that reaches the operating system.
+    // It used to be opened as-is: an `intent://` URI reaches an arbitrary exported activity
+    // on Android, and `sms:`/`tel:` open other apps - all of them chosen by the page.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    const handler = webViewProps?.onMessage as (e: { nativeEvent: { data: string } }) => void;
+
+    for (const value of [
+      'intent://evil#Intent;component=com.evil/.Main;end',
+      'sms:380501234567',
+      'tel:+380501234567',
+      'mailto:someone@example.com',
+      'http://evil.example/phish',
+      'javascript:alert(1)',
+    ]) {
+      handler({ nativeEvent: { data: JSON.stringify({ message: 'monopay-link', value }) } });
+    }
+
+    expect(mockOpenURL).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('prefers the Monobank app link over the URL the frame posted', () => {
+    // The link Monobank's API issued for THIS invoice is ours; the URL the page posted is
+    // the page's own. When the frame posts something we would not open - a custom scheme,
+    // an intent URI - the hand-off to the Monobank app still happens, through our own link.
+    mockParams = {
+      url: 'https://pay.monobank.ua/frame/inv-1',
+      appUrl: 'https://mbnk.app/or/deep',
+    };
+
+    render(<PaymentScreen />);
+
+    const handler = webViewProps?.onMessage as (e: { nativeEvent: { data: string } }) => void;
+
+    handler({
+      nativeEvent: {
+        data: JSON.stringify({
+          message: 'monopay-link',
+          value: 'intent://evil#Intent;component=com.evil/.Main;end',
+        }),
+      },
+    });
+
+    expect(mockOpenURL).toHaveBeenCalledWith('https://mbnk.app/or/deep');
+    expect(mockOpenURL).not.toHaveBeenCalledWith(
+      'intent://evil#Intent;component=com.evil/.Main;end',
+    );
+  });
+
+  it('keeps our own deep link inside the app instead of handing it to the OS', () => {
+    // `fuelflow://…` is ours. Handing it to `Linking.openURL` would relaunch the app on a
+    // URL the page chose; the app's own hand-off - the wallet, which reads the settled
+    // status - is the right answer, and it is the same one the navigation guard gives.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    const handler = webViewProps?.onMessage as (e: { nativeEvent: { data: string } }) => void;
+
+    handler({
+      nativeEvent: {
+        data: JSON.stringify({ message: 'monopay-link', value: 'fuelflow://payment-result' }),
+      },
+    });
+
+    expect(mockOpenURL).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/my-codes');
+  });
+
+  it('does not show a payment page the app refuses to load', () => {
+    // The URL is a route parameter, and a route parameter can be written by anything that
+    // can open our scheme. On Android the first load of a WebView is not gated by the
+    // navigation handler at all, so the check that matters happens before the frame is
+    // given anything to load.
+    mockParams = { url: 'http://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    expect(screen.queryByTestId('payment-webview')).toBeNull();
+    expect(screen.getByTestId('payment-refused-url')).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('leaves every navigation decision to this app, not to the WebView library', () => {
+    // react-native-webview's whitelist is not a restriction: a URL that is not on the list is
+    // handed to the OS by the library itself (`Linking.openURL`), which is how a page in the
+    // frame reaches `intent://…` and `tel:…`. So the list has to be wide open for our own
+    // handler to be the one that decides - and the handler refuses everything but HTTPS.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    expect(webViewProps?.originWhitelist).toEqual(['*']);
+  });
+
   it('keeps the Monobank-app route open for an order resumed from the wallet', async () => {
     // `appUrl` is a route parameter and is NOT persisted with the order, so paying for an
     // existing unpaid order from «Мої паливні активи» arrives here without one. Rendering the
@@ -151,6 +274,26 @@ describe('Payment screen', () => {
 
     // The direct checkout path carries a real Monobank-app deep link and must use it.
     await waitFor(() => expect(mockOpenURL).toHaveBeenCalledWith('https://mbnk.app/or/deep'));
+  });
+
+  it('falls back to the page when the app link is one the app may not open', async () => {
+    // `appUrl` is a route parameter like any other. A link we would refuse to open for the
+    // page is not a link we hand to the OS for the button either - the page we are already
+    // showing is the fallback, and it is ours.
+    mockParams = {
+      url: 'https://pay.monobank.ua/frame/inv-1',
+      appUrl: 'intent://evil#Intent;component=com.evil/.Main;end',
+    };
+
+    render(<PaymentScreen />);
+    fireEvent.press(screen.getByTestId('payment-open-monobank'));
+
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith('https://pay.monobank.ua/frame/inv-1'),
+    );
+    expect(mockOpenURL).not.toHaveBeenCalledWith(
+      'intent://evil#Intent;component=com.evil/.Main;end',
+    );
   });
 
   it('covers the frame with a loading state until the acquirer page paints', () => {

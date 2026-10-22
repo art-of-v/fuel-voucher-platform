@@ -191,6 +191,8 @@ export const en: Record<string, string> = {
   'payment.close': 'Close',
   'payment.openMonobank': 'Pay via mono',
   'payment.missingUrl': 'No payment link was provided. Go back to your order and try again.',
+  'payment.refusedUrl':
+    'This payment link is not secure, so we did not open it. Go back to your order and try again.',
   'payment.cantRenderTitle': 'Cannot open payment',
   'payment.cantRenderBody':
     'The payment page could not be shown in the app. Open it in the Monobank app instead?',

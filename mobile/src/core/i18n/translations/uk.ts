@@ -193,6 +193,8 @@ export const uk: Record<string, string> = {
   'payment.openMonobank': 'Сплатити через mono',
   'payment.missingUrl':
     'Посилання на оплату не знайдене. Поверніться до замовлення та спробуйте ще раз.',
+  'payment.refusedUrl':
+    'Посилання на оплату небезпечне, тому ми його не відкрили. Поверніться до замовлення та спробуйте ще раз.',
   'payment.cantRenderTitle': 'Не вдалося відкрити оплату',
   'payment.cantRenderBody':
     'Сторінку оплати не вдалося показати в застосунку. Відкрити в застосунку Monobank?',
