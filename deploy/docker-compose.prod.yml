@@ -248,7 +248,7 @@ services:
       # SUPPORT_MAIL_USERNAME/PASSWORD are empty, delivery is disabled but
       # submissions are still persisted to the support_messages table.
       SupportMail__Host: ${SUPPORT_MAIL_HOST:-smtp.gmail.com}
-      SupportMail__Port: "587"
+      SupportMail__Port: ${SUPPORT_MAIL_PORT:-587}
       SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
       SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
@@ -300,7 +300,10 @@ services:
       # TODO: remove once staging no longer tests against expired voucher stock.
       # Default true = fulfillment refuses expired vouchers (correct for production).
       # Set VOUCHER_EXPIRATION_ENABLED=false in .env only on a disposable/staging box.
+      # Turning it off in Production also needs the acknowledged flag, or the API
+      # refuses to start - "off" must be a recorded decision, not an omission.
       VoucherExpiration__Enabled: ${VOUCHER_EXPIRATION_ENABLED:-true}
+      VoucherExpiration__AcknowledgeDisabledInProduction: ${VOUCHER_EXPIRATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION:-false}
 
       # --- OKKO pump-price sync (Hangfire, every 15 minutes) ---
       # Pulls the current pump price from https://www.okko.ua/api/uk/fuels and reprices

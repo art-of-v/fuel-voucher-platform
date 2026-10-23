@@ -84,9 +84,12 @@ for example in .env.staging.example .env.production.example; do
   value="${hash_line#*=}"
   value="${value%\"}"; value="${value#\"}"
   value="${value%\'}"; value="${value#\'}"
+  # Compose collapses $$ to $ on the way into the container. The template keeps the
+  # escaped form so a copied .env reaches Caddy as a real hash.
+  value="${value//\$\$/\$}"
 
-  # bcrypt hashes are $2a$/$2b$/$2y$ + 22 salt chars + 31 digest chars = 60 characters.
-  if [[ "$value" =~ ^\$2[aby]?\$[./A-Za-z0-9]{53}$ ]]; then
+  # bcrypt hashes are $2a$/$2b$/$2y$ + cost + 22 salt chars + 31 digest chars = 60 characters.
+  if [[ "$value" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]; then
     ok "$example basic-auth hash is bcrypt-shaped"
   else
     bad "$example basic-auth hash is NOT a bcrypt hash (len=${#value}) - Caddy will treat it as base64 plaintext and refuse to start. Generate it with: caddy hash-password"
