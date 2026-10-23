@@ -247,10 +247,12 @@ public sealed class SecurityConfigurationValidatorTests
     }
 
     [Fact]
-    public void Validate_Throws_WhenMonobankUsesATestToken_AndNotAcknowledged()
+    public void Validate_Throws_WhenMonobankUsesATestToken()
     {
         // The failure this blocks is not an error, it is a launch that looks successful and takes
         // no money: invoices settle in Monobank's sandbox while orders are created and marked paid.
+        // The acknowledgement that used to make this expressible is gone - production has taken
+        // real money since 2026-10-11 (planning #192, #221, #679).
         var settings = ValidProductionBaseline();
         settings["Monobank:Token"] = "test_abc123";
 
@@ -258,19 +260,35 @@ public sealed class SecurityConfigurationValidatorTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*TEST merchant token*")
-            .WithMessage("*AcknowledgeTestTokenInProduction*");
+            .WithMessage("*no acknowledgement makes it one*");
     }
 
     [Fact]
-    public void Validate_DoesNotThrow_WhenTestTokenAcknowledged()
+    public void Validate_StillThrows_WhenTheRetiredAcknowledgementIsSet()
     {
-        // The sandbox phase is deliberate today, so the state must be expressible - as a decision
-        // that was written down.
+        // The setting is removed from the code, not merely defaulted off: an old deploy env file
+        // that still carries AcknowledgeTestTokenInProduction=true must not be able to turn the
+        // refusal back into a warning. This is the regression that would let the sandbox come back
+        // quietly after the guard was softened "for compatibility".
         var settings = ValidProductionBaseline();
         settings["Monobank:Token"] = "test_abc123";
         settings["Monobank:AcknowledgeTestTokenInProduction"] = "true";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*TEST merchant token*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenStagingUsesATestToken()
+    {
+        // Staging is the sandbox environment - it has no live merchant and no customer money.
+        // The refusal is a Production rule, like every other guard in this validator.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Token"] = "test_abc123";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Staging"));
         act.Should().NotThrow();
     }
 
