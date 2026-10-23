@@ -450,7 +450,7 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("code")
-                        .HasComment("The code itself, hashed.");
+                        .HasComment("The code itself, hashed with the server-side OTP pepper (HMAC-SHA256).");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")

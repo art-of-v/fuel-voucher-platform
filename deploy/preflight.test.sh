@@ -241,7 +241,7 @@ check "different QR cipher keys pass" 0 "$rc"
   || { echo "  FAIL  it does not say the keys were compared: $out"; fail=$((fail+1)); }
 
 # ------------------------------------------------------------------------------
-# The four secrets the env templates ship must not survive into the deployed file.
+# The five secrets the env templates ship must not survive into the deployed file.
 #
 # The repository is public until 2026-11-01, so the template's values are on the internet. An
 # operator who copies the template and misses a line deploys a platform whose access tokens are
@@ -249,7 +249,7 @@ check "different QR cipher keys pass" 0 "$rc"
 # staff token anybody can forge. The application refuses the same placeholders at boot; this is
 # the half that runs BEFORE the deploy.
 # ------------------------------------------------------------------------------
-for var in JWT_SECRET QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
+for var in JWT_SECRET OTP_PEPPER QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
   template_value="$(grep -E "^${var}=" "$SCRIPT_DIR/.env.production.example" | head -1 | cut -d= -f2-)"
   cp "$GOOD_ENV" "$FIXTURE/.env"
   sed -i "s|^${var}=.*|${var}=${template_value}|" "$FIXTURE/.env"

@@ -2,10 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using FuelFlow.Features.Auth.Refresh;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
@@ -60,7 +62,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             .FirstOrDefaultAsync();
 
         verificationCode.Should().NotBeNull();
-        verificationCode!.Code.Should().Be(SecretsHasher.Hash("000000"));
+        verificationCode!.Code.Should().Be(OtpCodeHasher.Hash("000000", AuthOptions.DevelopmentOtpPepper));
     }
 
     [Fact]
@@ -158,7 +160,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             {
                 Id = Guid.NewGuid(),
                 PhoneNumber = phoneNumber,
-                Code = SecretsHasher.Hash("000000"),
+                Code = OtpCodeHasher.Hash("000000", AuthOptions.DevelopmentOtpPepper),
                 CreatedAtUtc = TestClock.UtcNow.AddMinutes(-20),
                 ExpiresAtUtc = TestClock.UtcNow.AddMinutes(-10),
                 IsUsed = false
@@ -187,7 +189,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var verificationCode = await context.VerificationCodes
-            .Where(v => v.PhoneNumber == phoneNumber && v.Code == SecretsHasher.Hash("000000"))
+            .Where(v => v.PhoneNumber == phoneNumber && v.Code == OtpCodeHasher.Hash("000000", AuthOptions.DevelopmentOtpPepper))
             .OrderByDescending(v => v.CreatedAtUtc)
             .FirstOrDefaultAsync();
 

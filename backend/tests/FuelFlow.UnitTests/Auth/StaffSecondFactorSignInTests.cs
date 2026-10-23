@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.AdminLogin;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.Features.Auth.Verify;
@@ -132,7 +133,7 @@ public sealed class StaffSecondFactorSignInTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
-            Code = SecretsHasher.Hash(rawCode),
+            Code = OtpCodeHasher.Hash(rawCode, AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false

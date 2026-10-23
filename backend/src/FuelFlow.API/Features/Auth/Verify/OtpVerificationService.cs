@@ -1,7 +1,9 @@
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Persistence;
-using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FuelFlow.Features.Auth.Verify;
 
@@ -25,10 +27,12 @@ public sealed class OtpVerificationService
     public const int MaxFailedAttempts = 5;
 
     private readonly ApplicationDbContext _context;
+    private readonly AuthOptions _authOptions;
 
-    public OtpVerificationService(ApplicationDbContext context)
+    public OtpVerificationService(ApplicationDbContext context, IOptions<AuthOptions> authOptions)
     {
         _context = context;
+        _authOptions = authOptions.Value;
     }
 
     /// <summary>
@@ -52,7 +56,19 @@ public sealed class OtpVerificationService
         if (verificationCode == null)
             return false;
 
-        if (verificationCode.Code != SecretsHasher.Hash(trimmed))
+        // A digest written before the OTP pepper existed can never match a submitted code, so
+        // burn it instead of counting a guess against it. See VerifyCodeCommandHandler for the
+        // same rule on the login path.
+        if (!OtpCodeHasher.IsPeppered(verificationCode.Code))
+        {
+            verificationCode.IsUsed = true;
+            verificationCode.UsedAtUtc = SystemClock.UtcNow;
+            _context.VerificationCodes.Update(verificationCode);
+            await _context.SaveChangesAsync(cancellationToken);
+            return false;
+        }
+
+        if (!OtpCodeHasher.Verify(verificationCode.Code, trimmed, _authOptions.OtpPepper))
         {
             verificationCode.FailedAttempts++;
             if (verificationCode.FailedAttempts >= MaxFailedAttempts)

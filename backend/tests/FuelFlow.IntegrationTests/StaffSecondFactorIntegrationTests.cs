@@ -3,10 +3,12 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
@@ -226,7 +228,7 @@ public sealed class StaffSecondFactorIntegrationTests : IClassFixture<TestDataba
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
-            Code = SecretsHasher.Hash(plainCode),
+            Code = OtpCodeHasher.Hash(plainCode, AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = now.AddMinutes(5),
             CreatedAtUtc = now,
             IsUsed = false

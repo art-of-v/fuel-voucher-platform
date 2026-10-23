@@ -3,6 +3,7 @@ using FluentAssertions;
 using FuelFlow.API.Features.Auth.GenerateChallenge;
 using FuelFlow.API.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Auth.GenerateChallenge;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
@@ -85,7 +86,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
@@ -136,7 +137,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
@@ -171,7 +172,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("000000"),
+            Code = OtpCodeHasher.Hash("000000", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
@@ -192,7 +193,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = true
@@ -213,7 +214,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(-5),
             CreatedAtUtc = TestClock.UtcNow.AddHours(-1),
             IsUsed = false
@@ -234,7 +235,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
@@ -259,7 +260,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
@@ -292,7 +293,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            Code = SecretsHasher.Hash("123456"),
+            Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false

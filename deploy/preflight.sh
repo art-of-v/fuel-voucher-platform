@@ -224,14 +224,15 @@ check_env_file() {
 }
 
 # ------------------------------------------------------------------------------
-# The four secrets the env templates ship must not survive into the deployed file.
+# The five secrets the env templates ship must not survive into the deployed file.
 #
-# deploy/.env.production.example ships four placeholders:
+# deploy/.env.production.example ships five placeholders:
 #
 #   POSTGRES_PASSWORD=CHANGE_ME_openssl_rand_base64_36
 #   REDIS_PASSWORD=CHANGE_ME_openssl_rand_hex_32
 #   JWT_SECRET=CHANGE_ME_at_least_32_characters_long_random_string
 #   QR_CIPHER_KEY=CHANGE_ME_openssl_rand_base64_32
+#   OTP_PEPPER=CHANGE_ME_openssl_rand_base64_32
 #
 # They are INSTRUCTIONS, not secrets - and the repository is public until 2026-11-01, so
 # they are on the internet. An operator who copies the template and misses a line deploys
@@ -275,7 +276,7 @@ check_placeholder_secrets() {
   # superuser's, the traffic role's and the migrator's. All of them are secrets, so all of them
   # are checked - and a variable the env file does not carry is skipped, so the list can name a
   # role that a given deployment does not use.
-  for var in JWT_SECRET QR_CIPHER_KEY POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_READONLY_PASSWORD REDIS_PASSWORD; do
+  for var in JWT_SECRET OTP_PEPPER QR_CIPHER_KEY POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_READONLY_PASSWORD REDIS_PASSWORD; do
     value="$(grep -E "^${var}=" "$file" | head -1 | cut -d= -f2- || true)"
     if [[ -z "$value" ]]; then
       continue

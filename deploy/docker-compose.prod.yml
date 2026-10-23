@@ -185,6 +185,12 @@ services:
       Jwt__Audience: FuelFlow
       Auth__DevBypass: "false"
 
+      # --- OTP pepper (must be >= 32 chars or the app refuses to start) ---
+      # The half of a verification-code hash that never reaches the database. Without it a
+      # leaked verification_codes table is a million SHA-256 guesses; with it the dump alone
+      # cannot test a candidate. Changing it invalidates the codes in flight (five minutes).
+      Auth__OtpPepper: ${OTP_PEPPER:?set OTP_PEPPER (>=32 chars) in .env (openssl rand -base64 32)}
+
       # --- ProductOwner bootstrap ---
       # The single ProductOwner is pinned here, NOT created through the app (the role is not
       # assignable via the admin panel by anyone). On boot the app promotes this phone to
