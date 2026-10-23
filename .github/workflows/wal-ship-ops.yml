@@ -42,6 +42,7 @@ on:
           - install
           - ship-once
           - lag
+          - verify
           - alert-drill
           - drill
           - report

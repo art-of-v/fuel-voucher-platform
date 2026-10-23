@@ -321,6 +321,24 @@ if ! grep -q "archive recovery complete" <<<"$LOG"; then
   tail -20 <<<"$LOG" >&2
   exit 1
 fi
+
+# A segment that is HALF-WRITTEN stops the replay just as hard as a missing one, but
+# without the "the archive does not reach the requested moment" warning: PostgreSQL
+# reads the header, finds the first record incomplete, and ends recovery there -
+# successfully, as far as it is concerned. The restore then reports success and hands
+# over a database that is older than the archive it was given.
+#
+# The server's log says so explicitly ("invalid record length", "invalid magic number",
+# "unexpected pageaddr"), so those messages are treated as a failed restore rather than
+# as noise. A restore that cannot replay what it was given is not a restore.
+if grep -qE 'invalid record length|invalid magic number|unexpected pageaddr|invalid checkpoint|invalid resource manager|could not open file' <<<"$LOG"; then
+  echo "ERROR: the WAL archive is damaged: the server could not read a segment." >&2
+  echo "       A segment is truncated or corrupt, so the replay stopped there and the" >&2
+  echo "       database you would get is OLDER than the archive." >&2
+  echo "       The server's own words:" >&2
+  grep -E 'invalid record length|invalid magic number|unexpected pageaddr|invalid checkpoint|invalid resource manager|could not open file' <<<"$LOG" | tail -10 | sed 's/^/       /' >&2
+  exit 1
+fi
 echo "[$(date -Is)] Recovery confirmed: the cluster was restored from the base backup."
 
 # Report what was actually recovered, rather than what was asked for. If the archive ran

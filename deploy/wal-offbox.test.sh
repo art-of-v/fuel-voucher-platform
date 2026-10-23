@@ -52,7 +52,19 @@ case "$cmd" in
   lsf)
     dir="${1:-}"; shift || true
     [[ -d "$dir" ]] || { echo "directory not found" >&2; exit 3; }
-    ( cd "$dir" && ls -1 )
+    format=''
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --format) format="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    if [[ "$format" == *s* ]]; then
+      # path and size, the way the real rclone prints them
+      ( cd "$dir" && for f in *; do [[ -f "$f" ]] && printf '%s %s\n' "$f" "$(stat -c %s "$f")"; done )
+    else
+      ( cd "$dir" && ls -1 )
+    fi
     ;;
   copyto)
     src="${1:-}"; dst="${2:-}"
@@ -133,6 +145,7 @@ run_ship() {
     WAL_ARCHIVE_DIR="$TMP/archive" \
     WAL_SHIP_STATE_DIR="$TMP/state" \
     WAL_REMOTE_RETENTION_DAYS=31 \
+    WAL_SEGMENT_SIZE="$SEGMENT_SIZE" \
     ENV_FILE="$TMP/env" \
     RCLONE_BIN="$FAKEBIN/rclone" \
     AGE_BIN="$FAKEBIN/age" \
@@ -145,6 +158,11 @@ SEG1=000000010000000000000001
 SEG2=000000010000000000000002
 printf 'segment one\n' > "$TMP/archive/$SEG1"
 printf 'segment two\n' > "$TMP/archive/$SEG2"
+# The shipper only ships a segment that is WHOLE - a finished WAL segment is exactly
+# WAL_SEGMENT_SIZE bytes. The stub segments here are tiny, so the size the shipper is
+# told about is the size of the stub segment. The real 16 MiB default is checked
+# separately, below.
+SEGMENT_SIZE="$(stat -c %s "$TMP/archive/$SEG1")"
 # PostgreSQL also writes the backup history here. It is not a WAL segment: it must not
 # be shipped as one, and it must not become newest_archived_segment.
 printf 'history\n' > "$TMP/archive/$SEG2.backup"
@@ -196,6 +214,51 @@ run_ship
 assert_status "the prune run succeeds" 0
 assert_no_file "an old remote segment is pruned" "$TMP/remote/wal/$OLD.age"
 assert_file "the status object survives the prune" "$TMP/remote/wal/status.txt"
+
+# --- a half-written segment must not reach the bucket ------------------------------------
+# The archiver's cp writes a segment into the archive directory IN PLACE, so the file is
+# briefly shorter than a segment. Uploading that would put a hole in the off-box chain:
+# a restore stops replaying at the hole, silently, and everything after it is gone.
+SEG3=000000010000000000000003
+printf 'half' > "$TMP/archive/$SEG3"
+run_ship
+assert_status "a half-written segment is not a failure" 0
+assert_no_file "a half-written segment is not shipped" "$TMP/remote/wal/$SEG3.age"
+assert_contains "the shipper says why it left the segment" "still being written"
+rm -f "$TMP/archive/$SEG3"
+
+# And an off-box object that is SHORTER than the segment is a half-written upload that
+# was never replaced. The shipper has to notice it and put it right.
+printf 'x' > "$TMP/remote/wal/$SEG1.age"
+run_ship
+assert_status "the repair run succeeds" 0
+assert_contains "the short off-box object is repaired" "re-uploading it"
+assert_eq "the repaired object is whole again" \
+  "$(stat -c %s "$TMP/remote/wal/$SEG1.age")" "$SEGMENT_SIZE"
+if grep -q '^repaired_now=1$' "$TMP/remote/wal/status.txt"; then
+  ok "the status counts the repair"
+else
+  bad "the status does not count the repair"
+fi
+
+# A restore that meets a half-written segment must FAIL, not report success and hand over
+# a database that is older than the archive it was given. The server's own log says so
+# ("invalid record length"), so the restore reads those words and refuses.
+if grep -q 'invalid record length' "$SCRIPT_DIR/restore-pitr.sh"; then
+  ok "the restore refuses an archive with an unreadable segment"
+else
+  bad "the restore does not notice a damaged WAL segment"
+fi
+if grep -q 'wal_segment_is_complete' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
+  ok "the drill waits for a WHOLE segment, not just a file with the right name"
+else
+  bad "the drill waits for the file name only"
+fi
+if grep -q 'WAL_SEGMENT_SIZE:-16777216' "$SCRIPT_DIR/wal-offbox.sh"; then
+  ok "a finished WAL segment is 16 MiB by default"
+else
+  bad "the default WAL segment size is not 16 MiB"
+fi
 
 # --- the restore helpers -------------------------------------------------------------
 RCLONE="$FAKEBIN/rclone"

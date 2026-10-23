@@ -17,10 +17,11 @@
 #   install      install + enable + start fueflow-wal-ship.timer
 #   ship-once    run one shipment by hand and show what it did
 #   lag          how old the newest off-box segment is, right now
+#   verify       is every off-box segment WHOLE, or is one of them half-written
 #   alert-drill  break the remote on purpose and prove the alert fires
 #   drill        the real-R2 host-loss drill (real bucket, isolated prefix)
 #   report       everything above, in one transcript
-#   all          preflight -> install -> ship-once -> lag -> alert-drill -> drill -> report
+#   all          preflight -> install -> ship-once -> lag -> verify -> alert-drill -> drill -> report
 #
 # It runs on the box through the self-hosted GitHub Actions runner (see
 # .github/workflows/wal-ship-ops.yml), because SSH into the box is firewalled and the
@@ -413,6 +414,63 @@ cmd_drill() {
   DRILL_REMOTE="$remote" DRILL_KEEP="$DRILL_KEEP" bash "$SCRIPT_DIR/drill-wal-offbox.sh"
 }
 
+# --- the verification -----------------------------------------------------------------
+# Is the off-box copy WHOLE? A segment that was encrypted while the archiver was still
+# copying it decrypts, looks right and is never uploaded again - and it stops a restore
+# replaying at exactly that point, silently. The size is the only way to tell from the
+# outside, so it is checked here, for every segment on the box.
+cmd_verify() {
+  section "Verify the off-box chain"
+
+  local problems=0 checked=0 short=0 missing=0 f name local_size remote_size
+  declare -A remote_sizes=()
+  while read -r rname rsize; do
+    [[ -n "$rname" && -n "$rsize" ]] || continue
+    remote_sizes["$rname"]="$rsize"
+  done < <(wal_remote_object_sizes "$REMOTE_WAL" || true)
+
+  say "  the off-box objects: ${#remote_sizes[@]}"
+  say "  the on-box segments are compared with them, one by one:"
+
+  for f in "$WAL_ARCHIVE_DIR"/0000000*; do
+    [[ -f "$f" ]] || continue
+    name="$(basename "$f")"
+    wal_object_is_segment "$name" || continue
+    local_size="$(wal_segment_size "$f")"
+    checked=$((checked + 1))
+    remote_size="${remote_sizes[$name.age]:-}"
+    if [[ -z "$remote_size" ]]; then
+      say "    $name  on box ${local_size} bytes  off-box: MISSING"
+      missing=$((missing + 1))
+      continue
+    fi
+    if (( remote_size < local_size )); then
+      say "    $name  on box ${local_size} bytes  off-box: ${remote_size} bytes  <-- TRUNCATED"
+      short=$((short + 1))
+      continue
+    fi
+    say "    $name  on box ${local_size} bytes  off-box: ${remote_size} bytes  ok"
+  done
+
+  say ""
+  if (( short > 0 )); then
+    say "ERROR: $short off-box segment(s) are SHORTER than the segment on the box." >&2
+    say "       They were uploaded half-written, and a restore stops replaying at the" >&2
+    say "       first of them without saying why. The shipper re-uploads them on its" >&2
+    say "       next tick; run 'ship-once' now if you want it done immediately." >&2
+    problems=$((problems + 1))
+  fi
+  if (( missing > 0 )); then
+    say "ERROR: $missing segment(s) on the box are not off-box at all." >&2
+    problems=$((problems + 1))
+  fi
+  if (( problems == 0 )); then
+    say "  $checked segment(s) checked; every off-box copy is whole."
+    return 0
+  fi
+  return 1
+}
+
 # --- the report -----------------------------------------------------------------------
 cmd_report() {
   section "Report"
@@ -453,6 +511,7 @@ ops_function() {
     lag)         echo cmd_lag ;;
     alert-drill) echo cmd_alert_drill ;;
     drill)       echo cmd_drill ;;
+    verify)      echo cmd_verify ;;
     report)      echo cmd_report ;;
     all)         echo cmd_all ;;
     *)           return 1 ;;
@@ -462,7 +521,7 @@ ops_function() {
 # --- the whole campaign ---------------------------------------------------------------
 cmd_all() {
   local rc=0 step fn
-  for step in preflight install ship-once lag alert-drill drill; do
+  for step in preflight install ship-once lag verify alert-drill drill; do
     rc=0
     fn="$(ops_function "$step")"
     "$fn" || rc=$?

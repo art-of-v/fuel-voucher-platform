@@ -184,7 +184,14 @@ docker exec "$SRC" psql -U postgres -d fuelflow -Atc 'SELECT 1' >/dev/null 2>&1 
 wait_for_segment() {
   local segment="$1" deadline=$((SECONDS + 120))
   while (( SECONDS < deadline )); do
-    [[ -f "$TMP/archive/$segment" ]] && return 0
+    # The file has to be WHOLE, not just present: the archiver's cp writes the segment
+    # into the archive directory in place, so the name appears while the file is still
+    # growing. A drill that shipped that would prove nothing - and the first real-R2
+    # drill run proved exactly that, by restoring a cluster whose replay stopped in the
+    # middle of a half-written segment.
+    if [[ -f "$TMP/archive/$segment" ]] && wal_segment_is_complete "$TMP/archive/$segment"; then
+      return 0
+    fi
     sleep 1
   done
   return 1
@@ -244,6 +251,22 @@ SEG_MTIME="$(stat -c %Y "$TMP/archive/$SEG2")"
 SHIP_LAG=$((SHIPPED_AT - SEG_MTIME))
 echo "  shipped in $((SHIPPED_AT - SHIP_START))s; segment $SEG2 was ${SHIP_LAG}s old when it left"
 
+# What actually left the box, and what is in the bucket. The sizes are the point: a
+# segment that was half-written when it was encrypted is smaller than a segment, and
+# the transcript has to show that it was not.
+echo "  the segments that left the box:"
+for f in "$TMP/archive"/0000000*; do
+  [[ -f "$f" ]] || continue
+  name="$(basename "$f")"
+  wal_object_is_segment "$name" || continue
+  printf '    %s  on box: %s bytes' "$name" "$(wal_segment_size "$f")"
+  if [[ -n "$DRILL_REMOTE" ]]; then
+    remote_size="$(wal_remote_object_sizes "$REMOTE/wal" | awk -v n="$name.age" '$1 == n { print $2; exit }')"
+    printf '  off-box: %s bytes' "${remote_size:-not there}"
+  fi
+  printf '\n'
+done
+
 docker stop "$SRC" >/dev/null
 echo "[$(date -Is)] Source stopped. This is the host loss."
 echo "  last committed row: $MARKER2"
@@ -266,8 +289,16 @@ ROWS="$(docker exec "$DST" psql -U postgres -d fuelflow -Atc \
   "SELECT id || '|' || note FROM drill_marker ORDER BY id")"
 echo "  recovered rows:"
 printf '%s\n' "$ROWS" | sed 's/^/    /'
-grep -q '^2|after-base$' <<<"$ROWS" || fail \
-  "marker 2 is missing: the restore used the base backup but did not replay the off-box WAL."
+if ! grep -q '^2|after-base$' <<<"$ROWS"; then
+  # A missing marker means the replay stopped early. The reason is in the restored
+  # server's own log, and it is the whole point of the drill: print it, so the next
+  # reader does not have to guess.
+  echo "ERROR: marker 2 is missing: the restore used the base backup but did not replay" >&2
+  echo "       the off-box WAL all the way." >&2
+  echo "       The restored server's log says:" >&2
+  docker logs "$DST" 2>&1 | tail -25 | sed 's/^/       /' >&2 || true
+  fail "the off-box WAL was not replayed to the end."
+fi
 grep -q '^1|before-base$' <<<"$ROWS" || fail "marker 1 is missing."
 
 RECOVERED_AT="$(docker exec "$DST" psql -U postgres -d fuelflow -Atc \
