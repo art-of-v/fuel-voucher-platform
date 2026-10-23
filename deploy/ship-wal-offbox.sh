@@ -11,11 +11,18 @@
 #
 # Every run:
 #   1. lists the remote wal/ prefix once;
-#   2. uploads every complete local segment that is not there yet, encrypted on its own
+#   2. uploads every COMPLETE local segment that is not there yet, encrypted on its own
 #      with age to BACKUP_AGE_RECIPIENT (the same public key as the nightly dump);
-#   3. writes wal/status.txt with the newest segment, its archive time, the upload time
+#   3. re-uploads any segment whose off-box object is shorter than the segment itself -
+#      a half-written upload that was never replaced;
+#   4. writes wal/status.txt with the newest segment, its archive time, the upload time
 #      and the lag - so "is it shipping?" has an answer that is not a guess;
-#   4. prunes remote segments older than WAL_REMOTE_RETENTION_DAYS (default 31).
+#   5. prunes remote segments older than WAL_REMOTE_RETENTION_DAYS (default 31).
+#
+# "Complete" is checked, not assumed: the archiver's cp writes a segment into the
+# archive directory in place, so the file is briefly shorter than a segment while it is
+# being copied. Uploading that would put a hole in the off-box chain, and a restore
+# stops at a hole without saying why.
 #
 # It is run by fuelflow-wal-ship.timer every minute. A failed upload exits non-zero, and
 # the unit's OnFailure= hook sends the Telegram alert. A quiet database with no new
@@ -112,6 +119,17 @@ fi
 # The archive directory contains only segments the archiver has FINISHED: PostgreSQL
 # writes each one to the archive after it is complete. The segment being written is in
 # pg_wal, not here, so no file here is truncated.
+#
+# THAT LAST SENTENCE WAS WRONG, AND THE REAL-R2 DRILL PROVED IT. The archive_command is
+# "test ! -f %f && cp %p %f", and that cp writes the segment into the archive directory
+# IN PLACE: the file name appears from the first byte and the file grows to 16 MiB over
+# the next moments. A shipper that picks it up in that window uploads a TRUNCATED
+# segment - which decrypts, looks right, and is never uploaded again, and which stops a
+# restore replaying at exactly that point, silently.
+#
+# So the segments are checked, not trusted: only a file of exactly WAL_SEGMENT_SIZE bytes
+# is a finished segment, and the ship stops at the first one that is not (it does not
+# skip ahead, because a hole in the sequence stops a restore just as hard).
 SEGMENTS=()
 NEWEST_ARCHIVED=""
 for f in "$WAL_ARCHIVE_DIR"/0000000*; do
@@ -127,6 +145,7 @@ for f in "$WAL_ARCHIVE_DIR"/0000000*; do
 done
 
 UPLOADED=0
+REPAIRED=0
 NEWEST_SHIPPED=""
 
 # Anything already off-box counts as shipped, even when it was uploaded by an earlier
@@ -140,11 +159,43 @@ for name in "${!REMOTE[@]}"; do
   fi
 done
 
+# The sizes of what is off-box, so a short object can be spotted. A half-written segment
+# that was uploaded once is never replaced by the ordinary "not there yet" path: it IS
+# there, by name, so it would sit in the bucket forever with a hole in the chain.
+declare -A REMOTE_SIZES=()
+while read -r rname rsize; do
+  [[ -n "$rname" && -n "$rsize" ]] || continue
+  REMOTE_SIZES["$rname"]="$rsize"
+done < <(wal_remote_object_sizes "$REMOTE_DIR" || true)
+
 for f in "${SEGMENTS[@]}"; do
   name="$(basename "$f")"
   wal_object_is_segment "$name" || continue
 
+  # A segment that is still being copied is not a segment yet. Stop here: the next tick
+  # will pick it up, whole.
+  if ! wal_segment_is_complete "$f"; then
+    echo "[$(date -Is)] $name is still being written ($(wal_segment_size "$f") of $WAL_SEGMENT_SIZE bytes);" \
+         "the next tick ships it." >&2
+    break
+  fi
+
+  local_size="$(wal_segment_size "$f")"
+
   if [[ -n "${REMOTE[$name.age]:-}" ]]; then
+    # It is off-box. Is it WHOLE? The ciphertext is larger than the plaintext, so a
+    # shorter object is a half-written upload: re-upload it, or the chain stays broken.
+    # An UNKNOWN size is not evidence of anything, so it is left alone.
+    remote_size="${REMOTE_SIZES[$name.age]:-}"
+    if [[ -n "$remote_size" ]] && (( remote_size < local_size )); then
+      echo "[$(date -Is)] $name.age off-box is $remote_size bytes, the segment is $local_size;" \
+           "re-uploading it." >&2
+      if ! wal_ship_segment "$f" "$REMOTE_DIR" "$BACKUP_AGE_RECIPIENT" "$TMP"; then
+        echo "ERROR: could not re-upload $name.age. The next tick retries." >&2
+        exit 1
+      fi
+      REPAIRED=$((REPAIRED + 1))
+    fi
     continue
   fi
 
@@ -172,7 +223,7 @@ for f in "${SEGMENTS[@]}"; do
   fi
 done
 
-if (( UPLOADED == 0 )); then
+if (( UPLOADED == 0 && REPAIRED == 0 )); then
   echo "[$(date -Is)] nothing new to ship (${#SEGMENTS[@]} segment(s) in the archive)."
 fi
 
@@ -185,6 +236,7 @@ STATUS_TMP="$TMP/status.txt"
   printf 'newest_archived_segment=%s\n' "${NEWEST_ARCHIVED:--}"
   printf 'newest_shipped_segment=%s\n' "${NEWEST_SHIPPED:--}"
   printf 'uploaded_now=%s\n' "$UPLOADED"
+  printf 'repaired_now=%s\n' "$REPAIRED"
   printf 'last_upload_segment=%s\n' "${LAST_UPLOAD:--}"
   printf 'last_upload_archived_at=%s\n' "${LAST_ARCHIVED_AT:--}"
   printf 'last_upload_shipped_at=%s\n' "${LAST_SHIPPED_AT:--}"

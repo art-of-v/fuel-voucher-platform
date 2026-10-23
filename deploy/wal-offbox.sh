@@ -31,6 +31,41 @@ wal_object_is_segment() {
   [[ "$1" =~ ^[0-9A-F]{24}$ ]]
 }
 
+# The size of one WAL segment. PostgreSQL's default is 16 MiB and the box is built with
+# it; a cluster created with --wal-segsize would differ, so it is a variable and not a
+# constant in the code.
+WAL_SEGMENT_SIZE="${WAL_SEGMENT_SIZE:-16777216}"
+
+# Is this file a COMPLETE WAL segment?
+#
+# The archive directory is not a place where files appear atomically. PostgreSQL's
+# archive_command is
+#
+#     test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
+#
+# and that cp writes the segment into the directory IN PLACE: the name exists from the
+# first byte, and the file grows to 16 MiB over the next moments. A shipper that picks
+# the file up in that window encrypts a TRUNCATED segment and uploads it as if it were
+# whole.
+#
+# The damage is not visible at upload time. The off-box object decrypts, its name looks
+# right, and the shipper marks the segment as shipped - so it is never uploaded again.
+# But a restore that reaches that segment stops replaying there, silently, and
+# everything after it is gone. A segment that is missing stops the replay too, but a
+# missing segment is visible in the count; a half-written one looks complete.
+#
+# A finished WAL segment is exactly WAL_SEGMENT_SIZE bytes, so the size is the check.
+wal_segment_is_complete() {
+  local file="$1" size
+  [[ -f "$file" ]] || return 1
+  size="$(stat -c %s "$file" 2>/dev/null || echo 0)"
+  [[ "$size" == "$WAL_SEGMENT_SIZE" ]]
+}
+
+wal_segment_size() {
+  stat -c %s "$1" 2>/dev/null || echo 0
+}
+
 # Is this remote somewhere a DRILL may write?
 #
 # The drill writes a base backup and WAL segments to the same bucket the production
@@ -157,3 +192,14 @@ wal_ship_segment() {
   fi
   rm -f "$enc"
 }
+
+# The sizes of the objects in a remote directory, one "<name> <size>" pair per line.
+#
+# `rclone lsf --format ps` prints the path and the size, which is enough to tell a whole
+# object from a half-written one without a JSON parser on the box.
+wal_remote_object_sizes() {
+  local remote_dir="$1"
+  "${RCLONE:-rclone}" lsf "$remote_dir" --files-only --format "ps" 2>/dev/null \
+    | awk 'NF >= 2 { print $1, $2 }'
+}
+
