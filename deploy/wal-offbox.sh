@@ -195,11 +195,24 @@ wal_ship_segment() {
 
 # The sizes of the objects in a remote directory, one "<name> <size>" pair per line.
 #
-# `rclone lsf --format ps` prints the path and the size, which is enough to tell a whole
-# object from a half-written one without a JSON parser on the box.
+# `rclone lsf --format ps` prints the path and the size, but it separates the fields
+# with "; " (and rclone's separator is configurable), so the line is split on anything
+# that could be a separator. The two fields are also told apart by their shape: a size
+# is digits, a name is not.
+#
+# The listing is best effort. If the rclone on the box is too old for --format, this
+# returns nothing, and the caller must then treat the sizes as UNKNOWN - never as
+# "the object is missing" or "the object is short".
 wal_remote_object_sizes() {
   local remote_dir="$1"
   "${RCLONE:-rclone}" lsf "$remote_dir" --files-only --format "ps" 2>/dev/null \
-    | awk 'NF >= 2 { print $1, $2 }'
+    | awk '{
+        n = split($0, a, /[;,\t ]+/)
+        if (n < 2) next
+        name = a[1]; size = a[2]
+        if (name ~ /^[0-9]+$/ && size !~ /^[0-9]+$/) { t = name; name = size; size = t }
+        if (size !~ /^[0-9]+$/) next
+        print name, size
+      }'
 }
 
