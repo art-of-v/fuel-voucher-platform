@@ -34,7 +34,6 @@ public sealed class UpdateBrandStationCommandHandler
         entity.Address = updated.Address;
         entity.Phone = updated.Phone;
         entity.City = updated.City;
-        entity.StationType = updated.StationType;
         entity.Lat = updated.Lat;
         entity.Lng = updated.Lng;
         entity.UpdatedAtUtc = SystemClock.UtcNow;

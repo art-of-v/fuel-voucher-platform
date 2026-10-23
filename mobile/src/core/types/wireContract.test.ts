@@ -100,7 +100,6 @@ describe('GET /api/brand-stations — StationNode[]', () => {
         address: ['string', 'null'],
         phone: ['string', 'null'],
         city: ['string', 'null'],
-        stationType: ['string', 'null'],
         lat: 'number',
         lng: 'number',
       });

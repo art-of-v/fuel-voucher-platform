@@ -14,6 +14,6 @@ public sealed class GetPublicBrandStationsQueryHandler
             .OrderBy(x => EF.Property<string>(x, "NameSortKey"))
             .ThenBy(x => x.Name)
             .Select(x => new PublicBrandStationResponse(
-                x.Id, x.BrandId, x.Brand!.Slug, x.Name, x.Address, x.Phone, x.City, x.StationType, x.Lat, x.Lng))
+                x.Id, x.BrandId, x.Brand!.Slug, x.Name, x.Address, x.Phone, x.City, x.Lat, x.Lng))
             .ToListAsync(ct);
 }

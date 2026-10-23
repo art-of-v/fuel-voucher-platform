@@ -44,23 +44,23 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// going through EF would only prove EF sent a short string.
     /// </summary>
     /// <summary>
-    /// Pinned on <c>brand_stations</c> since the column left <c>brands</c>: a brand is a network and
-    /// has no station type, but a filling station still does, and the limit on a short label is worth
-    /// as much wherever the column now lives.
+    /// Pinned on <c>brand_stations.name</c>: it was <c>station_type</c> before, and that column went
+    /// with the station type it held (planning #680). The name is the display column the catalogue
+    /// is read by, and the limit on it is worth as much as the limit on any other.
     /// </summary>
     [Fact]
-    public async Task An_Overlong_Station_Type_Is_Refused_By_The_Column()
+    public async Task An_Overlong_Station_Name_Is_Refused_By_The_Column()
     {
         await using var context = CreateContext();
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO brand_stations (id, brand_id, external_id, name, station_type, lat, lng, created_at_utc, updated_at_utc, is_deleted)
-            VALUES (gen_random_uuid(), {0}, 'bounds-probe', 'Probe', {1}, 50.4, 30.4, NOW(), NOW(), false)
+            INSERT INTO brand_stations (id, brand_id, external_id, name, lat, lng, created_at_utc, updated_at_utc, is_deleted)
+            VALUES (gen_random_uuid(), {0}, 'bounds-probe', {1}, 50.4, 30.4, NOW(), NOW(), false)
             """, BrandIds.Okko, new string('x', 300));
 
         var ex = await act.Should().ThrowAsync<PostgresException>();
-        ex.Which.MessageText.Should().Contain("character varying(64)",
+        ex.Which.MessageText.Should().Contain("character varying(200)",
             "the column limit, not some unrelated constraint, is what must stop this");
     }
 

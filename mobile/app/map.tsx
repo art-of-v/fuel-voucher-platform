@@ -177,18 +177,6 @@ export default function MapScreen() {
           lineHeight: 22,
           marginBottom: tokens.spacing['2xl'],
         },
-        tag: {
-          paddingHorizontal: tokens.spacing.md,
-          paddingVertical: tokens.spacing.sm,
-          borderRadius: tokens.radius.fine8,
-          borderWidth: 1,
-        },
-        tagText: {
-          fontFamily: 'Rajdhani-SemiBold',
-          fontSize: tokens.type.caption.fontSize,
-          textTransform: 'uppercase',
-          letterSpacing: 1,
-        },
         brandBadge: {
           paddingHorizontal: tokens.spacing.sm,
           paddingVertical: tokens.spacing.xxs,
@@ -1152,21 +1140,6 @@ export default function MapScreen() {
                   marginTop: tokens.spacing.fine10,
                 }}
               >
-                {(selectedStation as StationNode).stationType && (
-                  <View
-                    style={[
-                      styles.tag,
-                      {
-                        backgroundColor: tokens.colors.primaryDim,
-                        borderColor: tokens.colors.primary,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.tagText, { color: tokens.colors.primary }]}>
-                      {(selectedStation as StationNode).stationType}
-                    </Text>
-                  </View>
-                )}
                 <Pressable
                   style={[
                     styles.actionBtn,

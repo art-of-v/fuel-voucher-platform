@@ -44,10 +44,6 @@ internal sealed class BrandStationConfiguration : IEntityTypeConfiguration<Brand
             .HasColumnName("city")
             .HasMaxLength(128);
 
-        builder.Property(e => e.StationType)
-            .HasColumnName("station_type")
-            .HasMaxLength(64);
-
         builder.Property(e => e.Lat)
             .HasColumnName("lat")
             .HasColumnType("double precision");
