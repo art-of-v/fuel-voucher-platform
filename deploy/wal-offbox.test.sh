@@ -15,7 +15,11 @@
 #   * the remote retention prune removes old segments and leaves status.txt alone;
 #   * the restore library finds the newest base backup, fetches it, and decrypts a set of
 #     per-segment objects;
-#   * the units run the shipper every minute, and restore-pitr.sh knows the off-box flags.
+#   * the drill refuses a remote that is not a drill prefix, so a drill can never write
+#     over the production copy;
+#   * the units run the shipper every minute, and restore-pitr.sh knows the off-box flags;
+#   * the production ops script and its workflow exist, and the workflow runs on the box
+#     without checking out any code.
 #
 # Run: bash deploy/wal-offbox.test.sh
 
@@ -221,6 +225,68 @@ assert_file "the first decrypted segment exists" "$TMP/walout/$SEG1"
 assert_file "the second decrypted segment exists" "$TMP/walout/$SEG2"
 assert_no_file "the status object is not treated as a segment" "$TMP/walout/status.txt"
 
+# --- the drill's remote guard ---------------------------------------------------------
+# The real-R2 drill writes into the same bucket the production shipper uses, so the
+# prefix it writes to has to be provably not the production one. The guard is a function
+# so it can be checked here without a bucket and without docker.
+assert_eq "a /drill prefix is allowed" \
+  "$(wal_drill_remote_is_safe 'r2:fuelflow-backups/drill/695-20261023T090000Z' && echo yes || echo no)" "yes"
+assert_eq "a /drill prefix on another backend is allowed" \
+  "$(wal_drill_remote_is_safe 's3:bucket/drill/x' && echo yes || echo no)" "yes"
+assert_eq "the bucket root is refused" \
+  "$(wal_drill_remote_is_safe 'r2:fuelflow-backups' && echo yes || echo no)" "no"
+assert_eq "the production wal/ prefix is refused" \
+  "$(wal_drill_remote_is_safe 'r2:fuelflow-backups/wal' && echo yes || echo no)" "no"
+assert_eq "a drill word that is not a path segment is refused" \
+  "$(wal_drill_remote_is_safe 'r2:fuelflow-backups/drill-run' && echo yes || echo no)" "no"
+assert_eq "an empty remote is refused" \
+  "$(wal_drill_remote_is_safe '' && echo yes || echo no)" "no"
+
+# And the drill itself refuses, before it starts a container or touches the bucket.
+OUTPUT="$(DRILL_REMOTE="r2:fuelflow-backups" ENV_FILE="$TMP/no-such.env" \
+  bash "$SCRIPT_DIR/drill-wal-offbox.sh" 2>&1)"
+STATUS=$?
+if [[ "$STATUS" -ne 0 ]]; then ok "the drill refuses a non-drill prefix"; else bad "the drill accepted a non-drill prefix"; fi
+assert_contains "the refusal explains the /drill rule" "/drill"
+
+# The drill has to use the remote it was given everywhere: the env file the shipper
+# reads, the base backup upload, the shipment and the restore.
+if grep -q 'BACKUP_REMOTE=$REMOTE' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
+  ok "the drill's env file points at the drill remote"
+else
+  bad "the drill's env file does not point at the drill remote"
+fi
+if grep -q 'copyto "$TMP/base.tar.age" "$REMOTE/$BASE_NAME"' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
+  ok "the drill uploads the base backup to the drill remote"
+else
+  bad "the drill does not upload the base backup to the drill remote"
+fi
+if grep -q -- '--base-remote "$REMOTE"' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
+  ok "the drill restores from the drill remote"
+else
+  bad "the drill does not restore from the drill remote"
+fi
+
+# --- the production ops script --------------------------------------------------------
+assert_file "the ops script exists" "$SCRIPT_DIR/wal-ship-ops.sh"
+for cmd in preflight install ship-once lag alert-drill drill report all; do
+  if grep -qE "^[[:space:]]+$cmd\)" "$SCRIPT_DIR/wal-ship-ops.sh"; then
+    ok "the ops script has the '$cmd' command"
+  else
+    bad "the ops script has no '$cmd' command"
+  fi
+done
+if grep -q 'trap restore_config EXIT' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the alert drill puts the rclone config back even if the run dies"
+else
+  bad "the alert drill does not restore the rclone config"
+fi
+if grep -q 'wal_drill_remote_is_safe' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
+  ok "the drill uses the shared remote guard"
+else
+  bad "the drill does not use the shared remote guard"
+fi
+
 # --- static wiring -------------------------------------------------------------------
 for unit in fuelflow-wal-ship.service fuelflow-wal-ship.timer fuelflow-wal-ship-alert@.service; do
   assert_file "the unit $unit exists" "$SCRIPT_DIR/systemd/$unit"
@@ -242,13 +308,41 @@ else
   bad "the installer does not check the remote settings"
 fi
 
+# The production ops workflow. It runs ON the box, so it must not check out code: the
+# box's checkout is reset to main by the job itself, and a second checkout is a second
+# copy to get out of step with the first.
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
+OPS_WORKFLOW="$REPO_ROOT/.github/workflows/wal-ship-ops.yml"
+assert_file "the production ops workflow exists" "$OPS_WORKFLOW"
+if grep -q 'workflow_dispatch' "$OPS_WORKFLOW"; then
+  ok "the production ops workflow is dispatched by hand"
+else
+  bad "the production ops workflow has no workflow_dispatch"
+fi
+if grep -q 'runs-on: \[self-hosted, linux, x64\]' "$OPS_WORKFLOW"; then
+  ok "the production ops workflow runs on the self-hosted runner"
+else
+  bad "the production ops workflow does not run on the self-hosted runner"
+fi
+if grep -qE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]*actions/checkout' "$OPS_WORKFLOW"; then
+  bad "the production ops workflow checks out code on the production box"
+else
+  ok "the production ops workflow checks out no code on the production box"
+fi
+if grep -q 'wal-ship-ops.sh' "$OPS_WORKFLOW"; then
+  ok "the production ops workflow runs the ops script"
+else
+  bad "the production ops workflow does not run the ops script"
+fi
+
 OUTPUT="$(bash "$SCRIPT_DIR/restore-pitr.sh" --help 2>&1)"
 STATUS=$?
 assert_eq "restore-pitr.sh --help exits 1" "$STATUS" 1
 assert_contains "the help names --base-remote" "--base-remote"
 assert_contains "the help names --wal-remote" "--wal-remote"
 
-for f in wal-offbox.sh ship-wal-offbox.sh notify-wal-ship-failure.sh install-wal-ship-schedule.sh; do
+for f in wal-offbox.sh ship-wal-offbox.sh notify-wal-ship-failure.sh install-wal-ship-schedule.sh \
+         drill-wal-offbox.sh wal-ship-ops.sh; do
   if bash -n "$SCRIPT_DIR/$f"; then ok "bash -n $f"; else bad "bash -n $f"; fi
 done
 

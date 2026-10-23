@@ -1,0 +1,100 @@
+# The WAL shipper's production operations: install the timer, prove the off-box copy
+# really lands in the bucket, and run the real-R2 host-loss drill.
+#
+# WHY THIS IS A WORKFLOW AND NOT AN SSH COMMAND
+# SSH into the production box is firewalled: port 22 times out from outside, and the
+# only way in is the self-hosted GitHub Actions runner, which IS the box. So the box-side
+# work of planning#695 runs here.
+#
+# THE RULES THIS FILE KEEPS
+#   * it runs `main`, never pull-request code. workflow_dispatch only sees the default
+#     branch, and the box's checkout is reset to origin/main before anything runs, so
+#     there is no path by which unmerged code reaches the production host;
+#   * there is no actions/checkout here, for the same reason the migration dry run has
+#     none: the box already has the repository, and pulling it again would only create a
+#     second copy to get out of step with the first;
+#   * the commands are idempotent, and each one can be run on its own, so a failed
+#     campaign can be resumed from the step that failed instead of starting over.
+#
+# WHAT IT PROVES (planning#695)
+#   W1 preflight    the tools, the env, the archive and the bucket are all there
+#   W2 install      the timer is installed, enabled and active
+#   W3 ship-once    a finished segment is off-box, encrypted, with a status object
+#   W4 lag          how old the newest off-box segment is (the host-loss recovery point)
+#   W5 alert-drill  a broken remote produces an alert, and the next run recovers
+#   W6 drill        the real-R2 host-loss drill: source stopped, restore from the bucket
+#
+# The transcript of the run is the evidence, and it is kept in the job log and in
+# /var/lib/fuelflow/wal-ship-ops-<timestamp>.txt on the box.
+name: WAL shipper production ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: What to run on the box
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - preflight
+          - install
+          - ship-once
+          - lag
+          - alert-drill
+          - drill
+          - report
+      force_wal_switch:
+        description: Force a WAL switch before measuring the lag (so a quiet database cannot fake a good number)
+        required: false
+        default: true
+        type: boolean
+      drill_keep:
+        description: Keep the drill objects in the bucket instead of deleting them
+        required: false
+        default: false
+        type: boolean
+
+# contents: read only. This job changes the box, not the repository.
+permissions:
+  contents: read
+
+# One at a time. This runner IS the production box: a second run would fight the first
+# one over the timer, the drill containers and the ports.
+concurrency:
+  group: wal-ship-ops
+  cancel-in-progress: false
+
+jobs:
+  wal-ship-ops:
+    name: WAL shipper ops (${{ inputs.mode }})
+    runs-on: [self-hosted, linux, x64]
+    # The drill starts a throwaway postgres, waits for WAL segments, stops the source and
+    # restores into another container. It is slow, not unpredictable; an hour is generous.
+    timeout-minutes: 90
+    steps:
+      - name: Who is this running on
+        run: |
+          set -euo pipefail
+          echo "host    : $(hostname)"
+          echo "user    : $(id -un)"
+          echo "time    : $(date -Is)"
+          echo "kernel  : $(uname -sr)"
+
+      # The same sync the deploy jobs do: the box's checkout is the one the units point
+      # at (/root/FuelFlow/deploy), so it has to be on main before the script runs.
+      - name: Sync the deployment checkout
+        run: |
+          set -euo pipefail
+          cd /root/FuelFlow
+          git fetch --prune origin main
+          git reset --hard origin/main
+          git clean -fd
+          git log --oneline -1
+
+      - name: Run the WAL shipper ops
+        env:
+          WAL_OPS_FORCE_SWITCH: ${{ inputs.force_wal_switch && '1' || '0' }}
+          DRILL_KEEP: ${{ inputs.drill_keep && '1' || '0' }}
+        run: bash /root/FuelFlow/deploy/wal-ship-ops.sh "${{ inputs.mode }}"

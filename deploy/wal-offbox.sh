@@ -31,6 +31,32 @@ wal_object_is_segment() {
   [[ "$1" =~ ^[0-9A-F]{24}$ ]]
 }
 
+# Is this remote somewhere a DRILL may write?
+#
+# The drill writes a base backup and WAL segments to the same bucket the production
+# shipper uses, so a wrong prefix would put drill objects where the restore reads
+# production objects from. The prefix therefore has to carry a "/drill" path segment:
+#
+#     r2:fuelflow-backups/drill/695-20261023T090000Z   allowed
+#     r2:fuelflow-backups                               refused (the production root)
+#     r2:fuelflow-backups/wal                           refused (the production prefix)
+#
+# The check is on the PATH part, not the whole remote, so it works for every rclone
+# backend ("r2:", "s3:", "b2:") and for a local directory ("/tmp/drill/remote").
+#
+# It refuses rather than warns: the alternative is a drill that quietly writes over the
+# disaster-recovery copy of a payment database.
+wal_drill_remote_is_safe() {
+  local remote="${1:-}" path
+  [[ -n "$remote" ]] || return 1
+  # The part after the backend name: "r2:bucket/drill/x" -> "bucket/drill/x".
+  path="${remote#*:}"
+  case "$path" in
+    */drill/*|*/drill) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # The newest base backup name on the remote, or nothing when there is none. Returns 2
 # when the remote cannot be listed at all - the caller must not read that as "empty".
 wal_newest_base_object() {
