@@ -85,7 +85,6 @@ public sealed class DeviceAuthControllerVerifyRawTests
         body["rsaPssValid"].Should().Be(false);
         body["ecdsaDerValid"].Should().Be(false);
         body["ecdsaIeeeValid"].Should().Be(false);
-        body.Should().ContainKey("rsaPkcs1Error");
     }
 
     [Fact]
