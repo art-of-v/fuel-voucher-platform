@@ -97,7 +97,7 @@ check_contains "the second run says it reuses the CA" "reusing the certificate a
 
 echo "=== it says how the application must connect ==="
 out3="$(bash "$SCRIPT" --dir "$WORK/certs2" --host postgres 2>&1)"
-check_contains "it prints the connection string to use" "SSL Mode=Verify Full" "$out3"
+check_contains "it prints the connection string to use" "SSL Mode=VerifyFull" "$out3"
 
 echo
 echo "passed: $pass  failed: $fail"
