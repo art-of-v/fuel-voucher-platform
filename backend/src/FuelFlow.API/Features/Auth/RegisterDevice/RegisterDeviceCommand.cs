@@ -5,6 +5,21 @@ public sealed class RegisterDeviceCommand
     public Guid UserId { get; set; }
     public string DeviceId { get; set; } = string.Empty;
     public string PublicKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The signature scheme the client will sign with, named exactly as
+    /// <c>AsymmetricSignatureAlgorithm</c> names it. Optional: when absent the server infers it
+    /// from the key (RSA -> PKCS#1, EC -> DER) and pins that. A value that contradicts the key's
+    /// family is refused.
+    /// </summary>
+    public string? SignatureAlgorithm { get; set; }
+
+    /// <summary>
+    /// The payload shape the client will sign. Optional and defaults to 1, the shape the
+    /// installed base uses; a client that understands the domain-separated payload asks for 2.
+    /// </summary>
+    public int? SignaturePayloadVersion { get; set; }
+
     public string? DeviceModel { get; set; }
     public string? OsVersion { get; set; }
     public string? AppVersion { get; set; }

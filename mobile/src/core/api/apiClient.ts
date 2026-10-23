@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { SecurityService } from './securityService';
+import { buildRequestSignaturePayload } from './deviceSignature';
 import { TokenStorage } from './tokenStorage';
 import { BASE_URL, CLIENT_PLATFORM_HEADER, NATIVE_CLIENT_PLATFORM } from './apiConfig';
 import {
@@ -194,7 +195,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   const needsAttestation = isAttestationProtected(path);
 
   await ensureSslPinningInitialized(BASE_URL);
-  await applySignature(endpoint, method, bodyString, headers, needsSignature);
+  await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
   await applyAttestation(path, method, bodyString, headers, needsAttestation);
 
   const response = await fetchWithRetry(url, {
@@ -214,7 +215,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     // attempt already consumed its device-signature nonce (the middleware runs before
     // attestation), so the retry must carry a fresh timestamp and signature as well.
     await clearAppleAttestationKey();
-    await applySignature(endpoint, method, bodyString, headers, needsSignature);
+    await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
     await applyAttestation(path, method, bodyString, headers, needsAttestation);
 
     return fetchWithRetry(url, {
@@ -237,7 +238,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       }
       // Re-sign and re-attest with fresh material: the first attempt may have
       // consumed its nonce/challenge server-side, and replaying either is rejected.
-      await applySignature(endpoint, method, bodyString, headers, needsSignature);
+      await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
       await applyAttestation(path, method, bodyString, headers, needsAttestation);
       const retryResponse = await fetchWithRetry(url, {
         ...options,
@@ -296,8 +297,10 @@ async function applyAttestation(
   }
 }
 
-// Signs the request with a fresh timestamp (payload = METHOD + path + body +
-// timestamp). Unsigned endpoints only get the timestamp header; the signature
+// Signs the request with a fresh timestamp. The payload shape is version 2
+// (device id + METHOD + path + timestamp + body, domain-separated) and is built
+// by buildRequestSignaturePayload so the server's reconstruction cannot drift
+// from this one. Unsigned endpoints only get the timestamp header; the signature
 // header is added when the endpoint requires it and device keys exist.
 function nextSignatureTimestamp(): string {
   // The server's replay nonce is keyed by (device id, timestamp), so two requests inside the
@@ -309,6 +312,7 @@ function nextSignatureTimestamp(): string {
 }
 
 async function applySignature(
+  deviceId: string,
   endpoint: string,
   method: string,
   bodyString: string,
@@ -328,7 +332,13 @@ async function applySignature(
   }
 
   try {
-    const payloadToSign = `${method}${endpoint}${bodyString}${timestamp}`;
+    const payloadToSign = buildRequestSignaturePayload(
+      deviceId,
+      method,
+      endpoint,
+      bodyString,
+      timestamp,
+    );
     const signature = await SecurityService.signPayload(payloadToSign);
     headers['x-signature'] = signature;
   } catch (error) {

@@ -263,6 +263,19 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("public_key")
                         .HasComment("The public key the device signs with. The private half never leaves the device.");
 
+                    b.Property<string>("SignatureAlgorithm")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("signature_algorithm")
+                        .HasComment("The only signature scheme this device may use. NULL = legacy row, pinned to the scheme that first verifies.");
+
+                    b.Property<int>("SignaturePayloadVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("signature_payload_version")
+                        .HasComment("The shape of the signed bytes: 1 = raw legacy payload, 2 = domain-separated FuelFlow-DeviceSignature-v2.");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -290,6 +303,10 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("devices", null, t =>
                         {
                             t.HasCheckConstraint("ck_device_status", "status IN ('Active', 'Revoked')");
+
+                            t.HasCheckConstraint("ck_devices_signature_algorithm", "signature_algorithm IS NULL OR signature_algorithm IN ('RsaPkcs1Sha256', 'RsaPssSha256', 'EcdsaSha256Der', 'EcdsaSha256P1363')");
+
+                            t.HasCheckConstraint("ck_devices_signature_payload_version", "signature_payload_version IN (1, 2)");
                         });
                 });
 

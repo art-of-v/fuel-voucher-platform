@@ -16,6 +16,7 @@ using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.Testing;
+using FuelFlow.UnitTests.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -129,7 +130,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             UserId = UserId,
             DeviceId = "device-abc",
-            PublicKey = "public-key-1",
+            PublicKey = DeviceTestKeys.RsaPrimary,
             DeviceModel = "iPhone 15",
             OsVersion = "iOS 18",
             AppVersion = "1.0.0"
@@ -144,11 +145,70 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var stored = await _context.Devices.SingleAsync(d => d.DeviceId == "device-abc");
         stored.Id.Should().Be(response.DeviceIdGuid);
         stored.UserId.Should().Be(UserId);
-        stored.PublicKey.Should().Be("public-key-1");
+        stored.PublicKey.Should().Be(DeviceTestKeys.RsaPrimary);
+        stored.SignatureAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256);
+        stored.SignaturePayloadVersion.Should().Be(1);
         stored.DeviceModel.Should().Be("iPhone 15");
         stored.OsVersion.Should().Be("iOS 18");
         stored.AppVersion.Should().Be("1.0.0");
         stored.Status.Should().Be(DeviceStatus.Active);
+    }
+
+    [Fact]
+    public async Task RegisterDevice_PinsTheRequestedAlgorithmAndPayloadVersion()
+    {
+        var handler = new RegisterDeviceCommandHandler(_context, null!, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var command = new RegisterDeviceCommand
+        {
+            UserId = UserId,
+            DeviceId = "device-v2",
+            PublicKey = DeviceTestKeys.RsaPrimary,
+            SignatureAlgorithm = nameof(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256),
+            SignaturePayloadVersion = 2
+        };
+
+        var response = await handler.HandleAsync(command);
+
+        response.Error.Should().BeNull();
+        var stored = await _context.Devices.SingleAsync(d => d.DeviceId == "device-v2");
+        stored.SignatureAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256);
+        stored.SignaturePayloadVersion.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task RegisterDevice_RefusesAnAlgorithmThatDoesNotMatchTheKey()
+    {
+        var handler = new RegisterDeviceCommandHandler(_context, null!, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var command = new RegisterDeviceCommand
+        {
+            UserId = UserId,
+            DeviceId = "device-ec",
+            PublicKey = DeviceTestKeys.EcPrimary,
+            SignatureAlgorithm = nameof(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256)
+        };
+
+        var response = await handler.HandleAsync(command);
+
+        response.Error.Should().Be("SignatureAlgorithmDoesNotMatchKey");
+        _context.Devices.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RegisterDevice_RefusesAnUnsupportedPayloadVersion()
+    {
+        var handler = new RegisterDeviceCommandHandler(_context, null!, new Mock<ILogger<RegisterDeviceCommandHandler>>().Object);
+        var command = new RegisterDeviceCommand
+        {
+            UserId = UserId,
+            DeviceId = "device-v9",
+            PublicKey = DeviceTestKeys.RsaPrimary,
+            SignaturePayloadVersion = 9
+        };
+
+        var response = await handler.HandleAsync(command);
+
+        response.Error.Should().Be("UnsupportedSignaturePayloadVersion");
+        _context.Devices.Should().BeEmpty();
     }
 
     [Fact]
@@ -174,7 +234,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             UserId = UserId,
             DeviceId = "device-abc",
-            PublicKey = "new-key",
+            PublicKey = DeviceTestKeys.RsaPrimary,
             DeviceModel = "New Model",
             OsVersion = "Android 15",
             AppVersion = "2.0.0"
@@ -188,7 +248,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         _context.Devices.Should().HaveCount(1);
 
         var stored = await _context.Devices.FindAsync(existingDevice.Id);
-        stored!.PublicKey.Should().Be("new-key");
+        stored!.PublicKey.Should().Be(DeviceTestKeys.RsaPrimary);
         stored.DeviceModel.Should().Be("New Model");
         stored.OsVersion.Should().Be("Android 15");
         stored.AppVersion.Should().Be("2.0.0");
@@ -228,7 +288,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             UserId = OtherUserId,
             DeviceId = "device-abc",
-            PublicKey = "attacker-key",
+            PublicKey = DeviceTestKeys.RsaSecondary,
             DeviceModel = "Attacker Phone",
             OsVersion = "Android 15",
             AppVersion = "2.0.0"

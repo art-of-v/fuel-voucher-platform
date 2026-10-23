@@ -33,6 +33,18 @@ internal sealed class DeviceConfiguration : IEntityTypeConfiguration<Device>
             .IsRequired()
             .HasComment(                "The public key the device signs with. The private half never leaves the device.");
 
+        builder.Property(e => e.SignatureAlgorithm)
+            .HasColumnName("signature_algorithm")
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .HasComment(                "The only signature scheme this device may use. NULL = legacy row, pinned to the scheme that first verifies.");
+
+        builder.Property(e => e.SignaturePayloadVersion)
+            .HasColumnName("signature_payload_version")
+            .HasDefaultValue(1)
+            .IsRequired()
+            .HasComment(                "The shape of the signed bytes: 1 = raw legacy payload, 2 = domain-separated FuelFlow-DeviceSignature-v2.");
+
         builder.Property(e => e.DeviceModel)
             .HasColumnName("device_model")
             .HasMaxLength(255)
@@ -84,6 +96,13 @@ internal sealed class DeviceConfiguration : IEntityTypeConfiguration<Device>
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_device_status", "status IN ('Active', 'Revoked')");
+            t.HasCheckConstraint(
+                "ck_devices_signature_algorithm",
+                "signature_algorithm IS NULL OR signature_algorithm IN "
+                + "('RsaPkcs1Sha256', 'RsaPssSha256', 'EcdsaSha256Der', 'EcdsaSha256P1363')");
+            t.HasCheckConstraint(
+                "ck_devices_signature_payload_version",
+                "signature_payload_version IN (1, 2)");
         });
     }
 }

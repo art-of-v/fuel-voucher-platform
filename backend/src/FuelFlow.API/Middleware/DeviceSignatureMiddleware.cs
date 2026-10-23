@@ -1,8 +1,8 @@
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
-using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,12 +16,12 @@ public sealed class DeviceSignatureMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<DeviceSignatureMiddleware> _logger;
-    private readonly IAsymmetricSignatureVerifier _signatureVerifier;
+    private readonly DeviceSignatureVerifier _signatureVerifier;
 
     public DeviceSignatureMiddleware(
         RequestDelegate next,
         ILogger<DeviceSignatureMiddleware> logger,
-        IAsymmetricSignatureVerifier signatureVerifier)
+        DeviceSignatureVerifier signatureVerifier)
     {
         _next = next;
         _logger = logger;
@@ -150,18 +150,35 @@ public sealed class DeviceSignatureMiddleware
         var body = await bodyReader.ReadToEndAsync();
         context.Request.Body.Position = 0;
 
-        var payload = $"{context.Request.Method}{context.Request.Path}{body}{timestamp}";
+        var verification = _signatureVerifier.VerifyRequest(
+            device,
+            context.Request.Method,
+            context.Request.Path,
+            body,
+            timestamp,
+            signature);
 
-        var isValid = _signatureVerifier.Verify(payload, signature, device.PublicKey);
-
-        if (!isValid)
+        if (!verification.IsValid)
         {
             _logger.LogWarning(
-                "Invalid signature for device {DeviceId}",
-                deviceId);
+                "Invalid signature for device {DeviceId} (tried {Algorithms})",
+                deviceId,
+                string.Join(",", verification.Attempts.Select(a => a.Algorithm)));
 
             await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Invalid signature");
             return;
+        }
+
+        // A device enrolled before the pins existed carries no scheme; the signature just proved
+        // possession, so record the one that verified and the fallback disappears for good. The
+        // LastSeenAt update below shares this SaveChanges, so pinning costs no extra round trip.
+        if (device.SignatureAlgorithm is null && verification.MatchedAlgorithm is { } matched)
+        {
+            device.SignatureAlgorithm = matched;
+            _logger.LogInformation(
+                "Pinned legacy device {DeviceId} to {Algorithm}",
+                deviceId,
+                matched);
         }
 
         // Nonce TTL must outlast the timestamp tolerance, or a consumed signed
