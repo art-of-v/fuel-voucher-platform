@@ -196,7 +196,7 @@ public class FuelVoucher
     public bool IsDeleted { get; set; }
 
     /// <summary>
-    /// How much of the printed QR matrix did not match, as a percentage.
+    /// How much of the printed QR matrix did not match the payload the importer decoded, as a percentage.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -208,9 +208,18 @@ public class FuelVoucher
     /// It was the only money-adjacent column in the schema that was a float. Every other one is
     /// <c>numeric</c> with an explicit scale.
     /// </para>
+    /// <para>
+    /// <b>This is decode integrity, not supplier authenticity.</b> A zero mismatch means the image and the
+    /// payload agree; it does not mean the supplier issued the voucher. The payload has no supplier
+    /// signature, serial or registry entry to check, and a counterfeit with a well-formed payload produces
+    /// a matching matrix by construction.
+    /// </para>
     /// </remarks>
-    public decimal? VerificationMismatchPercent { get; set; }
+    public decimal? MatrixMismatchPercent { get; set; }
 
-    public int? VerificationMismatchedModules { get; set; }
-    public int? VerificationTotalModules { get; set; }
+    /// <summary>How many QR modules disagreed between the printed matrix and the regenerated one.</summary>
+    public int? MatrixMismatchedModules { get; set; }
+
+    /// <summary>How many QR modules were compared.</summary>
+    public int? MatrixTotalModules { get; set; }
 }

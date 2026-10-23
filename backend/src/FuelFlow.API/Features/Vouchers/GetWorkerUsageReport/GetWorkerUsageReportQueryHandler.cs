@@ -28,7 +28,7 @@ public sealed class GetWorkerUsageReportQueryHandler
         var held = _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.WorkerUserId == query.UserId && v.LegalEntityId == query.LegalEntityId)
-            .Where(v => !v.IsDeleted && v.Status != VoucherStatus.VerificationFailed);
+            .Where(v => !v.IsDeleted && v.Status != VoucherStatus.DecodeIntegrityFailed);
 
         // The count is asked of the same query the page is, so the two cannot disagree.
         var totalCount = await held.CountAsync(cancellationToken);

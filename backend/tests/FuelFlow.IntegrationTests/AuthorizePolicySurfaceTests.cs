@@ -121,7 +121,7 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["GET /api/admin/vouchers"] = AuthPolicies.Staff,
         ["GET /api/admin/vouchers/{id}"] = AuthPolicies.Staff,
         ["GET /api/admin/vouchers/{id:guid}/lifecycle"] = AuthPolicies.Staff,
-        ["GET /api/admin/vouchers/{id:guid}/verification"] = AuthPolicies.Staff,
+        ["GET /api/admin/vouchers/{id:guid}/decode-integrity"] = AuthPolicies.Staff,
         ["GET /api/voucher-catalog"] = AuthPolicies.Staff,
         ["GET /api/vouchers/inventory"] = AuthPolicies.Staff,
 

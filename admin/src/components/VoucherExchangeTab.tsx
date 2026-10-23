@@ -48,8 +48,8 @@ interface ImportResponse {
   imported: number;
   duplicates: number;
   failed: number;
-  verificationFailed: number;
-  verifiedWithWarnings: number;
+  decodeIntegrityFailed: number;
+  decodeIntegrityWarning: number;
   errors?: {
     pageNumber: number;
     voucherNumber: string | null;

@@ -1494,6 +1494,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
     public async Task The_Longest_Voucher_Status_Fits_With_Room_To_Spare()
     {
         await using var context = CreateContext();
+        var longestStatus = Enum.GetNames<VoucherStatus>().MaxBy(name => name.Length)!;
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             $$"""
@@ -1501,10 +1502,10 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
                                        customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
             VALUES ({0}, 'okko', '{{BrandIds.Okko}}', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr', sha256(convert_to('longest-status-qr','UTF8')),
-                    now(), now(), 'VerifiedWithWarnings', 'real', false)
+                    now(), now(), '{{longestStatus}}', 'real', false)
             """, Guid.NewGuid());
 
-        await act.Should().NotThrowAsync("the longest member is 20 chars and the column is wider");
+        await act.Should().NotThrowAsync($"the longest member ({longestStatus}) must fit and the column is wider");
     }
 
     // ── F-02: the query filter users never had ───────────────────────────────────────────────

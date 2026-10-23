@@ -212,7 +212,7 @@ public sealed partial class ImportVouchersCommandHandler
             UpdatedAtUtc = SystemClock.UtcNow
         };
 
-        var verification = QrMatrixVerifier.Verify(
+        var integrity = QrDecodeIntegrityVerifier.Check(
             parsed.QrPayload,
             parsed.OriginalQrMatrix,
             parsed.QrEccLevel,
@@ -220,45 +220,45 @@ public sealed partial class ImportVouchersCommandHandler
             parsed.QrEncodingMode,
             parsed.QrMaskPattern);
 
-        voucher.Status = verification.Result switch
+        voucher.Status = integrity.Result switch
         {
-            QrMatrixVerifier.VerificationResult.Passed  => SharedModels.VoucherStatus.Imported,
-            QrMatrixVerifier.VerificationResult.Skipped => SharedModels.VoucherStatus.Imported,
-            QrMatrixVerifier.VerificationResult.Warning => SharedModels.VoucherStatus.VerifiedWithWarnings,
-            QrMatrixVerifier.VerificationResult.Failed  => SharedModels.VoucherStatus.VerificationFailed,
+            QrDecodeIntegrityVerifier.DecodeIntegrityResult.Matched    => SharedModels.VoucherStatus.Imported,
+            QrDecodeIntegrityVerifier.DecodeIntegrityResult.NotChecked => SharedModels.VoucherStatus.Imported,
+            QrDecodeIntegrityVerifier.DecodeIntegrityResult.Warning    => SharedModels.VoucherStatus.DecodeIntegrityWarning,
+            QrDecodeIntegrityVerifier.DecodeIntegrityResult.Mismatch   => SharedModels.VoucherStatus.DecodeIntegrityFailed,
             _ => SharedModels.VoucherStatus.Imported
         };
 
-        if (verification.Result != QrMatrixVerifier.VerificationResult.Skipped)
+        if (integrity.Result != QrDecodeIntegrityVerifier.DecodeIntegrityResult.NotChecked)
         {
             // The verifier counts modules, and its answer is a double. The column is a
             // decimal, and the rounding happens on the decimal - a double rounded to
             // four places and then converted is a different number from a decimal
             // rounded to four places.
-            voucher.VerificationMismatchPercent = Math.Round((decimal)verification.MismatchPercent, 4);
-            voucher.VerificationMismatchedModules = verification.MismatchedModules;
-            voucher.VerificationTotalModules = verification.TotalModules;
+            voucher.MatrixMismatchPercent = Math.Round((decimal)integrity.MatrixMismatchPercent, 4);
+            voucher.MatrixMismatchedModules = integrity.MatrixMismatchedModules;
+            voucher.MatrixTotalModules = integrity.MatrixTotalModules;
         }
 
-        if (verification.Result == QrMatrixVerifier.VerificationResult.Warning)
+        if (integrity.Result == QrDecodeIntegrityVerifier.DecodeIntegrityResult.Warning)
         {
-            import.VerifiedWithWarningsCount++;
+            import.DecodeIntegrityWarningCount++;
             _logger.LogWarning(
-                "QR verification warning for voucher {VoucherNumber}: {Mismatched}/{Total} modules mismatched ({Percent:F2}%)",
-                parsed.VoucherNumber, verification.MismatchedModules, verification.TotalModules, verification.MismatchPercent);
+                "QR decode-integrity warning for voucher {VoucherNumber}: {Mismatched}/{Total} modules mismatched ({Percent:F2}%)",
+                parsed.VoucherNumber, integrity.MatrixMismatchedModules, integrity.MatrixTotalModules, integrity.MatrixMismatchPercent);
         }
-        else if (verification.Result == QrMatrixVerifier.VerificationResult.Failed)
+        else if (integrity.Result == QrDecodeIntegrityVerifier.DecodeIntegrityResult.Mismatch)
         {
-            import.VerificationFailedCount++;
+            import.DecodeIntegrityFailedCount++;
             _logger.LogError(
-                "QR verification failed for voucher {VoucherNumber}: {Mismatched}/{Total} modules mismatched ({Percent:F2}%). Reason: {Reason}",
-                parsed.VoucherNumber, verification.MismatchedModules, verification.TotalModules, verification.MismatchPercent, verification.SkipReason);
+                "QR decode-integrity mismatch for voucher {VoucherNumber}: {Mismatched}/{Total} modules mismatched ({Percent:F2}%). Reason: {Reason}",
+                parsed.VoucherNumber, integrity.MatrixMismatchedModules, integrity.MatrixTotalModules, integrity.MatrixMismatchPercent, integrity.SkipReason);
         }
-        else if (verification.Result == QrMatrixVerifier.VerificationResult.Skipped)
+        else if (integrity.Result == QrDecodeIntegrityVerifier.DecodeIntegrityResult.NotChecked)
         {
             _logger.LogInformation(
-                "QR verification skipped for voucher {VoucherNumber}: {Reason}",
-                parsed.VoucherNumber, verification.SkipReason);
+                "QR decode integrity not checked for voucher {VoucherNumber}: {Reason}",
+                parsed.VoucherNumber, integrity.SkipReason);
         }
 
         _context.FuelVouchers.Add(voucher);

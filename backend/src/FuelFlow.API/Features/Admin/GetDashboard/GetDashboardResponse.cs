@@ -12,8 +12,8 @@ public sealed record GetDashboardResponse(
         int Available,
         int Assigned,
         int Used,
-        int VerificationFailed,
-        int VerifiedWithWarnings,
+        int DecodeIntegrityFailed,
+        int DecodeIntegrityWarning,
         IReadOnlyList<VouchersByProvider> ByProvider);
 
     public sealed record VouchersByProvider(string Brand, int Count);

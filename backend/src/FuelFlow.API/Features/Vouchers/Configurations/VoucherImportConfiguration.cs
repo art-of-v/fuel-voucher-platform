@@ -53,15 +53,35 @@ internal sealed class VoucherImportConfiguration : IEntityTypeConfiguration<Vouc
             .HasColumnName("failed_count")
             .IsRequired().HasComment("How many rows could not be read at all.");
 
-        builder.Property(e => e.VerificationFailedCount)
-            .HasColumnName("verification_failed_count")
-            .IsRequired().HasComment("How many rows were read but did not verify - the code does not match the fuel, the litres do" +
-                    "not match the code.");
+        // The operator's declaration for the delivery, written once at upload and inherited by every
+        // voucher in the batch. It is the first half of supplier/batch reconciliation, and the reason the
+        // batch list can say who the paper is settled with even before a cost has been entered.
+        //
+        // Nullable only for rows written before the supplier picker existed: production had no imports at
+        // that point (SUPPLIERS_AND_VOUCHER_COST), but a test or restored row may. A new import always sets
+        // it, and the handler refuses an unknown supplier before parsing.
+        //
+        // It is NOT a provenance proof: the payload carries no supplier signature, serial or registry entry.
+        builder.Property(e => e.SupplierId)
+            .HasColumnName("supplier_id")
+            .HasComment("The supplier the operator declared for this delivery. An operator assertion, not a " +
+                    "cryptographic or registry verification - no such check exists in the payload.");
+        builder.HasOne(e => e.Supplier)
+            .WithMany()
+            .HasForeignKey(e => e.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(e => e.SupplierId);
 
-        builder.Property(e => e.VerifiedWithWarningsCount)
-            .HasColumnName("verified_with_warnings_count")
-            .IsRequired().HasComment("How many rows verified but with a warning - read and checked, with something odd that did not" +
-                    "stop them.");
+        builder.Property(e => e.DecodeIntegrityFailedCount)
+            .HasColumnName("decode_integrity_failed_count")
+            .IsRequired().HasComment("How many rows were read but failed the decode-integrity check: the printed QR matrix " +
+                    "disagreed with the decoded payload by more than 2% of modules. Import QA, not a verdict on the " +
+                    "supplier.");
+
+        builder.Property(e => e.DecodeIntegrityWarningCount)
+            .HasColumnName("decode_integrity_warning_count")
+            .IsRequired().HasComment("How many rows passed the decode-integrity check with a 1-2% module mismatch - something " +
+                    "odd in the image, not proof that the voucher is counterfeit or genuine.");
 
         builder.HasIndex(e => e.StartedAtUtc)
             .IsDescending();

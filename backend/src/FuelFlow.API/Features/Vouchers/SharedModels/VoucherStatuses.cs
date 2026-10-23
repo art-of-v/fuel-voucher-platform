@@ -17,15 +17,16 @@ public static class VoucherStatuses
     /// to a customer and not yet spent, or one blocked pending something.
     /// <para>
     /// <c>Used</c> is spent and <c>Expired</c> is dead, so neither blocks — a loss is recorded for an
-    /// expired voucher separately. <c>VerificationFailed</c> and <c>Deactivated</c> are excluded too:
-    /// a voucher that failed verification or was switched off is not a claim on the fuel, and treating
-    /// it as one would make a fuel impossible to retire until somebody cleaned up junk rows.
+    /// expired voucher separately. <c>DecodeIntegrityFailed</c> and <c>Deactivated</c> are excluded too:
+    /// a voucher whose printed matrix failed the decode-integrity check or was switched off is not a claim
+    /// on the fuel, and treating it as one would make a fuel impossible to retire until somebody cleaned
+    /// up junk rows. That check is import QA, not a supplier-authenticity verdict.
     /// </para>
     /// </summary>
     public static readonly VoucherStatus[] Blocking =
     [
         VoucherStatus.Imported,
-        VoucherStatus.VerifiedWithWarnings,
+        VoucherStatus.DecodeIntegrityWarning,
         VoucherStatus.Available,
         VoucherStatus.Assigned,
         VoucherStatus.Blocked,

@@ -66,38 +66,38 @@ public class QrServiceTests
     }
 
     [Fact]
-    public void Verify_ShouldSkip_WhenOriginalMatrixIsNull()
+    public void Check_ShouldReportNotChecked_WhenOriginalMatrixIsNull()
     {
-        var details = QrMatrixVerifier.Verify("payload", null, "M", 1, "BYTE", 0);
+        var details = QrDecodeIntegrityVerifier.Check("payload", null, "M", 1, "BYTE", 0);
 
-        details.Result.Should().Be(QrMatrixVerifier.VerificationResult.Skipped);
+        details.Result.Should().Be(QrDecodeIntegrityVerifier.DecodeIntegrityResult.NotChecked);
         details.SkipReason.Should().Contain("matrix");
     }
 
     [Fact]
-    public void Verify_ShouldSkip_WhenVersionOrMaskNotExtracted()
+    public void Check_ShouldReportNotChecked_WhenVersionOrMaskNotExtracted()
     {
         var matrix = new bool[21, 21];
 
-        var details = QrMatrixVerifier.Verify("payload", matrix, "M", null, "BYTE", null);
+        var details = QrDecodeIntegrityVerifier.Check("payload", matrix, "M", null, "BYTE", null);
 
-        details.Result.Should().Be(QrMatrixVerifier.VerificationResult.Skipped);
+        details.Result.Should().Be(QrDecodeIntegrityVerifier.DecodeIntegrityResult.NotChecked);
     }
 
     [Fact]
-    public void Verify_ShouldFail_WhenMatrixSizeMismatch()
+    public void Check_ShouldReportMismatch_WhenMatrixSizeMismatch()
     {
         var matrix = new bool[2, 2];
 
-        var details = QrMatrixVerifier.Verify("payload", matrix, "M", 1, "BYTE", 0);
+        var details = QrDecodeIntegrityVerifier.Check("payload", matrix, "M", 1, "BYTE", 0);
 
-        details.Result.Should().Be(QrMatrixVerifier.VerificationResult.Failed);
-        details.MismatchPercent.Should().Be(100);
+        details.Result.Should().Be(QrDecodeIntegrityVerifier.DecodeIntegrityResult.Mismatch);
+        details.MatrixMismatchPercent.Should().Be(100);
         details.SkipReason.Should().Contain("Size mismatch");
     }
 
     [Fact]
-    public void Verify_ShouldPass_WhenMatrixMatchesRegeneratedCode()
+    public void Check_ShouldReportMatched_WhenMatrixMatchesRegeneratedCode()
     {
         const string payload = "HELLO-123";
         var generator = new QrGeneratorV2();
@@ -112,7 +112,7 @@ public class QrServiceTests
         decoded.Version.Should().NotBeNull();
         decoded.MaskPattern.Should().NotBeNull();
 
-        var details = QrMatrixVerifier.Verify(
+        var details = QrDecodeIntegrityVerifier.Check(
             payload,
             decoded.OriginalMatrix,
             "M",
@@ -120,8 +120,46 @@ public class QrServiceTests
             "BYTE",
             decoded.MaskPattern);
 
-        details.Result.Should().Be(QrMatrixVerifier.VerificationResult.Passed);
-        details.MismatchedModules.Should().Be(0);
+        details.Result.Should().Be(QrDecodeIntegrityVerifier.DecodeIntegrityResult.Matched);
+        details.MatrixMismatchedModules.Should().Be(0);
+    }
+
+    [Fact]
+    public void Check_ShouldReportMismatch_WhenThePrintedMatrixIsAltered()
+    {
+        const string payload = "HELLO-123";
+        var generator = new QrGeneratorV2();
+        var base64 = generator.GenerateQrCode(payload, 100, 100, "M", 1, "BYTE", 0);
+
+        var bytes = Convert.FromBase64String(base64);
+        using var image = Image.Load<Rgba32>(bytes);
+        var decoder = new QrDecoder(new Mock<ILogger<QrDecoder>>().Object);
+        var decoded = decoder.Decode(image);
+
+        var altered = (bool[,])decoded.OriginalMatrix!.Clone();
+        var flipped = 0;
+        foreach (var x in Enumerable.Range(0, altered.GetLength(0)))
+        {
+            foreach (var y in Enumerable.Range(0, altered.GetLength(1)))
+            {
+                if (flipped == 10) break;
+                altered[x, y] = !altered[x, y];
+                flipped++;
+            }
+            if (flipped == 10) break;
+        }
+
+        var details = QrDecodeIntegrityVerifier.Check(
+            payload,
+            altered,
+            "M",
+            decoded.Version,
+            "BYTE",
+            decoded.MaskPattern);
+
+        details.Result.Should().Be(QrDecodeIntegrityVerifier.DecodeIntegrityResult.Mismatch);
+        details.MatrixMismatchedModules.Should().Be(10);
+        details.MatrixMismatchPercent.Should().BeGreaterThan(QrDecodeIntegrityVerifier.MismatchThresholdPercent);
     }
 
     [Fact]

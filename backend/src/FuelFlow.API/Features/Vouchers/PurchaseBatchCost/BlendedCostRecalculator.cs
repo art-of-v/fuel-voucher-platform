@@ -32,9 +32,9 @@ public sealed class BlendedCostRecalculator
     /// </summary>
     /// <remarks>
     /// The pool = owned-but-unsold vouchers that carry a cost: statuses
-    /// <see cref="VoucherStatus.Imported"/> / <see cref="VoucherStatus.VerifiedWithWarnings"/> /
+    /// <see cref="VoucherStatus.Imported"/> / <see cref="VoucherStatus.DecodeIntegrityWarning"/> /
     /// <see cref="VoucherStatus.Available"/>. It EXCLUDES Assigned/Used/Expired/Blocked/Deactivated/
-    /// VerificationFailed. Imported counts on purpose — liters enter the pool at import, so the
+    /// DecodeIntegrityFailed. Imported counts on purpose — liters enter the pool at import, so the
     /// blended price steps on batch load, not on activation (activation is not a cost event).
     /// Cost comes from the voucher itself, not from a batch join: vouchers of one batch are not
     /// interchangeable, because a customer payment on one of them reduces that voucher alone.
@@ -50,7 +50,7 @@ public sealed class BlendedCostRecalculator
                 && !v.IsDeleted
                 && v.CostPerLiter != null
                 && (v.Status == VoucherStatus.Imported
-                    || v.Status == VoucherStatus.VerifiedWithWarnings
+                    || v.Status == VoucherStatus.DecodeIntegrityWarning
                     || v.Status == VoucherStatus.Available)
             select new { v.Liters, CostPerLiter = v.CostPerLiter!.Value })
             .ToListAsync(ct);

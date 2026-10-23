@@ -19,7 +19,7 @@ public sealed class GetImportBatchPnlQueryHandler
 
     // Owned-but-unsold stock (mirrors BlendedCostRecalculator's pool).
     private static readonly VoucherStatus[] InStockStatuses =
-        [VoucherStatus.Imported, VoucherStatus.VerifiedWithWarnings, VoucherStatus.Available];
+        [VoucherStatus.Imported, VoucherStatus.DecodeIntegrityWarning, VoucherStatus.Available];
 
     // Orders whose revenue is fully reversed — a sold voucher on one of these earns nothing.
     // Partial refunds are counted gross in v1 (see #86); exact per-unit netting is a follow-up.

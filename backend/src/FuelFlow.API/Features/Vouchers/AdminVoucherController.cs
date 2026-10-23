@@ -4,7 +4,7 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVoucherLifecycle;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.Features.Vouchers.GetVoucherVerification;
+using FuelFlow.Features.Vouchers.GetVoucherDecodeIntegrity;
 using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
@@ -21,7 +21,7 @@ public sealed class AdminVoucherController : ControllerBase
 {
     private readonly GetAdminVouchersQueryHandler _getAllHandler;
     private readonly GetAdminVoucherByIdQueryHandler _getByIdHandler;
-    private readonly GetVoucherVerificationQueryHandler _getVerificationHandler;
+    private readonly GetVoucherDecodeIntegrityQueryHandler _getDecodeIntegrityHandler;
     private readonly UnblockVoucherCommandHandler _unblockHandler;
     private readonly UpdateVoucherCommandHandler _updateHandler;
     private readonly DeleteVoucherCommandHandler _deleteHandler;
@@ -32,7 +32,7 @@ public sealed class AdminVoucherController : ControllerBase
     public AdminVoucherController(
         GetAdminVouchersQueryHandler getAllHandler,
         GetAdminVoucherByIdQueryHandler getByIdHandler,
-        GetVoucherVerificationQueryHandler getVerificationHandler,
+        GetVoucherDecodeIntegrityQueryHandler getDecodeIntegrityHandler,
         UnblockVoucherCommandHandler unblockHandler,
         UpdateVoucherCommandHandler updateHandler,
         DeleteVoucherCommandHandler deleteHandler,
@@ -42,7 +42,7 @@ public sealed class AdminVoucherController : ControllerBase
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
-        _getVerificationHandler = getVerificationHandler;
+        _getDecodeIntegrityHandler = getDecodeIntegrityHandler;
         _unblockHandler = unblockHandler;
         _updateHandler = updateHandler;
         _deleteHandler = deleteHandler;
@@ -182,20 +182,20 @@ public sealed class AdminVoucherController : ControllerBase
         return Ok(new { success = true });
     }
 
-    [HttpGet("{id:guid}/verification")]
+    [HttpGet("{id:guid}/decode-integrity")]
     [Authorize(Policy = AuthPolicies.Staff)]
-    [ProducesResponseType(typeof(GetVoucherVerificationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(GetVoucherDecodeIntegrityResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetVoucherVerification(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetVoucherDecodeIntegrity(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _getVerificationHandler.HandleAsync(new GetVoucherVerificationQuery(id), cancellationToken);
+        var result = await _getDecodeIntegrityHandler.HandleAsync(new GetVoucherDecodeIntegrityQuery(id), cancellationToken);
         if (result == null)
             return ApiError.NotFound("Not found");
 
-        // The verification's image IS the voucher's redeemable code, so it leaves the process
-        // only for the roles that hold the capability. The numbers stay: the mismatch percent
-        // and the module counts are the verification's result, and an operator checking a
-        // printed voucher needs them.
+        // The response's image IS the voucher's redeemable code, so it leaves the process only for
+        // the roles that hold the capability. The numbers stay: the matrix mismatch and the module
+        // counts are the decode-integrity result, and an operator checking a printed voucher needs
+        // them. The supplier provenance stays too - it says the matrix result is not authenticity.
         if (!CanSeeVoucherPayload())
             result = result with { QrCodeBase64 = null! };
 

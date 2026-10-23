@@ -250,8 +250,8 @@ public sealed class QrPayloadLoggingGuardTests
 
         /// <summary>
         /// Whether this expression IS the payload - as opposed to an object that merely mentions
-        /// one. The distinction matters: <c>verification = QrMatrixVerifier.Verify(parsed.QrPayload,
-        /// ...)</c> produces a verification report, not a payload, and a report that carries a
+        /// one. The distinction matters: <c>integrity = QrDecodeIntegrityVerifier.Check(parsed.QrPayload,
+        /// ...)</c> produces a decode-integrity report, not a payload, and a report that carries a
         /// fingerprint is not a leak. Only a value that IS the payload propagates.
         /// </summary>
         private bool IsThePayload(string expression)

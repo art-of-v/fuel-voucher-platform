@@ -15,7 +15,7 @@ namespace FuelFlow.API.BackgroundJobs;
 /// Nightly loss-booking sweep for operator stock that lapsed unsold (pricing epic slice 4).
 ///
 /// A voucher the operator imported but never sold sits in the in-stock pool
-/// (<c>Imported</c> / <c>VerifiedWithWarnings</c> / <c>Available</c>) until its printed
+/// (<c>Imported</c> / <c>DecodeIntegrityWarning</c> / <c>Available</c>) until its printed
 /// <see cref="FuelVoucher.SupplierExpirationDate"/> passes — after which it can never be sold, yet nothing
 /// moves it off the books. Left alone it keeps inflating per-batch P&amp;L "remaining / unrealized
 /// margin" (<see cref="Features.Vouchers.PurchaseBatchCost.GetImportBatchPnlQueryHandler"/>) as if it
@@ -49,7 +49,7 @@ public class ExpiredVoucherLossService
     // The operator-owned, unsold, sellable pool — identical to the P&L handler's remaining-stock set
     // and BlendedCostRecalculator's cost pool. Only these lapse into an operator loss.
     private static readonly VoucherStatus[] InStockStatuses =
-        [VoucherStatus.Imported, VoucherStatus.VerifiedWithWarnings, VoucherStatus.Available];
+        [VoucherStatus.Imported, VoucherStatus.DecodeIntegrityWarning, VoucherStatus.Available];
 
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
@@ -182,7 +182,7 @@ public class ExpiredVoucherLossService
             foreach (var v in batch)
             {
                 // Read the status BEFORE the flip. The candidate set spans three values (Imported /
-                // VerifiedWithWarnings / Available), so from_status has to say which one this voucher
+                // DecodeIntegrityWarning / Available), so from_status has to say which one this voucher
                 // actually was - a constant would tell the history that every stock expiry started at
                 // Available, which is false for imported-but-never-activated stock.
                 var fromStatus = v.Status;

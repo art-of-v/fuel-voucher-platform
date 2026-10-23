@@ -226,8 +226,8 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
 
             INSERT INTO voucher_imports
                 (id, file_name, page_count, started_at_utc, completed_at_utc, status,
-                 imported_count, duplicate_count, failed_count, verification_failed_count,
-                 verified_with_warnings_count)
+                 imported_count, duplicate_count, failed_count, decode_integrity_failed_count,
+                 decode_integrity_warning_count)
             VALUES ('77777777-7777-4777-8777-0000000000aa', 'QA-EMULATED-okko.pdf', 1, now(), now(),
                     'Completed', 1, 0, 0, 0, 0)
             ON CONFLICT (id) DO NOTHING;

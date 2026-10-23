@@ -466,7 +466,7 @@
                                                   }
                                   },
                                   {
-                                      "name":  "Get Voucher Verification",
+                                      "name":  "Get Voucher Decode Integrity",
                                       "event":  [
                                                     {
                                                         "listen":  "test",
@@ -476,9 +476,11 @@
                                                                                     "const body = pm.response.json();",
                                                                                     "pm.test(\u0027Has voucherId\u0027, () =\u003e pm.expect(body.voucherId).to.be.a(\u0027string\u0027));",
                                                                                     "pm.test(\u0027Has status\u0027, () =\u003e pm.expect(body.status).to.be.a(\u0027string\u0027));",
+                                                                                    "pm.test(\u0027Has decode integrity\u0027, () =\u003e pm.expect(body.decodeIntegrity).to.be.a(\u0027string\u0027));",
+                                                                                    "pm.test(\u0027Says provenance is unverified\u0027, () =\u003e pm.expect(body.supplierProvenance).to.eql(\u0027Unverified\u0027));",
                                                                                     "pm.test(\u0027Has QR image\u0027, () =\u003e pm.expect(body.qrCodeBase64).to.include(\u0027data:image/png\u0027));",
-                                                                                    "if (body.mismatchPercent !== null \u0026\u0026 body.mismatchPercent !== undefined) {",
-                                                                                    "  console.log(\u0027Mismatch:\u0027, body.mismatchPercent + \u0027%\u0027, body.mismatchedModules + \u0027/\u0027 + body.totalModules + \u0027 modules\u0027);",
+                                                                                    "if (body.matrixMismatchPercent !== null \u0026\u0026 body.matrixMismatchPercent !== undefined) {",
+                                                                                    "  console.log(\u0027Matrix mismatch:\u0027, body.matrixMismatchPercent + \u0027%\u0027, body.matrixMismatchedModules + \u0027/\u0027 + body.matrixTotalModules + \u0027 modules\u0027);",
                                                                                     "}"
                                                                                 ]
                                                                    }
@@ -492,7 +494,7 @@
                                                                          "value":  "Bearer {{adminToken}}"
                                                                      }
                                                                  ],
-                                                      "url":  "{{baseUrl}}/api/admin/vouchers/{{voucherId}}/verification"
+                                                      "url":  "{{baseUrl}}/api/admin/vouchers/{{voucherId}}/decode-integrity"
                                                   }
                                   },
                                   {

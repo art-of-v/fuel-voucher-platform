@@ -29,7 +29,7 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
             .AsNoTracking()
             .Where(v => v.ImportJobId == importId
                 && !v.IsDeleted
-                && (v.Status == VoucherStatus.Imported || v.Status == VoucherStatus.VerifiedWithWarnings))
+                && (v.Status == VoucherStatus.Imported || v.Status == VoucherStatus.DecodeIntegrityWarning))
             .Select(v => new
             {
                 v.FuelTypeId,

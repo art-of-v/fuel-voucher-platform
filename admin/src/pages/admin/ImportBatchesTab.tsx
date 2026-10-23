@@ -45,6 +45,9 @@ export default function ImportBatchesTab() {
     staleTime: 30_000,
   });
 
+  const selectedImport =
+    importsList.find((i) => i.id === selectedImportId) ?? null;
+
   // The batch's vouchers, a page at a time. The endpoint answers with the page and the size of
   // the whole batch, because the two buttons below act on the whole batch and have to be able
   // to say what they are about to do.
@@ -261,6 +264,18 @@ export default function ImportBatchesTab() {
 
           <BatchPnlPanel batchPnl={batchPnl} />
 
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              {t("imports.decodeIntegrityHint")}
+            </p>
+            <p className="text-sm">
+              {t("imports.supplier")}:{" "}
+              <span className="font-medium">
+                {selectedImport?.supplierName ?? "—"}
+              </span>
+            </p>
+          </div>
+
           <div className="glass-panel overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted">
@@ -271,7 +286,7 @@ export default function ImportBatchesTab() {
                   <th className="text-left p-4">{t("imports.number")}</th>
                   <th className="text-left p-4">{t("vouchers.expires")}</th>
                   <th className="text-left p-4">{t("common.status")}</th>
-                  <th className="text-left p-4">{t("imports.verification")}</th>
+                  <th className="text-left p-4">{t("imports.decodeIntegrity")}</th>
                   <th className="text-left p-4">{t("common.actions")}</th>
                 </tr>
               </thead>
@@ -280,9 +295,9 @@ export default function ImportBatchesTab() {
                   const statusColors: Record<string, string> = {
                     Imported: "bg-warning/10 text-warning border-warning/20",
                     Available: "bg-success/10 text-success border-success/20",
-                    VerifiedWithWarnings:
+                    DecodeIntegrityWarning:
                       "bg-warning/10 text-warning border-warning/20",
-                    VerificationFailed:
+                    DecodeIntegrityFailed:
                       "bg-destructive/10 text-destructive border-destructive/20",
                     Assigned: "bg-info/10 text-info border-info/20",
                     Used: "bg-muted text-muted-foreground border-border",
@@ -323,19 +338,19 @@ export default function ImportBatchesTab() {
                         </span>
                       </td>
                       <td className="p-4">
-                        {v.verificationMismatchPercent != null ? (
+                        {v.matrixMismatchPercent != null ? (
                           <span
                             className={`text-xs font-mono ${
-                              v.verificationMismatchPercent === 0
+                              v.matrixMismatchPercent <= 1
                                 ? "text-success"
-                                : v.verificationMismatchPercent < 5
+                                : v.matrixMismatchPercent <= 2
                                   ? "text-warning"
                                   : "text-destructive"
                             }`}
                           >
-                            {v.verificationMismatchPercent.toFixed(2)}% (
-                            {v.verificationMismatchedModules}/
-                            {v.verificationTotalModules})
+                            {v.matrixMismatchPercent.toFixed(2)}% (
+                            {v.matrixMismatchedModules}/
+                            {v.matrixTotalModules})
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">
@@ -346,7 +361,7 @@ export default function ImportBatchesTab() {
                       <td className="p-4">
                         <div className="flex gap-1">
                           {(v.status === "Imported" ||
-                            v.status === "VerifiedWithWarnings" ||
+                            v.status === "DecodeIntegrityWarning" ||
                             v.status === "Expired" ||
                             v.status === "Deactivated") && (
                             <Button
@@ -363,7 +378,7 @@ export default function ImportBatchesTab() {
                           )}
                           {(v.status === "Available" ||
                             v.status === "Imported" ||
-                            v.status === "VerifiedWithWarnings") && (
+                            v.status === "DecodeIntegrityWarning") && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -432,14 +447,18 @@ export default function ImportBatchesTab() {
       ) : (
         <>
           {/* List View */}
-          <div className="flex items-center justify-between">
+          <div>
             <h2 className="text-xl font-bold">{t("imports.title")}</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t("imports.decodeIntegrityHint")}
+            </p>
           </div>
           <div className="glass-panel overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left p-4">{t("imports.file")}</th>
+                  <th className="text-left p-4">{t("imports.supplier")}</th>
                   <th className="text-left p-4">{t("common.status")}</th>
                   <th className="text-left p-4">{t("imports.pages")}</th>
                   <th className="text-left p-4">{t("imports.vouchers")}</th>
@@ -459,6 +478,9 @@ export default function ImportBatchesTab() {
                     onClick={() => setSelectedImportId(imp.id)}
                   >
                     <td className="p-4 font-medium">{imp.fileName}</td>
+                    <td className="p-4 text-sm">
+                      {imp.supplierName ?? "—"}
+                    </td>
                     <td className="p-4">
                       <span
                         className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
@@ -477,10 +499,10 @@ export default function ImportBatchesTab() {
                     <td className="p-4 text-success">{imp.importedCount}</td>
                     <td className="p-4 text-warning">{imp.duplicateCount}</td>
                     <td className="p-4 text-destructive">
-                      {imp.failedCount + imp.verificationFailedCount}
+                      {imp.failedCount + imp.decodeIntegrityFailedCount}
                     </td>
                     <td className="p-4 text-warning">
-                      {imp.verifiedWithWarningsCount}
+                      {imp.decodeIntegrityWarningCount}
                     </td>
                     <td className="p-4 text-sm text-muted-foreground">
                       {formatDateTime(imp.startedAtUtc)}
@@ -493,7 +515,7 @@ export default function ImportBatchesTab() {
                 {importsList.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={11}
                       className="p-16 text-center text-muted-foreground"
                     >
                       {t("imports.none")}

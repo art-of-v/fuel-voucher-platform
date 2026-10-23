@@ -258,11 +258,11 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             // The value set AcquisitionSources.All documents - see AcquisitionSources.
             t.HasCheckConstraint("ck_fuel_vouchers_acquisition_source", "acquisition_source IN ('direct', 'partner')");
 
-            // The value set VoucherStatus defines. varchar(20) was exactly the length of
-            // VerifiedWithWarnings, so the column had zero headroom and the next member added to
-            // the enum would have failed at write time rather than at compile time; 32 gives room.
+            // The value set VoucherStatus defines. 32 characters leaves room for the longest member and the
+            // next one; the previous varchar(20) was exactly the old member's length, so the next rename
+            // would have failed at write time.
             t.HasCheckConstraint("ck_voucher_status", """
-                status IN ('Imported', 'VerifiedWithWarnings', 'VerificationFailed', 'Available',
+                status IN ('Imported', 'DecodeIntegrityWarning', 'DecodeIntegrityFailed', 'Available',
                            'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')
                 """);
 
@@ -347,19 +347,22 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasComment(                "When this voucher was actually refuelled with. Set once, when it is marked used; never" +
                     "moved afterwards. NULL while the voucher is still unused.");
 
-        builder.Property(e => e.VerificationMismatchPercent)
-            .HasColumnName("verification_mismatch_percent")
+        // Decode integrity: how far the module grid printed on the paper disagreed with the payload
+        // re-encoded from what the importer read. It says nothing about the supplier - no signature,
+        // serial or registry is checked - so the columns are named after the matrix, not "verification".
+        builder.Property(e => e.MatrixMismatchPercent)
+            .HasColumnName("matrix_mismatch_percent")
             .HasColumnType("numeric(5,4)")
-            .HasComment(                "How far the verification of this voucher's modules disagreed, as a percentage. NULL when" +
-                    "it was never verified.");
+            .HasComment("How far the printed QR matrix disagreed with the decoded payload, as a percentage. NULL " +
+                    "when the matrix could not be checked. Not a measure of authenticity.");
 
-        builder.Property(e => e.VerificationMismatchedModules)
-            .HasColumnName("verification_mismatched_modules")
-            .HasComment(                "How many modules disagreed.");
+        builder.Property(e => e.MatrixMismatchedModules)
+            .HasColumnName("matrix_mismatched_modules")
+            .HasComment("How many QR modules disagreed between the printed matrix and the regenerated one.");
 
-        builder.Property(e => e.VerificationTotalModules)
-            .HasColumnName("verification_total_modules")
-            .HasComment(                "How many modules were checked.");
+        builder.Property(e => e.MatrixTotalModules)
+            .HasColumnName("matrix_total_modules")
+            .HasComment("How many QR modules were compared.");
 
         // Both keys are filtered to live rows, so an archived voucher releases its number and its
         // QR payload for reuse. Without the filter the two paths disagree: the import's duplicate

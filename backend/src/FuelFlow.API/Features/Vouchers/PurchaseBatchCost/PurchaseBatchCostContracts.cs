@@ -44,7 +44,7 @@ public sealed class ImportBatchPnlDto
     public int VouchersSold { get; set; }
     public decimal LitersSold { get; set; }
 
-    /// <summary>Still owned and sellable (Imported / VerifiedWithWarnings / Available).</summary>
+    /// <summary>Still owned and sellable (Imported / DecodeIntegrityWarning / Available).</summary>
     public int VouchersRemaining { get; set; }
     public decimal LitersRemaining { get; set; }
 

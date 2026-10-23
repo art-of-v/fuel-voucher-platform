@@ -153,7 +153,7 @@ ON CONFLICT (fuel_type_id, data_kind, liters) DO NOTHING;
 -- One import per brand, named so it cannot be mistaken for a supplier PDF.
 INSERT INTO voucher_imports
     (id, file_name, page_count, started_at_utc, completed_at_utc, status,
-     imported_count, duplicate_count, failed_count, verification_failed_count, verified_with_warnings_count)
+     imported_count, duplicate_count, failed_count, decode_integrity_failed_count, decode_integrity_warning_count)
 SELECT
     gen_random_uuid(),
     'QA-EMULATED-' || brand.slug || '.pdf',

@@ -124,7 +124,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     /// </para>
     /// <para>
     /// One event per retired voucher, each carrying the status that voucher actually had. The candidate
-    /// set spans <c>Imported</c>, <c>VerifiedWithWarnings</c> and <c>Available</c>, so a single hardcoded
+    /// set spans <c>Imported</c>, <c>DecodeIntegrityWarning</c> and <c>Available</c>, so a single hardcoded
     /// from_status would tell the history that every stock expiry began at <c>Available</c> — false for
     /// imported-but-never-activated stock, which is precisely the kind of voucher this job exists for.
     /// </para>
@@ -163,7 +163,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         }
 
         (await FromOf("instock-imported")).Should().Be(nameof(VoucherStatus.Imported));
-        (await FromOf("instock-warnings")).Should().Be(nameof(VoucherStatus.VerifiedWithWarnings));
+        (await FromOf("instock-warnings")).Should().Be(nameof(VoucherStatus.DecodeIntegrityWarning));
         (await FromOf("instock-available")).Should().Be(nameof(VoucherStatus.Available));
 
         // Nothing that was kept may be recorded as retired. A voucher still inside the grace window is
@@ -196,7 +196,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         (await verify.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Expired)).Should().Be(0);
         (await StatusOf(verify, "instock-imported")).Should().Be(VoucherStatus.Imported);
         (await StatusOf(verify, "instock-available")).Should().Be(VoucherStatus.Available);
-        (await StatusOf(verify, "instock-warnings")).Should().Be(VoucherStatus.VerifiedWithWarnings);
+        (await StatusOf(verify, "instock-warnings")).Should().Be(VoucherStatus.DecodeIntegrityWarning);
 
         // D-13: a dry run that wrote events would book a write-off every night while the setting is off -
         // and this job is off by default, so that would be the default behaviour. The log says what
@@ -521,7 +521,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
 
         seed.FuelVouchers.Add(NewVoucher("instock-imported", VoucherStatus.Imported, lapsed));
         seed.FuelVouchers.Add(NewVoucher("instock-available", VoucherStatus.Available, lapsed));
-        seed.FuelVouchers.Add(NewVoucher("instock-warnings", VoucherStatus.VerifiedWithWarnings, lapsed));
+        seed.FuelVouchers.Add(NewVoucher("instock-warnings", VoucherStatus.DecodeIntegrityWarning, lapsed));
         seed.FuelVouchers.Add(NewVoucher("future-instock", VoucherStatus.Imported, tomorrow));
         seed.FuelVouchers.Add(NewVoucher("today-instock", VoucherStatus.Imported, today));
         seed.FuelVouchers.Add(NewVoucher("lapsed-assigned", VoucherStatus.Assigned, lapsed, holderId, soldOrderId));

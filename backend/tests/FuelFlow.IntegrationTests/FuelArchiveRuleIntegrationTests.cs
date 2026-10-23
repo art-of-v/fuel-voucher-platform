@@ -202,10 +202,10 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         VoucherStatuses.IsLive(VoucherStatus.Available).Should().BeTrue();
         VoucherStatuses.IsLive(VoucherStatus.Assigned).Should().BeTrue("a customer is holding it");
 
-        // Deliberately not blocking: a voucher that failed verification or was switched off is not a
-        // claim on the fuel, and counting it would make a fuel impossible to retire until somebody
-        // cleaned up junk rows.
-        VoucherStatuses.IsLive(VoucherStatus.VerificationFailed).Should().BeFalse();
+        // Deliberately not blocking: a voucher that failed the decode-integrity check or was switched
+        // off is not a claim on the fuel, and counting it would make a fuel impossible to retire until
+        // somebody cleaned up junk rows.
+        VoucherStatuses.IsLive(VoucherStatus.DecodeIntegrityFailed).Should().BeFalse();
         VoucherStatuses.IsLive(VoucherStatus.Deactivated).Should().BeFalse();
     }
 }
