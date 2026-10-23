@@ -460,7 +460,12 @@ existing_tables="$(psql_super -t -A -c "
         WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
           AND d.deptype = 'e' AND d.refclassid = 'pg_extension'::regclass)
    ORDER BY 1")"
-unlisted="$(comm -23 \
+# comm compares under the locale's collation, not the C order the two sorts above
+# produce. On 2026-10-23 the production deploy failed here with "comm: file 2 is not in
+# sorted order" because the box's en_US locale ordered the mixed-case
+# __EFMigrationsHistory differently from C; both inputs were sorted, just not the way
+# comm was reading them. Pin comm to the same locale as the sorts.
+unlisted="$(LC_ALL=C comm -23 \
   <(printf '%s\n' "$existing_tables" | awk 'NF' | LC_ALL=C sort) \
   <(awk -F'\t' '!/^#/ && $1 == "public" && NF >= 4 { print $1 "." $2 }' "$MATRIX_FILE" | LC_ALL=C sort -u))"
 if [[ -n "$unlisted" ]]; then
