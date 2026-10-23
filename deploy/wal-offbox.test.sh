@@ -276,10 +276,34 @@ for cmd in preflight install ship-once lag alert-drill drill report all; do
     bad "the ops script has no '$cmd' command"
   fi
 done
-if grep -q 'trap restore_config EXIT' "$SCRIPT_DIR/wal-ship-ops.sh"; then
-  ok "the alert drill puts the rclone config back even if the run dies"
+if grep -q 'trap end_injection EXIT' "$SCRIPT_DIR/wal-ship-ops.sh" \
+   && grep -q 'systemctl unset-environment ENV_FILE' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the alert drill removes its injected environment even if the run dies"
 else
-  bad "the alert drill does not restore the rclone config"
+  bad "the alert drill does not reliably remove its injected environment"
+fi
+if grep -q 'no-such-bucket' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the alert drill injects a remote that cannot exist (no request reaches the network)"
+else
+  bad "the alert drill does not inject an impossible remote"
+fi
+if grep -q 'fn="\$(ops_function "\$step")"' "$SCRIPT_DIR/wal-ship-ops.sh" \
+   && grep -q '^ops_function()' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the campaign and the dispatcher share one command map"
+else
+  bad "the campaign builds function names by hand (this is what broke 'all')"
+fi
+if grep -q 'config file' "$SCRIPT_DIR/wal-ship-ops.sh" \
+   && grep -q 'RCLONE_CONFIG\*' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the preflight reports how rclone is configured"
+else
+  bad "the preflight does not report the rclone configuration"
+fi
+if grep -q 'rclone_lsf()' "$SCRIPT_DIR/drill-wal-offbox.sh" \
+   && grep -q 'rclone_lsf "\$REMOTE" --recursive' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
+  ok "the drill retries its object listing (R2 rejects the first request on a fresh prefix)"
+else
+  bad "the drill trusts a one-shot object listing"
 fi
 if grep -q 'wal_drill_remote_is_safe' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
   ok "the drill uses the shared remote guard"

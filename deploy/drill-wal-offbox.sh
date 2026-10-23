@@ -65,6 +65,24 @@ source "$SCRIPT_DIR/wal-offbox.sh"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
+# R2 answers the very first request against a fresh prefix with a 501 NotImplemented, and
+# rclone retries the writes but not always the listings - the first run of this drill
+# printed an empty object list for objects that were demonstrably there. So a listing that
+# comes back empty is retried a few times before it is believed.
+rclone_lsf() {
+  local remote="$1" out attempt
+  shift
+  for attempt in 1 2 3 4; do
+    out="$("$RCLONE" lsf "$remote" "$@" 2>/dev/null || true)"
+    if [[ -n "$out" ]]; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    sleep 2
+  done
+  return 0
+}
+
 # The guards run BEFORE anything else, so a wrong prefix is refused without starting a
 # container or touching the bucket.
 PROD_REMOTE=""
@@ -258,7 +276,7 @@ RECOVERED_AT="$(docker exec "$DST" psql -U postgres -d fuelflow -Atc \
 echo
 echo "HOST-LOSS DRILL PASSED"
 if [[ -n "$DRILL_REMOTE" ]]; then
-  SHIPPED_COUNT="$("$RCLONE" lsf "$REMOTE/wal" --files-only 2>/dev/null | grep -c '\.age$' || true)"
+  SHIPPED_COUNT="$(rclone_lsf "$REMOTE/wal" --files-only | grep -c '\.age$' || true)"
 else
   SHIPPED_COUNT="$(find "$TMP/remote/wal" -maxdepth 1 -name '*.age' -type f | wc -l)"
 fi
@@ -270,7 +288,12 @@ echo "  measured ship lag   : ${SHIP_LAG}s (segment archived -> off-box; archive
 if [[ -n "$DRILL_REMOTE" ]]; then
   echo "  drill remote        : $REMOTE"
   echo "  objects in the drill prefix:"
-  "$RCLONE" lsf "$REMOTE" --recursive --files-only 2>/dev/null | sed 's/^/    /' || true
+  LISTING="$(rclone_lsf "$REMOTE" --recursive --files-only)"
+  if [[ -n "$LISTING" ]]; then
+    printf '%s\n' "$LISTING" | sed 's/^/    /'
+  else
+    echo "    <the listing stayed empty; the shipped count above is the evidence>"
+  fi
   if [[ "$DRILL_KEEP" == "1" ]]; then
     echo "  (DRILL_KEEP=1: the objects stay in the bucket)"
   else

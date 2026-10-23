@@ -28,9 +28,9 @@
 # run on its own; `all` is just the sequence.
 #
 # NOTHING HERE DELETES PRODUCTION DATA.
-#   * the alert drill moves the rclone config aside for the length of one service run
-#     and puts it back - and the run after it must succeed, which is the proof that
-#     the failure was injected and not pre-existing;
+#   * the alert drill points the shipper at a remote that does not exist, by handing the
+#     service an environment file for the length of one run - and the run after it must
+#     succeed, which is the proof that the failure was injected and not pre-existing;
 #   * the drill writes under a /drill prefix in the bucket and deletes that prefix
 #     afterwards;
 #   * the WAL switch closes the current segment early and writes no data.
@@ -151,6 +151,29 @@ cmd_preflight() {
       printf '  MISS  %-14s %s is not reachable\n' "bucket" "$REMOTE_WAL"
       problems=$((problems + 1))
     fi
+  fi
+
+  # How the remote is configured. This is not decoration: the alert drill has to break
+  # the remote without touching whatever the configuration is, and the answer to "where
+  # is rclone's config?" is different on every box.
+  local rclone_version rclone_config
+  rclone_version="$("$RCLONE" version 2>/dev/null | head -1 || true)"
+  rclone_config="$("$RCLONE" config file 2>/dev/null || true)"
+  say "  rclone:"
+  say "    version     : ${rclone_version:-unknown}"
+  if [[ -n "$rclone_config" ]]; then
+    if [[ -f "$rclone_config" ]]; then
+      say "    config file : $rclone_config (present)"
+    else
+      say "    config file : $rclone_config (not there - the remote must be configured another way)"
+    fi
+  else
+    say "    config file : rclone reported none"
+  fi
+  if env | grep -q '^RCLONE_CONFIG'; then
+    say "    environment : RCLONE_CONFIG* variables are set"
+  else
+    say "    environment : no RCLONE_CONFIG* variables"
   fi
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$PG_CONTAINER"; then
@@ -286,31 +309,37 @@ cmd_lag() {
 cmd_alert_drill() {
   section "Alert drill: break the remote on purpose"
 
-  local config
-  config="$("$RCLONE" config file 2>/dev/null || true)"
-  if [[ -z "$config" || ! -f "$config" ]]; then
-    say "ERROR: rclone has no config file to move aside, so the failure cannot be" >&2
-    say "       injected safely. Find out how the remote is configured first." >&2
-    return 1
-  fi
-  say "  rclone config: $config"
-
-  local moved="$config.disabled-by-wal-ship-ops"
-  if [[ -e "$moved" ]]; then
-    say "ERROR: $moved already exists; refusing to touch it." >&2
+  if [[ -z "${BACKUP_AGE_RECIPIENT:-}" ]]; then
+    say "ERROR: BACKUP_AGE_RECIPIENT is not set, so the shipper fails before it ever" >&2
+    say "       reaches the remote and the alert would prove the wrong thing." >&2
     return 1
   fi
 
-  restore_config() {
-    if [[ -e "$moved" ]]; then
-      mv "$moved" "$config" && say "  (the rclone config is back in place)"
-    fi
-  }
-  trap restore_config EXIT
-
-  mv "$config" "$moved"
-  say "  the config is moved aside: the remote is now unreachable."
+  # The failure is injected by pointing the shipper at a remote that does not exist,
+  # through an environment file the service picks up. Nothing on the box is edited: the
+  # file holds the two settings the shipper needs, lives for one run, and systemd's own
+  # environment is cleared again right after.
+  #
+  # Why not "move rclone's config aside" (what this drill did first): where rclone keeps
+  # its config is not the same on every box - the first run of this drill found no config
+  # file at all. An unknown remote name fails the same way whatever the configuration is,
+  # and it cannot create anything, because no request reaches the network.
+  local fake_env="$WAL_SHIP_STATE_DIR/wal-ship-ops-alert-drill.env"
+  local fake_remote="wal-ship-ops-alert-drill:no-such-bucket"
+  umask 077
+  {
+    printf 'BACKUP_REMOTE=%s\n' "$fake_remote"
+    printf 'BACKUP_AGE_RECIPIENT=%s\n' "$BACKUP_AGE_RECIPIENT"
+  } > "$fake_env"
+  say "  the shipper is pointed at $fake_remote (a remote that does not exist)"
   say ""
+
+  end_injection() {
+    systemctl unset-environment ENV_FILE >/dev/null 2>&1 || true
+    rm -f "$fake_env"
+  }
+  trap end_injection EXIT
+  systemctl set-environment ENV_FILE="$fake_env"
 
   local started rc
   started="$(date '+%Y-%m-%d %H:%M:%S')"
@@ -318,7 +347,7 @@ cmd_alert_drill() {
   systemctl start "$SERVICE" || rc=$?
   say "  systemctl start $SERVICE -> exit $rc"
   if (( rc == 0 )); then
-    say "ERROR: the shipment SUCCEEDED with the remote unreachable, so this drill" >&2
+    say "ERROR: the shipment SUCCEEDED with an impossible remote, so this drill" >&2
     say "       did not test anything." >&2
     return 1
   fi
@@ -353,14 +382,14 @@ cmd_alert_drill() {
   fi
 
   say ""
-  say "  putting the config back; the next shipment must succeed:"
+  say "  the injection is over; the next shipment must succeed:"
   trap - EXIT
-  restore_config
+  end_injection
   rc=0
   systemctl start "$SERVICE" || rc=$?
   if (( rc != 0 )); then
-    say "ERROR: the shipment still fails with the config back in place, so the fault" >&2
-    say "       is not the injected one." >&2
+    say "ERROR: the shipment still fails after the injection was removed, so the" >&2
+    say "       fault is not the injected one." >&2
     journalctl -u "$SERVICE" -n 30 --no-pager >&2 || true
     return 1
   fi
@@ -411,12 +440,30 @@ cmd_report() {
   ls -l --time-style=long-iso "$WAL_ARCHIVE_DIR" 2>/dev/null | tail -10 | sed 's/^/    /' || true
 }
 
+# One map, used by both the dispatcher and the campaign, so a command name is spelled in
+# exactly one place. The first version had cmd_all call "cmd_ship-once" and "cmd_alert-drill",
+# which are not function names: the whole campaign died on its third step.
+ops_function() {
+  case "$1" in
+    preflight)   echo cmd_preflight ;;
+    install)     echo cmd_install ;;
+    ship-once)   echo cmd_ship_once ;;
+    lag)         echo cmd_lag ;;
+    alert-drill) echo cmd_alert_drill ;;
+    drill)       echo cmd_drill ;;
+    report)      echo cmd_report ;;
+    all)         echo cmd_all ;;
+    *)           return 1 ;;
+  esac
+}
+
 # --- the whole campaign ---------------------------------------------------------------
 cmd_all() {
-  local rc=0 step
+  local rc=0 step fn
   for step in preflight install ship-once lag alert-drill drill; do
     rc=0
-    "cmd_$step" || rc=$?
+    fn="$(ops_function "$step")"
+    "$fn" || rc=$?
     if (( rc != 0 )); then
       say "ERROR: the '$step' step failed; stopping here." >&2
       break
@@ -429,17 +476,11 @@ cmd_all() {
 main() {
   load_box_env
   case "${1:-help}" in
-    preflight)   cmd_preflight ;;
-    install)     cmd_install ;;
-    ship-once)   cmd_ship_once ;;
-    lag)         cmd_lag ;;
-    alert-drill) cmd_alert_drill ;;
-    drill)       cmd_drill ;;
-    report)      cmd_report ;;
-    all)         cmd_all ;;
-    help|-h|--help) usage ;;
-    *) echo "unknown command: $1" >&2; usage ;;
+    help|-h|--help|"") usage ;;
   esac
+  local fn
+  fn="$(ops_function "$1")" || { echo "unknown command: $1" >&2; usage; }
+  "$fn"
 }
 
 mkdir -p "$(dirname "$REPORT_FILE")"
