@@ -428,7 +428,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         });
 
         var logger = new RecordingLogger();
-        using (var context = CreateContext())
+        using (var context = _fixture.CreateMaintenanceContext())
         {
             await new DataRetentionService(
                 context, new RuntimeSettingsService(context), logger).CleanupAsync();
@@ -525,7 +525,9 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
 
     private async Task RunAsync()
     {
-        using var context = CreateContext();
+        // The purge runs as fuelflow_maintenance - the role production connects as for it - so
+        // this exercises the real grant set rather than the superuser's.
+        using var context = _fixture.CreateMaintenanceContext();
         var service = new DataRetentionService(
             context, new RuntimeSettingsService(context), NullLogger<DataRetentionService>.Instance);
         await service.CleanupAsync();

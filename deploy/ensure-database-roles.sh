@@ -15,24 +15,42 @@
 # falsify the trail the money reconciliation depends on. The trail was protected by
 # the application's own discipline rather than by the database's privileges.
 #
-# The three roles this script creates:
+# The four roles this script creates:
 #
-#   fuelflow_app        the application's traffic. Reads and writes the application's
-#                       own tables. May NOT change the schema, create a role, create a
-#                       database, or bypass row-level security. Not a superuser.
-#   fuelflow_migrator   the schema. Owns the tables (a migration alters them), and may
-#                       do nothing else. Not a superuser: it cannot read the roles'
-#                       password hashes, cannot create a role, and cannot drop the
-#                       database.
-#   fuelflow_readonly   SELECT only, for the reporting and support queries a person
-#                       runs by hand. Optional - it is created only when a password for
-#                       it is configured.
+#   fuelflow_app            the application's traffic. Reads and writes the
+#                           application's own tables - EXACTLY the privileges the
+#                           matrix in database-privileges.tsv gives it, and nothing
+#                           else: the audit and ledger tables are insert-only for it,
+#                           the retention tables cannot be deleted by it, and it may
+#                           not change the schema, create a role, create a database,
+#                           or bypass row-level security. Not a superuser.
+#   fuelflow_migrator       the schema. Owns the tables (a migration alters them), and
+#                           may do nothing else. Not a superuser: it cannot read the
+#                           roles' password hashes, cannot create a role, and cannot
+#                           drop the database.
+#   fuelflow_maintenance    the destructive end of the data lifecycle. DELETE (and
+#                           SELECT) on exactly the tables the nightly retention purge
+#                           empties - DataRetentionService connects as this role - so
+#                           a defect in the traffic role cannot erase the ledger, the
+#                           audit trail or the outbox. It gets no other privilege: it
+#                           may not insert or update anything.
+#   fuelflow_readonly       SELECT only, for the reporting and support queries a person
+#                           runs by hand. Optional - it is created only when a password
+#                           for it is configured.
 #
-# The application's connection uses the first, and the migration uses the second
-# (deploy/docker-compose.prod.yml names both). Two startup guards keep the separation
-# honest: the configuration guard refuses to boot when the two connection strings name
-# the same role, and the live catalogue check refuses to serve traffic as a role that
-# is a superuser.
+# The application's connection uses the first, the migration uses the second and the
+# retention job uses the third (deploy/docker-compose.prod.yml names all three). Two
+# startup guards keep the separation honest: the configuration guard refuses to boot
+# when the connection strings name the same role, and the live catalogue check refuses
+# to serve traffic as a role that is a superuser.
+#
+# THE MATRIX (deploy/database-privileges.tsv) is the single source of truth for the
+# app's and maintenance's TABLE grants. This script verifies that every table in the
+# public schema is listed in it (an unlisted table is a deploy failure, not a silent
+# gap), then applies exactly those grants and revokes everything else. A table a
+# migration creates later gets the default privileges below (full DML for the app) so
+# the application keeps working between the migration and the matrix update - the PR
+# that adds the table adds its matrix row in the same change.
 #
 # IT IS IDEMPOTENT, and it is safe to run on every deploy: the roles are created if
 # they are missing and re-asserted if they are not, the objects the migrator must own
@@ -64,7 +82,7 @@ PASSWORDS_ONLY=0
 for argument in "$@"; do
   case "$argument" in
     --passwords-only) PASSWORDS_ONLY=1 ;;
-    -h|--help) sed -n '2,40p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,63p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown argument: $argument" >&2; exit 2 ;;
   esac
 done
@@ -74,12 +92,17 @@ CONTAINER="${POSTGRES_CONTAINER:-fuelflow-postgres}"
 
 # The role names are a CONTRACT, not a setting: the compose file names them, the
 # application's startup guard compares them, and the CI test asserts them. They are
-# spelled out here rather than read from .env so that the three places cannot drift
+# spelled out here rather than read from .env so that the four places cannot drift
 # apart silently - a role that exists under one name and is looked for under another is
 # a deploy that fails with "role does not exist" and nothing that says why.
 APP_ROLE="fuelflow_app"
 MIGRATOR_ROLE="fuelflow_migrator"
+MAINTENANCE_ROLE="fuelflow_maintenance"
 READONLY_ROLE="fuelflow_readonly"
+
+# The privilege matrix: one row per public table, saying what the application role and
+# the maintenance role may do to it. Its absence is a broken checkout, not a deploy.
+MATRIX_FILE="$SCRIPT_DIR/database-privileges.tsv"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 say() { echo "  $*"; }
@@ -95,7 +118,7 @@ say() { echo "  $*"; }
 # environment, and an operator who exports a value for one run means it.
 # ------------------------------------------------------------------------------
 declare -A preset=()
-for key in POSTGRES_USER POSTGRES_DB POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_READONLY_PASSWORD; do
+for key in POSTGRES_USER POSTGRES_DB POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_MAINTENANCE_PASSWORD POSTGRES_READONLY_PASSWORD; do
   if [[ -n "${!key:-}" ]]; then
     preset["$key"]="${!key}"
   fi
@@ -118,18 +141,18 @@ done
 : "${POSTGRES_USER:?POSTGRES_USER is not set - it names the cluster superuser, and this script needs it}"
 : "${POSTGRES_DB:?POSTGRES_DB is not set in $ENV_FILE}"
 
-# The superuser's own name must not be one of the three roles, or the separation this
+# The superuser's own name must not be one of the four roles, or the separation this
 # script exists for is a piece of text: `fuelflow_app` would BE the superuser, and the
 # application's guard would refuse to start (which is the right outcome, but a deploy
 # that dies on the first boot is a bad afternoon - better to say so here, where the
 # reason can still be acted on).
 case "$POSTGRES_USER" in
-  "$APP_ROLE"|"$MIGRATOR_ROLE"|"$READONLY_ROLE")
-    die "POSTGRES_USER is '$POSTGRES_USER', which is one of the three roles this script creates. The superuser and the application must be different roles - change POSTGRES_USER in $ENV_FILE." ;;
+  "$APP_ROLE"|"$MIGRATOR_ROLE"|"$MAINTENANCE_ROLE"|"$READONLY_ROLE")
+    die "POSTGRES_USER is '$POSTGRES_USER', which is one of the four roles this script creates. The superuser and the application must be different roles - change POSTGRES_USER in $ENV_FILE." ;;
 esac
 
 # ------------------------------------------------------------------------------
-# The passwords of the two roles the application needs.
+# The passwords of the three roles the application needs.
 #
 # They are generated when they are missing and written to the env file, because the
 # alternative is a deploy that stops at the preflight with "set POSTGRES_APP_PASSWORD
@@ -165,10 +188,11 @@ ensure_password() {
 
 ensure_password POSTGRES_APP_PASSWORD
 ensure_password POSTGRES_MIGRATOR_PASSWORD
+ensure_password POSTGRES_MAINTENANCE_PASSWORD
 
 # Exported unconditionally: `docker exec -e NAME` copies the value out of this
 # process's environment, and a variable that is set but not exported is not in it.
-export POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD
+export POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD POSTGRES_MAINTENANCE_PASSWORD
 
 # The read-only role is for a person running a query by hand, so it is optional: no
 # password configured means no role, and the application does not need it either way.
@@ -241,12 +265,13 @@ psql_super_with_passwords() {
   docker exec -i \
     -e POSTGRES_APP_PASSWORD \
     -e POSTGRES_MIGRATOR_PASSWORD \
+    -e POSTGRES_MAINTENANCE_PASSWORD \
     -e POSTGRES_READONLY_PASSWORD \
     "$CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
     -v ON_ERROR_STOP=1 -X -q "$@"
 }
 
-# psql as one of the three roles, over the socket. Used for the probes below: they
+# psql as one of the roles, over the socket. Used for the probes below: they
 # ask what a role may do, and a role's privileges are the same however it logged in.
 psql_as() {
   local role="$1"; shift
@@ -272,9 +297,11 @@ echo "== the database roles =="
 psql_super_with_passwords \
   -v app_role="$APP_ROLE" \
   -v migrator_role="$MIGRATOR_ROLE" \
+  -v maintenance_role="$MAINTENANCE_ROLE" \
   -v readonly_role="$READONLY_ROLE" <<'SQL'
 \getenv app_password POSTGRES_APP_PASSWORD
 \getenv migrator_password POSTGRES_MIGRATOR_PASSWORD
+\getenv maintenance_password POSTGRES_MAINTENANCE_PASSWORD
 \getenv readonly_password POSTGRES_READONLY_PASSWORD
 
 -- The application's traffic role.
@@ -289,6 +316,14 @@ SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'migrator_role', :'migrator_p
 ALTER ROLE :"migrator_role" WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT
   NOREPLICATION NOBYPASSRLS PASSWORD :'migrator_password';
 
+-- The maintenance role: the destructive end of the data lifecycle. The nightly
+-- retention purge connects as it, and it holds nothing but SELECT and DELETE on the
+-- tables the matrix hands it - it may never insert or update a row.
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'maintenance_role', :'maintenance_password')
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'maintenance_role') \gexec
+ALTER ROLE :"maintenance_role" WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT
+  NOREPLICATION NOBYPASSRLS PASSWORD :'maintenance_password';
+
 -- The read-only role, only when a password for it is configured.
 SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'readonly_role', :'readonly_password')
  WHERE :'readonly_password' <> ''
@@ -297,7 +332,7 @@ SELECT format('ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOIN
  WHERE :'readonly_password' <> '' \gexec
 SQL
 
-say "$APP_ROLE, $MIGRATOR_ROLE and${READONLY_ENABLED:+ $READONLY_ROLE} exist"
+say "$APP_ROLE, $MIGRATOR_ROLE, $MAINTENANCE_ROLE and${READONLY_ENABLED:+ $READONLY_ROLE} exist"
 
 # ------------------------------------------------------------------------------
 # 2. The schemas.
@@ -313,10 +348,11 @@ say "$APP_ROLE, $MIGRATOR_ROLE and${READONLY_ENABLED:+ $READONLY_ROLE} exist"
 psql_super \
   -v app_role="$APP_ROLE" \
   -v migrator_role="$MIGRATOR_ROLE" \
+  -v maintenance_role="$MAINTENANCE_ROLE" \
   -v readonly_role="$READONLY_ROLE" \
   -v readonly_password="$POSTGRES_READONLY_PASSWORD" \
   -v db="$POSTGRES_DB" <<'SQL'
-GRANT CONNECT ON DATABASE :"db" TO :"app_role", :"migrator_role";
+GRANT CONNECT ON DATABASE :"db" TO :"app_role", :"migrator_role", :"maintenance_role";
 -- The read-only role only exists when a password for it is configured, so its grants are
 -- conditional: a GRANT to a role that does not exist is an error, and an error here
 -- would stop a deploy over a role nobody asked for.
@@ -328,7 +364,7 @@ ALTER SCHEMA hangfire OWNER TO :"migrator_role";
 GRANT USAGE, CREATE ON SCHEMA hangfire TO :"app_role";
 REVOKE ALL ON SCHEMA hangfire FROM PUBLIC;
 
-GRANT USAGE ON SCHEMA public TO :"app_role";
+GRANT USAGE ON SCHEMA public TO :"app_role", :"maintenance_role";
 GRANT USAGE, CREATE ON SCHEMA public TO :"migrator_role";
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 SQL
@@ -381,35 +417,135 @@ say "the objects in public and hangfire belong to the migrator"
 # ------------------------------------------------------------------------------
 # 4. The grants.
 #
-# The application may do the application's work: DML on the tables, SELECT on the
-# views, and USAGE on the sequences the identity columns draw from. The read-only role
-# may read and nothing else.
+# THE MATRIX decides. database-privileges.tsv names every relation in the public
+# schema and the privileges the application role and the maintenance role hold on it:
+# the audit and ledger tables are insert-only for the app, the retention tables are
+# undeletable by it, and the maintenance role holds exactly the destructive half of
+# the retention purge - nothing else.
 #
-# The default privileges matter as much as the grants above: every table a FUTURE
-# migration creates belongs to the migrator, and without these the application would
-# not be able to write to it - the schema would be migrated and the application would
-# fail on the first query that touches the new table.
+# Three properties, in order:
+#
+#   - COMPLETE: every table and view in public must be listed in the matrix. An
+#     unlisted relation is a deploy failure, not a silent gap - the alternative is a
+#     table nobody classified keeping whatever the default privileges gave it.
+#   - EXACT: the script revokes everything it is about to grant before granting, so a
+#     privilege somebody added by hand disappears on the next deploy instead of
+#     hiding behind an idempotent-looking "it ran fine".
+#   - FORWARD-SAFE: a matrix row for a relation that does not exist yet (a fresh
+#     cluster, the CI test database) is skipped - the default privileges at the bottom
+#     cover a table between its migration and its matrix row.
+#
+# The default privileges still matter as much as the matrix: every table a FUTURE
+# migration creates belongs to the migrator, and without them the application would
+# not be able to write to it in the window before the matrix row lands.
 # ------------------------------------------------------------------------------
+if [[ ! -f "$MATRIX_FILE" ]]; then
+  die "database-privileges.tsv is missing next to this script - it is the source of truth for the app's grants"
+fi
+
+# A probe table left behind by a crashed earlier run would otherwise look like an
+# unlisted relation and stop the deploy with a confusing message.
+psql_super -c "DROP TABLE IF EXISTS public.__fuelflow_role_probe" >/dev/null
+
+existing_tables="$(psql_super -t -A -c "
+  SELECT nspname || '.' || relname
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname = 'public'
+   ORDER BY 1")"
+unlisted="$(comm -23 \
+  <(printf '%s\n' "$existing_tables" | awk 'NF' | LC_ALL=C sort) \
+  <(awk -F'\t' '!/^#/ && $1 == "public" && NF >= 4 { print $1 "." $2 }' "$MATRIX_FILE" | LC_ALL=C sort -u))"
+if [[ -n "$unlisted" ]]; then
+  die "public relations not listed in database-privileges.tsv - add a row for each, or the application loses access to them: $unlisted"
+fi
+
+# REVOKE ALL ON TABLE clears the TABLE-level privileges, but a column-level grant
+# (GRANT UPDATE (processed) ...) lives in its own place and survives it. So the
+# column-level UPDATE grants are revoked first, over every column of every public
+# relation - otherwise a column the matrix no longer names would keep its privilege
+# forever, and the matrix would stop being the whole truth.
 psql_super \
   -v app_role="$APP_ROLE" \
-  -v migrator_role="$MIGRATOR_ROLE" \
-  -v readonly_role="$READONLY_ROLE" \
-  -v readonly_password="$POSTGRES_READONLY_PASSWORD" <<'SQL'
+  -v maint_role="$MAINTENANCE_ROLE" <<'SQL'
+SELECT format('REVOKE UPDATE (%s) ON TABLE %I.%I FROM %I',
+              (SELECT string_agg(a.attname, ', ' ORDER BY a.attname)
+                 FROM pg_attribute a
+                WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
+              n.nspname, c.relname, :'app_role')
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE c.relkind IN ('r','p','v','m') AND n.nspname = 'public'
+   AND EXISTS (SELECT 1 FROM pg_attribute a
+                WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) \gexec
+
+SELECT format('REVOKE UPDATE (%s) ON TABLE %I.%I FROM %I',
+              (SELECT string_agg(a.attname, ', ' ORDER BY a.attname)
+                 FROM pg_attribute a
+                WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
+              n.nspname, c.relname, :'maint_role')
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE c.relkind IN ('r','p','v','m') AND n.nspname = 'public'
+   AND EXISTS (SELECT 1 FROM pg_attribute a
+                WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) \gexec
+SQL
+
+# Turn the matrix into SQL. The privilege letters: S=SELECT, I=INSERT, U=UPDATE,
+# D=DELETE; U(col,...) narrows the update to those columns; "-" means nothing at all.
+# Rows for relations that do not exist yet are skipped (forward-safety, above).
+awk -F'\t' \
+    -v app_role="$APP_ROLE" \
+    -v maint_role="$MAINTENANCE_ROLE" \
+    -v live_tables="$existing_tables" '
+  function emit_privs(priv, role, qname,    base, cols, out) {
+    base = priv; cols = ""
+    if (match(priv, /\+U\(/)) {
+      base = substr(priv, 1, RSTART - 1)
+      cols = substr(priv, RSTART + 3); sub(/\)$/, "", cols)
+    }
+    out = ""
+    if (index(base, "S")) out = out "SELECT, "
+    if (index(base, "I")) out = out "INSERT, "
+    if (index(base, "D")) out = out "DELETE, "
+    if (index(base, "U") && cols == "") out = out "UPDATE, "
+    if (out != "") { sub(/, $/, "", out); print "GRANT " out " ON TABLE " qname " TO " role ";" }
+    if (cols != "") print "GRANT UPDATE (" cols ") ON TABLE " qname " TO " role ";"
+  }
+  BEGIN {
+    n = split(live_tables, arr, "\n")
+    for (i = 1; i <= n; i++) if (arr[i] != "") exists[arr[i]] = 1
+  }
+  /^#/ || NF < 4 { next }
+  {
+    qname = $1 "." $2
+    if (!(qname in exists)) next
+    print "REVOKE ALL ON TABLE " qname " FROM " app_role ";"
+    print "REVOKE ALL ON TABLE " qname " FROM " maint_role ";"
+    if ($3 != "-") emit_privs($3, app_role, qname)
+    if ($4 != "-") emit_privs($4, maint_role, qname)
+  }' "$MATRIX_FILE" | psql_super
+
+# hangfire stays Hangfire's own: whatever the job queue creates in its schema keeps
+# the full DML it needs, by name rather than by matrix row.
+psql_super -v app_role="$APP_ROLE" <<'SQL'
 SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO %I',
               n.nspname, c.relname, :'app_role')
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
- WHERE c.relkind IN ('r','p') AND n.nspname IN ('public','hangfire') \gexec
+ WHERE c.relkind IN ('r','p') AND n.nspname = 'hangfire' \gexec
 
 SELECT format('GRANT SELECT ON TABLE %I.%I TO %I', n.nspname, c.relname, :'app_role')
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
- WHERE c.relkind IN ('v','m','f') AND n.nspname IN ('public','hangfire') \gexec
+ WHERE c.relkind IN ('v','m','f') AND n.nspname = 'hangfire' \gexec
+SQL
 
+# The sequences the identity columns draw from, and the read-only role, as before.
+psql_super \
+  -v app_role="$APP_ROLE" \
+  -v readonly_role="$READONLY_ROLE" \
+  -v readonly_password="$POSTGRES_READONLY_PASSWORD" <<'SQL'
 SELECT format('GRANT USAGE, SELECT ON SEQUENCE %I.%I TO %I',
               n.nspname, c.relname, :'app_role')
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE c.relkind = 'S' AND n.nspname IN ('public','hangfire') \gexec
 
--- The read-only role, when there is one.
 SELECT format('GRANT SELECT ON TABLE %I.%I TO %I', n.nspname, c.relname, :'readonly_role')
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE :'readonly_password' <> ''
@@ -420,8 +556,17 @@ SELECT format('GRANT USAGE, SELECT ON SEQUENCE %I.%I TO %I',
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE :'readonly_password' <> ''
    AND c.relkind = 'S' AND n.nspname IN ('public','hangfire') \gexec
+SQL
 
--- What the migrator creates from now on.
+# What the migrator creates from now on: the application keeps full DML until its
+# matrix row lands in the same change that adds the table. The maintenance role gets
+# NOTHING by default - a table the retention purge does not know about must not
+# quietly become deletable.
+psql_super \
+  -v app_role="$APP_ROLE" \
+  -v migrator_role="$MIGRATOR_ROLE" \
+  -v readonly_role="$READONLY_ROLE" \
+  -v readonly_password="$POSTGRES_READONLY_PASSWORD" <<'SQL'
 ALTER DEFAULT PRIVILEGES FOR ROLE :"migrator_role" IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"app_role";
 ALTER DEFAULT PRIVILEGES FOR ROLE :"migrator_role" IN SCHEMA public
@@ -436,7 +581,7 @@ SELECT format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT USAGE
  WHERE :'readonly_password' <> '' \gexec
 SQL
 
-say "the application's DML, the read-only role's SELECT, and the default privileges for what comes next"
+say "the matrix grants, the read-only role's SELECT, and the default privileges for what comes next"
 
 # ------------------------------------------------------------------------------
 # 5. The extensions the migrations need.
@@ -518,10 +663,79 @@ if [[ "$READONLY_ENABLED" == "1" ]]; then
   say "the read-only role may read and may not write"
 fi
 
+# ------------------------------------------------------------------------------
+# The matrix, asked for real. The probes below only mean something when the relation
+# the matrix classifies exists: on a fresh cluster (or the CI test database) the
+# migration has not created the schema yet, and the CI test probes the same
+# properties against stub tables of its own. `WHERE false` keeps every probe a
+# privilege check and nothing more - no row is read, written or locked.
+# ------------------------------------------------------------------------------
+have_relation() {
+  [[ -n "$(psql_super -t -A -c "SELECT to_regclass('$1')" 2>/dev/null)" ]]
+}
+
+if have_relation public.voucher_events; then
+  if psql_as "$APP_ROLE" -c "UPDATE public.voucher_events SET event_type = event_type WHERE false" >/dev/null 2>&1; then
+    die "the application role may UPDATE voucher_events. The voucher audit trail is insert-only for it - database-privileges.tsv says SI."
+  fi
+  if psql_as "$APP_ROLE" -c "DELETE FROM public.voucher_events WHERE false" >/dev/null 2>&1; then
+    die "the application role may DELETE from voucher_events. A redemption nobody can prove happened is a sale nobody has to honour."
+  fi
+  say "the application role may not rewrite or delete voucher_events"
+else
+  say "voucher_events does not exist yet - the CI test probes this against a stub table"
+fi
+
+if have_relation public.payments; then
+  if psql_as "$APP_ROLE" -c "DELETE FROM public.payments WHERE false" >/dev/null 2>&1; then
+    die "the application role may DELETE from payments. A payment a bug can erase is a payment the reconciliation cannot trust."
+  fi
+  say "the application role may not delete payments"
+else
+  say "payments does not exist yet - the CI test probes this against a stub table"
+fi
+
+if have_relation public.outbox_events; then
+  if ! psql_as "$APP_ROLE" -c "UPDATE public.outbox_events SET processed = true WHERE false" >/dev/null 2>&1; then
+    die "the application role may not UPDATE outbox_events.processed. The dispatcher closes an event exactly this way - database-privileges.tsv grants U(processed,processed_at_utc)."
+  fi
+  if psql_as "$APP_ROLE" -c "UPDATE public.outbox_events SET event_type = event_type WHERE false" >/dev/null 2>&1; then
+    die "the application role may UPDATE outbox_events columns outside the processed pair. database-privileges.tsv grants exactly U(processed,processed_at_utc)."
+  fi
+  if psql_as "$APP_ROLE" -c "DELETE FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
+    die "the application role may DELETE from outbox_events. The purge belongs to the maintenance role."
+  fi
+  say "the application role may close an outbox event and nothing more"
+  if ! psql_as "$MAINTENANCE_ROLE" -c "DELETE FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
+    die "the maintenance role may not DELETE from outbox_events. The retention purge would delete nothing, night after night."
+  fi
+  if psql_as "$MAINTENANCE_ROLE" -c "INSERT INTO public.outbox_events SELECT * FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
+    die "the maintenance role may INSERT into outbox_events. It holds the destructive half of the lifecycle only - database-privileges.tsv says SD for it."
+  fi
+  say "the maintenance role may purge the outbox and may not write it"
+else
+  say "outbox_events does not exist yet - the CI test probes this against a stub table"
+fi
+
+if have_relation public.provider_event_outbox; then
+  if psql_as "$APP_ROLE" -c "UPDATE public.provider_event_outbox SET payload = payload WHERE false" >/dev/null 2>&1; then
+    die "the application role may UPDATE provider_event_outbox. The admin change audit trail is insert-only for it - database-privileges.tsv says SI."
+  fi
+  if psql_as "$APP_ROLE" -c "DELETE FROM public.provider_event_outbox WHERE false" >/dev/null 2>&1; then
+    die "the application role may DELETE from provider_event_outbox. The audit purge belongs to the maintenance role."
+  fi
+  if ! psql_as "$MAINTENANCE_ROLE" -c "SELECT count(*) FROM public.provider_event_outbox" >/dev/null 2>&1; then
+    die "the maintenance role may not SELECT from provider_event_outbox - it cannot age the audit trail without reading it."
+  fi
+  say "the audit trail is insert-only for the app, purged by the maintenance role"
+else
+  say "provider_event_outbox does not exist yet - the CI test probes this against a stub table"
+fi
+
 psql_super -c "DROP TABLE IF EXISTS public.__fuelflow_role_probe" >/dev/null
 
 # ------------------------------------------------------------------------------
-# 7. What the catalogue says about the three roles.
+# 7. What the catalogue says about the four roles.
 #
 # The last word belongs to the catalogue: this is the same query the application's own
 # startup guard runs against the role it is connected as.
@@ -529,7 +743,7 @@ psql_super -c "DROP TABLE IF EXISTS public.__fuelflow_role_probe" >/dev/null
 echo "== the catalogue says =="
 roles_report="$(psql_super -t -A -F' ' -c "
   SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolcanlogin
-    FROM pg_roles WHERE rolname IN ('$APP_ROLE', '$MIGRATOR_ROLE', '$READONLY_ROLE')
+    FROM pg_roles WHERE rolname IN ('$APP_ROLE', '$MIGRATOR_ROLE', '$MAINTENANCE_ROLE', '$READONLY_ROLE')
    ORDER BY rolname")"
 while read -r name super createrole createdb bypassrls login; do
   [[ -z "$name" ]] && continue
@@ -540,4 +754,4 @@ while read -r name super createrole createdb bypassrls login; do
     "$name" "$super" "$createrole" "$createdb" "$bypassrls" "$login"
 done <<< "$roles_report"
 
-echo "the roles are in place: the application's traffic runs as $APP_ROLE and the schema as $MIGRATOR_ROLE."
+echo "the roles are in place: the application's traffic runs as $APP_ROLE, the schema as $MIGRATOR_ROLE, and the retention purge as $MAINTENANCE_ROLE."

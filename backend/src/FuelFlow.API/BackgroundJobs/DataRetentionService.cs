@@ -124,6 +124,11 @@ public class DataRetentionService
     //                                 record, there is no other copy.
 
 
+    /// <summary>
+    /// The context the purge runs on: connected as <c>fuelflow_maintenance</c>, which holds DELETE
+    /// (and SELECT) on exactly the tables this job empties and nothing else - a defect in the
+    /// traffic role can never erase the ledger, and the purge role can never forge a row in it.
+    /// </summary>
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
     private readonly ILogger<DataRetentionService> _logger;
@@ -137,7 +142,7 @@ public class DataRetentionService
     private readonly List<(string Table, string Reason)> _failures = [];
 
     public DataRetentionService(
-        ApplicationDbContext context,
+        [FromKeyedServices("maintenance")] ApplicationDbContext context,
         RuntimeSettingsService settings,
         ILogger<DataRetentionService> logger)
     {

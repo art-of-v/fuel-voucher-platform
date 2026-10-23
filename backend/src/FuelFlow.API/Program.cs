@@ -103,7 +103,9 @@ try
     // and the Postgres health check all open their own pool, and only the first one was capped.
     var maxPoolSize = DatabaseConnectionPool.ResolveMaxPoolSize(builder.Configuration);
     builder.Services
-        .AddDatabase(connectionString, maxPoolSize)
+        .AddDatabase(connectionString, maxPoolSize,
+            builder.Configuration["Database:MaintenanceConnectionString"],
+            requireMaintenanceConnection: builder.Environment.IsProduction())
         .AddJwtAuth(builder.Configuration, builder.Environment)
         .AddDefaultAuthorizationPolicy()
         .AddFeatureServices(builder.Configuration)

@@ -1,0 +1,89 @@
+# The privilege matrix: what each schema object may be done by which role.
+#
+# This file is the single source of truth for fuelflow_app's and fuelflow_maintenance's
+# table grants. ensure-database-roles.sh reads it, verifies that every table in the
+# public schema is listed (an unlisted table is a deploy failure, not a silent gap),
+# and applies exactly these grants - revoking everything else.
+#
+# Columns (tab-separated):
+#   schema       the schema the object lives in (the matrix covers public only;
+#                the hangfire schema belongs to Hangfire and keeps its own blanket grant)
+#   table        the table name
+#   app          fuelflow_app's privileges: S=SELECT I=INSERT U=UPDATE D=DELETE,
+#                U(col,...) for an update limited to the named columns, "-" for none
+#   maintenance  fuelflow_maintenance's privileges, same notation
+#   notes        why
+#
+# The classes behind the letters:
+#   mutable       SIUD  - ordinary product data; the application owns its lifecycle
+#   retention     SIU + maintenance SD - the nightly purge deletes these as
+#                 fuelflow_maintenance (DataRetentionService), so a defect in the
+#                 traffic role cannot erase them
+#   append-only   SI (+ a narrow column update where a row is "closed" in place) -
+#                 audit and ledger records: written once, never rewritten, never deleted
+#   read-only     S     - none today
+#   migration-only -    - none today (migrator-owned objects carry no app grant)
+#
+# WARNING: the blank maintenance column means the maintenance role has NO grants on the
+# table - it is not "inherit from app". The roles do not inherit from each other.
+
+schema	table	app	maintenance	notes
+public	accounting_periods	SIUD	-	Accounting-period lifecycle is ordinary product data.
+public	app_settings	SIUD	S	Runtime settings are read and written by the admin surface.
+public	attestation_keys	SIUD	-	App Attest key registry; written by the attestation endpoints.
+public	bank_accounts	SIUD	-	Customer payout accounts; ordinary product data.
+public	brand_stations	SIUD	-	Catalogue sync rewrites stations (insert + update + retire).
+public	brands	SIUD	-	Admin CRUD.
+public	chart_of_accounts	SIUD	-	Seeded at startup and editable by the admin surface.
+public	company_invitations	SIUD	-	Invitations are created, accepted (updated) and revoked (deleted).
+public	company_members	SIUD	-	Membership lifecycle; RLS-covered.
+public	contract_versions	SIUD	-	Version rows are written at signing time and read later.
+public	contracts	SIUD	-	Signing updates the contract; admin surface reads it.
+public	devices	SIU	SD	Retention purges dead devices as fuelflow_maintenance.
+public	document_sequences	SIUD	-	Numbering counters (journal:<period>, contract numbers).
+public	error_logs	SIUD	SD	ClearErrorLogs deletes from the API on purpose; diagnostics, not an audit trail.
+public	feedback_chat_bindings	SIUD	-	Telegram chat binding CRUD.
+public	feedback_message_replies	SIUD	SD	Admin can delete a thread; retention purges aged replies as maintenance.
+public	feedback_messages	SIUD	SD	DeleteAdminFeedback deletes from the API; retention purges as maintenance.
+public	fuel_nominals	SIUD	-	Nominal editor replaces rows (delete + insert) when a brand's nominals change.
+public	fuel_price_history	SIUD	-	Price sync appends and corrects rows.
+public	fuel_type_product_codes	SIUD	-	Catalogue sync maintains vendor code mappings.
+public	fuel_types	SIUD	-	Admin CRUD.
+public	fuel_vouchers	SIUD	S	Paid-for paper; soft delete only. RLS-covered; never purged. Maintenance reads it only for the qr_parameters reference check.
+public	fulfillments	SIUD	-	Fulfillment lifecycle (claimed, fulfilled, repaired).
+public	journal_entries	SIUD	-	Draft entries are inserted, posted (updated) and deleted on failure; posted rows are frozen by assert_lines_frozen and the line immutability trigger.
+public	journal_lines	SIUD	-	Lines belong to the draft lifecycle; trg_journal_lines_posted_is_immutable freezes posted lines.
+public	ledger_mapping_rules	SIUD	-	Admin CRUD.
+public	legal_entities	SIUD	-	Company profile CRUD; RLS-covered.
+public	monobank_statement_entries	SI	-	The acquirer's immutable evidence: inserted on import, never rewritten (acquiring-statement-118).
+public	movement_batches	SIUD	-	Settlement batch lifecycle (opened, confirmed, rejected).
+public	natural_persons	SIUD	-	Customer profile CRUD; RLS-covered.
+public	notifications	SIU	SD	Retention purges read notifications as fuelflow_maintenance.
+public	operator_legal_entities	SIUD	-	Operator-side legal entity CRUD.
+public	order_events	SI	-	Append-only order history: written by the SaveChanges interceptor, never rewritten.
+public	order_line_items	SIUD	-	DeletedUnpaidOrderCleanup removes the lines of abandoned orders.
+public	orders	SIUD	-	Order lifecycle incl. hard delete of abandoned unpaid orders; RLS-covered.
+public	outbox_events	SI+U(processed,processed_at_utc)	SD	The dispatcher closes a row by updating exactly processed and processed_at_utc; retention purges as maintenance.
+public	parties	SIUD	-	Party supertype rows behind persons and companies.
+public	payments	SIU	-	Payment status moves through webhooks; a payment is never deleted.
+public	provider_event_outbox	SI	SD	The admin change audit trail: inserted by AuditEventService, read by the audit screens, purged after a year as maintenance.
+public	purchase_batches	SIUD	S	Costing records for imported stock; never purged. Maintenance reads it only for the voucher_imports reference check.
+public	push_tokens	SIU	SD	Retention purges stale tokens as fuelflow_maintenance.
+public	qr_parameters	SIU	SD	Retention purges unreferenced QR configs as fuelflow_maintenance.
+public	refresh_tokens	SIU	SD	Retention purges dead sessions as fuelflow_maintenance.
+public	refunds	S	-	A view over payments for humans (a psql session, a spreadsheet); not in the EF model, read-only for the app.
+public	roles	SIUD	-	Seeded at startup and listed by the admin surface.
+public	settlement_messages	SIUD	-	Telegram settlement bot message log.
+public	staff_two_factor	SIUD	-	Staff second-factor lifecycle.
+public	stock_summary	SIUD	-	Stock rollup rows recomputed by the stock monitor.
+public	suppliers	SIUD	-	Admin CRUD.
+public	support_messages	SIU	SD	Retention purges the contact form after a year as fuelflow_maintenance.
+public	user_contracts	SIUD	-	Signed-contract links; RLS-covered.
+public	users	SIUD	-	Account lifecycle (soft delete via IsDeleted).
+public	verification_codes	SIU	SD	Retention purges spent OTPs as fuelflow_maintenance.
+public	voucher_events	SI	-	Append-only "who did this, and when" for voucher actions; the pairing CHECK refuses author-less rows.
+public	voucher_import_errors	SIUD	-	Per-row import errors, purged with their batch.
+public	voucher_imports	SIU	SD	Retention purges finished imports as fuelflow_maintenance.
+public	voucher_movements	SI	-	Append-only custody ledger: where the paper is, and how it got there (#319).
+public	voucher_term_pricing	SIUD	-	Term-pricing admin CRUD.
+public	webhook_events	SI+U(status,processed_at_utc,processing_started_at_utc,error,attempts)	-	Webhook dedup log: inserted once, closed by updating the outcome columns; never deleted.

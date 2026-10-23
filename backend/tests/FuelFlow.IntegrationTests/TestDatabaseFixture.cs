@@ -55,6 +55,20 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     private const string ConnectionStringVariable = "Database__ConnectionString";
 
     /// <summary>
+    /// Environment-variable form of <c>Database:MaintenanceConnectionString</c>. The host reads it
+    /// at <c>Program.cs</c>:48, so it must be set as a process variable before any host builds -
+    /// the maintenance role is what <see cref="DataRetentionService"/> resolves through DI.
+    /// </summary>
+    private const string MaintenanceConnectionStringVariable = "Database__MaintenanceConnectionString";
+
+    /// <summary>
+    /// Environment-variable form of <c>Database:MigrationConnectionString</c>. The migration is the
+    /// one thing that may change the schema, so it keeps the cluster's own credential here - the
+    /// traffic connection above is the application role, which may not.
+    /// </summary>
+    private const string MigrationConnectionStringVariable = "Database__MigrationConnectionString";
+
+    /// <summary>
     /// Environment-variable form of <c>Observability:Loki:Enabled</c>. appsettings.Development.json
     /// enables the Loki sink, and <c>LoggingSetup.ConfigureFuelFlowLogging</c> fails closed when
     /// it is enabled without credentials (<c>LokiOptions.ValidateCredentials</c>) - correct for a real
@@ -120,6 +134,28 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     /// </summary>
     public string ConnectionString { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Connection string for THIS class's private clone, as <c>fuelflow_app</c> - the role
+    /// production traffic runs as. Tests that connect over TCP as the application role use
+    /// this; the test host itself keeps the superuser string.
+    /// </summary>
+    public string AppConnectionString { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Connection string for THIS class's private clone, as <c>fuelflow_maintenance</c> - the
+    /// role the retention purge runs on.
+    /// </summary>
+    public string MaintenanceConnectionString { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// A context on THIS class's private clone connected as <c>fuelflow_maintenance</c> - what
+    /// <see cref="DataRetentionService"/> resolves through DI in production.
+    /// </summary>
+    public ApplicationDbContext CreateMaintenanceContext()
+        => new(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(MaintenanceConnectionString)
+            .Options, TestQrCipher.Instance);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Development env so startup-time config reads (AddJwtAuth, AddDatabase) resolve the
@@ -150,7 +186,9 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         // [CollectionDefinition("Integration Tests", DisableParallelization = true)] collection,
         // so classes never overlap and the previous class's host - which captured the previous
         // value at Program.cs:48 - is disposed before the next one boots.
-        Environment.SetEnvironmentVariable(ConnectionStringVariable, ConnectionString);
+        //
+        // The three connection strings are set by CloneTemplateDatabaseAsync, because each one
+        // names a different role and each class has its own database.
 
         // The voucher QR cipher refuses to construct without a key, by design - a default key would
         // be a key every deployment shares. Tests get a fixed one for the same reason the QA access
@@ -334,22 +372,55 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
 
         // Pooling left at the Npgsql default (on) here, unlike the two maintenance connections:
         // this string is used by every context a test opens, and they are short-lived and numerous.
-        return new NpgsqlConnectionStringBuilder(DbContainer.GetConnectionString())
+        var clone = new NpgsqlConnectionStringBuilder(DbContainer.GetConnectionString())
         {
             Database = name,
+            Pooling = true,
             SslMode = SslMode.Disable,
-        }.ConnectionString;
+        };
+        ConnectionString = clone.ConnectionString;
+
+        // The same database, as the two roles production connects as - the test host itself keeps
+        // the superuser string, but tests may connect directly as the application role or as the
+        // maintenance role to assert what those roles may and may not do.
+        var appClone = new NpgsqlConnectionStringBuilder(clone.ConnectionString)
+        {
+            Username = "fuelflow_app",
+            Password = "fuelflow-app-test",
+        };
+        var maintenanceClone = new NpgsqlConnectionStringBuilder(clone.ConnectionString)
+        {
+            Username = "fuelflow_maintenance",
+            Password = "fuelflow-maintenance-test",
+        };
+        AppConnectionString = appClone.ConnectionString;
+        MaintenanceConnectionString = maintenanceClone.ConnectionString;
+
+        // The host's OWN connection is the application role - the traffic role production runs as,
+        // with the grants deploy/database-privileges.tsv states. The suite therefore exercises the
+        // real privilege set: a query the matrix does not allow fails here the same way it would
+        // fail on the box, instead of passing because the suite connected as the owner.
+        //
+        // The migration keeps the superuser: it is the only thing that may change the schema, and
+        // it runs as the cluster's owner in the template - the same shape as production, where the
+        // migrator role owns the tables.
+        Environment.SetEnvironmentVariable(ConnectionStringVariable, appClone.ConnectionString);
+        Environment.SetEnvironmentVariable(MigrationConnectionStringVariable, clone.ConnectionString);
+        Environment.SetEnvironmentVariable(MaintenanceConnectionStringVariable, maintenanceClone.ConnectionString);
+
+        return clone.ConnectionString;
     }
 
     /// <summary>
-    /// Creates the roles the application and the optional reporting connection use in production,
-    /// so the conditional policies in <c>TheTenantScopeIsAGate</c> are installed in the template.
+    /// Creates the roles the application connects as in production, so the conditional policies
+    /// in <c>TheTenantScopeIsAGate</c> are installed in the template. All three are LOGIN roles
+    /// with fixed test passwords - the suite connects as the container's superuser and uses
+    /// <c>SET ROLE</c> for the policy tests, and other tests connect over TCP as the roles
+    /// themselves to assert what they may and may not do.
     /// </summary>
     /// <remarks>
-    /// NOLOGIN and NOREPLICATION because the suite never connects as them: it connects as the
-    /// container's superuser and uses <c>SET ROLE</c> for the policy tests. A superuser may SET
-    /// ROLE to any role, and after SET ROLE the current user is the role under test, so the
-    /// policies apply exactly as they do to that role in production.
+    /// NOREPLICATION and NOBYPASSRLS on purpose: after <c>SET ROLE</c> the policies apply exactly
+    /// as they do to that role in production. A superuser may SET ROLE to any role.
     /// </remarks>
     private static async Task EnsureTenantTestRoleAsync(PostgreSqlContainer container)
     {
@@ -362,42 +433,108 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
                     CREATE ROLE fuelflow_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
                         NOINHERIT NOREPLICATION NOBYPASSRLS;
                 END IF;
+                ALTER ROLE fuelflow_app LOGIN PASSWORD 'fuelflow-app-test';
 
-                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fuelflow_readonly') THEN
-                    CREATE ROLE fuelflow_readonly NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fuelflow_maintenance') THEN
+                    CREATE ROLE fuelflow_maintenance NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
                         NOINHERIT NOREPLICATION NOBYPASSRLS;
                 END IF;
+                ALTER ROLE fuelflow_maintenance LOGIN PASSWORD 'fuelflow-maintenance-test';
+
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fuelflow_readonly') THEN
+                    CREATE ROLE fuelflow_readonly NOLOGIN NOSUPERUSER NOCREATEROLE
+                        NOINHERIT NOREPLICATION NOBYPASSRLS;
+                END IF;
+                ALTER ROLE fuelflow_readonly LOGIN PASSWORD 'fuelflow-readonly-test';
             END
             $$;
             """);
     }
 
     /// <summary>
-    /// The grants production's <c>ensure-database-roles.sh</c> gives the traffic and reporting
-    /// roles. The policy predicates read the membership and owner tables, so those need SELECT as
-    /// well, and the reporting role is read-only.
+    /// The grants <c>deploy/ensure-database-roles.sh</c> gives the traffic and maintenance roles,
+    /// read straight out of <c>deploy/database-privileges.tsv</c> - the same file the deploy
+    /// script applies - so the template carries exactly the production matrix. Privileges are
+    /// revoked first and then granted, so a stale grant cannot survive into the template. The
+    /// reporting role is SELECT-only on everything public.
     /// </summary>
     private static async Task GrantTenantTestRoleAsync(PostgreSqlContainer container)
     {
+        var matrixPath = LocatePrivilegeMatrix();
+        var lines = File.ReadAllLines(matrixPath);
+
         await using var template = new ApplicationDbContext(NonPoolingContextOptions(container, TemplateDatabaseName), TestQrCipher.Instance);
-        await template.Database.ExecuteSqlRawAsync(
-            """
-            GRANT USAGE ON SCHEMA public TO fuelflow_app, fuelflow_readonly;
-            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-                public.orders,
-                public.fuel_vouchers,
-                public.user_contracts,
-                public.company_members,
-                public.legal_entities
-                TO fuelflow_app;
-            GRANT SELECT ON TABLE
-                public.orders,
-                public.fuel_vouchers,
-                public.user_contracts,
-                public.company_members,
-                public.legal_entities
-                TO fuelflow_readonly;
+        await template.Database.ExecuteSqlRawAsync("REVOKE ALL ON SCHEMA public FROM fuelflow_app, fuelflow_maintenance, fuelflow_readonly;");
+        await template.Database.ExecuteSqlRawAsync("GRANT USAGE ON SCHEMA public TO fuelflow_app, fuelflow_maintenance, fuelflow_readonly;");
+
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+            var parts = line.Split('\t');
+            if (parts.Length < 5 || parts[0] != "public") continue;
+
+            var table = parts[1];
+            await template.Database.ExecuteSqlRawAsync($"""
+                REVOKE ALL ON TABLE public."{table}" FROM fuelflow_app, fuelflow_maintenance;
+                {GrantSql("fuelflow_app", parts[2], table)}
+                {GrantSql("fuelflow_maintenance", parts[3], table)}
+                """);
+        }
+
+        await template.Database.ExecuteSqlRawAsync("""
+            GRANT SELECT ON ALL TABLES IN SCHEMA public TO fuelflow_readonly;
+            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO fuelflow_app, fuelflow_maintenance, fuelflow_readonly;
             """);
+
+        // Hangfire's own schema. The job queue creates its tables there when it starts, and it
+        // starts as the traffic role now - so the schema has to exist and the traffic role has to
+        // be allowed to create objects in it. This is the one schema the application may create
+        // objects in, and it is the same carve-out production's deploy script makes.
+        await template.Database.ExecuteSqlRawAsync("""
+            CREATE SCHEMA IF NOT EXISTS hangfire;
+            GRANT USAGE, CREATE ON SCHEMA hangfire TO fuelflow_app;
+            """);
+    }
+
+    static string GrantSql(string role, string priv, string table)
+    {
+        string? columns = null;
+        var basePriv = priv;
+        var columnUpdate = priv.IndexOf("+U(", StringComparison.Ordinal);
+        if (columnUpdate >= 0)
+        {
+            basePriv = priv[..columnUpdate];
+            var end = priv.IndexOf(')', columnUpdate);
+            columns = priv[(columnUpdate + 3)..end];
+        }
+
+        var grants = new List<string>();
+        if (basePriv.Contains('S')) grants.Add("SELECT");
+        if (basePriv.Contains('I')) grants.Add("INSERT");
+        if (basePriv.Contains('U') && columns is null) grants.Add("UPDATE");
+        if (basePriv.Contains('D')) grants.Add("DELETE");
+
+        var sql = string.Empty;
+        if (grants.Count > 0)
+            sql += $"GRANT {string.Join(", ", grants)} ON TABLE public.\"{table}\" TO {role};\n";
+        if (columns is not null)
+            sql += $"GRANT UPDATE ({columns}) ON TABLE public.\"{table}\" TO {role};\n";
+        return sql;
+    }
+
+    /// <summary>
+    /// Finds <c>deploy/database-privileges.tsv</c> by walking up from the test assembly's
+    /// directory - the test host runs from <c>bin/Debug/...</c>, so the file is several levels up.
+    /// </summary>
+    static string LocatePrivilegeMatrix()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var i = 0; i < 8 && directory is not null; i++, directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "deploy", "database-privileges.tsv");
+            if (File.Exists(candidate)) return candidate;
+        }
+        throw new FileNotFoundException("deploy/database-privileges.tsv could not be found from the test assembly");
     }
 
     /// <summary>
