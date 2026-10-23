@@ -178,6 +178,31 @@ case "$REASON" in
   *) echo "  FAIL  the reason does not say how long the segment has been waiting"; fail=$((fail + 1)) ;;
 esac
 
+echo "=== the off-box WAL blob ==="
+# The nightly backup ships the archive as one blob. It used GNU tar's
+# `--wildcards '0000000*'` on CREATE, where the pattern is a literal member name: tar
+# failed, the error was swallowed, and the run shipped a gzip of nothing while saying
+# "WAL archive shipped". Measured on the production box on 2026-10-22: 245 bytes for
+# an archive of 235 segments. The function is tested on the members it carries, not on
+# the bytes it writes - a gzip of nothing is a perfectly valid gzip.
+ARCHIVE="$TMP/blob"
+mkdir -p "$ARCHIVE"
+make_segment "$ARCHIVE" "000000010000000000000001" 0 8
+make_segment "$ARCHIVE" "000000010000000000000002" 0 8
+make_segment "$ARCHIVE" "000000010000000000000003" 0 8
+printf 'not a wal segment\n' > "$ARCHIVE/README"
+create_wal_blob "$ARCHIVE" "$TMP/blob.tar.gz" 2>/dev/null
+check "a populated archive is packaged" "0" "$?"
+check "the blob carries every segment" "3" \
+  "$(tar -tzf "$TMP/blob.tar.gz" | wc -l | tr -d ' ')"
+check "a file that is not a segment is not shipped" "no" \
+  "$(tar -tzf "$TMP/blob.tar.gz" | grep -qx README && echo yes || echo no)"
+
+ARCHIVE="$TMP/blob-empty"
+mkdir -p "$ARCHIVE"
+create_wal_blob "$ARCHIVE" "$TMP/blob-empty.tar.gz" 2>/dev/null
+check "an archive with no segments is refused, not shipped empty" "1" "$?"
+
 echo
 echo "  $pass passed, $fail failed"
 [[ "$fail" -eq 0 ]]

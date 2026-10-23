@@ -179,6 +179,7 @@ echo "[$(date -Is)] Backing up '${POSTGRES_DB}' -> ${OUT}"
 source "$SCRIPT_DIR/pitr-common.sh"
 
   ARCHIVER_OK=0
+  WAL_SHIP_FAILED=0
   check_wal_archive "$CONTAINER" "$WAL_ARCHIVE_DIR" "$POSTGRES_USER" "$POSTGRES_DB" 1800 || ARCHIVER_OK=1
   
   # Trim the WAL archive BEFORE anything is written, not after.
@@ -353,8 +354,18 @@ if [[ -n "${BACKUP_REMOTE:-}" ]] && command -v rclone >/dev/null 2>&1 && [[ -d "
   # truncated, and shipping a truncated segment means a restore that stops in the middle
   # of it. PostgreSQL writes each segment to a temporary name and renames it when it is
   # complete, so anything matching the segment pattern is complete.
-  tar --force-local -C "$WAL_ARCHIVE_DIR" -czf "$WAL_TMP/wal.tar.gz" --wildcards '0000000*' 2>/dev/null || true
-  if [[ -s "$WAL_TMP/wal.tar.gz" ]]; then
+  #
+  # The packaging lives in pitr-common.sh because it has to FAIL, not warn: this tar
+  # used to create an EMPTY blob (GNU tar does not expand a wildcard on create) and the
+  # run still reported it shipped. Measured on 2026-10-22: a 245-byte blob for an
+  # archive of 235 segments. An empty archive off-box is not a backup of an empty
+  # archive - it is a base backup nobody can replay.
+  if ! create_wal_blob "$WAL_ARCHIVE_DIR" "$WAL_TMP/wal.tar.gz"; then
+    echo "ERROR: the WAL archive could not be packaged, so it did NOT leave the box." >&2
+    echo "       The dump and the base backup above did; the replayable history did" >&2
+    echo "       not, so point-in-time recovery is on-box only until this is fixed." >&2
+    WAL_SHIP_FAILED=1
+  else
     # The blob is NAMED AFTER THE NIGHT, not written to a fixed name. A fixed name means
     # every night's copy replaces the one before it, and the off-box history is then
     # exactly one snapshot deep - which defeats the point of shipping it at all. The
@@ -372,9 +383,6 @@ if [[ -n "${BACKUP_REMOTE:-}" ]] && command -v rclone >/dev/null 2>&1 && [[ -d "
     else
       echo "WARNING: remote WAL prune failed (the copy above still succeeded)." >&2
     fi
-  else
-    echo "WARNING: the WAL archive is empty - no segments have been archived yet." >&2
-    echo "         Point-in-time recovery is not yet possible; check that archive_mode is on." >&2
   fi
   rm -rf "$WAL_TMP"
 else
@@ -428,6 +436,13 @@ if [[ "$ARCHIVER_OK" -ne 0 ]]; then
   echo "ERROR: the WAL archive was not healthy, so this backup cannot be replayed to a" >&2
   echo "       point in time. The dump itself was made and shipped, but the recovery" >&2
   echo "       point objective is still a full day until archiving is fixed." >&2
+  exit 1
+fi
+if [[ "$WAL_SHIP_FAILED" -ne 0 ]]; then
+  echo >&2
+  echo "ERROR: a healthy archive was not shipped off-box, so the off-site copy cannot be" >&2
+  echo "       replayed to a point in time. The dump and the base backup are on the" >&2
+  echo "       remote; the history that moves them forward is not." >&2
   exit 1
 fi
 check_wal_archive "$CONTAINER" "$WAL_ARCHIVE_DIR" "$POSTGRES_USER" "$POSTGRES_DB" 1800 || exit 1
