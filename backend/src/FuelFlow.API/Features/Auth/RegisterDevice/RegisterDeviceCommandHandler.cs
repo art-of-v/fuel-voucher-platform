@@ -1,5 +1,6 @@
 using FuelFlow.API.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
@@ -36,6 +37,35 @@ public sealed class RegisterDeviceCommandHandler
         _logger.LogInformation(
             "Registering device {DeviceId} for user {UserId} keyFingerprint={KF}",
             command.DeviceId, command.UserId, keyFingerprint);
+
+        if (!DeviceSignatureVerifier.TryResolveAlgorithm(
+                command.SignatureAlgorithm,
+                command.PublicKey,
+                out var signatureAlgorithm,
+                out var algorithmError))
+        {
+            _logger.LogWarning(
+                "Refused to enroll device {DeviceId}: {Reason}",
+                command.DeviceId, algorithmError);
+
+            return new RegisterDeviceResponse
+            {
+                Error = algorithmError
+            };
+        }
+
+        var payloadVersion = command.SignaturePayloadVersion ?? DeviceSignatureVerifier.Version1;
+        if (!DeviceSignatureVerifier.IsSupportedVersion(payloadVersion))
+        {
+            _logger.LogWarning(
+                "Refused to enroll device {DeviceId}: unsupported payload version {Version}",
+                command.DeviceId, payloadVersion);
+
+            return new RegisterDeviceResponse
+            {
+                Error = "UnsupportedSignaturePayloadVersion"
+            };
+        }
 
         var existingDevice = await _context.Devices
             .FirstOrDefaultAsync(
@@ -107,6 +137,8 @@ public sealed class RegisterDeviceCommandHandler
             }
 
             existingDevice.PublicKey = command.PublicKey;
+            existingDevice.SignatureAlgorithm = signatureAlgorithm;
+            existingDevice.SignaturePayloadVersion = payloadVersion;
             existingDevice.DeviceModel = command.DeviceModel;
             existingDevice.OsVersion = command.OsVersion;
             existingDevice.AppVersion = command.AppVersion;
@@ -135,6 +167,8 @@ public sealed class RegisterDeviceCommandHandler
             UserId = command.UserId,
             DeviceId = command.DeviceId,
             PublicKey = command.PublicKey,
+            SignatureAlgorithm = signatureAlgorithm,
+            SignaturePayloadVersion = payloadVersion,
             DeviceModel = command.DeviceModel,
             OsVersion = command.OsVersion,
             AppVersion = command.AppVersion,

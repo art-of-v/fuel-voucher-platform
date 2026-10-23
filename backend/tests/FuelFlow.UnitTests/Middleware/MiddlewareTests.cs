@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.Middleware;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
@@ -210,7 +211,7 @@ public sealed class MiddlewareTests : IDisposable
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
             NullLogger<DeviceSignatureMiddleware>.Instance,
-            new Mock<IAsymmetricSignatureVerifier>().Object);
+            CreateVerifier());
         var options = Options.Create(new DeviceAuthOptions { Enabled = false });
         var context = CreateHttpContext();
         context.Request.Path = "/api/purchases";
@@ -233,7 +234,7 @@ public sealed class MiddlewareTests : IDisposable
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
             NullLogger<DeviceSignatureMiddleware>.Instance,
-            new Mock<IAsymmetricSignatureVerifier>().Object);
+            CreateVerifier());
         var options = Options.Create(new DeviceAuthOptions
         {
             Enabled = true,
@@ -261,7 +262,7 @@ public sealed class MiddlewareTests : IDisposable
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
             NullLogger<DeviceSignatureMiddleware>.Instance,
-            new Mock<IAsymmetricSignatureVerifier>().Object);
+            CreateVerifier());
         var options = Options.Create(new DeviceAuthOptions
         {
             Enabled = true,
@@ -304,7 +305,7 @@ public sealed class MiddlewareTests : IDisposable
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
             NullLogger<DeviceSignatureMiddleware>.Instance,
-            new Mock<IAsymmetricSignatureVerifier>().Object);
+            CreateVerifier());
         var options = Options.Create(new DeviceAuthOptions
         {
             Enabled = true,
@@ -340,11 +341,20 @@ public sealed class MiddlewareTests : IDisposable
 
         var nextCalled = false;
         var verifier = new Mock<IAsymmetricSignatureVerifier>();
-        verifier.Setup(v => v.Verify(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns(true);
+        verifier
+            .Setup(v => v.VerifyWith(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyCollection<AsymmetricSignatureAlgorithm>>()))
+            .Returns(new SignatureVerificationResult(
+                [new SignatureAttempt(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256, true, null)],
+                "RSA",
+                null));
         var middleware = new DeviceSignatureMiddleware(
             _ => { nextCalled = true; return Task.CompletedTask; },
             NullLogger<DeviceSignatureMiddleware>.Instance,
-            verifier.Object);
+            new DeviceSignatureVerifier(verifier.Object));
         var options = Options.Create(new DeviceAuthOptions
         {
             Enabled = true,
@@ -386,6 +396,9 @@ public sealed class MiddlewareTests : IDisposable
         });
         await _context.SaveChangesAsync();
     }
+
+    private static DeviceSignatureVerifier CreateVerifier(IAsymmetricSignatureVerifier? inner = null) =>
+        new(inner ?? new Mock<IAsymmetricSignatureVerifier>().Object);
 
     private async Task SeedDeviceAsync(Guid userId, string deviceId, string publicKey)
     {

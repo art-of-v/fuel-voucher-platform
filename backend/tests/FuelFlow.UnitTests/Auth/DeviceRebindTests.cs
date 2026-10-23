@@ -1,8 +1,11 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.Testing;
+using FuelFlow.UnitTests.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -33,7 +36,7 @@ public sealed class DeviceRebindTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = OriginalOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "old-public-key",
+            PublicKey = DeviceTestKeys.RsaSecondary,
             Status = DeviceStatus.Revoked,
             CreatedAt = TestClock.UtcNow.AddDays(-1),
             LastSeenAt = TestClock.UtcNow.AddDays(-1)
@@ -72,6 +75,89 @@ public sealed class DeviceRebindTests : IDisposable
     }
 
     [Fact]
+    public async Task NewDevice_PinsTheAlgorithmInferredFromTheKey_AndVersionOneByDefault()
+    {
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = NewOwner,
+            DeviceId = "device-fresh-1",
+            PublicKey = DeviceTestKeys.RsaPrimary
+        });
+
+        response.Error.Should().BeNull();
+        var stored = await _context.Devices.SingleAsync(d => d.DeviceId == "device-fresh-1");
+        stored.SignatureAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256);
+        stored.SignaturePayloadVersion.Should().Be(DeviceSignatureVerifier.Version1);
+    }
+
+    [Fact]
+    public async Task NewDevice_StoresTheExplicitPinAndPayloadVersion()
+    {
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = NewOwner,
+            DeviceId = "device-fresh-2",
+            PublicKey = DeviceTestKeys.EcPrimary,
+            SignatureAlgorithm = "EcdsaSha256P1363",
+            SignaturePayloadVersion = DeviceSignatureVerifier.Version2
+        });
+
+        response.Error.Should().BeNull();
+        var stored = await _context.Devices.SingleAsync(d => d.DeviceId == "device-fresh-2");
+        stored.SignatureAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.EcdsaSha256P1363);
+        stored.SignaturePayloadVersion.Should().Be(DeviceSignatureVerifier.Version2);
+    }
+
+    [Fact]
+    public async Task AnRsaSchemePinnedToAnEcKey_IsRefusedBeforeAnyRowIsWritten()
+    {
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = NewOwner,
+            DeviceId = "device-fresh-3",
+            PublicKey = DeviceTestKeys.EcPrimary,
+            SignatureAlgorithm = "RsaPkcs1Sha256",
+            SignaturePayloadVersion = DeviceSignatureVerifier.Version2
+        });
+
+        response.Error.Should().Be("SignatureAlgorithmDoesNotMatchKey");
+        (await _context.Devices.AnyAsync(d => d.DeviceId == "device-fresh-3")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AnUnknownPayloadVersion_IsRefused()
+    {
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = NewOwner,
+            DeviceId = "device-fresh-4",
+            PublicKey = DeviceTestKeys.RsaPrimary,
+            SignaturePayloadVersion = 3
+        });
+
+        response.Error.Should().Be("UnsupportedSignaturePayloadVersion");
+        (await _context.Devices.AnyAsync(d => d.DeviceId == "device-fresh-4")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SameUserReRegistration_RepinsTheAlgorithmAndVersion()
+    {
+        var response = await CreateHandler().HandleAsync(new RegisterDeviceCommand
+        {
+            UserId = OriginalOwner,
+            DeviceId = SharedDeviceId,
+            PublicKey = DeviceTestKeys.EcPrimary,
+            SignatureAlgorithm = "EcdsaSha256Der",
+            SignaturePayloadVersion = DeviceSignatureVerifier.Version2
+        });
+
+        response.Error.Should().BeNull();
+        var stored = await _context.Devices.SingleAsync(d => d.DeviceId == SharedDeviceId);
+        stored.SignatureAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.EcdsaSha256Der);
+        stored.SignaturePayloadVersion.Should().Be(DeviceSignatureVerifier.Version2);
+    }
+
+    [Fact]
     public async Task DifferentUser_WithoutNonce_IsRefused()
     {
         SetupNonce(false);
@@ -80,13 +166,13 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = NewOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "new-public-key"
+            PublicKey = DeviceTestKeys.RsaPrimary
         });
 
         response.Error.Should().Be("DeviceAlreadyRegistered");
         var stored = await _context.Devices.SingleAsync(d => d.DeviceId == SharedDeviceId);
         stored.UserId.Should().Be(OriginalOwner);
-        stored.PublicKey.Should().Be("old-public-key");
+        stored.PublicKey.Should().Be(DeviceTestKeys.RsaSecondary);
     }
 
     [Fact]
@@ -98,7 +184,7 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = NewOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "new-public-key",
+            PublicKey = DeviceTestKeys.RsaPrimary,
             RegistrationNonce = "some-otp-nonce"
         });
 
@@ -108,7 +194,7 @@ public sealed class DeviceRebindTests : IDisposable
 
         var stored = await _context.Devices.SingleAsync(d => d.DeviceId == SharedDeviceId);
         stored.UserId.Should().Be(NewOwner);
-        stored.PublicKey.Should().Be("new-public-key");
+        stored.PublicKey.Should().Be(DeviceTestKeys.RsaPrimary);
         stored.Status.Should().Be(DeviceStatus.Active);
     }
 
@@ -122,7 +208,7 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = NewOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "new-public-key",
+            PublicKey = DeviceTestKeys.RsaPrimary,
             RegistrationNonce = "nonce"
         });
 
@@ -135,7 +221,7 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = OriginalOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "attacker-key"
+            PublicKey = DeviceTestKeys.EcPrimary
         });
 
         second.Error.Should().Be("DeviceAlreadyRegistered");
@@ -150,13 +236,13 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = OriginalOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "recreated-biometric-key"
+            PublicKey = DeviceTestKeys.RsaPrimary
         });
 
         response.Error.Should().BeNull();
         var stored = await _context.Devices.SingleAsync(d => d.DeviceId == SharedDeviceId);
         stored.UserId.Should().Be(OriginalOwner);
-        stored.PublicKey.Should().Be("recreated-biometric-key");
+        stored.PublicKey.Should().Be(DeviceTestKeys.RsaPrimary);
         stored.Status.Should().Be(DeviceStatus.Active);
     }
 
@@ -177,7 +263,7 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = NewOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "new-public-key"
+            PublicKey = DeviceTestKeys.RsaPrimary
         });
 
         response.Error.Should().BeNull();
@@ -195,7 +281,7 @@ public sealed class DeviceRebindTests : IDisposable
         {
             UserId = NewOwner,
             DeviceId = SharedDeviceId,
-            PublicKey = "attacker-key"
+            PublicKey = DeviceTestKeys.EcPrimary
         });
 
         response.Error.Should().Be("DeviceAlreadyRegistered");

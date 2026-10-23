@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SecurityService, DeviceSecurityError } from '../../../core/api/securityService';
 import { TokenStorage } from '../../../core/api/tokenStorage';
 import { BASE_URL } from '../../../core/api/apiClient';
+import { buildChallengeSignaturePayload } from '../../../core/api/deviceSignature';
 import { useStore } from '../../../core/state/appStore';
 import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
@@ -230,12 +231,14 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
 
     logs.push('--- STEP: getChallenge ---');
     let challenge = await getChallenge(deviceId, accessToken);
+    // The server reconstructs this exact string from the device id and the challenge.
+    let challengePayload = buildChallengeSignaturePayload(deviceId, challenge);
     logs.push(`challenge=${challenge}`);
 
     logs.push('--- STEP: signPayload ---');
     let signature: string;
     try {
-      signature = await SecurityService.signPayload(challenge);
+      signature = await SecurityService.signPayload(challengePayload);
     } catch (signErr) {
       // A device key minted by an older build under a biometrics-only ACL cannot be unlocked
       // once the customer turns Face ID / Touch ID off, so signing rejects (errSecAuthFailed).
@@ -249,7 +252,8 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
         publicKey = recreated.publicKey;
         await registerDevice(deviceId, publicKey, metadata, accessToken);
         challenge = await getChallenge(deviceId, accessToken);
-        signature = await SecurityService.signPayload(challenge);
+        challengePayload = buildChallengeSignaturePayload(deviceId, challenge);
+        signature = await SecurityService.signPayload(challengePayload);
         logs.push('OK signed after key recreation');
       } else {
         throw signErr;
@@ -264,7 +268,7 @@ export function useLogin(onSuccess: () => void): UseLoginReturn {
         const diagResp = await fetch(`${BASE_URL}/api/auth/device/verify-raw`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ challenge, signature, publicKey }),
+          body: JSON.stringify({ challenge: challengePayload, signature, publicKey }),
         });
         const diagData: any = await diagResp.json();
         logs.push(`verify-raw result: ${JSON.stringify(diagData)}`);

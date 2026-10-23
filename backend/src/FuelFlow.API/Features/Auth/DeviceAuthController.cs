@@ -4,6 +4,7 @@ using FuelFlow.API.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.RegisterDevice;
+using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.Features.Auth.VerifyChallenge;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
@@ -28,6 +29,7 @@ public sealed class DeviceAuthController : ControllerBase
     private readonly GenerateChallengeCommandHandler _generateChallengeHandler;
     private readonly VerifyChallengeCommandHandler _verifyChallengeHandler;
     private readonly LogoutDeviceCommandHandler _logoutDeviceHandler;
+    private readonly DeviceSignatureVerifier _signatureVerifier;
     private readonly AuthOptions _authOptions;
 
     public DeviceAuthController(
@@ -35,12 +37,14 @@ public sealed class DeviceAuthController : ControllerBase
         GenerateChallengeCommandHandler generateChallengeHandler,
         VerifyChallengeCommandHandler verifyChallengeHandler,
         LogoutDeviceCommandHandler logoutDeviceHandler,
+        DeviceSignatureVerifier signatureVerifier,
         IOptions<AuthOptions> authOptions)
     {
         _registerDeviceHandler = registerDeviceHandler;
         _generateChallengeHandler = generateChallengeHandler;
         _verifyChallengeHandler = verifyChallengeHandler;
         _logoutDeviceHandler = logoutDeviceHandler;
+        _signatureVerifier = signatureVerifier;
         _authOptions = authOptions.Value;
     }
 
@@ -68,8 +72,11 @@ public sealed class DeviceAuthController : ControllerBase
 
         var result = await _registerDeviceHandler.HandleAsync(command, cancellationToken);
 
-        if (result.Error is not null)
+        if (result.Error is "DeviceAlreadyRegistered")
             return ApiError.Conflict(result.Error);
+
+        if (result.Error is not null)
+            return ApiError.BadRequest(result.Error);
 
         return Ok(result);
     }
@@ -128,6 +135,11 @@ public sealed class DeviceAuthController : ControllerBase
     /// <c>Auth:DevBypass</c> is set, which <c>SecurityConfigurationValidator</c> refuses in Production
     /// (Program.cs:193-200), so this is unreachable in production regardless of the anonymous
     /// attribute. Anonymous by design: the whole point is to test a key that is not yet registered.
+    /// <para>
+    /// The checking itself is <see cref="DeviceSignatureVerifier.Diagnose"/> - the production
+    /// verifier. This endpoint used to carry its own RSA/ECDSA loops, which meant a key format
+    /// could pass here and fail at login.
+    /// </para>
     /// </remarks>
     [HttpPost("verify-raw")]
     [AllowAnonymous]
@@ -146,26 +158,15 @@ public sealed class DeviceAuthController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.PublicKey))
             return ApiError.BadRequest("PublicKey is required");
 
-        var challengeBytes = Encoding.UTF8.GetBytes(request.Challenge);
-        byte[] signatureBytes;
-        try { signatureBytes = Convert.FromBase64String(request.Signature); }
-        catch { return ApiError.BadRequest("Invalid base64 signature"); }
+        var result = _signatureVerifier.Diagnose(
+            request.Challenge,
+            request.Signature,
+            request.PublicKey);
 
-        // Normalize PEM
         string rawKey = request.PublicKey.Trim();
-        string pemKey;
-        if (rawKey.StartsWith("-----"))
-        {
-            pemKey = rawKey;
-        }
-        else
-        {
-            // Strip any whitespace/newlines from the raw base64 blob
-            var base64Only = new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray());
-            pemKey = $"-----BEGIN PUBLIC KEY-----\n{base64Only}\n-----END PUBLIC KEY-----";
-        }
 
-        // Compute a fingerprint of the key for diagnostics
+        // Compute a fingerprint of the key for diagnostics. This is a SHA-256 of the key bytes,
+        // not a verification step; the key itself stays out of the response.
         byte[] keyBytes;
         try { keyBytes = Convert.FromBase64String(new string(rawKey.Where(c => !char.IsWhiteSpace(c)).ToArray())); }
         catch { keyBytes = []; }
@@ -173,68 +174,39 @@ public sealed class DeviceAuthController : ControllerBase
             ? Convert.ToHexString(SHA256.HashData(keyBytes))[..16]
             : "invalid-base64";
 
-        var diag = new Dictionary<string, object>
+        var diag = new Dictionary<string, object?>
         {
-            ["challengeLen"] = challengeBytes.Length,
-            ["signatureLen"] = signatureBytes.Length,
+            ["challengeLen"] = Encoding.UTF8.GetByteCount(request.Challenge),
             ["keyLen"] = rawKey.Length,
             ["keyFingerprint"] = keyFingerprint,
+            ["keyType"] = result.KeyType ?? "unknown",
+            ["valid"] = result.IsValid,
+            ["method"] = result.MatchedAlgorithm?.ToString() ?? result.Failure ?? "NO-MATCH",
         };
 
-        // --- Try RSA PKCS1 (iOS react-native-biometrics uses RSA-2048 + PKCS1v15 SHA256) ---
-        try
+        try { diag["signatureLen"] = Convert.FromBase64String(request.Signature).Length; }
+        catch { diag["signatureLen"] = 0; }
+
+        foreach (var attempt in result.Attempts)
         {
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(pemKey);
-            diag["keyType"] = "RSA";
-            diag["rsaKeySize"] = rsa.KeySize;
-            bool valid = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-            diag["rsaPkcs1Valid"] = valid;
-            // Also try PSS just in case
-            bool pssValid = false;
-            try { pssValid = rsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss); } catch { }
-            diag["rsaPssValid"] = pssValid;
-            diag["valid"] = valid || pssValid;
-            diag["method"] = valid ? "RSA-PKCS1" : (pssValid ? "RSA-PSS" : "RSA-FAILED");
-            return Ok(diag);
-        }
-        catch (CryptographicException ex)
-        {
-            diag["rsaImportError"] = ex.Message;
+            var name = attempt.Algorithm switch
+            {
+                AsymmetricSignatureAlgorithm.RsaPkcs1Sha256 => "rsaPkcs1",
+                AsymmetricSignatureAlgorithm.RsaPssSha256 => "rsaPss",
+                AsymmetricSignatureAlgorithm.EcdsaSha256Der => "ecdsaDer",
+                AsymmetricSignatureAlgorithm.EcdsaSha256P1363 => "ecdsaIeee",
+                _ => attempt.Algorithm.ToString()
+            };
+
+            diag[$"{name}Valid"] = attempt.IsValid;
+
+            if (!attempt.IsValid && attempt.Error is not null)
+            {
+                diag[$"{name}Error"] = attempt.Error;
+            }
         }
 
-        // --- Try ECDSA (Android or custom key type) ---
-        try
-        {
-            using var ecdsa = ECDsa.Create();
-            ecdsa.ImportFromPem(pemKey);
-            diag["keyType"] = "ECDSA";
-
-            bool derValid = false;
-            bool ieeeValid = false;
-            string? derErr = null, ieeeErr = null;
-
-            try { derValid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence); }
-            catch (CryptographicException e) { derErr = e.Message; }
-
-            try { ieeeValid = ecdsa.VerifyData(challengeBytes, signatureBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation); }
-            catch (CryptographicException e) { ieeeErr = e.Message; }
-
-            diag["ecdsaDerValid"] = derValid;
-            diag["ecdsaIeeeValid"] = ieeeValid;
-            if (derErr != null) diag["ecdsaDerError"] = derErr;
-            if (ieeeErr != null) diag["ecdsaIeeeError"] = ieeeErr;
-            diag["valid"] = derValid || ieeeValid;
-            diag["method"] = derValid ? "ECDSA-DER" : (ieeeValid ? "ECDSA-IEEE" : "ECDSA-FAILED");
-            return Ok(diag);
-        }
-        catch (Exception ex)
-        {
-            diag["ecdsaImportError"] = ex.Message;
-            diag["valid"] = false;
-            diag["method"] = "KEY-IMPORT-FAILED";
-            return Ok(diag);
-        }
+        return Ok(diag);
     }
 
     [HttpPost("logout")]

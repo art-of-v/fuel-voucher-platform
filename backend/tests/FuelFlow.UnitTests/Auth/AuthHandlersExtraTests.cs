@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
+using System.Text;
 using FluentAssertions;
 using FuelFlow.API.Features.Auth.GenerateChallenge;
 using FuelFlow.API.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Brands;
@@ -439,6 +441,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
             _context,
             cacheService ?? new Mock<ICacheService>().Object,
             tokenServiceMock.Object,
+            new DeviceSignatureVerifier(new AsymmetricSignatureVerifier()),
             jwtOptionsMock.Object,
             new Mock<ILogger<VerifyChallengeCommandHandler>>().Object);
     }
@@ -563,5 +566,60 @@ public sealed class AuthHandlersExtraTests : IDisposable
         var response = await act.Should().NotThrowAsync();
         response.Subject.IsValid.Should().BeFalse();
         response.Subject.Error.Should().Be("Invalid signature");
+    }
+
+    [Fact]
+    public async Task VerifyChallenge_PinsALegacyDeviceToTheSchemeThatVerified()
+    {
+        using var rsa = RSA.Create(2048);
+        var device = await SeedActiveDeviceAsync("device-legacy", rsa.ExportSubjectPublicKeyInfoPem());
+        device.SignaturePayloadVersion = DeviceSignatureVerifier.Version2;
+        await _context.SaveChangesAsync();
+
+        var challenge = "challenge-value";
+        var payload = DeviceSignatureVerifier.BuildChallengePayload(device.DeviceId, challenge, 2);
+        var signature = Convert.ToBase64String(
+            rsa.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+
+        var cacheServiceMock = new Mock<ICacheService>();
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync($"challenge:{device.DeviceId}:{challenge}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var response = await BuildVerifyChallengeHandler(cacheServiceMock.Object).HandleAsync(
+            new VerifyChallengeCommand { DeviceId = device.DeviceId, Challenge = challenge, Signature = signature },
+            CancellationToken.None);
+
+        response.IsValid.Should().BeTrue();
+        var stored = await _context.Devices.AsNoTracking()
+            .SingleAsync(d => d.DeviceId == device.DeviceId);
+        stored.SignatureAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256);
+    }
+
+    [Fact]
+    public async Task VerifyChallenge_RefusesASchemeTheDeviceIsNotPinnedTo()
+    {
+        using var rsa = RSA.Create(2048);
+        var device = await SeedActiveDeviceAsync("device-pss", rsa.ExportSubjectPublicKeyInfoPem());
+        device.SignatureAlgorithm = AsymmetricSignatureAlgorithm.RsaPssSha256;
+        device.SignaturePayloadVersion = DeviceSignatureVerifier.Version2;
+        await _context.SaveChangesAsync();
+
+        var challenge = "challenge-value";
+        var payload = DeviceSignatureVerifier.BuildChallengePayload(device.DeviceId, challenge, 2);
+        var signature = Convert.ToBase64String(
+            rsa.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+
+        var cacheServiceMock = new Mock<ICacheService>();
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync($"challenge:{device.DeviceId}:{challenge}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var response = await BuildVerifyChallengeHandler(cacheServiceMock.Object).HandleAsync(
+            new VerifyChallengeCommand { DeviceId = device.DeviceId, Challenge = challenge, Signature = signature },
+            CancellationToken.None);
+
+        response.IsValid.Should().BeFalse();
+        response.Error.Should().Be("Invalid signature");
     }
 }

@@ -1,4 +1,8 @@
 import { apiRequest } from '../../../core/api/apiClient';
+import {
+  DEVICE_SIGNATURE_ALGORITHM,
+  DEVICE_SIGNATURE_PAYLOAD_VERSION,
+} from '../../../core/api/deviceSignature';
 
 export async function registerDevice(
   deviceId: string,
@@ -10,7 +14,14 @@ export async function registerDevice(
   const response = await apiRequest(
     'POST',
     '/api/auth/device/register',
-    { deviceId, publicKey, registrationNonce, ...metadata },
+    {
+      deviceId,
+      publicKey,
+      registrationNonce,
+      signatureAlgorithm: DEVICE_SIGNATURE_ALGORITHM,
+      signaturePayloadVersion: DEVICE_SIGNATURE_PAYLOAD_VERSION,
+      ...metadata,
+    },
     { Authorization: `Bearer ${accessToken}` },
   );
   if (!response.ok) {
