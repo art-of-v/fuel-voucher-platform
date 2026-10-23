@@ -209,8 +209,7 @@ public sealed class ContractCreationIntegrationTests : IClassFixture<TestDatabas
 
     private async Task ResetAsync()
     {
-        using var scope = _fixture.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var context = _fixture.CreateOwnerContext();
         await context.Database.ExecuteSqlRawAsync(
             """
             TRUNCATE TABLE "user_contracts", "contract_versions", "contracts", "brands", "payments",

@@ -224,8 +224,7 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
     /// </summary>
     private async Task<List<Order>> PendingPaymentOrdersAsync()
     {
-        using var scope = _fixture.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var context = _fixture.CreateOwnerContext();
         return await context.Orders
             .IgnoreQueryFilters()
             .Where(o => o.Status == OrderStatus.PendingPayment && o.UserId == _userId)
@@ -233,10 +232,15 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
             .ToListAsync();
     }
 
+    /// <summary>
+    /// The probe looks into the database while the request that owns it is still running. A unit of
+    /// work opened in that moment resolves to the anonymous tenant - the request's own scope is
+    /// not this scope's scope - and the row-level policies would hide every order from it. The
+    /// harness's eye is the owner's, so it sees what is committed.
+    /// </summary>
     private async Task<int> CountPendingPaymentOrdersAsync()
     {
-        using var scope = _fixture.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var context = _fixture.CreateOwnerContext();
         return await context.Orders
             .IgnoreQueryFilters()
             .CountAsync(o => o.Status == OrderStatus.PendingPayment && o.UserId == _userId);

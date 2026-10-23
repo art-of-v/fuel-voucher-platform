@@ -300,8 +300,7 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
 
     private async Task ResetAsync()
     {
-        using var scope = _fixture.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var context = _fixture.CreateOwnerContext();
         await context.Database.ExecuteSqlRawAsync(
             """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
