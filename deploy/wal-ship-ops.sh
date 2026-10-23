@@ -422,14 +422,28 @@ cmd_drill() {
 cmd_verify() {
   section "Verify the off-box chain"
 
-  local problems=0 checked=0 short=0 missing=0 f name local_size remote_size
+  local problems=0 checked=0 short=0 missing=0 unknown=0 f name local_size remote_size
+  # The NAMES are the source of truth for "is it off-box"; the sizes are only needed to
+  # tell a whole object from a half-written one. If the sizes cannot be read, the check
+  # says so and says nothing else - a broken listing must never be reported as a
+  # broken chain.
+  declare -A remote_names=()
+  local object
+  while IFS= read -r object; do
+    [[ -n "$object" ]] || continue
+    remote_names["$object"]=1
+  done < <("$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null || true)
+
   declare -A remote_sizes=()
   while read -r rname rsize; do
     [[ -n "$rname" && -n "$rsize" ]] || continue
     remote_sizes["$rname"]="$rsize"
   done < <(wal_remote_object_sizes "$REMOTE_WAL" || true)
 
-  say "  the off-box objects: ${#remote_sizes[@]}"
+  say "  the off-box objects: ${#remote_names[@]}"
+  if (( ${#remote_sizes[@]} == 0 )); then
+    say "  NOTE: the object sizes could not be read, so only presence is checked." >&2
+  fi
   say "  the on-box segments are compared with them, one by one:"
 
   for f in "$WAL_ARCHIVE_DIR"/0000000*; do
@@ -438,10 +452,15 @@ cmd_verify() {
     wal_object_is_segment "$name" || continue
     local_size="$(wal_segment_size "$f")"
     checked=$((checked + 1))
-    remote_size="${remote_sizes[$name.age]:-}"
-    if [[ -z "$remote_size" ]]; then
+    if [[ -z "${remote_names[$name.age]:-}" ]]; then
       say "    $name  on box ${local_size} bytes  off-box: MISSING"
       missing=$((missing + 1))
+      continue
+    fi
+    remote_size="${remote_sizes[$name.age]:-}"
+    if [[ -z "$remote_size" ]]; then
+      say "    $name  on box ${local_size} bytes  off-box: present (size unknown)"
+      unknown=$((unknown + 1))
       continue
     fi
     if (( remote_size < local_size )); then
@@ -465,7 +484,12 @@ cmd_verify() {
     problems=$((problems + 1))
   fi
   if (( problems == 0 )); then
-    say "  $checked segment(s) checked; every off-box copy is whole."
+    say "  $checked segment(s) checked; every off-box copy is present"
+    if (( unknown > 0 )); then
+      say "  and $unknown of them could not be size-checked (the sizes were not readable)."
+    else
+      say "  and whole."
+    fi
     return 0
   fi
   return 1

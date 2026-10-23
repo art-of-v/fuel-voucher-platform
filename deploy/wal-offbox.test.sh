@@ -60,8 +60,9 @@ case "$cmd" in
       esac
     done
     if [[ "$format" == *s* ]]; then
-      # path and size, the way the real rclone prints them
-      ( cd "$dir" && for f in *; do [[ -f "$f" ]] && printf '%s %s\n' "$f" "$(stat -c %s "$f")"; done )
+      # path and size, the way the real rclone prints them - with rclone's default
+      # separator, which is "; " and not a space
+      ( cd "$dir" && for f in *; do [[ -f "$f" ]] && printf '%s; %s\n' "$f" "$(stat -c %s "$f")"; done )
     else
       ( cd "$dir" && ls -1 )
     fi
@@ -261,10 +262,16 @@ else
 fi
 
 # --- the restore helpers -------------------------------------------------------------
+# The off-box sizes are read with rclone's own separator ("; "), not a space: the first
+# version of this parser split on whitespace only and therefore read NO sizes at all,
+# which made the whole verification say "everything is missing".
 RCLONE="$FAKEBIN/rclone"
 AGE="$FAKEBIN/age"
 # shellcheck source=wal-offbox.sh
 source "$SCRIPT_DIR/wal-offbox.sh"
+assert_eq "the off-box object sizes are read" \
+  "$(wal_remote_object_sizes "$TMP/remote/wal" | awk -v n="$SEG1.age" '$1 == n { print $2; exit }')" \
+  "$SEGMENT_SIZE"
 
 assert_eq "the bucket root gains /wal" "$(wal_remote_wal_dir "$TMP/remote")" "$TMP/remote/wal"
 assert_eq "a wal/ prefix does not gain another" "$(wal_remote_wal_dir "$TMP/remote/wal")" "$TMP/remote/wal"
