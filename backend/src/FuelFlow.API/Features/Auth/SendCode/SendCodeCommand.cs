@@ -1,4 +1,5 @@
 using FuelFlow.Features.Auth.QaTestAccess;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
@@ -6,7 +7,6 @@ using FuelFlow.Features.Brands;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
-using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
@@ -85,7 +85,7 @@ public sealed class SendCodeCommandHandler
             {
                 Id = Guid.CreateVersion7(),
                 PhoneNumber = phoneNumber,
-                Code = _qaTestAccess.CodeHash!, // already a SHA-256 hash of the configured QA code
+                Code = _qaTestAccess.CodeHash!, // already a peppered hash of the configured QA code
                 ExpiresAtUtc = SystemClock.UtcNow.AddMinutes(5),
                 CreatedAtUtc = SystemClock.UtcNow,
                 IsUsed = false
@@ -104,7 +104,7 @@ public sealed class SendCodeCommandHandler
         {
             Id = Guid.CreateVersion7(),
             PhoneNumber = phoneNumber,
-            Code = SecretsHasher.Hash(code),
+            Code = OtpCodeHasher.Hash(code, _authOptions.Value.OtpPepper),
             ExpiresAtUtc = SystemClock.UtcNow.AddMinutes(5), // spec §2: verification codes valid for 5 minutes
             CreatedAtUtc = SystemClock.UtcNow,
             IsUsed = false

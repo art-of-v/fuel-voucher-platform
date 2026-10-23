@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Brands;
@@ -6,10 +7,11 @@ using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
-using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace FuelFlow.UnitTests.Users;
@@ -66,7 +68,7 @@ public sealed class RequestEmailChangeCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
-            Code = SecretsHasher.Hash(code),
+            Code = OtpCodeHasher.Hash(code, AuthOptions.DevelopmentOtpPepper),
             IsUsed = false,
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
             CreatedAtUtc = TestClock.UtcNow
@@ -86,7 +88,7 @@ public sealed class RequestEmailChangeCommandHandlerTests : IDisposable
 
         return new RequestEmailChangeCommandHandler(
             _context,
-            new OtpVerificationService(_context),
+            new OtpVerificationService(_context, Options.Create(new AuthOptions())),
             email.Object,
             new AuditEventService(_context),
             NullLogger<RequestEmailChangeCommandHandler>.Instance);

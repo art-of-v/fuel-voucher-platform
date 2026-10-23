@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
@@ -22,7 +23,8 @@ namespace FuelFlow.UnitTests.Auth;
 /// <summary>
 /// Verification-code lifecycle rules that were exercised live against production but had no
 /// automated coverage: the newest-code-wins selection in VerifyCodeCommandHandler, the
-/// supersession sweep in SendCodeCommandHandler, and the stored-hash format contract. The
+/// supersession sweep in SendCodeCommandHandler, and the stored-hash contract (pinned in
+/// <see cref="OtpCodeHasherTests"/>). The
 /// expired-code, used-code, wrong-attempt-count and max-attempt-burn rules already live in
 /// <see cref="AuthHandlersExtraTests"/>; these fill the gaps around them.
 /// </summary>
@@ -91,6 +93,33 @@ public sealed class CodeLifecycleTests : IDisposable
         newest.UsedAtUtc.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task VerifyCode_ShouldBurnALegacyUnpepperedRow_AndReject()
+    {
+        // A row written before the pepper existed can never verify again. The login path must
+        // refuse it and mark it used, so the searchable digest does not sit live until it expires.
+        const string phone = "+380991110010";
+        _context.VerificationCodes.Add(new VerificationCode
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = phone,
+            Code = SecretsHasher.Hash("111111"),
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = TestClock.UtcNow,
+            IsUsed = false
+        });
+        await _context.SaveChangesAsync();
+
+        var act = () => BuildVerifyHandler()
+            .HandleAsync(new VerifyCodeCommand(phone, "111111"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+
+        var row = await _context.VerificationCodes.SingleAsync(v => v.PhoneNumber == phone);
+        row.IsUsed.Should().BeTrue();
+        row.UsedAtUtc.Should().NotBeNull();
+    }
+
     // --- Supersession at send-time --------------------------------------------------------
 
     [Fact]
@@ -114,20 +143,6 @@ public sealed class CodeLifecycleTests : IDisposable
         rows.Count(v => !v.IsUsed).Should().Be(1, "only the newest code stays active");
         rows[0].IsUsed.Should().BeTrue("the first code is superseded by the second");
         rows[^1].IsUsed.Should().BeFalse();
-    }
-
-    // --- Stored-hash format contract ------------------------------------------------------
-
-    [Fact]
-    public void SecretsHasher_ShouldProduceUppercaseHexSha256()
-    {
-        // Codes are stored as SHA-256 in uppercase hex. Pinned here at the source so a change
-        // to the hashing scheme is caught directly, not only through a handler round-trip.
-        // "111111" -> known SHA-256 (uppercase hex).
-        SecretsHasher.Hash("111111").Should()
-            .Be("BCB15F821479B4D5772BD0CA866C00AD5F926E3580720659CC80D39C9D09802A");
-        SecretsHasher.Hash("111111").Should().MatchRegex("^[0-9A-F]{64}$");
-        SecretsHasher.Hash("abc").Should().Be(SecretsHasher.Hash("abc"), "hashing is deterministic");
     }
 
     // --- Staff-login audit ----------------------------------------------------------------
@@ -182,7 +197,7 @@ public sealed class CodeLifecycleTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
-            Code = SecretsHasher.Hash(plainCode),
+            Code = OtpCodeHasher.Hash(plainCode, AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
             CreatedAtUtc = TestClock.UtcNow.AddMinutes(-createdMinutesAgo),
             IsUsed = false,
@@ -192,7 +207,7 @@ public sealed class CodeLifecycleTests : IDisposable
 
     private async Task<VerificationCode> GetCode(string phone, string plainCode)
     {
-        var hash = SecretsHasher.Hash(plainCode);
+        var hash = OtpCodeHasher.Hash(plainCode, AuthOptions.DevelopmentOtpPepper);
         return await _context.VerificationCodes.SingleAsync(v => v.PhoneNumber == phone && v.Code == hash);
     }
 

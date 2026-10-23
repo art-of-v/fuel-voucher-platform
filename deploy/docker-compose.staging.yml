@@ -84,6 +84,9 @@ services:
       # must not also be a full auth bypass. OTP codes reach the container log (FakeSmsService,
       # since no SMS provider is set below) — read them with `docker logs fuelflow-staging-backend`.
       Auth__DevBypass: "false"
+      # Optional on staging: left unset, the API generates a pepper for that process and codes
+      # stop verifying after a restart. Set OTP_PEPPER in .env.staging to keep them stable.
+      Auth__OtpPepper: ${OTP_PEPPER:-}
       Auth__BootstrapProductOwnerPhone: ${BOOTSTRAP_PRODUCT_OWNER_PHONE:-}
       Auth__QaTestAccessCode: ${AUTH_QA_TEST_ACCESS_CODE:-}
 

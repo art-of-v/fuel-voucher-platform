@@ -1,10 +1,13 @@
 using FluentAssertions;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FuelFlow.UnitTests.Auth;
 
@@ -26,7 +29,7 @@ public sealed class OtpVerificationServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
-        _service = new OtpVerificationService(_context);
+        _service = new OtpVerificationService(_context, Options.Create(new AuthOptions()));
     }
 
     public void Dispose()
@@ -42,7 +45,7 @@ public sealed class OtpVerificationServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
-            Code = SecretsHasher.Hash(code),
+            Code = OtpCodeHasher.Hash(code, AuthOptions.DevelopmentOtpPepper),
             IsUsed = used,
             ExpiresAtUtc = expiresAt ?? TestClock.UtcNow.AddMinutes(5),
             CreatedAtUtc = createdAt ?? TestClock.UtcNow
@@ -122,6 +125,31 @@ public sealed class OtpVerificationServiceTests : IDisposable
         await SeedCodeAsync("123456", used: true);
 
         (await _service.TryConsumeAsync(Phone, "123456", CancellationToken.None)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task TryConsume_WithLegacyUnpepperedHash_ReturnsFalseAndBurnsCode()
+    {
+        // A row written before the pepper existed cannot be verified: its bare SHA-256 is exactly
+        // the searchable digest #682 removed. It is burned on sight so it can neither be replayed
+        // nor be the subject of a pepper-oracle experiment.
+        var legacy = new VerificationCode
+        {
+            Id = Guid.NewGuid(),
+            PhoneNumber = Phone,
+            Code = SecretsHasher.Hash("123456"),
+            IsUsed = false,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = TestClock.UtcNow
+        };
+        _context.VerificationCodes.Add(legacy);
+        await _context.SaveChangesAsync();
+
+        (await _service.TryConsumeAsync(Phone, "123456", CancellationToken.None)).Should().BeFalse();
+
+        var row = await _context.VerificationCodes.FindAsync(legacy.Id);
+        row!.IsUsed.Should().BeTrue();
+        row.UsedAtUtc.Should().NotBeNull();
     }
 
     [Fact]

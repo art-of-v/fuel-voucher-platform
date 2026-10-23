@@ -25,7 +25,7 @@ internal sealed class VerificationCodeConfiguration : IEntityTypeConfiguration<V
             .HasColumnName("code")
             .HasMaxLength(64)
             .IsRequired()
-            .HasComment(                "The code itself, hashed.");
+            .HasComment(                "The code itself, hashed with the server-side OTP pepper (HMAC-SHA256).");
 
         builder.Property(e => e.ExpiresAtUtc)
             .HasColumnName("expires_at_utc")

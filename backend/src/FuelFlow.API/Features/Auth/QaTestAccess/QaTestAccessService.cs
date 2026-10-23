@@ -49,7 +49,7 @@ public sealed class QaTestAccessService
     /// permanently off no matter what the runtime switch says (fail-safe for a missing secret).</summary>
     public bool IsConfigured => _authOptions.Value.IsQaTestAccessConfigured;
 
-    /// <summary>The stored SHA-256 hash of the QA code, or null when unconfigured. Callers store
+    /// <summary>The stored peppered hash of the QA code, or null when unconfigured. Callers store
     /// this directly as a verification-code hash; the plaintext is never held.</summary>
     public string? CodeHash => _authOptions.Value.QaTestAccessCodeHash;
 

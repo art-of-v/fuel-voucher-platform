@@ -4,6 +4,7 @@ using FuelFlow.Features.Auth.DeleteUser;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.RegisterDevice;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
@@ -526,7 +527,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
         var storedCode = await _context.VerificationCodes
             .SingleOrDefaultAsync(v => v.PhoneNumber == "+380991234567");
         storedCode.Should().NotBeNull();
-        storedCode!.Code.Should().Be(SecretsHasher.Hash("000000"));
+        storedCode!.Code.Should().Be(OtpCodeHasher.Hash("000000", AuthOptions.DevelopmentOtpPepper));
         storedCode.IsUsed.Should().BeFalse();
 
         smsServiceMock.Verify(
@@ -563,8 +564,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
         var storedCode = await _context.VerificationCodes
             .SingleAsync(v => v.PhoneNumber == "+380991234567");
-        storedCode.Code.Should().MatchRegex("^[0-9A-F]{64}$");
-        storedCode.Code.Should().NotBe(SecretsHasher.Hash("000000"));
+        storedCode.Code.Should().MatchRegex("^v2:[A-Za-z0-9+/]{43}=$");
+        storedCode.Code.Should().NotBe(OtpCodeHasher.Hash("000000", AuthOptions.DevelopmentOtpPepper));
     }
 
     private static IEmailSender UnconfiguredEmailSender()

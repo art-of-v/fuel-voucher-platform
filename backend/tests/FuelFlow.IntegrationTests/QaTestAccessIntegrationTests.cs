@@ -3,13 +3,13 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Auth.Refresh;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
-using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +30,8 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     IAsyncLifetime
 {
     private const string TestQaCode = "525252"; // distinct from the dev-bypass "000000"
-    private static readonly string TestQaCodeHash = SecretsHasher.Hash(TestQaCode);
+    private static readonly string TestQaCodeHash =
+        OtpCodeHasher.Hash(TestQaCode, AuthOptions.DevelopmentOtpPepper);
     private const string QaPhone = AuthOptions.QaTestAccountPhoneNumber;
 
     /// <summary>Fixed id the seeding migration writes, so cleanup can tell the seeded row from the

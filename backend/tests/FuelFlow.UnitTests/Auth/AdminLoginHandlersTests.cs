@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.AdminLogin;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
@@ -128,7 +129,7 @@ public sealed class AdminLoginHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
-            Code = SecretsHasher.Hash(rawCode),
+            Code = OtpCodeHasher.Hash(rawCode, AuthOptions.DevelopmentOtpPepper),
             ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
             CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false

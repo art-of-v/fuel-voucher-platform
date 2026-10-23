@@ -2,6 +2,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
 using FuelFlow.API.Services;
 using FuelFlow.BackgroundJobs;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Database;
@@ -106,6 +107,7 @@ try
         .AddJwtAuth(builder.Configuration, builder.Environment)
         .AddDefaultAuthorizationPolicy()
         .AddFeatureServices(builder.Configuration)
+        .AddOtpSecurity(builder.Environment)
         .AddCorsPolicy(builder.Configuration)
         .AddForwardedHeadersSupport(builder.Configuration)
         .AddRateLimiting()
@@ -182,6 +184,7 @@ try
     var app = builder.Build();
 
     SecurityConfigurationValidator.Validate(builder.Configuration, builder.Environment);
+    OtpPepperValidator.Validate(builder.Configuration, builder.Environment);
     await app.ValidateDatabaseRoleAsync();
 
     app.UseSwaggerDocs();

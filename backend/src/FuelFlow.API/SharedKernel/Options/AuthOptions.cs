@@ -11,6 +11,28 @@ public sealed class AuthOptions
     public bool DevBypass { get; set; } = false;
 
     /// <summary>
+    /// The pepper a six-digit verification code is hashed with before it reaches the database.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A six-digit code has a million possible values, so a bare SHA-256 digest of it is not a
+    /// secret: anybody who reads the <c>verification_codes</c> table, or a backup of it, can search
+    /// that space in milliseconds. The pepper is the half of the key that never reaches the
+    /// database, so a leaked dump alone cannot test a candidate. It is supplied by the deployment
+    /// (<c>Auth__OtpPepper</c> / <c>OTP_PEPPER</c>) and Production refuses to start without a strong
+    /// one. Staging needs its own; Development falls back to
+    /// <see cref="DevelopmentOtpPepper"/>, which Production refuses.
+    /// </para>
+    /// </remarks>
+    public string OtpPepper { get; set; } = DevelopmentOtpPepper;
+
+    /// <summary>
+    /// The committed fallback pepper for the local development loop and the test suite only. It is
+    /// not a secret - it is in the repository - which is why Production and Staging refuse it.
+    /// </summary>
+    public const string DevelopmentOtpPepper = "fuelflow-development-otp-pepper-not-a-secret";
+
+    /// <summary>
     /// When true, staff-role users receive their sign-in OTP by email over the configured support
     /// SMTP account instead of a paid SMS. Delivery falls back to SMS whenever email is
     /// unconfigured, the account has no email, or the send throws, so a staff member is never
@@ -112,8 +134,8 @@ public sealed class AuthOptions
     /// <summary>
     /// The QA verification code, supplied in plaintext through configuration/secret
     /// (<c>Auth__QaTestAccessCode</c>, wired from the deploy secret store). It is <b>never</b>
-    /// used from here directly: <see cref="FuelFlow.API.Extensions.ServiceSetup"/> hashes it once
-    /// at boot into <see cref="QaTestAccessCodeHash"/> and then clears this property, so the
+    /// used from here directly: <see cref="FuelFlow.Features.Auth.Security.OtpSecuritySetup.AddOtpSecurity"/>
+    /// hashes it once at boot into <see cref="QaTestAccessCodeHash"/> and then clears this property, so the
     /// plaintext does not linger in the bound options for the process lifetime. Absent/blank =
     /// QA access is unconfigured and therefore permanently disabled regardless of the runtime
     /// switch (fail-safe). Treat as a credential: never log it, never return it from an API.
@@ -121,10 +143,11 @@ public sealed class AuthOptions
     public string? QaTestAccessCode { get; set; }
 
     /// <summary>
-    /// SHA-256 hash (hex) of <see cref="QaTestAccessCode"/>, computed once at startup. Compared
-    /// against the hash of the code a QA tester submits, exactly like a stored OTP hash. Null/empty
-    /// when no QA code is configured, which forces QA access off. This is the only representation
-    /// of the QA code retained in memory.
+    /// Peppered HMAC-SHA256 hash of <see cref="QaTestAccessCode"/> (see
+    /// <c>Features/Auth/Security/OtpCodeHasher</c>), computed once at startup with
+    /// <see cref="OtpPepper"/>. Compared in constant time against the hash of the code a QA tester
+    /// submits, exactly like a stored OTP hash. Null/empty when no QA code is configured, which
+    /// forces QA access off. This is the only representation of the QA code retained in memory.
     /// </summary>
     public string? QaTestAccessCodeHash { get; set; }
 

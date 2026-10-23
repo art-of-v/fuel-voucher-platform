@@ -1,5 +1,6 @@
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.Features.Brands;
 using FuelFlow.SharedKernel.Domain;
@@ -146,7 +147,27 @@ public sealed class VerifyCodeCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }
 
-        if (verificationCode.Code != SecretsHasher.Hash(code))
+        // A row written before the pepper existed can never match a submitted code again: the
+        // old digest is an unprefixed SHA-256 of a six-digit value, which is searchable offline.
+        // Burn it rather than counting a guess against it - no answer could ever be right, and
+        // leaving it live would keep the searchable digest in the table. The migration that
+        // introduced the pepper also marks every existing row used; this is the runtime half,
+        // so a row that missed the migration (a restored dump, a manual insert) cannot linger.
+        if (!OtpCodeHasher.IsPeppered(verificationCode.Code))
+        {
+            verificationCode.IsUsed = true;
+            verificationCode.UsedAtUtc = SystemClock.UtcNow;
+            _context.VerificationCodes.Update(verificationCode);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "Refused a verification code stored before the OTP pepper existed for {PhoneNumber}",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+            await LogFailedAdminLoginAsync(phoneNumber, "Invalid or expired verification code", cancellationToken);
+            throw new UnauthorizedAccessException("Invalid or expired verification code");
+        }
+
+        if (!OtpCodeHasher.Verify(verificationCode.Code, code, _authOptions.OtpPepper))
         {
             verificationCode.FailedAttempts++;
             if (verificationCode.FailedAttempts >= MaxFailedAttempts)

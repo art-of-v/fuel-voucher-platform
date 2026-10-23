@@ -114,23 +114,13 @@ internal static class ServiceSetup
         // Registered as a singleton rather than scoped on purpose. EF caches the model per context
         // type, so the value converter captures whatever instance it was handed; a scoped cipher
         // would mean a per-request instance captured into a process-wide model. Singleton also means
-        // one key in memory for the process lifetime, matching how the QA access code is handled
-        // below.
+        // one key in memory for the process lifetime.
         services.Configure<QrCipherOptions>(config.GetSection(QrCipherOptions.SectionName));
         services.AddSingleton<FuelFlow.Features.Vouchers.Security.IQrCipher,
             FuelFlow.Features.Vouchers.Security.QrCipher>();
-        // Runs after the section binding above: hash the plaintext QA code (supplied via the deploy
-        // secret Auth__QaTestAccessCode) once at startup and drop the plaintext, so only the hash
-        // lives in memory for the process lifetime — nothing plaintext is retained or committed. An
-        // absent/blank code leaves the hash null, which forces QA access permanently off (fail-safe).
-        services.Configure<AuthOptions>(options =>
-        {
-            if (!string.IsNullOrWhiteSpace(options.QaTestAccessCode))
-            {
-                options.QaTestAccessCodeHash = SecretsHasher.Hash(options.QaTestAccessCode.Trim());
-                options.QaTestAccessCode = null;
-            }
-        });
+        // The QA access code is hashed with the OTP pepper once at boot and its plaintext dropped,
+        // by AddOtpSecurity (Features/Auth/Security): it is a verification code, so it uses the
+        // same peppered hasher as an OTP row rather than a bare digest.
         services.Configure<AppVersionOptions>(config.GetSection(AppVersionOptions.SectionName));
         services.Configure<UpdatesOptions>(config.GetSection(UpdatesOptions.SectionName));
         services.Configure<ObservabilityOptions>(config.GetSection(ObservabilityOptions.SectionName));

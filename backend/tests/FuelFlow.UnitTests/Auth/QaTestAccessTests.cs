@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.QaTestAccess;
+using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
@@ -32,7 +33,8 @@ public sealed class QaTestAccessTests : IDisposable
     // Deliberately NOT the production code. Tests only need the configured hash and the submitted
     // code to correspond.
     private const string TestQaCode = "424242";
-    private static readonly string TestQaCodeHash = SecretsHasher.Hash(TestQaCode);
+    private static readonly string TestQaCodeHash =
+        OtpCodeHasher.Hash(TestQaCode, AuthOptions.DevelopmentOtpPepper);
     private const string QaPhone = AuthOptions.QaTestAccountPhoneNumber;
 
     private readonly ApplicationDbContext _context;
