@@ -19,7 +19,7 @@
 #   - the application role may NOT rewrite or delete the audit and ledger tables
 #     (voucher_events, payments, provider_event_outbox) - database-privileges.tsv is
 #     the source of truth, and the test reads its intent from there;
-#   - the application role may close an outbox event and nothing else;
+#   - the application role may close an outbox event and may not delete it;
 #   - the maintenance role may purge the retention tables (DELETE) and may NOT insert
 #     or update anywhere - a defect in the traffic role must not be able to erase the
 #     ledger, and the destructive half of the lifecycle must not be able to forge it;
@@ -265,6 +265,7 @@ else
       CREATE TABLE public.payments(id integer PRIMARY KEY, amount numeric);
       CREATE TABLE public.voucher_events(id integer PRIMARY KEY, event_type text);
       CREATE TABLE public.outbox_events(id integer PRIMARY KEY, event_type text, processed boolean NOT NULL DEFAULT false, processed_at_utc timestamptz);
+      CREATE TABLE public.webhook_events(id integer PRIMARY KEY, status text, processed_at_utc timestamptz, processing_started_at_utc timestamptz, error text, attempts integer NOT NULL DEFAULT 1, payload text);
       CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, payload text);
     " 2>&1)"; rc=$?
     check "the migration role may create the stub tables" "0" "$rc"
@@ -325,6 +326,16 @@ else
     out="$(as_app "DELETE FROM public.voucher_events WHERE false" 2>&1)"; rc=$?
     check_denied "the application role may NOT delete a voucher event" "$rc"
 
+    # webhook_events: SI + U(status, processed_at_utc, processing_started_at_utc, error, attempts)
+    # for the app - the recorder writes exactly those columns - and the body exactly as received
+    # is not one of them.
+    out="$(as_app "INSERT INTO public.webhook_events(id, status, payload) VALUES (1, 'Received', '{}')" 2>&1)"; rc=$?
+    check "the application role may store a webhook delivery" "0" "$rc"
+    out="$(as_app "UPDATE public.webhook_events SET status = 'Processed', processed_at_utc = now() WHERE false" 2>&1)"; rc=$?
+    check "the application role may settle a webhook delivery" "0" "$rc"
+    out="$(as_app "UPDATE public.webhook_events SET payload = payload WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite a stored webhook delivery" "$rc"
+
     # provider_event_outbox: SI for the app, SD for the maintenance role.
     out="$(as_app "UPDATE public.provider_event_outbox SET payload = payload WHERE false" 2>&1)"; rc=$?
     check_denied "the application role may NOT rewrite the provider event audit trail" "$rc"
@@ -333,13 +344,15 @@ else
     out="$(as_maint "DELETE FROM public.provider_event_outbox WHERE false" 2>&1)"; rc=$?
     check "the maintenance role may purge the provider event audit trail" "0" "$rc"
 
-    # outbox_events: SI + U(processed, processed_at_utc) for the app; SD for maintenance.
+    # outbox_events: SIU for the app; SD for maintenance. The app's UPDATE covers the whole
+    # row: EF Core's Update(entity) writes every column, so a column-level grant refuses the
+    # dispatcher's own save.
     out="$(as_app "INSERT INTO public.outbox_events(id, event_type) VALUES (1, 'order.created')" 2>&1)"; rc=$?
     check "the application role may append an outbox event" "0" "$rc"
     out="$(as_app "UPDATE public.outbox_events SET processed = true, processed_at_utc = now() WHERE false" 2>&1)"; rc=$?
     check "the application role may close an outbox event" "0" "$rc"
     out="$(as_app "UPDATE public.outbox_events SET event_type = event_type WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite an outbox event" "$rc"
+    check "the application role may update the whole outbox row (EF writes every column)" "0" "$rc"
     out="$(as_app "DELETE FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
     check_denied "the application role may NOT delete an outbox event" "$rc"
     out="$(as_maint "DELETE FROM public.outbox_events WHERE false" 2>&1)"; rc=$?

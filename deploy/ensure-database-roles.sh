@@ -711,16 +711,17 @@ else
 fi
 
 if have_relation public.outbox_events; then
-  if ! psql_as "$APP_ROLE" -c "UPDATE public.outbox_events SET processed = true WHERE false" >/dev/null 2>&1; then
-    die "the application role may not UPDATE outbox_events.processed. The dispatcher closes an event exactly this way - database-privileges.tsv grants U(processed,processed_at_utc)."
-  fi
-  if psql_as "$APP_ROLE" -c "UPDATE public.outbox_events SET event_type = event_type WHERE false" >/dev/null 2>&1; then
-    die "the application role may UPDATE outbox_events columns outside the processed pair. database-privileges.tsv grants exactly U(processed,processed_at_utc)."
+  # EF Core's Update(entity) writes EVERY column of the row: the dispatcher's own save is
+  # "UPDATE outbox_events SET created_at_utc = ..., event_type = ..., payload = ..., processed =
+  # ..., processed_at_utc = ...". A grant on two columns refuses that save, and the outbox stops
+  # closing - so the grant covers the row, and the row stays undeletable for the traffic role.
+  if ! psql_as "$APP_ROLE" -c "UPDATE public.outbox_events SET event_type = event_type WHERE false" >/dev/null 2>&1; then
+    die "the application role may not UPDATE outbox_events. The dispatcher closes an event by updating the whole row - database-privileges.tsv grants SIU."
   fi
   if psql_as "$APP_ROLE" -c "DELETE FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
     die "the application role may DELETE from outbox_events. The purge belongs to the maintenance role."
   fi
-  say "the application role may close an outbox event and nothing more"
+  say "the application role may close an outbox event and may not delete it"
   if ! psql_as "$MAINTENANCE_ROLE" -c "DELETE FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
     die "the maintenance role may not DELETE from outbox_events. The retention purge would delete nothing, night after night."
   fi
@@ -730,6 +731,21 @@ if have_relation public.outbox_events; then
   say "the maintenance role may purge the outbox and may not write it"
 else
   say "outbox_events does not exist yet - the CI test probes this against a stub table"
+fi
+
+if have_relation public.webhook_events; then
+  # The recorder settles a delivery with a tracked read-modify-write and claims one with a
+  # conditional UPDATE - both write only the columns the matrix names, so the grant may be the
+  # narrow one. The body exactly as received is the evidence, and it is not one of them.
+  if ! psql_as "$APP_ROLE" -c "UPDATE public.webhook_events SET status = 'Processed', processed_at_utc = now() WHERE false" >/dev/null 2>&1; then
+    die "the application role may not settle a webhook delivery. The recorder closes a delivery exactly this way - database-privileges.tsv grants U(status,processed_at_utc,processing_started_at_utc,error,attempts)."
+  fi
+  if psql_as "$APP_ROLE" -c "UPDATE public.webhook_events SET payload = payload WHERE false" >/dev/null 2>&1; then
+    die "the application role may UPDATE webhook_events.payload. The body exactly as received is the evidence the delivery is worth - database-privileges.tsv grants the five outcome columns and nothing else."
+  fi
+  say "the application role may settle a webhook delivery and may not rewrite it"
+else
+  say "webhook_events does not exist yet - the CI test probes this against a stub table"
 fi
 
 if have_relation public.provider_event_outbox; then

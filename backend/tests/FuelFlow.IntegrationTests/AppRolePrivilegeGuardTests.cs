@@ -87,24 +87,43 @@ public sealed class AppRolePrivilegeGuardTests : IClassFixture<TestDatabaseFixtu
     }
 
     [Fact]
-    public async Task The_traffic_role_may_close_an_outbox_event_and_nothing_else()
+    public async Task The_traffic_role_may_close_an_outbox_event_and_may_not_delete_it()
     {
         await using var connection = await OpenAsync(_fixture.AppConnectionString);
 
         await AllowedAsync(
             connection,
             "UPDATE public.outbox_events SET processed = true, processed_at_utc = now() WHERE false",
-            "the dispatcher closes an event exactly this way, and the matrix grants those two columns");
+            "the dispatcher closes an event exactly this way");
 
-        await DeniedAsync(
+        await AllowedAsync(
             connection,
             "UPDATE public.outbox_events SET event_type = event_type WHERE false",
-            "the event itself is what happened: rewriting it would rewrite the history");
+            "EF Core's Update(entity) writes every column of the row when the dispatcher closes it, "
+            + "so the matrix grants the update on the table and not on two columns - a column-level "
+            + "grant would refuse the dispatcher's own save");
 
         await DeniedAsync(
             connection,
             "DELETE FROM public.outbox_events WHERE false",
             "the purge belongs to the maintenance role");
+    }
+
+    [Fact]
+    public async Task The_traffic_role_may_settle_a_webhook_delivery_and_may_not_rewrite_it()
+    {
+        await using var connection = await OpenAsync(_fixture.AppConnectionString);
+
+        await AllowedAsync(
+            connection,
+            "UPDATE public.webhook_events SET status = 'Processed', processed_at_utc = now() WHERE false",
+            "the recorder settles a delivery by writing exactly the outcome columns");
+
+        await DeniedAsync(
+            connection,
+            "UPDATE public.webhook_events SET payload = payload WHERE false",
+            "the body exactly as received is the evidence the delivery is worth: a role that may "
+            + "rewrite it may rewrite the evidence");
     }
 
     [Fact]
