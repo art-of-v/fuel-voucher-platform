@@ -335,8 +335,10 @@ cmd_alert_drill() {
   say ""
 
   end_injection() {
+    # The path is spelled out here, not read from a local: an EXIT trap runs after the
+    # function that set the local has returned, and its frame is gone by then.
     systemctl unset-environment ENV_FILE >/dev/null 2>&1 || true
-    rm -f "$fake_env"
+    rm -f "$WAL_SHIP_STATE_DIR/wal-ship-ops-alert-drill.env"
   }
   trap end_injection EXIT
   systemctl set-environment ENV_FILE="$fake_env"
