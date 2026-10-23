@@ -655,6 +655,24 @@ jobs:
       - name: Test the WAL archive prune job
         run: bash deploy/prune-wal-archive.test.sh
 
+      # The continuous off-box copy. The archive used to leave the box once a night as
+      # one tarball, so a host loss lost up to a day even though PostgreSQL had already
+      # archived a segment a minute ago. The test stubs rclone and age and asserts on
+      # the bytes that land in the stub remote: a first run ships everything, a second
+      # ships nothing, a quiet database is not a failure, and an upload failure is a
+      # non-zero exit (the OnFailure alert depends on it).
+      - name: Test the WAL off-box shipping
+        run: bash deploy/wal-offbox.test.sh
+
+      # The drill that proves the point: a real postgres archives a row written AFTER
+      # the base backup, the source is stopped, the archive is shipped with real age and
+      # rclone, and restore-pitr.sh rebuilds the cluster from --base-remote/--wal-remote
+      # only. If the WAL replay is broken, marker 2 is missing and this fails.
+      - name: Install the off-box drill's tools
+        run: sudo apt-get update && sudo apt-get install -y age rclone
+      - name: Drill the host-loss restore from the off-box copy
+        run: bash deploy/drill-wal-offbox.sh
+
       # The check that stops a false claim about the collation from reaching a
       # document. On 2026-10-20 a review of the live database reported that the
       # production cluster was "still on the C collation", and recorded it - and it

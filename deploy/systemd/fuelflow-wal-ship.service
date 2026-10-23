@@ -1,0 +1,47 @@
+# Ships the finished WAL segments off-box (deploy/ship-wal-offbox.sh), as a systemd
+# oneshot. Triggered by fuelflow-wal-ship.timer every minute.
+#
+# WHY THIS IS NOT PART OF THE NIGHTLY BACKUP
+#
+# backup.sh already ships the archive, as one tarball, once a night. That makes the
+# host-loss recovery point a day old even though PostgreSQL has already archived every
+# segment up to a minute ago. The archive is granular; the copy should be too.
+#
+# Type=oneshot: the unit is "active" only while the shipper runs, and a non-zero exit is
+# a failed unit - which is what fires the OnFailure alert. The script exits non-zero when
+# it cannot encrypt or upload a segment, or write the status object. A quiet database
+# with no new segment exits 0 on purpose.
+#
+# Type=oneshot + the timer every minute: a run that takes longer than a minute does not
+# overlap the next one. The script also takes a non-blocking flock, so a slow upload and
+# a timer tick cannot ship the same segment twice.
+[Unit]
+Description=FuelFlow WAL off-box shipping
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
+# The upload needs the network. Wants= rather than Requires=: a failed network-online
+# target must not stop the unit from running and reporting a real rclone error.
+After=network-online.target
+Wants=network-online.target
+
+# On failure, start the alert unit. %n is this unit's name, passed as the instance so
+# the alert message can name what failed.
+OnFailure=fuelflow-wal-ship-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+ExecStart=/root/FuelFlow/deploy/ship-wal-offbox.sh
+# Lower priority than the live app: shipping a 16 MiB segment must never be why a
+# customer request is slow.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+# A stuck upload must not hold the next tick forever. The next run retries whatever is
+# still missing; the unit's failure sends the alert.
+TimeoutStartSec=600
+# Log lines land in the journal tagged with this identifier:
+# `journalctl -t fuelflow-wal-ship`.
+SyslogIdentifier=fuelflow-wal-ship
+
+# No [Install] section on purpose: this service is started BY the timer, never
+# enabled on its own. The timer is the thing that gets enabled.

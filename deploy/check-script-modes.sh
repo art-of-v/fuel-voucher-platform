@@ -30,9 +30,9 @@
 #   - a script with a shebang that is RUN gets mode 755;
 #   - a script that is SOURCED gets mode 644, and is listed in SOURCED below.
 #
-# The sourced ones are the exception and the reason the list exists: `load-env.sh` and
-# `pitr-common.sh` define functions for other scripts to pull in, and nothing runs
-# them.
+# The sourced ones are the exception and the reason the list exists: `load-env.sh`,
+# `pitr-common.sh` and `wal-offbox.sh` define functions for other scripts to pull in,
+# and nothing runs them.
 #
 # Exit 0 = every mode is right. Exit 1 = at least one is wrong, and it says which.
 # ------------------------------------------------------------------------------
@@ -45,6 +45,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCED=(
   load-env.sh
   pitr-common.sh
+  wal-offbox.sh
 )
 
 is_sourced() {

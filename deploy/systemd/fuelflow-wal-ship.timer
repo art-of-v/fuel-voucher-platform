@@ -1,0 +1,35 @@
+# Fires fuelflow-wal-ship.service every minute.
+#
+# WHY EVERY MINUTE
+#
+# The host-loss recovery point is the age of the newest segment that is BOTH archived and
+# off-box. The archive timeout is 15 minutes, so a segment can be up to 15 minutes old
+# before PostgreSQL finishes it; the shipping interval is then added on top. A one-minute
+# interval keeps that addition at about a minute, so the designed worst case is about
+# 16 minutes. The 15-minute gate is the shipment half (archived -> off-box); the
+# archive_timeout half is a compose setting and is not changed here.
+#
+# The upload is a listing plus one small object per new segment (~16 MiB), so a minute is
+# not a load problem. The script writes the status object every run, which also makes the
+# status a liveness heartbeat.
+#
+# Persistent=true: if the box was off (or the timer was stopped) while segments were
+# archived, the first run after it comes back ships the backlog instead of waiting for
+# the next segment.
+[Unit]
+Description=FuelFlow WAL off-box shipping (every minute)
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*:0/1
+# Without this, systemd's default one-minute accuracy makes a one-minute timer fire at
+# an unpredictable point in the minute. Ten seconds keeps the interval honest.
+AccuracySec=10s
+# Smear the start by up to 10 seconds so the tick never lands at the exact instant of
+# another job.
+RandomizedDelaySec=10
+Persistent=true
+Unit=fuelflow-wal-ship.service
+
+[Install]
+WantedBy=timers.target

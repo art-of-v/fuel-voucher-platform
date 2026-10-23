@@ -25,12 +25,24 @@
 #   restore-pitr.sh --base <file.tar.gz> --wal-dir <dir> [--target-time "YYYY-MM-DD HH:MM:SS"]
 #                   [--name <container>] [--port <port>] [--keep]
 #
+#   restore-pitr.sh --base-remote <rclone:bucket> --wal-remote <rclone:bucket[/wal]>
+#                   [--target-time "YYYY-MM-DD HH:MM:SS"]
+#                   [--name <container>] [--port <port>] [--keep]
+#
 #   --base        a base backup. Either the .tar.gz from pg_basebackup, or the .tar.gz.age
 #                 from backup.sh - the encrypted one is decrypted first, with the age key.
 #   --wal-dir     a directory of WAL segments (the archive, or the unpacked off-box copy).
+#   --base-remote the off-box directory that holds fuelflow_base_*.tar.age. The newest one
+#                 is fetched with rclone. That is the host-loss restore: nothing on the
+#                 dead box is needed.
+#   --wal-remote  the off-box wal/ prefix (or the bucket root - /wal is appended if it is
+#                 missing). Every <segment>.age object is downloaded and decrypted.
 #   --target-time the moment to restore to. Without it, recovery replays as far as the
 #                 archive goes, which is "the last thing that happened" - rarely what
 #                 anybody wants, so think before omitting it.
+#
+# --base/--base-remote and --wal-dir/--wal-remote are pairs: give exactly one of each.
+# The off-box pair needs rclone, age, and the private key.
 #
 # The age key is read from AGE_KEY_FILE, or from ~/.config/age/keys.txt. The server does
 # not have it - the key lives on a laptop, in a password manager - so a restore usually
@@ -39,8 +51,16 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RCLONE="${RCLONE_BIN:-rclone}"
+AGE="${AGE_BIN:-age}"
+# shellcheck source=wal-offbox.sh
+source "$SCRIPT_DIR/wal-offbox.sh"
+
 BASE=""
+BASE_REMOTE=""
 WAL_DIR=""
+WAL_REMOTE=""
 TARGET_TIME=""
 NAME="fuelflow-pitr"
 PORT="55499"
@@ -51,14 +71,18 @@ PG_DB="${PG_DB:-fuelflow}"
 ENV_FILE="${ENV_FILE:-}"
 
 usage() {
-  sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+  # Print the header down to `set -euo pipefail`, without depending on a line number:
+  # adding a flag must not silently truncate the help text.
+  sed -n '2,/^set -euo pipefail$/{/^set -euo pipefail$/d;p}' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base)        BASE="$2"; shift 2 ;;
+    --base-remote) BASE_REMOTE="$2"; shift 2 ;;
     --wal-dir)     WAL_DIR="$2"; shift 2 ;;
+    --wal-remote)  WAL_REMOTE="$2"; shift 2 ;;
     --target-time) TARGET_TIME="$2"; shift 2 ;;
     --name)        NAME="$2"; shift 2 ;;
     --port)        PORT="$2"; shift 2 ;;
@@ -79,7 +103,6 @@ done
 # The restore usually happens somewhere ELSE - on the laptop that holds the age key - so
 # the .env may not be there at all. In that case the flags are the way to say it.
 if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   # shellcheck source=load-env.sh
   source "$SCRIPT_DIR/load-env.sh"
   load_env "$ENV_FILE"
@@ -87,22 +110,46 @@ if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
   PG_DB="${POSTGRES_DB:-$PG_DB}"
 fi
 
-[[ -n "$BASE"   ]] || { echo "ERROR: --base is required." >&2; exit 1; }
-[[ -n "$WAL_DIR" ]] || { echo "ERROR: --wal-dir is required." >&2; exit 1; }
-[[ -f "$BASE" ]]  || { echo "ERROR: base backup not found: $BASE" >&2; exit 1; }
-[[ -d "$WAL_DIR" ]] || { echo "ERROR: WAL directory not found: $WAL_DIR" >&2; exit 1; }
+if [[ -n "$BASE" && -n "$BASE_REMOTE" ]]; then
+  echo "ERROR: give --base or --base-remote, not both." >&2; exit 1
+fi
+if [[ -n "$WAL_DIR" && -n "$WAL_REMOTE" ]]; then
+  echo "ERROR: give --wal-dir or --wal-remote, not both." >&2; exit 1
+fi
+[[ -n "$BASE" || -n "$BASE_REMOTE" ]] || { echo "ERROR: --base or --base-remote is required." >&2; exit 1; }
+[[ -n "$WAL_DIR" || -n "$WAL_REMOTE" ]] || { echo "ERROR: --wal-dir or --wal-remote is required." >&2; exit 1; }
+[[ -z "$BASE" || -f "$BASE" ]] || { echo "ERROR: base backup not found: $BASE" >&2; exit 1; }
+[[ -z "$WAL_DIR" || -d "$WAL_DIR" ]] || { echo "ERROR: WAL directory not found: $WAL_DIR" >&2; exit 1; }
 
-# The key is only needed for an encrypted base backup.
-if [[ "$BASE" == *.age ]]; then
+if [[ -n "$BASE_REMOTE" || -n "$WAL_REMOTE" ]]; then
+  command -v "$RCLONE" >/dev/null 2>&1 || {
+    echo "ERROR: --base-remote/--wal-remote need rclone, and it is not installed." >&2; exit 1; }
+fi
+if [[ -n "$WAL_REMOTE" ]]; then
+  WAL_REMOTE="$(wal_remote_wal_dir "$WAL_REMOTE")"
+fi
+
+# The key is needed for an encrypted base backup AND for the per-segment off-box WAL.
+NEEDS_AGE=0
+[[ -n "$BASE_REMOTE" ]] && NEEDS_AGE=1
+[[ -n "$WAL_REMOTE" ]] && NEEDS_AGE=1
+if [[ -n "$BASE" && "$BASE" == *.age ]]; then NEEDS_AGE=1; fi
+
+AGE_KEY_PATH=""
+AGE_ARGS=()
+if [[ "$NEEDS_AGE" -eq 1 ]]; then
+  command -v "$AGE" >/dev/null 2>&1 || {
+    echo "ERROR: this restore needs age, and it is not installed." >&2; exit 1; }
   if [[ -n "${AGE_KEY_FILE:-}" ]]; then
-    AGE_ARGS=(-i "$AGE_KEY_FILE")
+    AGE_KEY_PATH="$AGE_KEY_FILE"
   elif [[ -f "$HOME/.config/age/keys.txt" ]]; then
-    AGE_ARGS=(-i "$HOME/.config/age/keys.txt")
+    AGE_KEY_PATH="$HOME/.config/age/keys.txt"
   else
-    echo "ERROR: the base backup is encrypted and no age key was found." >&2
+    echo "ERROR: this restore uses encrypted data and no age key was found." >&2
     echo "       Set AGE_KEY_FILE to the private key, or put it in ~/.config/age/keys.txt." >&2
     exit 1
   fi
+  AGE_ARGS=(-i "$AGE_KEY_PATH")
 fi
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/pitr.XXXXXX")"
@@ -125,6 +172,28 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# The off-box path is the one that survives losing the host: the base backup and the WAL
+# are both fetched here, and nothing on the dead box is read. The fetches land in WORK,
+# so the cleanup above removes them with everything else.
+if [[ -n "$BASE_REMOTE" ]]; then
+  echo "[$(date -Is)] Fetching the newest base backup from $BASE_REMOTE ..."
+  BASE="$WORK/base-fetched.tar.age"
+  BASE_NAME="$(wal_fetch_base "$BASE_REMOTE" "$BASE")" || exit 1
+  echo "         fetched $BASE_NAME"
+fi
+if [[ -n "$WAL_REMOTE" ]]; then
+  echo "[$(date -Is)] Fetching and decrypting the WAL archive from $WAL_REMOTE ..."
+  WAL_DIR="$WORK/wal-offbox"
+  mkdir -p "$WAL_DIR"
+  WAL_COUNT="$(wal_fetch_offbox "$WAL_REMOTE" "$WAL_DIR" "$AGE_KEY_PATH")" || exit 1
+  if (( WAL_COUNT == 0 )); then
+    echo "ERROR: $WAL_REMOTE holds no decryptable WAL segments." >&2
+    echo "       The base backup alone is a snapshot, not a point-in-time restore." >&2
+    exit 1
+  fi
+  echo "         decrypted $WAL_COUNT segment(s)"
+fi
+
 echo "[$(date -Is)] Restoring to a point in time"
 echo "  base backup : $BASE"
 echo "  WAL archive : $WAL_DIR ($(find "$WAL_DIR" -maxdepth 1 -name '0000000*' -type f | wc -l) segments)"
@@ -133,7 +202,7 @@ echo "  target time : ${TARGET_TIME:-<end of archive>}"
 # --- Unpack the base backup ---------------------------------------------------------
 BASE_TAR="$WORK/base.tar"
 if [[ "$BASE" == *.age ]]; then
-  age -d "${AGE_ARGS[@]}" "$BASE" > "$BASE_TAR"
+  "$AGE" -d "${AGE_ARGS[@]}" "$BASE" > "$BASE_TAR"
 else
   cp "$BASE" "$BASE_TAR"
 fi
@@ -270,9 +339,6 @@ echo "[$(date -Is)] Recovery finished."
 [[ -n "$REACHED" ]] && echo "  $REACHED"
 if [[ -n "$TARGET_TIME" ]]; then
   echo "  requested target: $TARGET_TIME"
-  # Compare the two. The recovered time is a few milliseconds off the requested one in
-  # normal operation - recovery stops at the first commit AFTER the target - so this is
-  # a check that the recovered time is not BEFORE the target, not an equality test.
 # Compare the two moments. The recovered time is a few milliseconds off the requested one
 # in normal operation - recovery stops at the first commit AFTER the target - so this is
 # a check that the recovered time is not BEFORE the target, not an equality test.
