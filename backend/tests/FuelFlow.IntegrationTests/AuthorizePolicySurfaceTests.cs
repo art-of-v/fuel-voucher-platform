@@ -149,8 +149,8 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
 
         // ---- the voucher stock -------------------------------------------------------
         ["POST /api/admin/redemptions/statement"] = AuthPolicies.VoucherWrite,
-        ["POST /api/admin/redemptions/statement/{rowId}/dismiss"] = AuthPolicies.VoucherWrite,
-        ["POST /api/admin/redemptions/{voucherId}/decision"] = AuthPolicies.VoucherWrite,
+        ["POST /api/admin/redemptions/statement/{rowid:guid}/dismiss"] = AuthPolicies.VoucherWrite,
+        ["POST /api/admin/redemptions/{voucherid:guid}/decision"] = AuthPolicies.VoucherWrite,
         ["POST /api/admin/voucher-exchange/confirm"] = AuthPolicies.VoucherWrite,
         ["POST /api/admin/voucher-imports/{id:guid}/bulk-action"] = AuthPolicies.VoucherWrite,
         ["POST /api/admin/voucher-imports/{id:guid}/parse-invoice"] = AuthPolicies.VoucherWrite,
