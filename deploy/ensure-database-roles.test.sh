@@ -213,6 +213,34 @@ else
       echo "  FAIL  the maintenance role's password is not in the env file"; fail=$((fail + 1))
     fi
 
+    # --- the set comparison is not at the mercy of the box's locale --------------
+    # The production deploy failed on 2026-10-23 with "comm: file 2 is not in sorted
+    # order": the two lists were sorted under LC_ALL=C, and comm read them under the
+    # box's en_US locale. C.UTF-8 is always available and is not C. The shim simulates
+    # the failure: unless comm is pinned to C, it reports a relation that is not in the
+    # matrix, so the script's own completeness guard stops the run. The marker proves
+    # the shim, not the host's comm, produced the result.
+    COMM_MARKER="$(mktemp)"
+    comm() {
+      printf '%s' "${LC_ALL:-}" > "$COMM_MARKER"
+      if [[ "${LC_ALL:-}" != "C" ]]; then
+        printf '%s\n' "public.__locale_probe"
+        return 0
+      fi
+      command comm "$@"
+    }
+    export -f comm
+    out="$(COMM_MARKER="$COMM_MARKER" LC_ALL=C.UTF-8 bash "$SCRIPT" 2>&1)"; rc=$?
+    unset -f comm
+    check "the role check forces the C locale for comm" "0" "$rc"
+    check "the shim intercepted comm under the C locale" "C" "$(cat "$COMM_MARKER" 2>/dev/null)"
+    rm -f "$COMM_MARKER"
+    if [[ "$rc" -ne 0 ]]; then
+      echo "--- the script said ---"
+      echo "$out"
+      echo "----------------------"
+    fi
+
     app_password="$(grep '^POSTGRES_APP_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
     maint_password="$(grep '^POSTGRES_MAINTENANCE_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
 
