@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------------------------
 # Tests deploy/ensure-database-roles.sh - the script that gives the production
-# database its three roles.
+# database its four roles and applies the privilege matrix.
 #
 # WHY THIS EXISTS
 #
@@ -15,12 +15,22 @@
 # A script that SAYS it created the roles proves nothing - it printed what it intended
 # to do. So this test asks the database, as each role, what that role may do:
 #
-#   - the application role may read and write the application's own tables;
-#   - the application role may NOT create a table, alter a table, create a role, or
-#     create a database;
+#   - the application role may read and write the application's mutable tables;
+#   - the application role may NOT rewrite or delete the audit and ledger tables
+#     (voucher_events, payments, provider_event_outbox) - database-privileges.tsv is
+#     the source of truth, and the test reads its intent from there;
+#   - the application role may close an outbox event and nothing else;
+#   - the maintenance role may purge the retention tables (DELETE) and may NOT insert
+#     or update anywhere - a defect in the traffic role must not be able to erase the
+#     ledger, and the destructive half of the lifecycle must not be able to forge it;
+#   - the application role may NOT create a table, alter a table, drop a table, create
+#     a role, or create a database;
 #   - the migration role may change the schema;
 #   - the read-only role may read and may not write;
-#   - none of the three is a superuser;
+#   - none of the four is a superuser;
+#   - a public table missing from the matrix stops the deploy instead of being left
+#     with whatever the defaults happened to give it;
+#   - a privilege granted by hand is revoked on the next run;
 #   - the script runs twice in a row without changing anything.
 #
 # It also pins the two PostgreSQL facts the design leans on, because both were checked
@@ -40,6 +50,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="$SCRIPT_DIR/ensure-database-roles.sh"
+MATRIX="$SCRIPT_DIR/database-privileges.tsv"
 
 pass=0
 fail=0
@@ -60,12 +71,25 @@ check_contains() {
     echo "  FAIL  $what (output did not contain '$needle')"; fail=$((fail + 1))
   fi
 }
+check_denied() {
+  local what="$1" out rc="$2"
+  if [[ "$rc" -ne 0 ]]; then
+    echo "  PASS  $what"; pass=$((pass + 1))
+  else
+    echo "  FAIL  $what"; fail=$((fail + 1))
+  fi
+}
 
-echo "=== the script exists, is executable, and parses ==="
+echo "=== the script and the matrix exist, are executable/readable, and parse ==="
 if [[ -x "$SCRIPT" ]]; then
   echo "  PASS  ensure-database-roles.sh is executable"; pass=$((pass + 1))
 else
   echo "  FAIL  ensure-database-roles.sh is not executable"; fail=$((fail + 1))
+fi
+if [[ -r "$MATRIX" ]]; then
+  echo "  PASS  database-privileges.tsv is there"; pass=$((pass + 1))
+else
+  echo "  FAIL  database-privileges.tsv is missing - the script has no source of truth"; fail=$((fail + 1))
 fi
 if bash -n "$SCRIPT" 2>/dev/null; then
   echo "  PASS  ensure-database-roles.sh parses"; pass=$((pass + 1))
@@ -88,7 +112,7 @@ fi
 check_contains "it says which container it wanted" "fuelflow-no-such-container" "$out"
 
 echo "=== the passwords-only mode writes the passwords and touches no database ==="
-# The PRODUCTION compose file names the two role passwords, and the staging deploy's
+# The PRODUCTION compose file names the role passwords, and the staging deploy's
 # preflight resolves that file against the production .env - so the passwords have to be
 # in that file before the staging deploy runs. This mode does it without the database,
 # so a staging deploy does not depend on the production database being up.
@@ -107,6 +131,11 @@ if grep -q '^POSTGRES_MIGRATOR_PASSWORD=.' "$PASSWORDS_ENV"; then
   echo "  PASS  it wrote the migration role's password into the env file"; pass=$((pass + 1))
 else
   echo "  FAIL  it did not write the migration role's password into the env file"; fail=$((fail + 1))
+fi
+if grep -q '^POSTGRES_MAINTENANCE_PASSWORD=.' "$PASSWORDS_ENV"; then
+  echo "  PASS  it wrote the maintenance role's password into the env file"; pass=$((pass + 1))
+else
+  echo "  FAIL  it did not write the maintenance role's password into the env file"; fail=$((fail + 1))
 fi
 rm -f "$PASSWORDS_ENV"
 
@@ -140,16 +169,17 @@ else
     fail=$((fail + 1))
   else
     # The environment drives the script: the env file is EMPTY, so the script has to
-    # generate the two passwords the application needs and write them there. That is the
-    # path the deploy takes on a box whose .env predates this change, and it is the path
-    # that would otherwise stop the deploy at the preflight.
+    # generate the three passwords the application needs and write them there. That is
+    # the path the deploy takes on a box whose .env predates this change, and it is the
+    # path that would otherwise stop the deploy at the preflight.
     export POSTGRES_USER=postgres
     export POSTGRES_DB=fuelflow
     export POSTGRES_CONTAINER="$CONTAINER_NAME"
     export FUELFLOW_ENV_FILE="$ENV_FILE"
 
+    # --- the first run: a fresh cluster, no tables at all -----------------------
     out="$(bash "$SCRIPT" 2>&1)"; rc=$?
-    check "the script exits 0 on a healthy cluster" "0" "$rc"
+    check "the script exits 0 on a fresh cluster" "0" "$rc"
     if [[ "$rc" -ne 0 ]]; then
       echo "--- the script said ---"
       echo "$out"
@@ -169,8 +199,34 @@ else
     else
       echo "  FAIL  the migration role's password is not in the env file"; fail=$((fail + 1))
     fi
+    if grep -q '^POSTGRES_MAINTENANCE_PASSWORD=' "$ENV_FILE"; then
+      echo "  PASS  the maintenance role's password was written to the env file"; pass=$((pass + 1))
+    else
+      echo "  FAIL  the maintenance role's password is not in the env file"; fail=$((fail + 1))
+    fi
 
     app_password="$(grep '^POSTGRES_APP_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
+    maint_password="$(grep '^POSTGRES_MAINTENANCE_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
+
+    as_super() {
+      docker exec -i "$CONTAINER_NAME" psql -U postgres -d fuelflow \
+        -v ON_ERROR_STOP=1 -X -q -c "$1" 2>&1
+    }
+    as_migrator() {
+      docker exec -i "$CONTAINER_NAME" psql -U fuelflow_migrator -d fuelflow \
+        -v ON_ERROR_STOP=1 -X -q -c "$1" 2>&1
+    }
+    # A password is handed over on stdin and through a .pgpass file, never in argv -
+    # a secret in the process list is a secret in everybody's `ps`.
+    as_role() {
+      local role="$1" password="$2" sql="$3"
+      printf '%s' "127.0.0.1:5432:fuelflow:$role:$password" \
+        | docker exec -i "$CONTAINER_NAME" sh -c \
+            'cat > /tmp/.pgpass; chmod 600 /tmp/.pgpass; PGPASSFILE=/tmp/.pgpass psql -h 127.0.0.1 -U "$0" -d fuelflow -v ON_ERROR_STOP=1 -X -q -c "$1"; rc=$?; rm -f /tmp/.pgpass; exit $rc' \
+            "$role" "$sql" 2>&1
+    }
+    as_app() { as_role fuelflow_app "$app_password" "$1"; }
+    as_maint() { as_role fuelflow_maintenance "$maint_password" "$1"; }
 
     # The roles, as the catalogue reports them.
     roles="$(docker exec "$CONTAINER_NAME" psql -U postgres -d fuelflow -t -A -F' ' -c "
@@ -178,64 +234,134 @@ else
         FROM pg_roles WHERE rolname LIKE 'fuelflow%' ORDER BY rolname")"
     check_contains "the application role exists" "fuelflow_app" "$roles"
     check_contains "the migration role exists" "fuelflow_migrator" "$roles"
+    check_contains "the maintenance role exists" "fuelflow_maintenance" "$roles"
 
     supers="$(echo "$roles" | grep -c ' t ' || true)"
     if [[ "$supers" == "0" ]]; then
-      echo "  PASS  none of the three roles is a superuser"; pass=$((pass + 1))
+      echo "  PASS  none of the roles is a superuser"; pass=$((pass + 1))
     else
       echo "  FAIL  one of the roles is a superuser: $roles"; fail=$((fail + 1))
     fi
 
-    # The application's password works over TCP, which is how the container connects.
-    # The password is handed over on stdin and through a .pgpass file, never in argv -
-    # a secret in the process list is a secret in everybody's `ps`.
-    as_app() {
-      printf '%s' "127.0.0.1:5432:fuelflow:fuelflow_app:$app_password" \
-        | docker exec -i "$CONTAINER_NAME" sh -c \
-            'cat > /tmp/.pgpass; PGPASSFILE=/tmp/.pgpass psql -h 127.0.0.1 -U fuelflow_app -d fuelflow -v ON_ERROR_STOP=1 -X -q -c "$1"; rc=$?; rm -f /tmp/.pgpass; exit $rc' \
-            sh "$1" 2>&1
-    }
-    as_migrator() {
-      docker exec -i "$CONTAINER_NAME" psql -U fuelflow_migrator -d fuelflow \
-        -v ON_ERROR_STOP=1 -X -q -c "$1" 2>&1
-    }
-
     out="$(as_app "SELECT 1" 2>&1)"; rc=$?
     check "the application role can log in with its password" "0" "$rc"
+    out="$(as_maint "SELECT 1" 2>&1)"; rc=$?
+    check "the maintenance role can log in with its password" "0" "$rc"
 
-    # The application's own work.
-    out="$(as_migrator "CREATE TABLE public.role_probe(id integer PRIMARY KEY, note text)" 2>&1)"; rc=$?
-    check "the migration role may create a table" "0" "$rc"
+    # --- the schema arrives, as the migrator -------------------------------------
+    # Stub tables carry the same names the matrix classifies, so the matrix is applied
+    # to real relations: the eight-column identity-column detail does not matter here,
+    # the privileges do. brands is the mutable control case.
+    out="$(as_migrator "
+      CREATE TABLE public.brands(id integer PRIMARY KEY, name text);
+      CREATE TABLE public.payments(id integer PRIMARY KEY, amount numeric);
+      CREATE TABLE public.voucher_events(id integer PRIMARY KEY, event_type text);
+      CREATE TABLE public.outbox_events(id integer PRIMARY KEY, event_type text, processed boolean NOT NULL DEFAULT false, processed_at_utc timestamptz);
+      CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, payload text);
+    " 2>&1)"; rc=$?
+    check "the migration role may create the stub tables" "0" "$rc"
 
-    out="$(as_app "INSERT INTO public.role_probe(id, note) VALUES (1, 'x'); SELECT count(*) FROM public.role_probe; DELETE FROM public.role_probe;" 2>&1)"; rc=$?
-    check "the application role may read and write the application's tables" "0" "$rc"
+    # Default privileges: the app can write a table the migrator just created, before
+    # the matrix has a row for it. That is what keeps a migration's table usable in the
+    # window between the migration and the matrix update.
+    out="$(as_app "INSERT INTO public.brands(id, name) VALUES (1, 'default-privilege probe')" 2>&1)"; rc=$?
+    check "the application role may write a table the migration created" "0" "$rc"
 
-    # The things it must not do.
-    out="$(as_app "CREATE TABLE public.role_probe_two(id integer)" 2>&1)"; rc=$?
+    # --- the completeness check --------------------------------------------------
+    out="$(as_super "CREATE TABLE public.unlisted_probe(id integer)" 2>&1)"; rc=$?
+    check "the superuser may create an unlisted table (the probe setup)" "0" "$rc"
+    out="$(bash "$SCRIPT" 2>&1)"; rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+      echo "  PASS  an unlisted public table stops the deploy"; pass=$((pass + 1))
+    else
+      echo "  FAIL  the script ignored a public table that is not in the matrix"; fail=$((fail + 1))
+    fi
+    check_contains "it names the unlisted table" "unlisted_probe" "$out"
+    out="$(as_super "DROP TABLE public.unlisted_probe" 2>&1)"; rc=$?
+    check "the unlisted probe table is dropped again" "0" "$rc"
+
+    # --- the second run applies the matrix ---------------------------------------
+    out="$(bash "$SCRIPT" 2>&1)"; rc=$?
+    check "the script exits 0 when the matrix has tables to apply" "0" "$rc"
+    if [[ "$rc" -ne 0 ]]; then
+      echo "--- the script said ---"
+      echo "$out"
+      echo "----------------------"
+    fi
+
+    # The application's mutable work.
+    out="$(as_app "UPDATE public.brands SET name = 'renamed' WHERE false" 2>&1)"; rc=$?
+    check "the application role may update a mutable table" "0" "$rc"
+    out="$(as_app "DELETE FROM public.brands WHERE false" 2>&1)"; rc=$?
+    check "the application role may delete from a mutable table" "0" "$rc"
+
+    # payments: SIU. No delete, ever - a payment a bug can erase is a payment the
+    # reconciliation cannot trust.
+    out="$(as_app "UPDATE public.payments SET amount = amount WHERE false" 2>&1)"; rc=$?
+    check "the application role may update a payment" "0" "$rc"
+    out="$(as_app "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete a payment" "$rc"
+    out="$(as_maint "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT delete a payment" "$rc"
+
+    # voucher_events: SI. The audit trail is written once and never rewritten.
+    out="$(as_app "INSERT INTO public.voucher_events(id, event_type) VALUES (1, 'redeemed')" 2>&1)"; rc=$?
+    check "the application role may append a voucher event" "0" "$rc"
+    out="$(as_app "UPDATE public.voucher_events SET event_type = event_type WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite a voucher event" "$rc"
+    out="$(as_app "DELETE FROM public.voucher_events WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete a voucher event" "$rc"
+
+    # provider_event_outbox: SI for the app, SD for the maintenance role.
+    out="$(as_app "UPDATE public.provider_event_outbox SET payload = payload WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite the provider event audit trail" "$rc"
+    out="$(as_app "DELETE FROM public.provider_event_outbox WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete the provider event audit trail" "$rc"
+    out="$(as_maint "DELETE FROM public.provider_event_outbox WHERE false" 2>&1)"; rc=$?
+    check "the maintenance role may purge the provider event audit trail" "0" "$rc"
+
+    # outbox_events: SI + U(processed, processed_at_utc) for the app; SD for maintenance.
+    out="$(as_app "INSERT INTO public.outbox_events(id, event_type) VALUES (1, 'order.created')" 2>&1)"; rc=$?
+    check "the application role may append an outbox event" "0" "$rc"
+    out="$(as_app "UPDATE public.outbox_events SET processed = true, processed_at_utc = now() WHERE false" 2>&1)"; rc=$?
+    check "the application role may close an outbox event" "0" "$rc"
+    out="$(as_app "UPDATE public.outbox_events SET event_type = event_type WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite an outbox event" "$rc"
+    out="$(as_app "DELETE FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete an outbox event" "$rc"
+    out="$(as_maint "DELETE FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
+    check "the maintenance role may purge the outbox" "0" "$rc"
+    out="$(as_maint "UPDATE public.outbox_events SET processed = true WHERE false" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT update the outbox" "$rc"
+    out="$(as_maint "INSERT INTO public.outbox_events SELECT * FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT write the outbox" "$rc"
+
+    # The maintenance role's rights end where the matrix says they end.
+    out="$(as_maint "SELECT count(*) FROM public.brands" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT read a table the matrix does not give it" "$rc"
+    out="$(as_maint "DELETE FROM public.brands WHERE false" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT delete from a mutable product table" "$rc"
+
+    # The things the application must not do to the schema.
+    out="$(as_app "CREATE TABLE public.app_created(id integer)" 2>&1)"; rc=$?
     if [[ "$rc" -ne 0 ]]; then
       echo "  PASS  the application role may not create a table"; pass=$((pass + 1))
     else
+      as_super "DROP TABLE IF EXISTS public.app_created" > /dev/null 2>&1
       echo "  FAIL  the application role created a table"; fail=$((fail + 1))
     fi
 
-    out="$(as_app "ALTER TABLE public.role_probe ADD COLUMN extra text" 2>&1)"; rc=$?
-    if [[ "$rc" -ne 0 ]]; then
-      echo "  PASS  the application role may not alter a table"; pass=$((pass + 1))
-    else
-      echo "  FAIL  the application role altered a table"; fail=$((fail + 1))
-    fi
+    out="$(as_app "ALTER TABLE public.brands ADD COLUMN extra text" 2>&1)"; rc=$?
+    check_denied "the application role may not alter a table" "$rc"
 
-    out="$(as_app "DROP TABLE public.role_probe" 2>&1)"; rc=$?
-    if [[ "$rc" -ne 0 ]]; then
-      echo "  PASS  the application role may not drop a table"; pass=$((pass + 1))
-    else
-      echo "  FAIL  the application role dropped a table"; fail=$((fail + 1))
-    fi
+    out="$(as_app "DROP TABLE public.brands" 2>&1)"; rc=$?
+    check_denied "the application role may not drop a table" "$rc"
 
     out="$(as_app "CREATE ROLE probe_role LOGIN" 2>&1)"; rc=$?
     if [[ "$rc" -ne 0 ]]; then
       echo "  PASS  the application role may not create a role"; pass=$((pass + 1))
     else
+      as_super "DROP ROLE IF EXISTS probe_role" > /dev/null 2>&1
       echo "  FAIL  the application role created a role"; fail=$((fail + 1))
     fi
 
@@ -243,17 +369,13 @@ else
     if [[ "$rc" -ne 0 ]]; then
       echo "  PASS  the application role may not create a database"; pass=$((pass + 1))
     else
+      as_super "DROP DATABASE IF EXISTS probe_database" > /dev/null 2>&1
       echo "  FAIL  the application role created a database"; fail=$((fail + 1))
     fi
 
-    # The migration may change the schema, and the table a migration creates is granted
-    # to the application without anybody granting it by hand - that is the default
-    # privilege, and it is what keeps the next migration's table usable.
-    out="$(as_migrator "ALTER TABLE public.role_probe ADD COLUMN extra text" 2>&1)"; rc=$?
+    # The migration role may change the schema.
+    out="$(as_migrator "ALTER TABLE public.brands ADD COLUMN extra text" 2>&1)"; rc=$?
     check "the migration role may alter a table" "0" "$rc"
-
-    out="$(as_app "INSERT INTO public.role_probe(id, note, extra) VALUES (2, 'y', 'z')" 2>&1)"; rc=$?
-    check "the application role may write to a table the migration created" "0" "$rc"
 
     # The extension facts the migrations lean on.
     out="$(as_migrator "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" 2>&1)"; rc=$?
@@ -279,31 +401,28 @@ else
       check "the script exits 0 when the read-only role is configured" "0" "$rc"
       readonly_password="read-only-probe-password"
     fi
-    as_readonly() {
-      printf '%s' "127.0.0.1:5432:fuelflow:fuelflow_readonly:$readonly_password" \
-        | docker exec -i "$CONTAINER_NAME" sh -c \
-            'cat > /tmp/.pgpass; PGPASSFILE=/tmp/.pgpass psql -h 127.0.0.1 -U fuelflow_readonly -d fuelflow -v ON_ERROR_STOP=1 -X -q -c "$1"; rc=$?; rm -f /tmp/.pgpass; exit $rc' \
-            sh "$1" 2>&1
-    }
-    out="$(as_readonly "SELECT count(*) FROM public.role_probe" 2>&1)"; rc=$?
+    out="$(as_role fuelflow_readonly "$readonly_password" "SELECT count(*) FROM public.brands" 2>&1)"; rc=$?
     check "the read-only role may read" "0" "$rc"
 
-    out="$(as_readonly "INSERT INTO public.role_probe(id) VALUES (3)" 2>&1)"; rc=$?
-    if [[ "$rc" -ne 0 ]]; then
-      echo "  PASS  the read-only role may not write"; pass=$((pass + 1))
-    else
-      echo "  FAIL  the read-only role wrote to a table"; fail=$((fail + 1))
-    fi
+    out="$(as_role fuelflow_readonly "$readonly_password" "INSERT INTO public.brands(id) VALUES (2)" 2>&1)"; rc=$?
+    check_denied "the read-only role may not write" "$rc"
 
-    # Idempotence: the deploy runs this on every deploy, so running it twice has to
-    # work and has to change nothing.
+    # --- a privilege granted by hand is revoked by the next run ------------------
+    out="$(as_super "GRANT DELETE ON public.payments TO fuelflow_app" 2>&1)"; rc=$?
+    check "the superuser may grant a privilege by hand (the probe setup)" "0" "$rc"
+    out="$(as_app "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
+    check "the hand-granted privilege works before the next run" "0" "$rc"
+
     before="$(docker exec "$CONTAINER_NAME" psql -U postgres -d fuelflow -t -A -c "
       SELECT count(*) FROM pg_roles WHERE rolname LIKE 'fuelflow%'")"
     out="$(bash "$SCRIPT" 2>&1)"; rc=$?
-    check "the script exits 0 when it runs a second time" "0" "$rc"
+    check "the script exits 0 when it runs again" "0" "$rc"
     after="$(docker exec "$CONTAINER_NAME" psql -U postgres -d fuelflow -t -A -c "
       SELECT count(*) FROM pg_roles WHERE rolname LIKE 'fuelflow%'")"
-    check "the second run did not create another role" "$before" "$after"
+    check "the run did not create another role" "$before" "$after"
+
+    out="$(as_app "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
+    check_denied "the next run revoked the hand-granted DELETE" "$rc"
 
     # The probe table the script leaves behind is not left behind.
     leftover="$(docker exec "$CONTAINER_NAME" psql -U postgres -d fuelflow -t -A -c "

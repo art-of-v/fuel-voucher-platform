@@ -141,11 +141,13 @@ services:
       # old default by accident.
       #
       # The ROLE is not the cluster's superuser any more. `fuelflow_app` may do the
-      # application's own work - read and write the application's tables - and nothing else:
-      # it cannot change the schema, cannot create a role, cannot create a database, and it
-      # is not a superuser. The schema is changed through the connection below, as a
-      # different role. One role used to do both, and it owned the cluster, so a defect that
-      # reached the database owned the cluster too.
+      # application's own work and nothing else: exactly the privileges the matrix in
+      # deploy/database-privileges.tsv gives it. The audit and ledger tables are
+      # insert-only for it, the retention tables cannot be deleted by it, it cannot
+      # change the schema, cannot create a role, cannot create a database, and it is
+      # not a superuser. The schema is changed through the connection below, as a
+      # different role. One role used to do both, and it owned the cluster, so a defect
+      # that reached the database owned the cluster too.
       Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=fuelflow_app;Password=${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
 
       # --- The migration connection: a different role, on purpose ---
@@ -160,16 +162,31 @@ services:
       # two strings name the same role, and DatabaseRoleValidator asks the live catalogue
       # whether the role the traffic connects as is a superuser.
       #
-      # deploy/ensure-database-roles.sh creates the three roles and applies the grants; the
+      # deploy/ensure-database-roles.sh creates the four roles and applies the grants; the
       # deploy job runs it before this container is recreated.
       Database__MigrationConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=fuelflow_migrator;Password=${POSTGRES_MIGRATOR_PASSWORD:?set POSTGRES_MIGRATOR_PASSWORD in .env};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
 
+      # --- The maintenance connection: the destructive end of the data lifecycle ---
+      #
+      # The nightly retention purge (DataRetentionService) connects as
+      # `fuelflow_maintenance`: DELETE and SELECT on exactly the tables
+      # deploy/database-privileges.tsv hands it, and no INSERT or UPDATE anywhere. So a
+      # defect in the traffic role cannot erase the ledger, the audit trail or the
+      # outbox, and the role that CAN erase the retention tables cannot forge a row in
+      # them. It is not a superuser either.
+      #
+      # When this variable is absent the application falls back to the traffic
+      # connection, which is what staging does until its .env carries the password;
+      # production refuses to boot without it.
+      Database__MaintenanceConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=fuelflow_maintenance;Password=${POSTGRES_MAINTENANCE_PASSWORD:?set POSTGRES_MAINTENANCE_PASSWORD in .env};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
+
       # --- The connection-pool cap ---
       # One process opens SEVERAL pools against this database: the application's data source, the
-      # Hangfire storage and the Postgres health check (the worker opens its own set). Npgsql's
-      # default cap is 100 per pool, so the cap has to be on all of them or it protects nothing.
-      # 5 per pool keeps the API inside the server's max_connections=50 even during an incident.
-      # Raise it only together with max_connections on the database.
+      # maintenance data source (the retention purge's own connection), the Hangfire storage and
+      # the Postgres health check (the worker opens its own set). Npgsql's default cap is 100 per
+      # pool, so the cap has to be on all of them or it protects nothing. 5 per pool keeps the API
+      # inside the server's max_connections=50 even during an incident. Raise it only together with
+      # max_connections on the database.
       Database__MaxPoolSize: "5"
 
       # --- Redis ---

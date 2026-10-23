@@ -98,7 +98,9 @@ try
     // runs the API's services, so it must also get the outbox interceptor and - now that the
     // tables carry row-level policies - the tenant scope. A worker has no HTTP request, so the
     // accessor resolves to the system scope and the background jobs keep reading across tenants.
-    builder.Services.AddDatabase(connectionString!, maxPoolSize);
+    builder.Services.AddDatabase(connectionString!, maxPoolSize,
+        builder.Configuration["Database:MaintenanceConnectionString"],
+        requireMaintenanceConnection: builder.Environment.IsProduction());
 
     builder.Services.AddScoped<NotificationService>();
     builder.Services.AddScoped<VoucherStockMonitor>();

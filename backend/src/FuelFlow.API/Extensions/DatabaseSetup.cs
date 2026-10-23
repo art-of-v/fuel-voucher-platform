@@ -54,8 +54,18 @@ internal static class DatabaseSetup
     internal static IServiceCollection AddDatabase(
         this IServiceCollection services,
         string connectionString,
-        int maxPoolSize = DatabaseConnectionPool.DefaultMaxPoolSize)
+        int maxPoolSize = DatabaseConnectionPool.DefaultMaxPoolSize,
+        string? maintenanceConnectionString = null,
+        bool requireMaintenanceConnection = false)
     {
+        // The retention purge runs as `fuelflow_maintenance` on its own connection. Production
+        // must not boot without that string - the traffic role must never become the purge role
+        // by default.
+        if (requireMaintenanceConnection && string.IsNullOrWhiteSpace(maintenanceConnectionString))
+            throw new InvalidOperationException(
+                "Database:MaintenanceConnectionString is required in production: the retention " +
+                "purge runs as fuelflow_maintenance and must not fall back to the traffic role.");
+
         // The cap belongs to EVERY pool this process opens, not only to this data source - see
         // DatabaseConnectionPool. The Hangfire storage and the health check get the same string.
         var poolSizeLimited = DatabaseConnectionPool.WithPoolSettings(connectionString, maxPoolSize);
@@ -74,6 +84,45 @@ internal static class DatabaseSetup
         dataSourceBuilder.EnableDynamicJson();
         var dataSource = dataSourceBuilder.Build();
         services.AddSingleton(dataSource);
+
+        // The maintenance connection: the destructive end of the data lifecycle. DataRetentionService
+        // resolves the keyed "maintenance" context and runs every purge on it. When nothing configures
+        // a maintenance string - development and staging - it falls back to the traffic connection,
+        // which is exactly the old behaviour; production is guarded above.
+        var effectiveMaintenanceConnectionString =
+            string.IsNullOrWhiteSpace(maintenanceConnectionString)
+                ? connectionString
+                : maintenanceConnectionString;
+        var maintenancePool = DatabaseConnectionPool.WithPoolSettings(effectiveMaintenanceConnectionString, maxPoolSize);
+        var maintenanceDataSourceBuilder = new NpgsqlDataSourceBuilder(maintenancePool);
+        maintenanceDataSourceBuilder.EnableDynamicJson();
+        var maintenanceDataSource = maintenanceDataSourceBuilder.Build();
+        services.AddKeyedSingleton("maintenance", maintenanceDataSource);
+
+        services.AddKeyedScoped<ApplicationDbContext>("maintenance", (provider, _) =>
+        {
+            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            var environment = provider.GetRequiredService<IHostEnvironment>();
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseLoggerFactory(loggerFactory)
+                .UseNpgsql(maintenanceDataSource, b =>
+                {
+                    b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                    // The purge never opens its own transaction - PurgeAsync saves per table and each
+                    // SaveChanges is one small transaction, so the retrying strategy stays out of the
+                    // way and a deadlock on one table cannot poison the rest of the run.
+                    b.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorCodesToAdd: null);
+                });
+            if (environment.IsDevelopment())
+                optionsBuilder.EnableSensitiveDataLogging();
+            return new ApplicationDbContext(
+                optionsBuilder.Options,
+                provider.GetRequiredService<IQrCipher>(),
+                provider.GetService<ILogger<ApplicationDbContext>>());
+        });
 
         services.AddScoped<IImportVouchersDbContext>(brand => brand.GetRequiredService<ApplicationDbContext>());
 
