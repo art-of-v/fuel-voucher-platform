@@ -139,32 +139,26 @@ regexes = [
 
 [allowlist]
 description = "Known-safe test/dev values and third-party checksums"
-# Two historical commits contain configuration values that these rules correctly flag.
-# They are allowlisted BY COMMIT, not by rule or path, so the rules stay live for anything
-# new. Rewriting history to remove them is tracked separately; until that happens this
-# allowlist is what keeps the job's red/green signal meaningful instead of permanently red.
-#
-# Time-bound (hardening item 10): this allowlist exists only while the FF-05 history
-# decision (deploy checklist #4/#5) is open. If that decision lands as "history rewritten",
-# delete these commits; if it lands as "accepted", record that here with a date and delete
-# the entries anyway - accepted residue does not need scanner suppression. Re-review by
-# 2026-11-30 at the latest.
-#
-# What is actually in them (values verified by hash, never reproduced here):
+# The commit allowlist that used to live here was retired on 2026-10-23 with the FF-05
+# decision (deploy checklist #4/#5): the history is deliberately NOT rewritten, and the
+# credentials in it are dead, so accepted residue does not get permanent scanner suppression.
+# What it used to hide (values verified by hash, never reproduced here):
 #   3cb50dc  appsettings.Production.json - a committed TEMPLATE, not a deployed config:
 #            Monobank:PublicKey is the literal "PRODUCTION_PUBLIC_KEY_HERE", Twilio
 #            PhoneNumber is "+1234567890", and Jwt:Secret is the exact 71-character value
 #            that AuthSetup.cs names PlaceholderSecret and refuses to boot with in Production.
 #            That JWT value is therefore burned, not usable.
 #            The one value that cannot be dismissed as a placeholder is Monobank:Token
-#            (34 chars, no placeholder marker) - treat as exposed and confirm it was rotated.
+#            (34 chars, no placeholder marker). It was revoked merchant-side; the revocation
+#            is proven and recorded in docs/SECURITY_AUDIT_2026-08-21.md FF-05 (planning repo,
+#            issues #221 and #679).
 #   3cb50dc  appsettings.Development.json - localhost-only dev key, superseded.
 #   72492dc  admin-panel/backend-dotnet appsettings.json - Session:Secret from the retired
 #            Node/.NET admin-panel backend.
-commits = [
-  "3cb50dc197918b771ec912bd21514d9e9c7e6412",
-  "72492dcf4955b1314d765ff11e110fa0ceaf7a00",
-]
+#
+# The CI gate scans the working tree (`gitleaks dir`), not the git history, so removing the
+# commit entries does not change what it sees. A deliberate history scan will now report
+# these burned values instead of hiding them, which is the honest result.
 regexes = [
   # CocoaPods checksum in mobile-app-native/ios/Podfile.lock (historical).
   '''8a31808565da7af926dd9b595e98594d8b1553b6''',
