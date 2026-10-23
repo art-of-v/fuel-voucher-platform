@@ -7,7 +7,8 @@ backend rollout are in the planning repo:
 The two controls:
 
 - **App attestation** — Apple App Attest on iOS, Play Integrity on Android. The client proves the
-  request came from the real app on a genuine device. Server enforcement is report-only today.
+  request came from the real app on a genuine device. The checked-in production config runs it
+  report-only; enforcement is a later per-platform step.
 - **Certificate pinning** — the client only trusts the pinned `api.palne.shop` chain. Pinning
   initialises at app start and fails open (with a loud log) if the native module is unavailable.
 
@@ -86,6 +87,77 @@ Adding `@expo/app-integrity` and `react-native-ssl-public-key-pinning` changes t
 fingerprint. Existing builds cannot receive an OTA containing this feature; this is a new native
 build, not an OTA-only change.
 
+## Production rollout: report-only first
+
+The checked-in production config is `ATTESTATION_ENABLED=true`,
+`ATTESTATION_MODE=ReportOnly`, `ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true`. ReportOnly
+verifies and logs a proof that is present but never blocks a request, so the older fleet keeps
+working while the new build is measured.
+
+The live `.env` is not updated by a git deploy. On the droplet:
+
+```bash
+cd /root/FuelFlow/deploy
+grep -E '^ATTESTATION_' .env
+# Set ATTESTATION_ENABLED=true, ATTESTATION_MODE=ReportOnly and
+# ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true in .env if they differ.
+docker compose -f docker-compose.prod.yml up -d fuelflow-backend
+```
+
+Before restarting, confirm `OTP_PEPPER` is set in the same `.env`: the current API refuses to
+start in Production without it. The restart also applies the pending `attestation_keys` migration;
+take the normal pre-deploy backup and let the deploy job's migration dry run pass.
+
+Verify the state and the logs:
+
+```bash
+docker compose -f docker-compose.prod.yml ps fuelflow-backend
+docker compose -f docker-compose.prod.yml logs --since 15m fuelflow-backend \
+  | grep -E 'Attestation (Valid|Missing|Invalid)'
+```
+
+Expected: `Missing` for the 1.1.0 fleet, no attestation-caused 401/503, and `Valid` only after a
+new native build is installed. Do not set `ATTESTATION_MODE=Enforce` yet. To roll the measurement
+back, set `ATTESTATION_ENABLED=false` (keep the acknowledgement true) and restart; no client
+release is involved.
+
+## Android Play and Google Cloud setup
+
+This is the one-time bootstrap that must exist before an Android proof can be `Valid`.
+
+1. **Put the package in Play.** In Play Console, create or verify the app for
+   `com.artem.vashchuk.mobileappnative`. Build the production AAB with
+   `eas build --profile production --platform android` and upload it to at least the internal
+   testing track (`eas submit --profile production --platform android` uses the internal track in
+   `eas.json`). Play Integrity will not return `PLAY_RECOGNIZED` for an APK installed by `adb`, a
+   preview APK, or an internal-app-sharing build. Install the build from the Play test track on a
+   Play-certified device.
+2. **Create and link the Google Cloud project.** Create or choose a project in Google Cloud
+   Console, enable **Play Integrity API**, and copy its **project number** (not the project id).
+   In Play Console open **Release > App integrity > Play Integrity API** (the exact menu label
+   varies by console version) and link that Cloud project to the app. Wait for the link to
+   propagate.
+3. **Create the backend credential.** In the same linked project, create a service account for the
+   API and a JSON key. Minify the JSON to one line and put it only in the server secret store as
+   `ATTESTATION_GOOGLE_CREDENTIALS_JSON` / `Attestation__GoogleCredentialsJson` (the service-account
+   JSON has escaped `\n` newlines, not literal ones). The backend uses the
+   `https://www.googleapis.com/auth/playintegrity` scope. There is no `roles/playintegrity.user`
+   role; do not add a made-up binding. If your organization requires an IAM grant, grant only what
+   the API/console documents and confirm with a decode. Never commit the key.
+4. **Bake the project number into the client.** Set the EAS production environment variable
+   `EXPO_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER` to the numeric project number and rebuild the native
+   app. A missing number sends no Google proof; an OTA is not enough for the native modules. The
+   backend checks the package name and, when configured, the signing-certificate allowlist; use
+   the Play App Signing SHA-256 if `GoogleAllowedCertificateDigests` is set.
+5. **Measure before enforcing.** Install the new build from Play, sign in, and make a protected
+   request. With the service-account JSON set, the server should log
+   `Attestation Valid ... via google`. If it logs `GOOGLE_TEST_RESPONSE`, the token is a test
+   response; do not set `GoogleAllowTestingResponses=true` in production just to pass. Use a build
+   installed from a normal Play track. `UNRECOGNIZED_VERSION` means the install is not
+   Play-recognized. Only after a real device shows `Valid` may `EnforcePlatforms` include
+   `android`; raising `Mode` to `Enforce` also requires the service-account JSON or the API refuses
+   to start.
+
 ## Smoke test on a real device
 
 1. Start the app against the production API (or a preview API that has report-only enabled).
@@ -117,6 +189,7 @@ build, not an OTA-only change.
 | `ATTESTATION_CHALLENGE_INVALID` | Challenge expired (>120s), reused, wrong device/action, or body/path changed | Check clock, retry once, and verify the exact body is hashed before send. |
 | `GOOGLE_NOT_CONFIGURED` | The backend has no service-account credential | Set `Attestation__GoogleCredentialsJson`; do not enable Android enforcement until it is set. A missing client project number sends no proof and surfaces as `ATTESTATION_REQUIRED`, not this code. |
 | `GOOGLE_APP_NOT_RECOGNIZED` / `UNRECOGNIZED_VERSION` | Sideloaded APK, wrong package, or not in Play | Install from Play; check package name and Play Console linkage. |
+| `GOOGLE_TEST_RESPONSE` | Play marked the response as a test response | Do not set `GoogleAllowTestingResponses=true` in production; install from a normal Play track and re-test. |
 | `GOOGLE_HASH_MISMATCH` | Proxy or interceptor changed the body/path after the proof | Compute the hash from the exact bytes sent; check retries that rewrite the body. |
 | Pinning error / no network | Certificate changed, pin set wrong, or a proxy | Compare the live SPKI hashes (below); ship a corrected pin; if impossible, wait for the expiry dead-man switch. |
 | `native module unavailable` in pinning logs | Expo Go, web, or a build without the native module | Expected outside a native build; a production build logging this is broken. |
@@ -165,9 +238,9 @@ removes the safety net for installs that cannot update.
 
 ## Rollback and kill switch
 
-- **Attestation misbehaving**: set the backend `Attestation:Mode` to `ReportOnly` (and restart). The
-  app keeps sending proofs; the server stops blocking. This is the fastest lever and does not need
-  a client release.
+- **Attestation misbehaving**: set `ATTESTATION_MODE=ReportOnly` (or `ATTESTATION_ENABLED=false`)
+  in the droplet `.env` and restart. The app keeps sending proofs; the server stops blocking. This
+  is the fastest lever and does not need a client release.
 - **Pinning misbehaving**: ship a corrected native build, or a signed OTA if the current pin still
   permits the update host. If neither is possible, the `expirationDate` stops pinning enforcement.
   There is no server-side pin kill switch.
