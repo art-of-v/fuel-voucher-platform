@@ -286,7 +286,9 @@ export default function ImportBatchesTab() {
                   <th className="text-left p-4">{t("imports.number")}</th>
                   <th className="text-left p-4">{t("vouchers.expires")}</th>
                   <th className="text-left p-4">{t("common.status")}</th>
-                  <th className="text-left p-4">{t("imports.decodeIntegrity")}</th>
+                  <th className="text-left p-4">
+                    {t("imports.decodeIntegrity")}
+                  </th>
                   <th className="text-left p-4">{t("common.actions")}</th>
                 </tr>
               </thead>
@@ -349,8 +351,7 @@ export default function ImportBatchesTab() {
                             }`}
                           >
                             {v.matrixMismatchPercent.toFixed(2)}% (
-                            {v.matrixMismatchedModules}/
-                            {v.matrixTotalModules})
+                            {v.matrixMismatchedModules}/{v.matrixTotalModules})
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">
@@ -478,9 +479,7 @@ export default function ImportBatchesTab() {
                     onClick={() => setSelectedImportId(imp.id)}
                   >
                     <td className="p-4 font-medium">{imp.fileName}</td>
-                    <td className="p-4 text-sm">
-                      {imp.supplierName ?? "—"}
-                    </td>
+                    <td className="p-4 text-sm">{imp.supplierName ?? "—"}</td>
                     <td className="p-4">
                       <span
                         className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
