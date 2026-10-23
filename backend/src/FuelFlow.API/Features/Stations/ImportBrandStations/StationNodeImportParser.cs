@@ -52,7 +52,6 @@ public static class BrandStationImportParser
                 Address = Trim(row.Address),
                 Phone = Trim(row.Phone),
                 City = Trim(row.City),
-                StationType = Trim(row.StationType),
                 Lat = row.Lat,
                 Lng = row.Lng,
             });
@@ -112,7 +111,6 @@ public static class BrandStationImportParser
                 Address = Get("address"),
                 Phone = Get("phone"),
                 City = Get("city"),
-                StationType = Get("StationType"),
                 Lat = lat,
                 Lng = lng,
             });
@@ -169,7 +167,6 @@ public static class BrandStationImportParser
         public string? Address { get; set; }
         public string? Phone { get; set; }
         public string? City { get; set; }
-        public string? StationType { get; set; }
         public double? Lat { get; set; }
         public double? Lng { get; set; }
     }

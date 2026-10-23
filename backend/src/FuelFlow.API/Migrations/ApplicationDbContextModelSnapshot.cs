@@ -4305,11 +4305,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(45)")
                         .HasColumnName("phone");
 
-                    b.Property<string>("StationType")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("station_type");
-
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc")

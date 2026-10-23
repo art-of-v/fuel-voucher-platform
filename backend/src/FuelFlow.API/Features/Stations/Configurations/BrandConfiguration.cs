@@ -46,7 +46,7 @@ internal sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasMaxLength(64)
             .IsRequired();
 
-        // Everything that describes a place - address, phone, station_type, lat, lng - belongs to a
+        // Everything that describes a place - address, phone, lat, lng - belongs to a
         // row in `brand_stations`, not here. A network is not somewhere you can stand: OKKO has twenty
         // of those and no single one of them is "the OKKO address". The columns sat here all NULL, and
         // `IX_brands_station_type` indexed four NULLs.

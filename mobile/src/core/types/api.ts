@@ -32,7 +32,6 @@ export interface StationNode {
   address?: string;
   phone?: string;
   city?: string;
-  stationType?: string;
   /**
    * Decimal degrees, as JSON numbers. They were typed `string` for as long as the
    * API existed and the API never sent one — `PublicBrandStationResponse` maps

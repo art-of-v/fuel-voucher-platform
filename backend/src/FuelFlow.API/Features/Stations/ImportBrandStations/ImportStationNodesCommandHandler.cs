@@ -66,7 +66,6 @@ public sealed class ImportBrandStationsCommandHandler
                 Address = row.Address,
                 Phone = row.Phone,
                 City = row.City,
-                StationType = row.StationType,
                 Lat = row.Lat,
                 Lng = row.Lng,
             };
@@ -91,7 +90,6 @@ public sealed class ImportBrandStationsCommandHandler
                 entity.Address = incoming.Address;
                 entity.Phone = incoming.Phone;
                 entity.City = incoming.City;
-                entity.StationType = incoming.StationType;
                 entity.Lat = incoming.Lat;
                 entity.Lng = incoming.Lng;
                 entity.UpdatedAtUtc = now;

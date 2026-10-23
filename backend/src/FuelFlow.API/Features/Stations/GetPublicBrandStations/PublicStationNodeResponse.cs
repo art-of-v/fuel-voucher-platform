@@ -15,8 +15,10 @@ namespace FuelFlow.Features.Brands.GetPublicBrandStations;
 ///
 /// <para>
 /// Every field the entity exposes today is carried through except <c>CreatedAtUtc</c> and
-/// <c>UpdatedAtUtc</c>, which no client reads, so the wire format is unchanged for installed mobile
-/// clients.
+/// <c>UpdatedAtUtc</c>, which no client reads, and <c>StationType</c>, which was removed with the
+/// column it came from (planning #680: a station's brand, its number and its address are what the
+/// catalogue is for; "Тип АЗС" was a label nobody acted on and 1,321 of 1,322 rows carried none).
+/// The mobile client is changed in the same commit, so the two are never out of step.
 /// </para>
 ///
 /// <para>
@@ -33,6 +35,5 @@ public sealed record PublicBrandStationResponse(
     string? Address,
     string? Phone,
     string? City,
-    string? StationType,
     double? Lat,
     double? Lng);

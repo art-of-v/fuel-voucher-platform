@@ -7,7 +7,7 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Import",
     "stationNodes.selectedFile": "Selected file",
     "stationNodes.importHint":
-      "CSV or JSON. Columns: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng required).",
+      "CSV or JSON. Columns: id, brandId, name, address, phone, city, lat, lng (brandId, name, lat, lng required).",
     "stationNodes.upload": "Upload",
     "stationNodes.importedAdded": "Added",
     "stationNodes.importedUpdated": "Updated",
@@ -21,7 +21,6 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.city": "City",
     "stationNodes.address": "Address",
     "stationNodes.phone": "Phone",
-    "stationNodes.stationType": "Type",
     "stationNodes.externalId": "External ID",
     "stationNodes.externalIdHint":
       "Importer key (leave blank to derive from the brand + coordinates)",
@@ -123,7 +122,7 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Імпорт",
     "stationNodes.selectedFile": "Обраний файл",
     "stationNodes.importHint":
-      "CSV або JSON. Колонки: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng — обовʼязкові).",
+      "CSV або JSON. Колонки: id, brandId, name, address, phone, city, lat, lng (brandId, name, lat, lng — обовʼязкові).",
     "stationNodes.upload": "Завантажити",
     "stationNodes.importedAdded": "Додано",
     "stationNodes.importedUpdated": "Оновлено",
@@ -137,7 +136,6 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.city": "Місто",
     "stationNodes.address": "Адреса",
     "stationNodes.phone": "Телефон",
-    "stationNodes.stationType": "Тип",
     "stationNodes.externalId": "Зовнішній ID",
     "stationNodes.externalIdHint":
       "Ключ для імпорту (лишіть порожнім — виведеться з бренду + координат)",
@@ -241,7 +239,7 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Import",
     "stationNodes.selectedFile": "Ausgewählte Datei",
     "stationNodes.importHint":
-      "CSV oder JSON. Spalten: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng erforderlich).",
+      "CSV oder JSON. Spalten: id, brandId, name, address, phone, city, lat, lng (brandId, name, lat, lng erforderlich).",
     "stationNodes.upload": "Hochladen",
     "stationNodes.importedAdded": "Hinzugefügt",
     "stationNodes.importedUpdated": "Aktualisiert",
@@ -255,7 +253,6 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.city": "Stadt",
     "stationNodes.address": "Adresse",
     "stationNodes.phone": "Telefon",
-    "stationNodes.stationType": "Typ",
     "stationNodes.externalId": "Externe ID",
     "stationNodes.externalIdHint":
       "Importschlüssel (leer lassen, um ihn aus Marke + Koordinaten abzuleiten)",
@@ -359,7 +356,7 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Importar",
     "stationNodes.selectedFile": "Archivo seleccionado",
     "stationNodes.importHint":
-      "CSV o JSON. Columnas: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng obligatorios).",
+      "CSV o JSON. Columnas: id, brandId, name, address, phone, city, lat, lng (brandId, name, lat, lng obligatorios).",
     "stationNodes.upload": "Subir",
     "stationNodes.importedAdded": "Añadidos",
     "stationNodes.importedUpdated": "Actualizados",
@@ -373,7 +370,6 @@ export const operations: Record<Language, Record<string, string>> = {
     "stationNodes.city": "Ciudad",
     "stationNodes.address": "Dirección",
     "stationNodes.phone": "Teléfono",
-    "stationNodes.stationType": "Tipo",
     "stationNodes.externalId": "ID externo",
     "stationNodes.externalIdHint":
       "Clave de importación (déjalo vacío para derivarla de marca + coordenadas)",

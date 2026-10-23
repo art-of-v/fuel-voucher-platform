@@ -55,7 +55,6 @@ type NodeForm = {
   address: string;
   phone: string;
   city: string;
-  stationType: string;
   lat: string;
   lng: string;
 };
@@ -67,7 +66,6 @@ const EMPTY_FORM: NodeForm = {
   address: "",
   phone: "",
   city: "",
-  stationType: "",
   lat: "",
   lng: "",
 };
@@ -82,7 +80,6 @@ function toNodePayload(form: NodeForm): Omit<StationNode, "id"> {
     address: form.address.trim() || null,
     phone: form.phone.trim() || null,
     city: form.city.trim() || null,
-    stationType: form.stationType.trim() || null,
     lat,
     lng,
   };
@@ -96,7 +93,6 @@ function nodeToForm(n: StationNode): NodeForm {
     address: n.address ?? "",
     phone: n.phone ?? "",
     city: n.city ?? "",
-    stationType: n.stationType ?? "",
     lat: n.lat != null ? String(n.lat) : "",
     lng: n.lng != null ? String(n.lng) : "",
   };
@@ -520,18 +516,6 @@ export default function StationNodesTab() {
                 value={form.phone}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, phone: e.target.value }))
-                }
-                className="h-8 w-40"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                {t("stationNodes.stationType")}
-              </label>
-              <Input
-                value={form.stationType}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, stationType: e.target.value }))
                 }
                 className="h-8 w-40"
               />

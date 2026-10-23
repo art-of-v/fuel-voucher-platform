@@ -18,7 +18,6 @@ export interface StationNode {
   address?: string | null;
   phone?: string | null;
   city?: string | null;
-  stationType?: string | null;
   lat?: number | null;
   lng?: number | null;
   createdAtUtc?: string;

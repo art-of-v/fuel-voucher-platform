@@ -133,7 +133,7 @@
                                                       "url":  "{{baseUrl}}/api/admin/stations",
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"id\": \"okko\",\n  \"name\": \"OKKO\",\n  \"logoText\": \"OKKO\",\n  \"color\": \"#e63946\",\n  \"address\": \"Kyiv, Ukraine\",\n  \"stationType\": \"fuel\"\n}"
+                                                                   "raw":  "{\n  \"id\": \"okko\",\n  \"name\": \"OKKO\",\n  \"logoText\": \"OKKO\",\n  \"color\": \"#e63946\",\n  \"address\": \"Kyiv, Ukraine\"\n}"
                                                                }
                                                   }
                                   },
