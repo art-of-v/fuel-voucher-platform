@@ -35,6 +35,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         var seeded = await SeedAssignedVoucherAsync();
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
 
         var line = new ImportRedemptionStatementLine(
             "supplier-line-1",
@@ -126,6 +127,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         var seeded = await SeedPendingVoucherAsync(reportedLiters: 50m);
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
 
         await using (var context = CreateContext())
         {
@@ -231,6 +233,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         var seeded = await SeedPendingVoucherAsync(reportedLiters: 50m);
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
         Guid redemptionId;
 
         await using (var context = CreateContext())
@@ -322,6 +325,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         var seeded = await SeedAssignedVoucherAsync();
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
 
         await using (var context = CreateContext())
         {
@@ -400,6 +404,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         await ResetAsync();
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
         Guid rowId;
 
         await using (var context = CreateContext())
@@ -474,6 +479,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         var seeded = await SeedConfirmedVoucherAsync();
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
         Guid rowId;
 
         await using (var context = CreateContext())
@@ -631,6 +637,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
     {
         var seeded = await SeedPendingVoucherAsync(50m);
         var operatorUserId = Guid.NewGuid();
+        await SeedOperatorAsync(operatorUserId);
 
         await using var context = CreateContext();
         var confirmed = await context.ExecuteReplaySafeAsync(async ct =>
@@ -660,6 +667,20 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
         });
 
         return orderId;
+    }
+
+    private async Task SeedOperatorAsync(Guid operatorId)
+    {
+        await using var seed = CreateContext();
+        seed.Users.Add(new User
+        {
+            Id = operatorId,
+            PhoneNumber = $"+38{operatorId:N}"[..20],
+            IsActive = true,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
+        });
+        await seed.SaveChangesAsync();
     }
 
     private async Task ResetAsync()

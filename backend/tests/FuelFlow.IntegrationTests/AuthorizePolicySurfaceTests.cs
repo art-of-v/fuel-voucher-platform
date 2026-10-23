@@ -98,6 +98,7 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["GET /api/admin/reconciliation/statement"] = AuthPolicies.Staff,
         ["GET /api/admin/reconciliation/statement/csv"] = AuthPolicies.Staff,
         ["GET /api/admin/reconciliation/statement/pdf"] = AuthPolicies.Staff,
+        ["GET /api/admin/redemptions/exceptions"] = AuthPolicies.Staff,
         ["GET /api/admin/report"] = AuthPolicies.Staff,
         ["GET /api/admin/settings"] = AuthPolicies.Staff,
         ["GET /api/admin/suppliers"] = AuthPolicies.Staff,
@@ -147,6 +148,9 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["PUT /api/admin/suppliers/{id:guid}"] = AuthPolicies.CatalogueWrite,
 
         // ---- the voucher stock -------------------------------------------------------
+        ["POST /api/admin/redemptions/statement"] = AuthPolicies.VoucherWrite,
+        ["POST /api/admin/redemptions/statement/{rowId}/dismiss"] = AuthPolicies.VoucherWrite,
+        ["POST /api/admin/redemptions/{voucherId}/decision"] = AuthPolicies.VoucherWrite,
         ["POST /api/admin/voucher-exchange/confirm"] = AuthPolicies.VoucherWrite,
         ["POST /api/admin/voucher-imports/{id:guid}/bulk-action"] = AuthPolicies.VoucherWrite,
         ["POST /api/admin/voucher-imports/{id:guid}/parse-invoice"] = AuthPolicies.VoucherWrite,
