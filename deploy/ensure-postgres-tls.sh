@@ -3,6 +3,7 @@
 # Creates the certificate the database server presents, and the CA that signs it.
 #
 #     ensure-postgres-tls.sh [--dir <path>] [--host <dns name>] [--uid <n>]
+#                            [--ca-subject <common name>]
 #
 # Exit 0 = the certificate is in place and usable. Exit 1 = it could not be made.
 #
@@ -19,7 +20,7 @@
 # The third option was always there: give the server a certificate. This script is that option.
 # It creates a small CA, signs a server certificate for the name the client connects by, and
 # leaves the CA certificate where the application can verify it. The application then says
-# "SSL Mode=Verify Full;Root Certificate=<ca.crt>", and the startup guard refuses to boot a
+# "SSL Mode=VerifyFull;Root Certificate=<ca.crt>", and the startup guard refuses to boot a
 # production build whose connection string still trusts any certificate.
 #
 # IDEMPOTENT, ON PURPOSE
@@ -43,15 +44,17 @@ CERT_UID="${CERT_UID:-70}"
 CA_DAYS="${CA_DAYS:-3650}"
 CERT_DAYS="${CERT_DAYS:-365}"
 RENEW_WITHIN_DAYS="${RENEW_WITHIN_DAYS:-30}"
+CA_SUBJECT="${CA_SUBJECT:-FuelFlow database CA}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dir)  CERT_DIR="${2:-}"; shift 2 ;;
-    --host) CERT_HOST="${2:-}"; shift 2 ;;
-    --uid)  CERT_UID="${2:-}"; shift 2 ;;
-    -h|--help) sed -n '2,45p' "$0"; exit 0 ;;
+    --dir)       CERT_DIR="${2:-}"; shift 2 ;;
+    --host)      CERT_HOST="${2:-}"; shift 2 ;;
+    --uid)       CERT_UID="${2:-}"; shift 2 ;;
+    --ca-subject) CA_SUBJECT="${2:-}"; shift 2 ;;
+    -h|--help)   sed -n '2,45p' "$0"; exit 0 ;;
     *) fail "unknown argument: $1" ;;
   esac
 done
@@ -72,7 +75,7 @@ if [[ ! -f "$CA_CRT" || ! -f "$CA_KEY" ]]; then
   openssl req -x509 -newkey rsa:4096 -nodes \
     -keyout "$CA_KEY" -out "$CA_CRT" \
     -days "$CA_DAYS" -sha256 \
-    -subj "/CN=FuelFlow database CA" \
+    -subj "/CN=$CA_SUBJECT" \
     -addext "basicConstraints=critical,CA:TRUE" \
     -addext "keyUsage=critical,keyCertSign,cRLSign" \
     > /dev/null 2>&1 || fail "could not create the certificate authority"
@@ -139,5 +142,5 @@ openssl x509 -in "$CA_CRT" -noout -subject -fingerprint -sha256 | sed 's/^/  /'
 echo "server certificate:   $SRV_CRT (for $CERT_HOST)"
 openssl x509 -in "$SRV_CRT" -noout -subject -dates | sed 's/^/  /'
 echo
-echo "The application connects with: SSL Mode=Verify Full;Root Certificate=$CA_CRT"
+echo "The application connects with: SSL Mode=VerifyFull;Root Certificate=$CA_CRT"
 exit 0

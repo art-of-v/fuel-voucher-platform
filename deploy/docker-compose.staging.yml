@@ -70,7 +70,20 @@ services:
       ASPNETCORE_ENVIRONMENT: Staging
       ASPNETCORE_URLS: http://+:8080
 
-      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true"
+      # The connection VERIFIES the staging database's certificate. Staging shares the
+      # host and the Docker network with production, and this connection carries the
+      # same data production's does - refresh-token hashes, phone numbers, order
+      # amounts and the encrypted voucher payloads. "SSL Mode=Disable" left it readable
+      # to anything that can reach the Docker network.
+      #
+      # The CA is STAGING'S OWN, in deploy/certs/postgres-staging, and the deploy job
+      # creates it with deploy/ensure-postgres-tls.sh before this compose comes up. It
+      # must never be production's CA: staging is a separate trust domain, and a shared
+      # CA would let a staging key sign a certificate production accepts.
+      #
+      # "VerifyFull" is the Npgsql spelling. "Verify Full" (with a space) is libpq's and
+      # Npgsql refuses it at startup - that spelling took production down on 2026-10-21.
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
       # One cap for every pool in the process - the data source, the Hangfire storage and the
       # health check. See the same key in docker-compose.prod.yml.
       Database__MaxPoolSize: "5"
@@ -147,6 +160,13 @@ services:
       Updates__PublicBaseUrl: ${OTA_PUBLIC_BASE_URL:-}
       # The deadline the CDN is given (an installed app's update check waits on it).
       Updates__TimeoutSeconds: ${OTA_TIMEOUT_SECONDS:-15}
+    volumes:
+      # The CA that signed the staging database's certificate. The application verifies
+      # the server against it, so the file has to be inside the container - the
+      # connection string names /certs/ca.crt. Created by deploy/ensure-postgres-tls.sh
+      # with --dir deploy/certs/postgres-staging, which the staging deploy job runs
+      # before this compose comes up.
+      - ./certs/postgres-staging/ca.crt:/certs/ca.crt:ro
     ports:
       # localhost only — lets you verify staging over an SSH tunnel BEFORE the prod Caddy
       # fronts it publicly (a different port from anything prod publishes). The public path
@@ -291,12 +311,30 @@ services:
       - archive_timeout=900
       - -c
       - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
+      # The server certificate, and the three lines that make Postgres present it. The
+      # client verifies it against the CA in the same directory (the application mounts
+      # ca.crt and says "SSL Mode=VerifyFull"), so the session is encrypted AND the
+      # other side proves who it is - the connection carries the money and the personal
+      # data. Staging's certificate is signed by STAGING'S OWN CA, not production's.
+      #
+      # The key is read-only to the server, and deploy/ensure-postgres-tls.sh gives it to
+      # the database user with mode 0600, because Postgres refuses to start otherwise.
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/certs/server.crt
+      - -c
+      - ssl_key_file=/certs/server.key
     volumes:
       - staging_postgres_data:/var/lib/postgresql/data
       # A separate archive directory from production's: staging must never write into (or
       # prune) production's WAL archive. Literal rather than a variable, for the reason given
       # in docker-compose.prod.yml.
       - /root/fuelflow-wal-staging:/var/lib/postgresql/wal
+      # The certificate, read-only: the server reads it at startup and never writes it.
+      # A DIFFERENT directory from production's on purpose - see the backend's connection
+      # string above.
+      - ./certs/postgres-staging:/certs:ro
     ports:
       # localhost only, and a DIFFERENT port from prod's 5432 so both can bind the loopback.
       - "127.0.0.1:55432:5432"

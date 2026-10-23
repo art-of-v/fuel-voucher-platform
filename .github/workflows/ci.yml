@@ -634,6 +634,23 @@ jobs:
       - name: Test the PITR setup
         run: bash deploy/enable-pitr.test.sh
 
+      # The certificate helper both environments' deploys call. It had been exercised
+      # only INSIDE the deploy jobs, so a PR could merge a broken certificate step and
+      # the first thing to notice would be a deploy that dies before the app starts.
+      # It is idempotent by contract - the CA is created once and never touched - so
+      # the test checks the second run reuses it instead of quietly replacing the trust
+      # anchor under the running application.
+      - name: Test the database certificate helper
+        run: bash deploy/ensure-postgres-tls.test.sh
+
+      # The proof that a stack's connections are actually verified TLS, not merely
+      # configured to be. A connection string that names a CA proves nothing on its own;
+      # this runs the assertion for real against a throwaway Postgres: a session verified
+      # against the stack's own CA passes, a session pointed at another CA is refused,
+      # and reusing the same CA for staging and production is refused.
+      - name: Test the verified-TLS assertion
+        run: bash deploy/assert-postgres-tls.test.sh
+
       # The pruning that keeps the WAL archive from filling the disk. It is the guard
       # between a full disk and a database that stops accepting writes, and it was
       # written after the archive was measured growing at 4.6 GiB a day on a disk with
@@ -1686,6 +1703,21 @@ jobs:
       - name: Check the box env files are readable by Compose
         run: bash /root/FuelFlow/deploy/preflight.sh --env-only
 
+      # The staging database serves a certificate signed by ITS OWN CA, in
+      # deploy/certs/postgres-staging - deliberately not production's. The
+      # helper is idempotent (the CA is created once and never touched), so
+      # running it on every deploy only renews the server certificate when it
+      # is close to expiring. It has to run BEFORE `docker compose up`: the
+      # server refuses to start on a missing or over-permissive key, and the
+      # backend verifies the certificate at startup and would fail its health
+      # check.
+      - name: Ensure the staging database certificate exists
+        run: >-
+          bash /root/FuelFlow/deploy/ensure-postgres-tls.sh
+          --dir /root/FuelFlow/deploy/certs/postgres-staging
+          --host postgres
+          --ca-subject "FuelFlow staging database CA"
+
       - name: Resolve image tags
         id: tags
         env:
@@ -1734,6 +1766,21 @@ jobs:
           curl -fsS -H "Host: fuelflow-staging-backend" http://127.0.0.1:18080/health
           curl -fsS http://127.0.0.1:15000/ -o /dev/null
           curl -fsS http://127.0.0.1:15001/ -o /dev/null
+
+      # The smoke test above proves the API boots and reaches /health. This proves
+      # WHY it can: the connection is SSL and the server's certificate chains to
+      # staging's own CA. A connection string that merely says "SSL Mode=VerifyFull"
+      # would still have passed the smoke test if the CA were production's or the
+      # mode were silently ignored, so the check reads pg_stat_ssl on the live
+      # session and on every application connection. It runs after the smoke test
+      # on purpose: the health request is what opens the application connection.
+      - name: Prove the staging database connection is verified TLS
+        run: >-
+          bash /root/FuelFlow/deploy/assert-postgres-tls.sh
+          --env-file /root/FuelFlow/deploy/.env.staging
+          --ca /root/FuelFlow/deploy/certs/postgres-staging/ca.crt
+          --different-from /root/FuelFlow/deploy/certs/postgres/ca.crt
+          --container fuelflow-staging-postgres
 
   # Deploys to the single Hetzner production server after every green push to main — but
   # ONLY after staging above deployed and smoke-tested clean (staging-gate flow).
