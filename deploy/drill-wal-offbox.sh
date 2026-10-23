@@ -65,10 +65,10 @@ source "$SCRIPT_DIR/wal-offbox.sh"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
-# R2 answers the very first request against a fresh prefix with a 501 NotImplemented, and
-# rclone retries the writes but not always the listings - the first run of this drill
-# printed an empty object list for objects that were demonstrably there. So a listing that
-# comes back empty is retried a few times before it is believed.
+# R2 answers the very first request against a fresh prefix with 501 NotImplemented (the
+# real-R2 drill shows it on every upload, and rclone retries the writes by itself). A
+# listing is a single request, so it is retried here rather than trusted on the first
+# answer: the drill's evidence must never be an empty list that means "not yet".
 rclone_lsf() {
   local remote="$1" out attempt
   shift
