@@ -22,12 +22,14 @@
 #   append-only   SI (+ a narrow column update where a row is "closed" in place) -
 #                 audit and ledger records: written once, never rewritten, never deleted
 #   read-only     S     - none today
-#   migration-only -    - none today (migrator-owned objects carry no app grant)
+#   migration-only -    - the EF migration history: the migrator owns it, the
+#                 application never reads it
 #
 # WARNING: the blank maintenance column means the maintenance role has NO grants on the
 # table - it is not "inherit from app". The roles do not inherit from each other.
 
 schema	table	app	maintenance	notes
+public	__EFMigrationsHistory	-	-	The EF Core migration history; the migrator owns it and the application never reads it.
 public	accounting_periods	SIUD	-	Accounting-period lifecycle is ordinary product data.
 public	app_settings	SIUD	S	Runtime settings are read and written by the admin surface.
 public	attestation_keys	SIUD	-	App Attest key registry; written by the attestation endpoints.
@@ -70,6 +72,7 @@ public	provider_event_outbox	SI	SD	The admin change audit trail: inserted by Aud
 public	purchase_batches	SIUD	S	Costing records for imported stock; never purged. Maintenance reads it only for the voucher_imports reference check.
 public	push_tokens	SIU	SD	Retention purges stale tokens as fuelflow_maintenance.
 public	qr_parameters	SIU	SD	Retention purges unreferenced QR configs as fuelflow_maintenance.
+public	redemption_statement_rows	SI+U(status,resolved_at_utc,resolved_by_user_id,resolution_note)	-	Imported supplier evidence: inserted once, resolved in place, never deleted.
 public	refresh_tokens	SIU	SD	Retention purges dead sessions as fuelflow_maintenance.
 public	refunds	S	-	A view over payments for humans (a psql session, a spreadsheet); not in the EF model, read-only for the app.
 public	roles	SIUD	-	Seeded at startup and listed by the admin surface.
@@ -85,5 +88,6 @@ public	voucher_events	SI	-	Append-only "who did this, and when" for voucher acti
 public	voucher_import_errors	SIUD	-	Per-row import errors, purged with their batch.
 public	voucher_imports	SIU	SD	Retention purges finished imports as fuelflow_maintenance.
 public	voucher_movements	SI	-	Append-only custody ledger: where the paper is, and how it got there (#319).
+public	voucher_redemptions	SI+U(status,confirmed_at_utc,confirmed_by_user_id,closed_at_utc,closed_by_user_id,resolution_note,updated_at_utc)	-	Claim lifecycle history: inserted once, closed in place, never deleted.
 public	voucher_term_pricing	SIUD	-	Term-pricing admin CRUD.
 public	webhook_events	SI+U(status,processed_at_utc,processing_started_at_utc,error,attempts)	-	Webhook dedup log: inserted once, closed by updating the outcome columns; never deleted.

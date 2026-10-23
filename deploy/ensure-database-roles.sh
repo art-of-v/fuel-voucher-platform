@@ -504,10 +504,18 @@ SQL
 # Turn the matrix into SQL. The privilege letters: S=SELECT, I=INSERT, U=UPDATE,
 # D=DELETE; U(col,...) narrows the update to those columns; "-" means nothing at all.
 # Rows for relations that do not exist yet are skipped (forward-safety, above).
+#
+# The generated SQL quotes the schema and table name: __EFMigrationsHistory is
+# mixed-case, and unquoted public.__EFMigrationsHistory would name a different
+# (lowercase) relation. The matrix's own key stays unquoted for the existence check.
 awk -F'\t' \
     -v app_role="$APP_ROLE" \
     -v maint_role="$MAINTENANCE_ROLE" \
     -v live_tables="$existing_tables" '
+  function quote_ident(name) {
+    gsub(/"/, "\"\"", name)
+    return "\"" name "\""
+  }
   function emit_privs(priv, role, qname,    base, cols, out) {
     base = priv; cols = ""
     if (match(priv, /\+U\(/)) {
@@ -530,10 +538,11 @@ awk -F'\t' \
   {
     qname = $1 "." $2
     if (!(qname in exists)) next
-    print "REVOKE ALL ON TABLE " qname " FROM " app_role ";"
-    print "REVOKE ALL ON TABLE " qname " FROM " maint_role ";"
-    if ($3 != "-") emit_privs($3, app_role, qname)
-    if ($4 != "-") emit_privs($4, maint_role, qname)
+    sqlname = quote_ident($1) "." quote_ident($2)
+    print "REVOKE ALL ON TABLE " sqlname " FROM " app_role ";"
+    print "REVOKE ALL ON TABLE " sqlname " FROM " maint_role ";"
+    if ($3 != "-") emit_privs($3, app_role, sqlname)
+    if ($4 != "-") emit_privs($4, maint_role, sqlname)
   }' "$MATRIX_FILE" | psql_super
 
 # hangfire stays Hangfire's own: whatever the job queue creates in its schema keeps

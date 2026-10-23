@@ -295,6 +295,9 @@ else
       CREATE TABLE public.outbox_events(id integer PRIMARY KEY, event_type text, processed boolean NOT NULL DEFAULT false, processed_at_utc timestamptz);
       CREATE TABLE public.webhook_events(id integer PRIMARY KEY, status text, processed_at_utc timestamptz, processing_started_at_utc timestamptz, error text, attempts integer NOT NULL DEFAULT 1, payload text);
       CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, payload text);
+      CREATE TABLE public.voucher_redemptions(id integer PRIMARY KEY, status text, confirmed_at_utc timestamptz, confirmed_by_user_id uuid, closed_at_utc timestamptz, closed_by_user_id uuid, resolution_note text, updated_at_utc timestamptz, reported_liters numeric);
+      CREATE TABLE public.redemption_statement_rows(id integer PRIMARY KEY, status text, resolved_at_utc timestamptz, resolved_by_user_id uuid, resolution_note text, external_id text);
+      CREATE TABLE public.\"__EFMigrationsHistory\"(id integer);
     " 2>&1)"; rc=$?
     check "the migration role may create the stub tables" "0" "$rc"
 
@@ -371,6 +374,38 @@ else
     check_denied "the application role may NOT delete the provider event audit trail" "$rc"
     out="$(as_maint "DELETE FROM public.provider_event_outbox WHERE false" 2>&1)"; rc=$?
     check "the maintenance role may purge the provider event audit trail" "0" "$rc"
+
+    # voucher_redemptions and redemption_statement_rows: SI + the columns the decision
+    # paths close in place. The evidence itself (the claimed litres, the supplier's line
+    # id) is not writable after the insert, and neither table is deletable.
+    out="$(as_app "INSERT INTO public.voucher_redemptions(id, status) VALUES (1, 'Reported')" 2>&1)"; rc=$?
+    check "the application role may record a redemption claim" "0" "$rc"
+    out="$(as_app "UPDATE public.voucher_redemptions SET status = 'Confirmed', confirmed_at_utc = now(), confirmed_by_user_id = NULL, closed_at_utc = now(), closed_by_user_id = NULL, resolution_note = 'checked', updated_at_utc = now() WHERE false" 2>&1)"; rc=$?
+    check "the application role may close a redemption claim" "0" "$rc"
+    out="$(as_app "UPDATE public.voucher_redemptions SET reported_liters = reported_liters WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite the claimed litres" "$rc"
+    out="$(as_app "DELETE FROM public.voucher_redemptions WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete a redemption claim" "$rc"
+    out="$(as_maint "DELETE FROM public.voucher_redemptions WHERE false" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT delete a redemption claim" "$rc"
+
+    out="$(as_app "INSERT INTO public.redemption_statement_rows(id, external_id, status) VALUES (1, 'line-1', 'Matched')" 2>&1)"; rc=$?
+    check "the application role may import a statement line" "0" "$rc"
+    out="$(as_app "UPDATE public.redemption_statement_rows SET status = 'Confirmed', resolved_at_utc = now(), resolved_by_user_id = NULL, resolution_note = 'checked' WHERE false" 2>&1)"; rc=$?
+    check "the application role may resolve a statement line" "0" "$rc"
+    out="$(as_app "UPDATE public.redemption_statement_rows SET external_id = external_id WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite the supplier's line id" "$rc"
+    out="$(as_app "DELETE FROM public.redemption_statement_rows WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete a statement line" "$rc"
+    out="$(as_maint "DELETE FROM public.redemption_statement_rows WHERE false" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT delete a statement line" "$rc"
+
+    # __EFMigrationsHistory: migration-only, and its name is mixed-case. The app and the
+    # maintenance role get nothing; the quoted REVOKE is what makes the row applicable.
+    out="$(as_app "SELECT count(*) FROM public.\"__EFMigrationsHistory\"" 2>&1)"; rc=$?
+    check_denied "the application role may NOT read the EF migration history" "$rc"
+    out="$(as_maint "SELECT count(*) FROM public.\"__EFMigrationsHistory\"" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT read the EF migration history" "$rc"
 
     # outbox_events: SIU for the app; SD for maintenance. The app's UPDATE covers the whole
     # row: EF Core's Update(entity) writes every column, so a column-level grant refuses the
