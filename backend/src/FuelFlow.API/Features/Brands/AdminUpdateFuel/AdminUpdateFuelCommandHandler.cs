@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FuelFlow.Features.Pricing;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Time;
@@ -108,6 +109,41 @@ public sealed class AdminUpdateFuelCommandHandler
         // The price, or null when we cannot know it - see the create path above.
         var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
             request.SupplierPricePerLiter, request.MarginUahPerLiter);
+
+        // The numbers themselves, refused here rather than by the database. The checks the database
+        // makes are real (ck_fuel_types_margin_signs, ck_fuel_types_allow_below_cost_needs_a_cost),
+        // but a check constraint answers "23514" and names neither the knob nor the operator, and a
+        // zero cost is one the constraints let through and the pricing must not: a litre we paid
+        // nothing for has no cost to guard a sale against.
+        if (FuelEconomics.Fault(request.SupplierPricePerLiter, request.MarginUahPerLiter, request.AllowBelowCost)
+            is { } fault)
+        {
+            return new AdminUpdateFuelResult { Error = fault.Error, Field = fault.Field };
+        }
+
+        // A fuel that has live stock on the shelf keeps a price of its own. The stock is already on
+        // sale, and the price the customer is charged is computed from the fuel's cost and margin -
+        // so taking either of them away here does not reprice the stock, it strands it: the storefront
+        // stops listing it as buyable and the sale is refused at checkout. A fuel with no stock behind
+        // it may be unpriced: it is a card nobody buys yet.
+        var liveStock = await _context.FuelVouchers
+            .Where(VoucherDeletionGuard.IsStock)
+            .AnyAsync(v => v.FuelTypeId == fuel.Id && v.DataKind != DataKinds.Qa, ct);
+
+        if (liveStock)
+        {
+            var resulting = FuelEconomics.State(request.SupplierPricePerLiter, request.MarginUahPerLiter);
+            if (!resulting.IsPriced)
+            {
+                return new AdminUpdateFuelResult
+                {
+                    Error = $"This fuel has live stock on the shelf, so it must keep a price of its own: "
+                              + $"{FuelEconomics.Missing(resulting)}. Set the cost and the margin, or take "
+                              + "the stock off the shelf first.",
+                    Field = resulting.HasCost ? nameof(request.MarginUahPerLiter) : nameof(request.SupplierPricePerLiter)
+                };
+            }
+        }
 
         // The reference and the price are computed, so there is nothing to write for them here either.
         // The operator's four knobs are the whole truth: the cost, the margin, the column price and

@@ -126,8 +126,30 @@ public sealed record BrandFuelPriceSpreadDto
 public sealed record CreateFuelRequest
 {
     public string Name { get; init; } = null!;
-    public decimal SupplierPricePerLiter { get; init; }
-    public decimal MarginUahPerLiter { get; init; }
+
+    /// <summary>
+    /// The supplier cost per litre, or null when the cost is not stated yet.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nullable, and it has to stay nullable.</b> It used to be a plain <c>decimal</c>, which
+    /// turned "the operator has not entered the cost" into either a zero or a binding failure - and
+    /// the admin screen sends null for a blank field, so an operator pricing a fuel in two steps
+    /// (the cost arrives with the batch, the margin is set on the card) got a 400 from the screen
+    /// that was supposed to accept the half he had. A cost that is not stated is not a zero: a zero
+    /// cost is a litre we paid nothing for, which has no cost to guard a sale against.
+    /// </remarks>
+    public decimal? SupplierPricePerLiter { get; init; }
+
+    /// <summary>
+    /// The margin per litre, or null when the margin is not stated yet.
+    /// </summary>
+    /// <remarks>
+    /// Nullable for the same reason as the cost. A stated zero is a decision - the fuel is sold at
+    /// cost - and the database accepts it (<c>ck_fuel_types_margin_signs</c> pins the margin at zero
+    /// or more); a null is a gap, and a fuel with a gap has no price until it is filled in.
+    /// </remarks>
+    public decimal? MarginUahPerLiter { get; init; }
+
     public decimal? MarginPercent { get; init; }
     public decimal FinalPricePerLiter { get; init; }
     public decimal? PumpPricePerLiter { get; init; }

@@ -104,6 +104,17 @@ public sealed class ImportBatchBulkActionQueryHandler
                     string.Join(", ", uncosted.Take(10).Select(v => v.VoucherNumber)),
                     0);
             }
+
+            // The same gate the id-based action has, for the same reason: the price the customer is
+            // charged comes from the FUEL's cost and margin, so a batch whose fuel has no margin is
+            // a batch with no price to sell at - refused here rather than at checkout.
+            var liveFuelIds = FuelEconomicsGate.LiveFuelTypeIds(vouchers);
+            var economicsRefusal = await FuelEconomicsGate.RefusalAsync(
+                _context, liveFuelIds, cancellationToken);
+            if (economicsRefusal is not null)
+            {
+                return new ImportBatchBulkActionResult(false, economicsRefusal, 0);
+            }
         }
 
         var to = query.Action == "activate" ? VoucherStatus.Available : VoucherStatus.Deactivated;

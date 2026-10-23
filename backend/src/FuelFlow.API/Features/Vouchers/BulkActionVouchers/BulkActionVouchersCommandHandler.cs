@@ -196,6 +196,20 @@ public sealed class BulkActionVouchersCommandHandler
                         Success = false,
                         Error = $"Cannot activate — enter the cost (собівартість) first for {uncosted.Count} voucher(s): {string.Join(", ", uncosted.Take(10).Select(e => e.VoucherNumber))}"
                     };
+
+                // The fuel's own economics, for the live pool. The gate above asks what THIS voucher
+                // cost us; the price the customer is charged is computed from the FUEL's cost and
+                // margin, so a fuel with no margin has no price whatever the vouchers carry - and the
+                // sale is refused at checkout, in front of the customer. Asked here, where the answer
+                // can still be acted on.
+                var liveFuelIds = FuelEconomicsGate.LiveFuelTypeIds(entities);
+                var economicsRefusal = await FuelEconomicsGate.RefusalAsync(
+                    _context, liveFuelIds, cancellationToken);
+                if (economicsRefusal is not null)
+                {
+                    return new BulkActionResult { Success = false, Error = economicsRefusal };
+                }
+
                 foreach (var e in entities) { e.Status = VoucherStatus.Available; e.UpdatedAtUtc = now; RecordStatusChange(e, preImages[e.Id], VoucherStatus.Available, now, actor); }
                 break;
             }
