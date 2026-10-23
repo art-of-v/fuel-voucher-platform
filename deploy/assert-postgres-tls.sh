@@ -61,6 +61,9 @@ done
 [[ -f "$ENV_FILE" ]] || fail "env file not found: $ENV_FILE"
 [[ -n "$CA" ]] || fail "--ca is required"
 [[ -f "$CA" ]] || fail "CA certificate not found: $CA"
+# Docker wants an absolute host path for a bind mount, and the manual invocation in
+# the usage above passes a relative one.
+CA="$(cd "$(dirname "$CA")" && pwd)/$(basename "$CA")"
 
 command -v docker > /dev/null 2>&1 || fail "docker is not on this host"
 command -v openssl > /dev/null 2>&1 || fail "openssl is not on this host"
