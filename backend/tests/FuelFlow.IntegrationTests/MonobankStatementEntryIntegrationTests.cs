@@ -146,8 +146,7 @@ public sealed class MonobankStatementEntryIntegrationTests : IClassFixture<TestD
 
     private async Task ResetAsync()
     {
-        using var scope = _fixture.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await using var context = _fixture.CreateOwnerContext();
         await context.Database.ExecuteSqlRawAsync(
             """TRUNCATE TABLE "monobank_statement_entries" RESTART IDENTITY CASCADE""");
     }

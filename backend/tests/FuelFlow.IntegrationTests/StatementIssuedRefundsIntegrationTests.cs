@@ -55,7 +55,7 @@ public sealed class StatementIssuedRefundsIntegrationTests : IClassFixture<TestD
     /// </summary>
     private async Task ResetAsync()
     {
-        await using var context = Context();
+        await using var context = _fixture.CreateOwnerContext();
         await context.Database.ExecuteSqlRawAsync(
             """TRUNCATE TABLE "monobank_statement_entries" RESTART IDENTITY CASCADE""");
         await context.Database.ExecuteSqlRawAsync(

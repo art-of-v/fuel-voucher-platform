@@ -156,6 +156,31 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             .UseNpgsql(MaintenanceConnectionString)
             .Options, TestQrCipher.Instance);
 
+    /// <summary>
+    /// A context on THIS class's private clone connected as the cluster's owner - the role the
+    /// test harness itself works through.
+    /// </summary>
+    /// <remarks>
+    /// The harness sets the stage; the application under test is the thing that runs as
+    /// <c>fuelflow_app</c>, and the suite proves that the traffic role can do everything
+    /// production asks of it. TRUNCATE and DDL are staging operations, and they are deliberately
+    /// NOT privileges the traffic role has: a TRUNCATE on <c>payments</c> would let a single
+    /// defect erase the ledger in one statement, which is the very thing the ledger's
+    /// immutability rules exist to prevent. A harness that reset as the traffic role would
+    /// therefore fail on its own reset rather than on the application's behaviour - and the
+    /// obvious way to make it pass would be to hand the traffic role the privilege.
+    /// <para>
+    /// Reading through this context also sees every row: the owner bypasses the row-level
+    /// policies the traffic role lives under. That is what a probe that looks into the database
+    /// while a request is still running needs - a unit of work opened during a request, but
+    /// outside the request's own scope, resolves to the anonymous tenant and would see nothing.
+    /// </para>
+    /// </remarks>
+    public ApplicationDbContext CreateOwnerContext()
+        => new(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(ConnectionString)
+            .Options, TestQrCipher.Instance);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Development env so startup-time config reads (AddJwtAuth, AddDatabase) resolve the

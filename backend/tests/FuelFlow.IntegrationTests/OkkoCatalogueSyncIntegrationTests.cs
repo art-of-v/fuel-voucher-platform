@@ -306,7 +306,10 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await SeedOperatorTypedFuelsAsync(context);
 
-        await context.Database.ExecuteSqlRawAsync(
+        // The constraint is schema, and the schema is the owner's business: the traffic role
+        // has no DDL privilege, and it must not have one.
+        await using var owner = _fixture.CreateOwnerContext();
+        await owner.Database.ExecuteSqlRawAsync(
             "ALTER TABLE fuel_types ADD CONSTRAINT ck_rejects_one_name CHECK (name <> 'ДП')");
 
         try
@@ -337,7 +340,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         }
         finally
         {
-            await context.Database.ExecuteSqlRawAsync(
+            await owner.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE fuel_types DROP CONSTRAINT ck_rejects_one_name");
         }
     }
