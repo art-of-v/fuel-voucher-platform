@@ -63,7 +63,7 @@ public	operator_legal_entities	SIUD	-	Operator-side legal entity CRUD.
 public	order_events	SI	-	Append-only order history: written by the SaveChanges interceptor, never rewritten.
 public	order_line_items	SIUD	-	DeletedUnpaidOrderCleanup removes the lines of abandoned orders.
 public	orders	SIUD	-	Order lifecycle incl. hard delete of abandoned unpaid orders; RLS-covered.
-public	outbox_events	SI+U(processed,processed_at_utc)	SD	The dispatcher closes a row by updating exactly processed and processed_at_utc; retention purges as maintenance.
+public	outbox_events	SIU	SD	The dispatcher closes a row by updating it. The grant is on the table, not on two columns: EF Core's Update(entity) writes every column of the row, so a column-level grant refuses the dispatcher's own save. The row is still never deletable by the traffic role; the purge empties it as maintenance.
 public	parties	SIUD	-	Party supertype rows behind persons and companies.
 public	payments	SIU	-	Payment status moves through webhooks; a payment is never deleted.
 public	provider_event_outbox	SI	SD	The admin change audit trail: inserted by AuditEventService, read by the audit screens, purged after a year as maintenance.
