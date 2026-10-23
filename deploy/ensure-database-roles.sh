@@ -476,12 +476,14 @@ fi
 # (GRANT UPDATE (processed) ...) lives in its own place and survives it. So the
 # column-level UPDATE grants are revoked first, over every column of every public
 # relation - otherwise a column the matrix no longer names would keep its privilege
-# forever, and the matrix would stop being the whole truth.
+# forever, and the matrix would stop being the whole truth. The column names are
+# quoted for the same reason as the table names: __EFMigrationsHistory's columns are
+# mixed-case, and an unquoted MigrationId in the column list folds to migrationid.
 psql_super \
   -v app_role="$APP_ROLE" \
   -v maint_role="$MAINTENANCE_ROLE" <<'SQL'
 SELECT format('REVOKE UPDATE (%s) ON TABLE %I.%I FROM %I',
-              (SELECT string_agg(a.attname, ', ' ORDER BY a.attname)
+              (SELECT string_agg(format('%I', a.attname), ', ' ORDER BY a.attname)
                  FROM pg_attribute a
                 WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
               n.nspname, c.relname, :'app_role')
@@ -491,7 +493,7 @@ SELECT format('REVOKE UPDATE (%s) ON TABLE %I.%I FROM %I',
                 WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) \gexec
 
 SELECT format('REVOKE UPDATE (%s) ON TABLE %I.%I FROM %I',
-              (SELECT string_agg(a.attname, ', ' ORDER BY a.attname)
+              (SELECT string_agg(format('%I', a.attname), ', ' ORDER BY a.attname)
                  FROM pg_attribute a
                 WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
               n.nspname, c.relname, :'maint_role')

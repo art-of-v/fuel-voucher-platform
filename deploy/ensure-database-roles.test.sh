@@ -297,7 +297,7 @@ else
       CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, payload text);
       CREATE TABLE public.voucher_redemptions(id integer PRIMARY KEY, status text, confirmed_at_utc timestamptz, confirmed_by_user_id uuid, closed_at_utc timestamptz, closed_by_user_id uuid, resolution_note text, updated_at_utc timestamptz, reported_liters numeric);
       CREATE TABLE public.redemption_statement_rows(id integer PRIMARY KEY, status text, resolved_at_utc timestamptz, resolved_by_user_id uuid, resolution_note text, external_id text);
-      CREATE TABLE public.\"__EFMigrationsHistory\"(id integer);
+      CREATE TABLE public.\"__EFMigrationsHistory\"(\"MigrationId\" text PRIMARY KEY, \"ProductVersion\" text);
     " 2>&1)"; rc=$?
     check "the migration role may create the stub tables" "0" "$rc"
 
@@ -400,8 +400,10 @@ else
     out="$(as_maint "DELETE FROM public.redemption_statement_rows WHERE false" 2>&1)"; rc=$?
     check_denied "the maintenance role may NOT delete a statement line" "$rc"
 
-    # __EFMigrationsHistory: migration-only, and its name is mixed-case. The app and the
-    # maintenance role get nothing; the quoted REVOKE is what makes the row applicable.
+    # __EFMigrationsHistory: migration-only, and its name and columns are mixed-case. The
+    # app and the maintenance role get nothing; the quoted REVOKE is what makes the row
+    # applicable, and the quoted column list is what lets the broad column-level REVOKE
+    # touch it without turning MigrationId into migrationid.
     out="$(as_app "SELECT count(*) FROM public.\"__EFMigrationsHistory\"" 2>&1)"; rc=$?
     check_denied "the application role may NOT read the EF migration history" "$rc"
     out="$(as_maint "SELECT count(*) FROM public.\"__EFMigrationsHistory\"" 2>&1)"; rc=$?
