@@ -19,13 +19,27 @@ describe('deviceSignature', () => {
 
   it('builds the request payload with the body and timestamp in a fixed order', () => {
     expect(
-      buildRequestSignaturePayload('device-1', 'POST', '/api/purchases', '{"x":1}', '1700000000000'),
-    ).toBe('FuelFlow-DeviceSignature-v2\nrequest\ndevice-1\nPOST\n/api/purchases\n1700000000000\n{"x":1}');
+      buildRequestSignaturePayload(
+        'device-1',
+        'POST',
+        '/api/purchases',
+        '{"x":1}',
+        '1700000000000',
+      ),
+    ).toBe(
+      'FuelFlow-DeviceSignature-v2\nrequest\ndevice-1\nPOST\n/api/purchases\n1700000000000\n{"x":1}',
+    );
   });
 
   it('drops the query string, because the server signs the path only', () => {
     expect(
-      buildRequestSignaturePayload('device-1', 'POST', '/api/purchases?ignored=1', '', '1700000000000'),
+      buildRequestSignaturePayload(
+        'device-1',
+        'POST',
+        '/api/purchases?ignored=1',
+        '',
+        '1700000000000',
+      ),
     ).toBe('FuelFlow-DeviceSignature-v2\nrequest\ndevice-1\nPOST\n/api/purchases\n1700000000000\n');
   });
 });
