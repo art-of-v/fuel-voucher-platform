@@ -98,15 +98,16 @@ public sealed class VoucherPayloadCapabilityTests : IClassFixture<TestDatabaseFi
     }
 
     [Fact]
-    public async Task A_Manager_Keeps_The_Verification_Numbers_And_Not_The_Image()
+    public async Task A_Manager_Keeps_The_Decode_Integrity_Numbers_And_Not_The_Image()
     {
-        // The verification's image IS the redeemable code, so it leaves the process only for the
-        // roles that hold the capability. The numbers are the verification's RESULT - the mismatch
-        // percent and the module counts - and an operator checking a printed voucher needs them.
+        // The response's image IS the redeemable code, so it leaves the process only for the roles
+        // that hold the capability. The numbers are the matrix check's result - and an operator
+        // checking a printed voucher needs them, together with the statement that they do not prove
+        // who issued it.
         var voucherId = await SeedVoucherAsync();
         var manager = await StaffClientAsync("+15550009104", SeedRoles.ManagerName);
 
-        var response = await manager.GetAsync($"/api/admin/vouchers/{voucherId}/verification");
+        var response = await manager.GetAsync($"/api/admin/vouchers/{voucherId}/decode-integrity");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadAsStringAsync();
@@ -115,6 +116,8 @@ public sealed class VoucherPayloadCapabilityTests : IClassFixture<TestDatabaseFi
 
         root.GetProperty("qrCodeBase64").ValueKind.Should().Be(JsonValueKind.Null);
         root.GetProperty("voucherNumber").GetString().Should().NotBeNullOrEmpty();
+        root.GetProperty("decodeIntegrity").GetString().Should().Be("NotChecked");
+        root.GetProperty("supplierProvenance").GetString().Should().Be("Unverified");
     }
 
     private async Task<Guid> SeedVoucherAsync()

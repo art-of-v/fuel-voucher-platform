@@ -32,8 +32,8 @@ public sealed record ImportVouchersResponse(
     int Imported,
     int Duplicates,
     int Failed,
-    int VerificationFailed,
-    int VerifiedWithWarnings,
+    int DecodeIntegrityFailed,
+    int DecodeIntegrityWarning,
     double DurationSeconds,
     IReadOnlyList<ImportErrorLine>? Errors = null
 );

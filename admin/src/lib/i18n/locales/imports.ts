@@ -7,7 +7,10 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.activateAll": "Activate all",
     "imports.deactivateAll": "Deactivate all",
     "imports.number": "Number",
-    "imports.verification": "Verification",
+    "imports.decodeIntegrity": "QR decode integrity",
+    "imports.supplier": "Supplier (declared)",
+    "imports.decodeIntegrityHint":
+      "The QR check compares the printed matrix with the decoded payload. A match is not proof of authenticity: no supplier signature, serial or registry is checked — reconcile each batch with the supplier's delivery note and invoice.",
     "imports.noVouchers": "No vouchers in this import",
     "imports.batchCostsTitle": "Batch costs",
     "imports.batchCostsHint":
@@ -99,7 +102,10 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.activateAll": "Активувати всі",
     "imports.deactivateAll": "Деактивувати всі",
     "imports.number": "Номер",
-    "imports.verification": "Верифікація",
+    "imports.decodeIntegrity": "Цілісність QR-декодування",
+    "imports.supplier": "Постачальник (заявлений)",
+    "imports.decodeIntegrityHint":
+      "Перевірка QR порівнює надруковану матрицю з декодованим вмістом. Збіг не доводить справжність: підпис постачальника, серійний номер чи реєстр не перевіряються — звіряйте кожну партію з накладною та видатковою постачальника.",
     "imports.noVouchers": "Немає ваучерів у цьому імпорті",
     "imports.batchCostsTitle": "Собівартість партій",
     "imports.batchCostsHint":
@@ -214,7 +220,10 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.activateAll": "Alle aktivieren",
     "imports.deactivateAll": "Alle deaktivieren",
     "imports.number": "Nummer",
-    "imports.verification": "Prüfung",
+    "imports.decodeIntegrity": "QR-Dekodierungsintegrität",
+    "imports.supplier": "Lieferant (angegeben)",
+    "imports.decodeIntegrityHint":
+      "Die QR-Prüfung vergleicht die gedruckte Matrix mit der dekodierten Nutzlast. Eine Übereinstimmung beweist keine Echtheit: Es wird weder eine Lieferantensignatur noch eine Seriennummer oder ein Register geprüft – gleichen Sie jede Charge mit Lieferschein und Rechnung des Lieferanten ab.",
     "imports.noVouchers": "Keine Gutscheine in diesem Import",
     "imports.batchCostsTitle": "Chargenkosten",
     "imports.batchCostsHint":
@@ -306,7 +315,10 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.activateAll": "Activar todos",
     "imports.deactivateAll": "Desactivar todos",
     "imports.number": "Número",
-    "imports.verification": "Verificación",
+    "imports.decodeIntegrity": "Integridad de decodificación QR",
+    "imports.supplier": "Proveedor (declarado)",
+    "imports.decodeIntegrityHint":
+      "La comprobación QR compara la matriz impresa con el contenido decodificado. Una coincidencia no demuestra autenticidad: no se comprueba firma, número de serie ni registro del proveedor; concilie cada lote con el albarán y la factura del proveedor.",
     "imports.noVouchers": "No hay vales en esta importación",
     "imports.batchCostsTitle": "Coste por lote",
     "imports.batchCostsHint":

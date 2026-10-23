@@ -2786,7 +2786,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_voucher_events_status_changed", "(event_type = 'StatusChanged') = (from_status IS NOT NULL AND to_status IS NOT NULL) AND (event_type <> 'StatusChanged' OR from_status <> to_status)");
 
-                            t.HasCheckConstraint("ck_voucher_events_statuses", "(from_status IS NULL OR from_status IN ('Imported','VerifiedWithWarnings','VerificationFailed','Available','Assigned','Used','Expired','Blocked','Deactivated')) AND (to_status IS NULL OR to_status IN ('Imported','VerifiedWithWarnings','VerificationFailed','Available','Assigned','Used','Expired','Blocked','Deactivated'))");
+                            t.HasCheckConstraint("ck_voucher_events_statuses", "(from_status IS NULL OR from_status IN ('Imported','DecodeIntegrityWarning','DecodeIntegrityFailed','Available','Assigned','Used','Expired','Blocked','Deactivated')) AND (to_status IS NULL OR to_status IN ('Imported','DecodeIntegrityWarning','DecodeIntegrityFailed','Available','Assigned','Used','Expired','Blocked','Deactivated'))");
 
                             t.HasCheckConstraint("ck_voucher_events_type", "event_type IN ('Imported','StatusChanged','Extended','Archived','Unarchived')");
                         });
@@ -2975,6 +2975,21 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("liters")
                         .HasComment("How many litres this voucher's paper is for.");
 
+                    b.Property<decimal?>("MatrixMismatchPercent")
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("matrix_mismatch_percent")
+                        .HasComment("How far the printed QR matrix disagreed with the decoded payload, as a percentage. NULL when the matrix could not be checked. Not a measure of authenticity.");
+
+                    b.Property<int?>("MatrixMismatchedModules")
+                        .HasColumnType("integer")
+                        .HasColumnName("matrix_mismatched_modules")
+                        .HasComment("How many QR modules disagreed between the printed matrix and the regenerated one.");
+
+                    b.Property<int?>("MatrixTotalModules")
+                        .HasColumnType("integer")
+                        .HasColumnName("matrix_total_modules")
+                        .HasComment("How many QR modules were compared.");
+
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id")
@@ -3023,21 +3038,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("used_at_utc")
                         .HasComment("When this voucher was actually refuelled with. Set once, when it is marked used; nevermoved afterwards. NULL while the voucher is still unused.");
-
-                    b.Property<decimal?>("VerificationMismatchPercent")
-                        .HasColumnType("numeric(5,4)")
-                        .HasColumnName("verification_mismatch_percent")
-                        .HasComment("How far the verification of this voucher's modules disagreed, as a percentage. NULL whenit was never verified.");
-
-                    b.Property<int?>("VerificationMismatchedModules")
-                        .HasColumnType("integer")
-                        .HasColumnName("verification_mismatched_modules")
-                        .HasComment("How many modules disagreed.");
-
-                    b.Property<int?>("VerificationTotalModules")
-                        .HasColumnType("integer")
-                        .HasColumnName("verification_total_modules")
-                        .HasComment("How many modules were checked.");
 
                     b.Property<string>("VoucherNumber")
                         .IsRequired()
@@ -3128,7 +3128,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
 
-                            t.HasCheckConstraint("ck_voucher_status", "status IN ('Imported', 'VerifiedWithWarnings', 'VerificationFailed', 'Available',\n           'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')");
+                            t.HasCheckConstraint("ck_voucher_status", "status IN ('Imported', 'DecodeIntegrityWarning', 'DecodeIntegrityFailed', 'Available',\n           'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')");
                         });
                 });
 
@@ -3350,6 +3350,16 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("completed_at_utc")
                         .HasComment("When the import finished - successfully or not. NULL while it is still running, and thedatabase ties this to the status below.");
 
+                    b.Property<int>("DecodeIntegrityFailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("decode_integrity_failed_count")
+                        .HasComment("How many rows were read but failed the decode-integrity check: the printed QR matrix disagreed with the decoded payload by more than 2% of modules. Import QA, not a verdict on the supplier.");
+
+                    b.Property<int>("DecodeIntegrityWarningCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("decode_integrity_warning_count")
+                        .HasComment("How many rows passed the decode-integrity check with a 1-2% module mismatch - something odd in the image, not proof that the voucher is counterfeit or genuine.");
+
                     b.Property<int>("DuplicateCount")
                         .HasColumnType("integer")
                         .HasColumnName("duplicate_count")
@@ -3389,15 +3399,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("status")
                         .HasComment("Started, Completed or Failed - the three values the importer writes. This status gates thewhole intake, so it is pinned by a CHECK rather than left as free text.");
 
-                    b.Property<int>("VerificationFailedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("verification_failed_count")
-                        .HasComment("How many rows were read but did not verify - the code does not match the fuel, the litres donot match the code.");
-
-                    b.Property<int>("VerifiedWithWarningsCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("verified_with_warnings_count")
-                        .HasComment("How many rows verified but with a warning - read and checked, with something odd that did notstop them.");
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id")
+                        .HasComment("The supplier the operator declared for this delivery. An operator assertion, not a cryptographic or registry verification - no such check exists in the payload.");
 
                     b.HasKey("Id");
 
@@ -3407,6 +3412,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_voucher_imports_status");
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_voucher_imports_supplier_id");
 
                     b.ToTable("voucher_imports", null, t =>
                         {
@@ -5514,6 +5522,16 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImport", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>

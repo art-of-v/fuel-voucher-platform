@@ -62,9 +62,9 @@ public sealed class GetImportBatchVouchersQueryHandler
                 VoucherNumber = v.VoucherNumber,
                 Status = v.Status.ToString(),
                 CreatedAtUtc = v.CreatedAtUtc,
-                VerificationMismatchPercent = v.VerificationMismatchPercent,
-                VerificationMismatchedModules = v.VerificationMismatchedModules,
-                VerificationTotalModules = v.VerificationTotalModules
+                MatrixMismatchPercent = v.MatrixMismatchPercent,
+                MatrixMismatchedModules = v.MatrixMismatchedModules,
+                MatrixTotalModules = v.MatrixTotalModules
             })
             .ToListAsync(cancellationToken);
 

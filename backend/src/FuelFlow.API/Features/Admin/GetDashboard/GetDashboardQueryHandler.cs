@@ -24,8 +24,8 @@ public sealed class GetDashboardQueryHandler
         var availableVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Available || v.Status == VoucherStatus.Imported, cancellationToken);
         var assignedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Assigned, cancellationToken);
         var usedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Used, cancellationToken);
-        var verificationFailedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.VerificationFailed, cancellationToken);
-        var verifiedWithWarningsVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.VerifiedWithWarnings, cancellationToken);
+        var decodeIntegrityFailedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.DecodeIntegrityFailed, cancellationToken);
+        var decodeIntegrityWarningVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.DecodeIntegrityWarning, cancellationToken);
 
         // A company handing already-purchased fuel to a worker is not a sale — it would inflate
         // the order counters and, worse, book the handover as revenue the platform never earned.
@@ -73,7 +73,7 @@ public sealed class GetDashboardQueryHandler
 
         return new GetDashboardResponse(
             new GetDashboardResponse.UsersStats(totalUsers),
-            new GetDashboardResponse.VouchersStats(totalVouchers, availableVouchers, assignedVouchers, usedVouchers, verificationFailedVouchers, verifiedWithWarningsVouchers, byProvider),
+            new GetDashboardResponse.VouchersStats(totalVouchers, availableVouchers, assignedVouchers, usedVouchers, decodeIntegrityFailedVouchers, decodeIntegrityWarningVouchers, byProvider),
             new GetDashboardResponse.OrdersStats(totalOrders, pendingOrders, fulfilledOrders, revenueUah));
     }
 }

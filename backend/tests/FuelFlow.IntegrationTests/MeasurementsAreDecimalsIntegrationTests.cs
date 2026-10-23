@@ -11,7 +11,7 @@ namespace FuelFlow.IntegrationTests;
 /// <remarks>
 /// <para>
 /// Two columns in the schema were <c>double precision</c> and carried a measurement:
-/// <c>fuel_vouchers.verification_mismatch_percent</c> and
+/// <c>fuel_vouchers.matrix_mismatch_percent</c> and
 /// <c>feedback_messages.confidence</c>. Both are compared against a threshold - a mismatch
 /// percentage against the line that separates a warning from a failure, a classifier's confidence
 /// against the floor below which a message is dropped - and binary floating point cannot represent
@@ -38,7 +38,7 @@ public sealed class MeasurementsAreDecimalsIntegrationTests : IClassFixture<Test
     /// </summary>
     private static readonly string[] MeasurementColumns =
     [
-        "verification_mismatch_percent",
+        "matrix_mismatch_percent",
         "confidence",
         "margin_percent",
         "margin_uah_per_liter"

@@ -377,7 +377,7 @@ export default function ReconciliationTab() {
                   Assigned: "bg-warning/10 border-warning/30 text-warning",
                   Used: "bg-info/10 border-info/30 text-info",
                   Expired: "bg-muted border-border text-muted-foreground",
-                  VerificationFailed:
+                  DecodeIntegrityFailed:
                     "bg-destructive/10 border-destructive/30 text-destructive",
                 };
                 const c =

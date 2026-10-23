@@ -154,6 +154,7 @@ public sealed partial class ImportVouchersCommandHandler
             PageCount = 0,
             StartedAtUtc = SystemClock.UtcNow,
             Status = "Started",
+            SupplierId = supplierId,
             ImportedCount = 0,
             DuplicateCount = 0,
             FailedCount = 0

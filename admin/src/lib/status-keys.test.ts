@@ -25,8 +25,8 @@ describe("the status keys", () => {
 
   it("turns a voucher's state into its translation key", () => {
     expect(voucherStatusKey("Available")).toBe("available");
-    expect(voucherStatusKey("VerifiedWithWarnings")).toBe(
-      "verifiedWithWarnings",
+    expect(voucherStatusKey("DecodeIntegrityWarning")).toBe(
+      "decodeIntegrityWarning",
     );
   });
 });

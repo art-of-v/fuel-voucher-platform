@@ -10,7 +10,7 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
-using FuelFlow.Features.Vouchers.GetVoucherVerification;
+using FuelFlow.Features.Vouchers.GetVoucherDecodeIntegrity;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.UnblockVoucher;
@@ -775,23 +775,42 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result.Should().BeNull();
     }
 
-    // ── 7. GetVoucherVerificationQueryHandler ────────────────────────────────
+    // ── 7. GetVoucherDecodeIntegrityQueryHandler ────────────────────────────────
 
     [Fact]
-    public async Task GetVoucherVerification_ShouldReturnVerificationData()
+    public async Task GetVoucherDecodeIntegrity_ShouldSayWhatTheMatrixProves_AndWhatItDoesNot()
     {
+        var supplierId = await SeedSupplierAsync();
+        var supplierName = await _context.Suppliers
+            .Where(s => s.Id == supplierId)
+            .Select(s => s.Name)
+            .SingleAsync();
+
         var voucher = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-VERIFY-1");
+        voucher.SupplierId = supplierId;
+        voucher.MatrixMismatchPercent = 0m;
+        voucher.MatrixMismatchedModules = 0;
+        voucher.MatrixTotalModules = 441;
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new GetVoucherVerificationQueryHandler(_context, _qrGeneratorMock.Object);
-        var result = await handler.HandleAsync(new GetVoucherVerificationQuery(voucher.Id));
+        var handler = new GetVoucherDecodeIntegrityQueryHandler(_context, _qrGeneratorMock.Object);
+        var result = await handler.HandleAsync(new GetVoucherDecodeIntegrityQuery(voucher.Id));
 
         result.Should().NotBeNull();
         result!.VoucherId.Should().Be(voucher.Id);
         result.VoucherNumber.Should().Be("OKKO-VERIFY-1");
         result.Status.Should().Be(VoucherStatus.Assigned.ToString());
         result.QrCodeBase64.Should().Be("data:image/png;base64,base64-data");
+
+        // The matrix agrees with the payload. That is the whole claim: a counterfeit with a
+        // well-formed payload would produce the same answer, so the response must not call it
+        // authentic.
+        result.DecodeIntegrity.Should().Be("Matched");
+        result.MatrixMismatchPercent.Should().Be(0);
+        result.SupplierId.Should().Be(supplierId);
+        result.SupplierName.Should().Be(supplierName);
+        result.SupplierProvenance.Should().Be(GetVoucherDecodeIntegrityQueryHandler.SupplierProvenanceUnverified);
     }
 
 
@@ -831,6 +850,23 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result[0].FileName.Should().Be("vouchers.pdf");
         result[0].Status.Should().Be("Completed");
         result[0].VoucherCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetImportBatches_ShouldNameTheDeclaredSupplier()
+    {
+        var supplierId = await SeedSupplierAsync();
+        var import = CreateImport(importedCount: 1);
+        import.SupplierId = supplierId;
+        _context.VoucherImports.Add(import);
+        await _context.SaveChangesAsync();
+
+        var handler = new GetImportBatchesQueryHandler(_context);
+        var result = await handler.HandleAsync(new GetImportBatchesQuery());
+
+        result.Should().ContainSingle();
+        result[0].SupplierId.Should().Be(supplierId);
+        result[0].SupplierName.Should().Be("Seed Supplier");
     }
 
     [Fact]
@@ -995,6 +1031,12 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         saved[0].VoucherNumber.Should().Be(voucherNumber);
         saved[0].Status.Should().Be(VoucherStatus.Imported);
         saved[0].ImportJobId.Should().NotBeNull();
+
+        // The supplier is declared once for the delivery and copied onto every voucher; the batch
+        // keeps it too, so supplier/batch reconciliation can run before a cost batch exists.
+        saved[0].SupplierId.Should().Be(supplierId);
+        var importRow = await _context.VoucherImports.SingleAsync();
+        importRow.SupplierId.Should().Be(supplierId);
 
         // D-13: the voucher's first entry into the ledger. This is the one movement the table cannot
         // do without - a voucher's life starts here - and the reason `from_voucher_id` could not stay

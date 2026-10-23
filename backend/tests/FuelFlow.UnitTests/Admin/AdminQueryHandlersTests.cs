@@ -131,8 +131,8 @@ public sealed class AdminQueryHandlersTests : IDisposable
             CreateVoucher("okko", "okko-95", VoucherStatus.Imported),
             CreateVoucher("okko", "okko-95", VoucherStatus.Assigned),
             CreateVoucher("okko", "okko-95", VoucherStatus.Used),
-            CreateVoucher("okko", "okko-95", VoucherStatus.VerificationFailed),
-            CreateVoucher("okko", "okko-95", VoucherStatus.VerifiedWithWarnings),
+            CreateVoucher("okko", "okko-95", VoucherStatus.DecodeIntegrityFailed),
+            CreateVoucher("okko", "okko-95", VoucherStatus.DecodeIntegrityWarning),
             CreateVoucher("okko", "okko-95", VoucherStatus.Expired));
         _context.SaveChanges();
 
@@ -158,8 +158,8 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Vouchers.Available.Should().Be(2);
         response.Vouchers.Assigned.Should().Be(1);
         response.Vouchers.Used.Should().Be(1);
-        response.Vouchers.VerificationFailed.Should().Be(1);
-        response.Vouchers.VerifiedWithWarnings.Should().Be(1);
+        response.Vouchers.DecodeIntegrityFailed.Should().Be(1);
+        response.Vouchers.DecodeIntegrityWarning.Should().Be(1);
         response.Vouchers.ByProvider.Should().ContainSingle(v => v.Brand == "okko" && v.Count == 7);
 
         response.Orders.Total.Should().Be(3);
@@ -181,8 +181,8 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Vouchers.Available.Should().Be(0);
         response.Vouchers.Assigned.Should().Be(0);
         response.Vouchers.Used.Should().Be(0);
-        response.Vouchers.VerificationFailed.Should().Be(0);
-        response.Vouchers.VerifiedWithWarnings.Should().Be(0);
+        response.Vouchers.DecodeIntegrityFailed.Should().Be(0);
+        response.Vouchers.DecodeIntegrityWarning.Should().Be(0);
         response.Vouchers.ByProvider.Should().BeEmpty();
         response.Orders.Total.Should().Be(0);
         response.Orders.Pending.Should().Be(0);

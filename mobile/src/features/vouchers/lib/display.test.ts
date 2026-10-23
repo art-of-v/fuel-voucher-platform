@@ -286,7 +286,7 @@ describe('isLiveWalletVoucher', () => {
   it('rejects spent, lapsed and unavailable fuel', () => {
     // These are the statuses that leave an order with nothing to show, which is what drops a spent
     // order out of the wallet instead of listing a dead card.
-    ['Used', 'Expired', 'Blocked', 'Deactivated', 'Imported', 'VerificationFailed'].forEach(
+    ['Used', 'Expired', 'Blocked', 'Deactivated', 'Imported', 'DecodeIntegrityFailed'].forEach(
       (status) => expect(isLiveWalletVoucher({ status })).toBe(false),
     );
   });

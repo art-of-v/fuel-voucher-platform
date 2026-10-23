@@ -62,7 +62,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
     {
         VoucherStatus.Available,
         VoucherStatus.Imported,
-        VoucherStatus.VerifiedWithWarnings,
+        VoucherStatus.DecodeIntegrityWarning,
         VoucherStatus.Expired
     };
 
@@ -146,7 +146,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             .AsTracking()
             .Where(v => v.ImportJobId == command.NewImportId
                 && !v.IsDeleted
-                && (v.Status == VoucherStatus.Imported || v.Status == VoucherStatus.VerifiedWithWarnings))
+                && (v.Status == VoucherStatus.Imported || v.Status == VoucherStatus.DecodeIntegrityWarning))
             .Select(v => new VoucherExchangePairing.Candidate(v.Id, v.Brand, v.FuelTypeId, v.Liters, v.VoucherNumber))
             .ToListAsync(ct);
 
@@ -240,7 +240,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                     .SetProperty(v => v.UpdatedAtUtc, now), ct);
         }
 
-        // Expire the olds BEFORE repricing. The blended pool only counts Imported/VerifiedWithWarnings/
+        // Expire the olds BEFORE repricing. The blended pool only counts Imported/DecodeIntegrityWarning/
         // Available, so with the olds already Expired (and flushed by the save below) the reprice lands on
         // the post-exchange pool — no transient under-price.
         foreach (var v in olds)

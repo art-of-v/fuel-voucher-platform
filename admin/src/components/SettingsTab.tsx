@@ -714,7 +714,7 @@ function DataRetentionCard({
 
 /**
  * Expired-unsold voucher loss-booking switch. Controls the nightly ExpiredVoucherLossService, which
- * retires operator-owned stock that lapsed past its expiration date (Imported / VerifiedWithWarnings /
+ * retires operator-owned stock that lapsed past its expiration date (Imported / DecodeIntegrityWarning /
  * Available) to Expired, so per-batch P&L books its cost as a realised loss instead of phantom future
  * margin. Customer-owned (Assigned) vouchers are never touched — their expiry is the paid renewal flow's
  * concern. Off = dry-run (logs the loss it would book, mutates nothing); on = the nightly job flips

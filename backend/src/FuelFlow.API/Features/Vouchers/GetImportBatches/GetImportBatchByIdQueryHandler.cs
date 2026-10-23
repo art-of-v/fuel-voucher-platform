@@ -27,11 +27,13 @@ public sealed class GetImportBatchByIdQueryHandler
                 StartedAtUtc = i.StartedAtUtc,
                 CompletedAtUtc = i.CompletedAtUtc,
                 Status = i.Status,
+                SupplierId = i.SupplierId,
+                SupplierName = i.Supplier != null ? i.Supplier.Name : null,
                 ImportedCount = i.ImportedCount,
                 DuplicateCount = i.DuplicateCount,
                 FailedCount = i.FailedCount,
-                VerificationFailedCount = i.VerificationFailedCount,
-                VerifiedWithWarningsCount = i.VerifiedWithWarningsCount,
+                DecodeIntegrityFailedCount = i.DecodeIntegrityFailedCount,
+                DecodeIntegrityWarningCount = i.DecodeIntegrityWarningCount,
                 VoucherCount = _context.FuelVouchers.Count(v => v.ImportJobId == i.Id)
             })
             .FirstOrDefaultAsync(cancellationToken);

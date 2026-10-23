@@ -15,8 +15,8 @@ namespace FuelFlow.Features.Vouchers;
 /// nothing replaced it, so both paths went on to archive paid vouchers silently.
 /// </para>
 /// <para>
-/// A voucher is treated as paid or held when it has an order, an owner, or any status past
-/// verification. What remains archivable is stock that has never left stock.
+/// A voucher is treated as paid or held when it has an order, an owner, or any status past the
+/// import checks. What remains archivable is stock that has never left stock.
 /// </para>
 /// </summary>
 internal static class VoucherDeletionGuard
@@ -34,8 +34,8 @@ internal static class VoucherDeletionGuard
         voucher.OrderId == null
         && voucher.AssignedToUserId == null
         && (voucher.Status == VoucherStatus.Imported
-            || voucher.Status == VoucherStatus.VerifiedWithWarnings
-            || voucher.Status == VoucherStatus.VerificationFailed
+            || voucher.Status == VoucherStatus.DecodeIntegrityWarning
+            || voucher.Status == VoucherStatus.DecodeIntegrityFailed
             || voucher.Status == VoucherStatus.Available);
 
     private static readonly Func<FuelVoucher, bool> IsStockCompiled = IsStock.Compile();

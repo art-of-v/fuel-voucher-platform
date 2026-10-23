@@ -35,7 +35,8 @@ public sealed partial class ImportVouchersCommandHandler
                 Imported = import.ImportedCount,
                 Duplicates = import.DuplicateCount,
                 Failed = import.FailedCount,
-                VerificationFailed = import.VerificationFailedCount
+                DecodeIntegrityFailed = import.DecodeIntegrityFailedCount,
+                DecodeIntegrityWarning = import.DecodeIntegrityWarningCount
             }),
             request.ActingUserId,
             request.ActingUserName,
@@ -61,13 +62,13 @@ public sealed partial class ImportVouchersCommandHandler
                 s => s.ProcessPendingOrdersAsync(CancellationToken.None));
         }
 
-        // Covers parse exceptions, failed validation and failed QR integrity checks -
+        // Covers parse exceptions, failed validation and failed decode-integrity checks -
         // every one of those paths writes a VoucherImportError row, so reading them
         // back keeps this in step with the rejection logic above automatically.
         // Loaded once: the same rows feed both the staff Telegram sample and the
         // per-row reasons returned to the admin UI (#22). Capped so a pathological
         // all-fail upload can't bloat the response.
-        var failedTotal = import.FailedCount + import.VerificationFailedCount;
+        var failedTotal = import.FailedCount + import.DecodeIntegrityFailedCount;
         var errorRows = await _context.VoucherImportErrors
             .Where(e => e.ImportId == import.Id)
             .OrderBy(e => e.PageNumber)
@@ -90,8 +91,8 @@ public sealed partial class ImportVouchersCommandHandler
             import.ImportedCount,
             import.DuplicateCount,
             import.FailedCount,
-            import.VerificationFailedCount,
-            import.VerifiedWithWarningsCount,
+            import.DecodeIntegrityFailedCount,
+            import.DecodeIntegrityWarningCount,
             stopwatch.Elapsed.TotalSeconds,
             errorRows
         );

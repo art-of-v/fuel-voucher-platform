@@ -2,7 +2,7 @@
  * The translation keys for the states the API reports.
  *
  * <p>
- * The API spells its states in PascalCase (`PendingPayment`, `VerifiedWithWarnings`) and the
+ * The API spells its states in PascalCase (`PendingPayment`, `DecodeIntegrityWarning`) and the
  * translation file keys them in camelCase (`order.status.pendingPayment`). These two functions
  * are the one place that knows the two spellings agree.
  */

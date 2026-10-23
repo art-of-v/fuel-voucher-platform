@@ -18,6 +18,7 @@ public sealed class GetImportBatchesQueryHandler
     {
         var importBatches = await _context.VoucherImports
             .AsNoTracking()
+            .Include(i => i.Supplier)
             .OrderByDescending(i => i.StartedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -38,11 +39,13 @@ public sealed class GetImportBatchesQueryHandler
             StartedAtUtc = i.StartedAtUtc,
             CompletedAtUtc = i.CompletedAtUtc,
             Status = i.Status,
+            SupplierId = i.SupplierId,
+            SupplierName = i.Supplier != null ? i.Supplier.Name : null,
             ImportedCount = i.ImportedCount,
             DuplicateCount = i.DuplicateCount,
             FailedCount = i.FailedCount,
-            VerificationFailedCount = i.VerificationFailedCount,
-            VerifiedWithWarningsCount = i.VerifiedWithWarningsCount,
+            DecodeIntegrityFailedCount = i.DecodeIntegrityFailedCount,
+            DecodeIntegrityWarningCount = i.DecodeIntegrityWarningCount,
             VoucherCount = voucherCounts.GetValueOrDefault(i.Id)
         }).ToList();
     }

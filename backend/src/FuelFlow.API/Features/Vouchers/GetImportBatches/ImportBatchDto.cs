@@ -8,10 +8,12 @@ public sealed class ImportBatchDto
     public DateTime StartedAtUtc { get; set; }
     public DateTime? CompletedAtUtc { get; set; }
     public string Status { get; set; } = null!;
+    public Guid? SupplierId { get; set; }
+    public string? SupplierName { get; set; }
     public int ImportedCount { get; set; }
     public int DuplicateCount { get; set; }
     public int FailedCount { get; set; }
-    public int VerificationFailedCount { get; set; }
-    public int VerifiedWithWarningsCount { get; set; }
+    public int DecodeIntegrityFailedCount { get; set; }
+    public int DecodeIntegrityWarningCount { get; set; }
     public int VoucherCount { get; set; }
 }

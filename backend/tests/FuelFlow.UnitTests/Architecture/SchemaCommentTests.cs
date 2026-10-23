@@ -730,9 +730,9 @@ public sealed class SchemaCommentTests
             nameof(FuelVoucher.DataKind),
             nameof(FuelVoucher.HolderKind),
             nameof(FuelVoucher.IsDeleted),
-            nameof(FuelVoucher.VerificationMismatchPercent),
-            nameof(FuelVoucher.VerificationMismatchedModules),
-            nameof(FuelVoucher.VerificationTotalModules)
+            nameof(FuelVoucher.MatrixMismatchPercent),
+            nameof(FuelVoucher.MatrixMismatchedModules),
+            nameof(FuelVoucher.MatrixTotalModules)
         ])
     ];
 
@@ -836,8 +836,8 @@ public sealed class SchemaCommentTests
             nameof(VoucherImport.ImportedCount),
             nameof(VoucherImport.DuplicateCount),
             nameof(VoucherImport.FailedCount),
-            nameof(VoucherImport.VerificationFailedCount),
-            nameof(VoucherImport.VerifiedWithWarningsCount)
+            nameof(VoucherImport.DecodeIntegrityFailedCount),
+            nameof(VoucherImport.DecodeIntegrityWarningCount)
         ]),
         (typeof(LegalEntity),
         [

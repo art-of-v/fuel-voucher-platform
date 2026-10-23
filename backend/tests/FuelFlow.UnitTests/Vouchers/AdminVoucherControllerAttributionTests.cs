@@ -8,7 +8,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVoucherLifecycle;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.Features.Vouchers.GetVoucherVerification;
+using FuelFlow.Features.Vouchers.GetVoucherDecodeIntegrity;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.UnblockVoucher;
@@ -66,7 +66,7 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
         => new(
             new GetAdminVouchersQueryHandler(_context),
             new GetAdminVoucherByIdQueryHandler(_context, _qr.Object),
-            new GetVoucherVerificationQueryHandler(_context, _qr.Object),
+            new GetVoucherDecodeIntegrityQueryHandler(_context, _qr.Object),
             new UnblockVoucherCommandHandler(_context, _eventService),
             new UpdateVoucherCommandHandler(_context, _eventService),
             new DeleteVoucherCommandHandler(_context, _eventService),

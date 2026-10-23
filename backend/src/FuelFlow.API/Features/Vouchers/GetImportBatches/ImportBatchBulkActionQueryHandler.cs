@@ -41,7 +41,7 @@ public sealed class ImportBatchBulkActionQueryHandler
     private static readonly VoucherStatus[] ActivatableFrom =
     [
         VoucherStatus.Imported,
-        VoucherStatus.VerifiedWithWarnings,
+        VoucherStatus.DecodeIntegrityWarning,
         VoucherStatus.Expired,
         VoucherStatus.Deactivated
     ];
@@ -53,7 +53,7 @@ public sealed class ImportBatchBulkActionQueryHandler
     [
         VoucherStatus.Imported,
         VoucherStatus.Available,
-        VoucherStatus.VerifiedWithWarnings
+        VoucherStatus.DecodeIntegrityWarning
     ];
 
     private readonly ApplicationDbContext _context;

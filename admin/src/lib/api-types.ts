@@ -191,11 +191,13 @@ export interface ImportBatch {
   startedAtUtc: string;
   completedAtUtc: string | null;
   status: string;
+  supplierId: string | null;
+  supplierName: string | null;
   importedCount: number;
   duplicateCount: number;
   failedCount: number;
-  verificationFailedCount: number;
-  verifiedWithWarningsCount: number;
+  decodeIntegrityFailedCount: number;
+  decodeIntegrityWarningCount: number;
   voucherCount: number;
 }
 
@@ -211,9 +213,9 @@ export interface ImportBatchVoucher {
   voucherNumber: string;
   status: string;
   createdAtUtc: string;
-  verificationMismatchPercent: number | null;
-  verificationMismatchedModules: number | null;
-  verificationTotalModules: number | null;
+  matrixMismatchPercent: number | null;
+  matrixMismatchedModules: number | null;
+  matrixTotalModules: number | null;
 }
 
 /** A page of an import batch's vouchers, and the size of the batch it is a page of. */
