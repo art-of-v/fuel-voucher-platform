@@ -283,16 +283,18 @@ services:
       # ==================================================================================
 
       # === APP ATTESTATION (Apple App Attest / Play Integrity) ===========================
-      # Disabled until a native build with the client is live. ReportOnly verifies and logs
-      # proofs without blocking; Enforce is a deliberate rollout step per platform and app
-      # version. The startup guard refuses Production when this is not enforcing unless the
-      # acknowledgement is true. See planning docs/APP_ATTESTATION_AND_PINNING.md.
-      Attestation__Enabled: ${ATTESTATION_ENABLED:-false}
+      # Report-only is the production default: ReportOnly verifies and logs proofs without
+      # blocking, so old installs keep working while the fleet is measured. Enforce is a
+      # deliberate rollout step per platform and app version. The startup guard refuses
+      # Production when this is not enforcing unless the acknowledgement is true. See
+      # planning docs/APP_ATTESTATION_AND_PINNING.md and the app runbook.
+      Attestation__Enabled: ${ATTESTATION_ENABLED:-true}
       Attestation__Mode: ${ATTESTATION_MODE:-ReportOnly}
       Attestation__AcknowledgeDisabledInProduction: ${ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION:-true}
       # Android only, after the package is in Play and the Google Cloud project exists.
-      # Keep the service-account JSON in the server secret store, never in git.
-      # Attestation__GoogleCredentialsJson: ${ATTESTATION_GOOGLE_CREDENTIALS_JSON:?set ATTESTATION_GOOGLE_CREDENTIALS_JSON}
+      # Keep the service-account JSON in the server secret store, never in git. Empty is
+      # inert: the Google verifier reports GOOGLE_NOT_CONFIGURED instead of trusting.
+      Attestation__GoogleCredentialsJson: ${ATTESTATION_GOOGLE_CREDENTIALS_JSON:-}
       # ==================================================================================
 
       # TODO: remove once staging no longer tests against expired voucher stock.
