@@ -148,6 +148,17 @@ public sealed class AdminAddFuelCommandHandler
             }
         }
 
+        // The numbers themselves, refused here rather than by the database. The checks the database
+        // makes are real (ck_fuel_types_margin_signs, ck_fuel_types_allow_below_cost_needs_a_cost),
+        // but a check constraint answers "23514" and names neither the knob nor the operator, and a
+        // zero cost is one the constraints let through and the pricing must not: a litre we paid
+        // nothing for has no cost to guard a sale against.
+        if (FuelEconomics.Fault(request.SupplierPricePerLiter, request.MarginUahPerLiter, request.AllowBelowCost)
+            is { } fault)
+        {
+            return new AdminAddFuelResult { Error = fault.Error, Field = fault.Field };
+        }
+
         // The price, or null when we cannot know it. A cost that is not stated is not a zero: the
         // model refuses to build a price out of a missing number, because "we do not know what we
         // paid" is not the same fact as "we paid nothing".
@@ -203,9 +214,11 @@ public sealed class AdminAddFuelCommandHandler
         // the pool on the size list they are written on the fuel and there is no second place to keep
         // them in step.
         var pool = DataKinds.ForPool(request.IsTestData.Value);
-        // The cost and the margin are not nullable on the request: an operator who leaves them blank
-        // means zero, and the fuel records that. Only the column price and the margin percent are
-        // "not stated", and those stay null rather than being invented as zero.
+        // The cost and the margin are nullable on the request, and null is written as null: a cost
+        // that is not stated is not a zero. The fuel is allowed to be born unpriced - it has no
+        // stock behind it yet - and what it may not do is carry a price built out of a number
+        // nobody entered. Only the column price and the margin percent are "not stated" for their
+        // own reasons, and those stay null rather than being invented as zero either.
         fuel.SupplierPricePerLiter = request.SupplierPricePerLiter;
         if (request.MarginPercent is not null) fuel.MarginPercent = request.MarginPercent;
         if (request.PumpPricePerLiter is not null) fuel.PumpPricePerLiter = request.PumpPricePerLiter;

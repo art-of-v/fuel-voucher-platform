@@ -186,6 +186,11 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
             Id = fuelTypeId,
             Name = "Batch fuel " + Guid.NewGuid().ToString("N")[..8],
             BrandId = brandId,
+            // The fuel has a price of its own: paper cannot go on the shelf while the fuel it is
+            // paper for has no cost and no margin (planning #680). These tests are about the paging
+            // and the batch action, so they state the precondition rather than the gate itself.
+            SupplierPricePerLiter = 45m,
+            MarginUahPerLiter = 2m,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });

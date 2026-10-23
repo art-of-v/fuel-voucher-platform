@@ -143,6 +143,20 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         };
     }
 
+    /// <summary>
+    /// The fuel has a price of its own: paper cannot go on the shelf while the fuel it is paper for
+    /// has no cost and no margin, because the price of a litre is what we pay plus our margin
+    /// (planning #680). The tests below are about what activation DOES, so they state the
+    /// precondition rather than the gate itself - the gate has its own file.
+    /// </summary>
+    private void PriceTheFuel(string fuelTypeId = "okko-95")
+    {
+        var fuel = _context.FuelTypes.First(f => f.Id == ToUuid(fuelTypeId));
+        fuel.SupplierPricePerLiter = 40m;
+        fuel.MarginUahPerLiter = 5m;
+        _context.SaveChanges();
+    }
+
     // ── 1. DeleteVoucherCommandHandler ───────────────────────────────────────
 
     [Fact]
@@ -355,6 +369,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(imported);
         await _context.SaveChangesAsync();
 
+        PriceTheFuel();
+
         var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(
             new BulkActionVouchersCommand("activate", [imported.Id], null, UserId, "Admin User"));
@@ -388,6 +404,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         already.CostPerLiter = 40m;
         _context.FuelVouchers.Add(already);
         await _context.SaveChangesAsync();
+
+        PriceTheFuel();
 
         var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(
@@ -508,6 +526,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         assigned.CostPerLiter = 40m;
         _context.FuelVouchers.AddRange(imported, assigned);
         await _context.SaveChangesAsync();
+
+        PriceTheFuel();
 
         var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
         var result = await handler.HandleAsync(new BulkActionVouchersCommand("activate", [imported.Id, assigned.Id], null));
