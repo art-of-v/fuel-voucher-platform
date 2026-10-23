@@ -255,6 +255,16 @@ if grep -q 'wal_segment_is_complete' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
 else
   bad "the drill waits for the file name only"
 fi
+if grep -q 'chmod -R a+rX "\$WAL_DIR"' "$SCRIPT_DIR/restore-pitr.sh"; then
+  ok "the restore makes the fetched WAL readable for the container's postgres user"
+else
+  bad "the restore depends on the caller's umask (a 600 WAL file stops the replay)"
+fi
+if grep -q '^  umask 077$' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  bad "the ops script sets the umask for the whole process (it leaks into the drill)"
+else
+  ok "the ops script does not set a process-wide umask"
+fi
 if grep -q 'WAL_SEGMENT_SIZE:-16777216' "$SCRIPT_DIR/wal-offbox.sh"; then
   ok "a finished WAL segment is 16 MiB by default"
 else
