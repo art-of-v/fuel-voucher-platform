@@ -79,6 +79,14 @@ check_denied() {
     echo "  FAIL  $what"; fail=$((fail + 1))
   fi
 }
+check_not_contains() {
+  local what="$1" needle="$2" haystack="$3"
+  if [[ "$haystack" != *"$needle"* ]]; then
+    echo "  PASS  $what"; pass=$((pass + 1))
+  else
+    echo "  FAIL  $what (output contained '$needle')"; fail=$((fail + 1))
+  fi
+}
 
 echo "=== the script and the matrix exist, are executable/readable, and parse ==="
 if [[ -x "$SCRIPT" ]]; then
@@ -288,6 +296,11 @@ else
       echo "$out"
       echo "----------------------"
     fi
+    # The first run created pg_stat_statements, and that extension puts two views in
+    # public. They are PostgreSQL's own objects, not ours to classify: the matrix must
+    # not have to name them, and the SECOND deploy must not stop because the first one
+    # created them.
+    check_not_contains "the extension's own views are not asked for in the matrix" "public.pg_stat_statements" "$out"
 
     # The application's mutable work.
     out="$(as_app "UPDATE public.brands SET name = 'renamed' WHERE false" 2>&1)"; rc=$?

@@ -428,6 +428,10 @@ say "the objects in public and hangfire belong to the migrator"
 #   - COMPLETE: every table and view in public must be listed in the matrix. An
 #     unlisted relation is a deploy failure, not a silent gap - the alternative is a
 #     table nobody classified keeping whatever the default privileges gave it.
+#     The objects that belong to an EXTENSION are exempt: PostgreSQL creates those
+#     itself (pg_stat_statements puts its two views in public), they are not ours to
+#     classify, and what PostgreSQL itself grants on them is PostgreSQL's business,
+#     not the matrix's. Listing them would also tie the matrix to the server version.
 #   - EXACT: the script revokes everything it is about to grant before granting, so a
 #     privilege somebody added by hand disappears on the next deploy instead of
 #     hiding behind an idempotent-looking "it ran fine".
@@ -451,6 +455,10 @@ existing_tables="$(psql_super -t -A -c "
   SELECT nspname || '.' || relname
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
    WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname = 'public'
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_depend d
+        WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+          AND d.deptype = 'e' AND d.refclassid = 'pg_extension'::regclass)
    ORDER BY 1")"
 unlisted="$(comm -23 \
   <(printf '%s\n' "$existing_tables" | awk 'NF' | LC_ALL=C sort) \
@@ -537,6 +545,9 @@ SELECT format('GRANT SELECT ON TABLE %I.%I TO %I', n.nspname, c.relname, :'app_r
 SQL
 
 # The sequences the identity columns draw from, and the read-only role, as before.
+# The read-only role reads the schema's own relations; the extension's objects are
+# left out - they are PostgreSQL's, not ours, and the role has no business being
+# handed them by name.
 psql_super \
   -v app_role="$APP_ROLE" \
   -v readonly_role="$READONLY_ROLE" \
@@ -549,7 +560,11 @@ SELECT format('GRANT USAGE, SELECT ON SEQUENCE %I.%I TO %I',
 SELECT format('GRANT SELECT ON TABLE %I.%I TO %I', n.nspname, c.relname, :'readonly_role')
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE :'readonly_password' <> ''
-   AND c.relkind IN ('r','p','v','m','f') AND n.nspname IN ('public','hangfire') \gexec
+   AND c.relkind IN ('r','p','v','m','f') AND n.nspname IN ('public','hangfire')
+   AND NOT EXISTS (
+     SELECT 1 FROM pg_depend d
+      WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+        AND d.deptype = 'e' AND d.refclassid = 'pg_extension'::regclass) \gexec
 
 SELECT format('GRANT USAGE, SELECT ON SEQUENCE %I.%I TO %I',
               n.nspname, c.relname, :'readonly_role')
