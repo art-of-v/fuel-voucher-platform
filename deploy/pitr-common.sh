@@ -211,6 +211,46 @@ check_wal_archive() {
   return 0
 }
 
+# create_wal_blob <archive-dir> <out.tar.gz>
+#
+# Packages the archive into ONE gzip for the off-box copy.
+#
+# The nightly backup used to run `tar --wildcards '0000000*'` directly, and GNU tar
+# expands that pattern only when EXTRACTING: on create it is a literal member name, so
+# tar exited with "Cannot stat: No such file or directory", the error was swallowed by
+# `2>/dev/null || true`, and the gzip of nothing that it left behind passed the `-s`
+# size test. Measured on the production box on 2026-10-22: the off-box WAL blob was
+# **245 bytes** against an archive of 235 segments, and the backup reported it
+# shipped. Every blob written since PITR shipped was this empty tar, which is not a
+# small mistake: it is the difference between a replayable history and a base backup
+# nobody can move forward from.
+#
+# The names come from `find`, NUL-separated, so a path with a space or a colon cannot
+# split or become an option (WAL names are hex today, but the next caller will reuse
+# this). The count is checked against the directory afterwards: a blob that carries
+# fewer members than the archive holds is a restore that stops early, and shipping it
+# as success is the exact failure this function exists to make impossible.
+create_wal_blob() {
+  local dir="$1" out="$2" count members
+  if [[ ! -d "$dir" ]]; then
+    echo "ERROR: the WAL archive directory does not exist: $dir" >&2
+    return 1
+  fi
+  count="$(find "$dir" -maxdepth 1 -type f -name '0000000*' | wc -l)"
+  if (( count == 0 )); then
+    echo "ERROR: the WAL archive at $dir holds no segments - there is nothing to ship." >&2
+    return 1
+  fi
+
+  ( cd "$dir" && find . -maxdepth 1 -type f -name '0000000*' -printf '%f\0' \
+      | tar --null --no-recursion --force-local -czf "$out" -T - )
+  members="$(tar -tzf "$out" 2>/dev/null | wc -l)"
+  if (( members != count )); then
+    echo "ERROR: the WAL blob carries ${members} of ${count} segments." >&2
+    return 1
+  fi
+}
+
 # prune_wal_archive <dir> <max-age-days> <max-bytes>
 #
 # Keeps the WAL archive inside two bounds, and the second one is the important one.
