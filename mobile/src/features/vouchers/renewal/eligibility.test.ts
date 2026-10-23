@@ -42,6 +42,17 @@ describe('isRenewableVoucher', () => {
     expect(isRenewableVoucher(makeVoucher({ status: 'blocked' }), 'me', cfg, NOW)).toBe(false);
   });
 
+  it('rejects a voucher waiting for supplier confirmation', () => {
+    // Its fuel is already dispensed and is being reviewed - renewing it would create a second
+    // paper for the same tank while the first one is still open.
+    expect(
+      isRenewableVoucher(makeVoucher({ status: 'pendingreconciliation' }), 'me', cfg, NOW),
+    ).toBe(false);
+    expect(
+      isRenewableVoucher(makeVoucher({ status: 'PendingReconciliation' }), 'me', cfg, NOW),
+    ).toBe(false);
+  });
+
   it('rejects a voucher gifted to another worker (owner cannot act on it)', () => {
     const v = makeVoucher({ legalEntityId: 'co-1', workerUserId: 'other-worker' });
     expect(isRenewableVoucher(v, 'me', cfg, NOW)).toBe(false);

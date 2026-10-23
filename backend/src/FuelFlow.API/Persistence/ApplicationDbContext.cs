@@ -21,6 +21,7 @@ using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Acquiring;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -76,6 +77,10 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<MovementBatch> MovementBatches => Set<MovementBatch>();
     // D-13: the state history voucher_movements deliberately does not carry - see VoucherEvent.
     public DbSet<VoucherEvent> VoucherEvents => Set<VoucherEvent>();
+    // #684: the claim that a voucher was used, and the supplier lines that confirm or challenge it.
+    // The voucher's status is the current answer; these two tables are the evidence behind it.
+    public DbSet<VoucherRedemption> VoucherRedemptions => Set<VoucherRedemption>();
+    public DbSet<RedemptionStatementRow> RedemptionStatementRows => Set<RedemptionStatementRow>();
     // D-13 / #319: the single ledger. The exchange pairs live here now, on the row of the retired
     // paper (see VoucherMovement.ReplacedByVoucherId).
     public DbSet<VoucherMovement> VoucherMovements => Set<VoucherMovement>();

@@ -197,5 +197,13 @@ repo under `docs/`:
 - `docs/DEPLOYMENT.md` — deploy & ops runbook for the Hetzner stack, CI auto-deploy, backups,
   troubleshooting.
 
+The **app-side operator guides** live in this repository under `docs/`, because they describe the
+running app rather than the platform's design:
+
+- `docs/SUPPLIER_REDEMPTION_RECONCILIATION_RUNBOOK.md` — the daily supplier statement import and the
+  redemption exception queue.
+- `docs/APP_ATTESTATION_AND_PINNING_RUNBOOK.md` — attestation and certificate pinning.
+- `docs/DEVICE_SIGNATURE.md` — the device signature contract.
+
 References like `docs/DEPLOYMENT.md` in code comments and scripts throughout this repo point at
 that private repo.

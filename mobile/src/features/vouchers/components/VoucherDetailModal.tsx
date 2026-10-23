@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Ban,
   AlertTriangle,
+  Clock,
   RefreshCw,
   History as HistoryIcon,
   ChevronRight,
@@ -20,6 +21,7 @@ import { classifyVoucher } from '../../../core/types/api';
 import type { Voucher } from '../../../core/types/api';
 import { formatExpirationDate } from '../../../core/utils/formatters';
 import { formatMoney, formatLitres } from '../../../core/utils/currency';
+import { isPendingReconciliation } from '../lib/display';
 import * as Clipboard from 'expo-clipboard';
 
 /**
@@ -109,6 +111,7 @@ export function VoucherDetailModal({
           (() => {
             const bColor = brandColor;
             const isUsed = voucher.status === 'used';
+            const isPending = isPendingReconciliation(voucher);
             const imageUrl = voucher.imageUrl || (voucher as any).image_url;
             const kind = classifyVoucher(voucher, user?.id);
             const isBlocked = kind === 'blocked';
@@ -229,9 +232,11 @@ export function VoucherDetailModal({
                         {
                           backgroundColor: isBlocked
                             ? `${tokens.colors.error}14`
-                            : isUsed
-                              ? tokens.colors.status.neutral.subtle
-                              : `${bColor}18`,
+                            : isPending
+                              ? tokens.colors.status.warning.subtle
+                              : isUsed
+                                ? tokens.colors.status.neutral.subtle
+                                : `${bColor}18`,
                         },
                       ]}
                     >
@@ -241,9 +246,11 @@ export function VoucherDetailModal({
                           {
                             backgroundColor: isBlocked
                               ? tokens.colors.error
-                              : isUsed
-                                ? tokens.colors.text.dim
-                                : bColor,
+                              : isPending
+                                ? tokens.colors.status.warning.base
+                                : isUsed
+                                  ? tokens.colors.text.dim
+                                  : bColor,
                           },
                         ]}
                       />
@@ -254,18 +261,53 @@ export function VoucherDetailModal({
                           {
                             color: isBlocked
                               ? tokens.colors.error
-                              : isUsed
-                                ? tokens.colors.text.dim
-                                : bColor,
+                              : isPending
+                                ? tokens.colors.status.warning.base
+                                : isUsed
+                                  ? tokens.colors.text.dim
+                                  : bColor,
                           },
                         ]}
                       >
-                        {isBlocked ? t('voucher.badge.blocked') : isUsed ? 'REDEEMED' : 'READY'}
+                        {isBlocked
+                          ? t('voucher.badge.blocked')
+                          : isPending
+                            ? t('codes.pendingReconciliation')
+                            : isUsed
+                              ? 'REDEEMED'
+                              : 'READY'}
                       </Text>
                     </View>
                   </View>
 
-                  {isBlocked ? (
+                  {isPending ? (
+                    <View
+                      style={[
+                        styles.modalQrWrap,
+                        {
+                          borderColor: tokens.colors.status.warning.border,
+                          paddingVertical: 40,
+                          alignItems: 'center',
+                          gap: 12,
+                        },
+                      ]}
+                    >
+                      <Clock size={40} color={tokens.colors.status.warning.base} />
+                      <Text
+                        allowFontScaling={false}
+                        style={{
+                          color: tokens.colors.text.muted,
+                          fontSize: 11,
+                          fontFamily: 'Inter-Bold',
+                          letterSpacing: 1,
+                          textTransform: 'uppercase',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {t('voucher.pending.awaitingConfirmation')}
+                      </Text>
+                    </View>
+                  ) : isBlocked ? (
                     <View
                       style={[
                         styles.modalQrWrap,
@@ -348,25 +390,37 @@ export function VoucherDetailModal({
                       style={[
                         styles.modalActionBtn,
                         {
-                          backgroundColor: isUsed ? tokens.colors.status.neutral.subtle : bColor,
-                          borderColor: isUsed ? tokens.colors.status.neutral.border : 'transparent',
-                          borderWidth: isUsed ? 1 : 0,
+                          backgroundColor:
+                            isUsed || isPending ? tokens.colors.status.neutral.subtle : bColor,
+                          borderColor:
+                            isUsed || isPending
+                              ? tokens.colors.status.neutral.border
+                              : 'transparent',
+                          borderWidth: isUsed || isPending ? 1 : 0,
                         },
                       ]}
                     >
-                      {!isUsed && <ShieldCheck size={20} color={tokens.colors.text.onPrimary} />}
+                      {!isUsed && !isPending && (
+                        <ShieldCheck size={20} color={tokens.colors.text.onPrimary} />
+                      )}
+                      {isPending && <Clock size={20} color={tokens.colors.text.primary} />}
                       <Text
                         allowFontScaling={false}
                         style={[
                           styles.modalActionText,
                           {
-                            color: isUsed
-                              ? tokens.colors.text.primary
-                              : tokens.colors.text.onPrimary,
+                            color:
+                              isUsed || isPending
+                                ? tokens.colors.text.primary
+                                : tokens.colors.text.onPrimary,
                           },
                         ]}
                       >
-                        {isUsed ? t('codes.restoreCode') : t('codes.markAsUsed')}
+                        {isPending
+                          ? t('codes.withdrawReport')
+                          : isUsed
+                            ? t('codes.restoreCode')
+                            : t('codes.markAsUsed')}
                       </Text>
                     </Pressable>
                   ) : (

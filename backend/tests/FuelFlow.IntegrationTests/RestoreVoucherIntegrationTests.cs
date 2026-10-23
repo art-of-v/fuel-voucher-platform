@@ -1,10 +1,14 @@
 using FluentAssertions;
+using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -14,13 +18,11 @@ using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// Covers #242. The restore path used to read the voucher, check its status, and then write it
-/// back through the change tracker - no ownership check, no atomic transition, and it left
-/// <c>UsedAtUtc</c> populated after undoing a redemption.
+/// The holder's undo, now that a report waits for evidence. <c>PendingReconciliation</c> goes back
+/// to <c>Assigned</c>, the claim is withdrawn, and the provisional drafts are discarded.
 /// <para>
-/// These live in the integration suite rather than the unit suite deliberately: the fix is an
-/// <c>ExecuteUpdateAsync</c> whose WHERE clause carries the status predicate, and the EF Core
-/// in-memory brand neither translates <c>ExecuteUpdate</c> nor models row locking.
+/// A <c>Used</c> voucher is no longer restorable here: once the evidence is accepted the sale is
+/// posted, and undoing it is an operator reversal.
 /// </para>
 /// </summary>
 [Collection("Integration Tests")]
@@ -33,86 +35,91 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         _fixture = fixture;
     }
 
-    /// <summary>
-    /// The regression test for #242, and the reason the handler was rewritten rather than patched.
-    /// <see cref="RestoreVoucherCommandHandler"/> set the status back to Assigned but never cleared
-    /// <c>UsedAtUtc</c>, so a restored voucher carried the timestamp of a redemption that no longer
-    /// happened - which a worker usage report reads as "when was this redeemed".
-    /// </summary>
     [Fact]
-    public async Task RestoreVoucher_TransitionsFromUsedToAssigned_AndClearsTheRedemptionTime()
+    public async Task RestoreVoucher_WithdrawsThePendingClaim_AndDiscardsTheDrafts()
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
 
-        await SeedUsedVoucherAsync(userId, voucherId);
+        await SeedPendingVoucherAsync(userId, voucherId);
 
-        await using var context = CreateContext();
-        var handler = new RestoreVoucherCommandHandler(context);
+        await using (var verify = CreateContext())
+        {
+            (await verify.JournalEntries.CountAsync(e => e.SourceId == voucherId))
+                .Should().Be(3, "the report composed cost, revenue and VAT drafts");
+            (await verify.JournalEntries
+                    .Where(e => e.SourceId == voucherId)
+                    .Select(e => e.Status)
+                    .ToListAsync())
+                .Should().OnlyContain(status => status == JournalEntryStatus.Draft);
+        }
 
-        var response = await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
+        await using (var context = CreateContext())
+        {
+            var handler = new RestoreVoucherCommandHandler(context, TestRedemptions.For(context));
+            var response = await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
 
-        response.Success.Should().BeTrue();
-        response.Message.Should().Be("Voucher restored to Assigned status");
+            response.Success.Should().BeTrue();
+            response.Message.Should().Be("Voucher restored to Assigned status");
+        }
 
-        await using var verify = CreateContext();
-        var stored = await verify.FuelVouchers
+        await using var final = CreateContext();
+        var stored = await final.FuelVouchers
             .Where(v => v.Id == voucherId)
             .Select(v => new { v.Status, v.UsedAtUtc, v.UpdatedAtUtc })
             .SingleAsync();
 
         stored.Status.Should().Be(VoucherStatus.Assigned);
-        stored.UsedAtUtc.Should().BeNull("a restored voucher was not redeemed, so it has no redemption time");
+        stored.UsedAtUtc.Should().BeNull();
         stored.UpdatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(10));
+
+        var redemption = await final.VoucherRedemptions
+            .Where(r => r.VoucherId == voucherId)
+            .SingleAsync();
+        redemption.Status.Should().Be(VoucherRedemptionStatus.Withdrawn);
+        redemption.ClosedByUserId.Should().Be(userId);
+
+        (await final.JournalEntries.CountAsync(e => e.SourceId == voucherId))
+            .Should().Be(0, "a withdrawn claim has no sale to post");
     }
 
-    /// <summary>
-    /// D-13, and the exact inverse of the redemption event. Undoing a redemption moves no paper
-    /// either - the customer never gave the ticket up - so this writes an event and not a
-    /// <c>returned</c> movement, and records who undid it.
-    /// </summary>
     [Fact]
-    public async Task RestoreVoucher_RecordsTheUndo_NamingWhoDidIt()
+    public async Task RestoreVoucher_RecordsTheWithdrawal_NamingWhoDidIt()
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
 
-        await SeedUsedVoucherAsync(userId, voucherId);
+        await SeedPendingVoucherAsync(userId, voucherId);
 
-        await using var context = CreateContext();
-        var handler = new RestoreVoucherCommandHandler(context);
-
-        await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
+        await using (var context = CreateContext())
+        {
+            var handler = new RestoreVoucherCommandHandler(context, TestRedemptions.For(context));
+            await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
+        }
 
         await using var verify = CreateContext();
         var undo = await verify.VoucherEvents
             .AsNoTracking()
-            .Where(e => e.VoucherId == voucherId)
-            .Select(e => new { e.EventType, e.FromStatus, e.ToStatus, e.ActorKind, e.ActorUserId })
+            .Where(e => e.VoucherId == voucherId
+                && e.FromStatus == nameof(VoucherStatus.PendingReconciliation))
             .SingleAsync();
 
         undo.EventType.Should().Be(VoucherEventTypes.StatusChanged);
-        undo.FromStatus.Should().Be(nameof(VoucherStatus.Used));
         undo.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
         undo.ActorKind.Should().Be(VoucherActorKinds.User);
         undo.ActorUserId.Should().Be(userId);
     }
 
-    /// <summary>
-    /// The boundary this PR deliberately did not cross. Un-archiving is an operator action, so the
-    /// global query filter stays in force: a customer must not be able to bring back a voucher an
-    /// admin archived by id - <c>delete_all</c> archives every voucher in the system.
-    /// </summary>
     [Fact]
     public async Task RestoreVoucher_RefusesToTouchAnArchivedVoucher()
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
 
-        await SeedUsedVoucherAsync(userId, voucherId, archived: true);
+        await SeedPendingVoucherAsync(userId, voucherId, archived: true);
 
         await using var context = CreateContext();
-        var handler = new RestoreVoucherCommandHandler(context);
+        var handler = new RestoreVoucherCommandHandler(context, TestRedemptions.For(context));
 
         var response = await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
 
@@ -126,16 +133,11 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             .Select(v => new { v.Status, v.IsDeleted })
             .SingleAsync();
 
-        stored.Status.Should().Be(VoucherStatus.Used, "an archived voucher must come back untouched");
+        stored.Status.Should().Be(VoucherStatus.PendingReconciliation,
+            "an archived voucher must come back untouched");
         stored.IsDeleted.Should().BeTrue();
     }
 
-    /// <summary>
-    /// Someone else's redeemed voucher. The endpoint used to be Staff-only while its only caller was
-    /// a customer's mobile toggle, so ownership was enforced by nothing at all - opening the endpoint
-    /// to customers without moving the check into the handler would have handed them the ability to
-    /// un-redeem each other's vouchers.
-    /// </summary>
     [Fact]
     public async Task RestoreVoucher_RefusesAnotherCustomersVoucher()
     {
@@ -143,10 +145,10 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         var intruderId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
 
-        await SeedUsedVoucherAsync(ownerId, voucherId);
+        await SeedPendingVoucherAsync(ownerId, voucherId);
 
         await using var context = CreateContext();
-        var handler = new RestoreVoucherCommandHandler(context);
+        var handler = new RestoreVoucherCommandHandler(context, TestRedemptions.For(context));
 
         var response = await handler.HandleAsync(new RestoreVoucherCommand(voucherId, intruderId));
 
@@ -159,15 +161,122 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             .Select(v => v.Status)
             .SingleAsync();
 
-        stored.Should().Be(VoucherStatus.Used);
+        stored.Should().Be(VoucherStatus.PendingReconciliation);
 
-        // A refusal changes nothing, so it records nothing. An event here would name a person for an
-        // action the system just declined to take.
         (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
-            .Should().Be(0);
+            .Should().Be(1, "a refusal records nothing beyond the report that already existed");
     }
 
-    private async Task SeedUsedVoucherAsync(Guid userId, Guid voucherId, bool archived = false)
+    [Fact]
+    public async Task RestoreVoucher_RefusesAConfirmedRedemption()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        await SeedUsedVoucherAsync(userId, voucherId);
+
+        await using var context = CreateContext();
+        var handler = new RestoreVoucherCommandHandler(context, TestRedemptions.For(context));
+
+        var response = await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
+
+        response.Success.Should().BeFalse();
+        response.ErrorCode.Should().Be("InvalidState");
+        response.Message.Should().Contain("reversed by an operator");
+    }
+
+    private async Task SeedPendingVoucherAsync(Guid userId, Guid voucherId, bool archived = false)
+    {
+        await using (var seed = CreateContext())
+        {
+            await ResetDataAsync(seed);
+
+            seed.Users.Add(new User
+            {
+                Id = userId,
+                PhoneNumber = $"+38{userId:N}"[..20],
+                IsActive = true,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            });
+
+            var orderId = SeedPurchaseOrder(seed, userId);
+            var lineId = Guid.NewGuid();
+            seed.OrderLineItems.Add(new OrderLineItem
+            {
+                Id = lineId,
+                OrderId = orderId,
+                BrandId = BrandIds.ForSlug("okko"),
+                Brand = "okko",
+                FuelTypeId = ToUuid("okko-95"),
+                Liters = 50m,
+                Quantity = 1,
+                UnitPrice = 2500m,
+                LineTotal = 2500m,
+            });
+
+            seed.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = voucherId,
+                BrandId = BrandIds.ForSlug("okko"),
+                Brand = "okko",
+                FuelTypeId = ToUuid("okko-95"),
+                Liters = 50m,
+                CostPerLiter = 45m,
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+                VoucherNumber = $"OKKO-{voucherId:N}"[..20],
+                QrPayload = $"payload-{voucherId:N}",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = userId,
+                OrderId = orderId,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            });
+
+            seed.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.Issued,
+                VoucherId = voucherId,
+                FromLocation = VoucherLocations.Pool,
+                ToLocation = VoucherLocations.Customer,
+                OrderId = orderId,
+                LineItemId = lineId,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = userId,
+                OccurredAtUtc = TestClock.UtcNow,
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var reportContext = CreateContext())
+        {
+            var claimed = await reportContext.ExecuteReplaySafeAsync(async ct =>
+                await TestRedemptions.For(reportContext).ReportAsync(
+                    voucherId,
+                    reportedByUserId: userId,
+                    actorUserId: userId,
+                    reportedLiters: null,
+                    redeemedAtUtc: TestClock.UtcNow,
+                    supplierReference: null,
+                    reason: "seed",
+                    ct));
+
+            claimed.Outcome.Should().Be(RedemptionReportOutcome.Reported);
+        }
+
+        if (archived)
+        {
+            await using var archive = CreateContext();
+            await archive.FuelVouchers
+                .Where(v => v.Id == voucherId)
+                .ExecuteUpdateAsync(s => s.SetProperty(v => v.IsDeleted, true));
+        }
+    }
+
+    private async Task SeedUsedVoucherAsync(Guid userId, Guid voucherId)
     {
         await using var seed = CreateContext();
         await ResetDataAsync(seed);
@@ -196,7 +305,6 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             AssignedToUserId = userId,
             OrderId = SeedPurchaseOrder(seed, userId),
             UsedAtUtc = TestClock.UtcNow.AddMinutes(-5),
-            IsDeleted = archived,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         });
@@ -204,10 +312,6 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         await seed.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// The purchase a held voucher came out of. A voucher in somebody's hands must carry an order
-    /// (<c>ck_voucher_held_has_order</c>), so every Assigned/Used/Blocked seed needs one behind it.
-    /// </summary>
     private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
     {
         var orderId = Guid.NewGuid();
@@ -215,7 +319,7 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         {
             Id = orderId,
             UserId = userId,
-            Price = 0,
+            Price = 2500m,
             Status = OrderStatus.Fulfilled,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
@@ -225,7 +329,15 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """
+            TRUNCATE TABLE
+                "journal_lines", "journal_entries", "document_sequences", "accounting_periods",
+                "voucher_redemptions", "redemption_statement_rows",
+                "voucher_events", "voucher_movements", "order_line_items", "orders",
+                "fuel_vouchers", "users", "payments", "fulfillments", "outbox_events",
+                "provider_event_outbox", "app_settings"
+            RESTART IDENTITY CASCADE
+            """);
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()

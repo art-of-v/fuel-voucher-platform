@@ -176,6 +176,12 @@ public sealed class VouchersController : ControllerBase
                 return Forbid();
         }
 
+        if (voucher.Status == VoucherStatus.PendingReconciliation)
+        {
+            return ApiError.BadRequest(
+                "Voucher is waiting for supplier confirmation; the QR cannot be presented again.");
+        }
+
         // Clamp: unbounded width/height let any authenticated caller ask for a
         // gigapixel PNG and OOM the container (no per-container memory limit).
         width = Math.Clamp(width, MinQrSize, MaxQrSize);

@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -44,6 +45,27 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var logger = new Mock<ILogger<GetUserVouchersCommandHandler>>().Object;
         return new GetUserVouchersCommandHandler(_context, qrGeneratorMock.Object, logger);
     }
+
+    private VoucherRedemptionService BuildRedemptionService()
+    {
+        var journal = new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance);
+        var poster = new RedemptionJournalPoster(
+            _context,
+            journal,
+            NullLogger<RedemptionJournalPoster>.Instance);
+
+        return new VoucherRedemptionService(
+            _context,
+            poster,
+            journal,
+            NullLogger<VoucherRedemptionService>.Instance);
+    }
+
+    private MarkVoucherAsUsedCommandHandler BuildMarkHandler() =>
+        new(_context, BuildRedemptionService(), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+
+    private RestoreVoucherCommandHandler BuildRestoreHandler() =>
+        new(_context, BuildRedemptionService());
 
     private void SeedFuelTypes()
     {
@@ -308,7 +330,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new MarkVoucherAsUsedCommandHandler(_context, new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+        var handler = BuildMarkHandler();
         var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
@@ -342,7 +364,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new MarkVoucherAsUsedCommandHandler(_context, new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+        var handler = BuildMarkHandler();
         var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
@@ -378,7 +400,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new MarkVoucherAsUsedCommandHandler(_context, new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+        var handler = BuildMarkHandler();
         var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, UserId));
 
         response.Success.Should().BeFalse();
@@ -421,7 +443,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new RestoreVoucherCommandHandler(_context);
+        var handler = BuildRestoreHandler();
         var command = new RestoreVoucherCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
@@ -456,7 +478,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new RestoreVoucherCommandHandler(_context);
+        var handler = BuildRestoreHandler();
         var command = new RestoreVoucherCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
@@ -493,7 +515,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new RestoreVoucherCommandHandler(_context);
+        var handler = BuildRestoreHandler();
         var command = new RestoreVoucherCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);

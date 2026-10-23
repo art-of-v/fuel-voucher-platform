@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/money";
 import { useSession } from "@/lib/session-store";
 import { formatDate } from "@/lib/utils";
 import type { ReconciliationResponse } from "@/lib/api-types";
+import { RedemptionReconciliationPanel } from "@/components/RedemptionReconciliationPanel";
 
 /**
  * The reconciliation: what we received, what we delivered, and the orders where those two do
@@ -49,6 +50,8 @@ export default function ReconciliationTab() {
         <BarChart className="w-6 h-6 text-primary" />
         {t("reconciliation.title")}
       </h2>
+
+      <RedemptionReconciliationPanel />
 
       {isReconLoading ? (
         <div className="flex items-center gap-2 text-muted-foreground">

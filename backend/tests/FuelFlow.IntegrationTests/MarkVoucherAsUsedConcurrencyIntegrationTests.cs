@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -40,7 +41,7 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
     /// longer execute it once the write became an <c>ExecuteUpdateAsync</c>.
     /// </summary>
     [Fact]
-    public async Task MarkVoucherAsUsed_TransitionsFromAssignedToUsed()
+    public async Task MarkVoucherAsUsed_TransitionsFromAssignedToPendingReconciliation()
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
@@ -48,21 +49,29 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
         await SeedAssignedVoucherAsync(userId, voucherId);
 
         await using var context = CreateContext();
-        var handler = new MarkVoucherAsUsedCommandHandler(context, TestJournal.For(context), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+        var handler = new MarkVoucherAsUsedCommandHandler(context, TestRedemptions.For(context), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
 
         response.Success.Should().BeTrue();
-        response.Message.Should().Be("Voucher marked as used");
+        response.Message.Should().Be("Voucher reported; waiting for supplier confirmation");
 
         await using var verify = CreateContext();
         var stored = await verify.FuelVouchers
             .Where(v => v.Id == voucherId)
-            .Select(v => new { v.Status, v.UpdatedAtUtc })
+            .Select(v => new { v.Status, v.UsedAtUtc, v.UpdatedAtUtc })
             .SingleAsync();
 
-        stored.Status.Should().Be(VoucherStatus.Used);
+        stored.Status.Should().Be(VoucherStatus.PendingReconciliation);
+        stored.UsedAtUtc.Should().BeNull("the customer reported the fuel, not the supplier's evidence");
         stored.UpdatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(10));
+
+        var redemption = await verify.VoucherRedemptions
+            .Where(r => r.VoucherId == voucherId)
+            .SingleAsync();
+        redemption.Status.Should().Be(VoucherRedemptionStatus.Reported);
+        redemption.ReportedByUserId.Should().Be(userId);
+        redemption.ReportedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>
@@ -83,28 +92,29 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
         await SeedAssignedVoucherAsync(userId, voucherId);
 
         await using var context = CreateContext();
-        var handler = new MarkVoucherAsUsedCommandHandler(context, TestJournal.For(context), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+        var handler = new MarkVoucherAsUsedCommandHandler(context, TestRedemptions.For(context), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
 
         await using var verify = CreateContext();
-        var redemption = await verify.VoucherEvents
+        var reported = await verify.VoucherEvents
             .AsNoTracking()
             .Where(e => e.VoucherId == voucherId)
             .Select(e => new { e.EventType, e.FromStatus, e.ToStatus, e.ActorKind, e.ActorUserId, e.OccurredAtUtc })
             .SingleAsync();
-        var usedAt = await verify.FuelVouchers
-            .Where(v => v.Id == voucherId)
-            .Select(v => v.UsedAtUtc)
+        var claim = await verify.VoucherRedemptions
+            .AsNoTracking()
+            .Where(r => r.VoucherId == voucherId)
+            .Select(r => new { r.ReportedAtUtc })
             .SingleAsync();
 
-        redemption.EventType.Should().Be(VoucherEventTypes.StatusChanged);
-        redemption.FromStatus.Should().Be(nameof(VoucherStatus.Assigned));
-        redemption.ToStatus.Should().Be(nameof(VoucherStatus.Used));
-        redemption.ActorKind.Should().Be(VoucherActorKinds.User);
-        redemption.ActorUserId.Should().Be(userId);
-        redemption.OccurredAtUtc.Should().Be(usedAt!.Value,
-            "the event and the voucher's own stamp are the same instant - one moment, two tables");
+        reported.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        reported.FromStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        reported.ToStatus.Should().Be(nameof(VoucherStatus.PendingReconciliation));
+        reported.ActorKind.Should().Be(VoucherActorKinds.User);
+        reported.ActorUserId.Should().Be(userId);
+        reported.OccurredAtUtc.Should().Be(claim.ReportedAtUtc,
+            "the event and the claim are the same instant - one moment, two tables");
     }
 
     /// <summary>
@@ -121,21 +131,23 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
 
         await using (var first = CreateContext())
         {
-            var handler = new MarkVoucherAsUsedCommandHandler(first, TestJournal.For(first), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+            var handler = new MarkVoucherAsUsedCommandHandler(first, TestRedemptions.For(first), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
             (await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId))).Success
                 .Should().BeTrue();
         }
 
         await using (var second = CreateContext())
         {
-            var handler = new MarkVoucherAsUsedCommandHandler(second, TestJournal.For(second), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+            var handler = new MarkVoucherAsUsedCommandHandler(second, TestRedemptions.For(second), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
             (await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId))).Message
-                .Should().Be("Voucher already marked as used");
+                .Should().Be("Voucher is already awaiting supplier confirmation");
         }
 
         await using var verify = CreateContext();
         (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
-            .Should().Be(1, "a second mark-as-used is the same redemption, not a new one");
+            .Should().Be(1, "a second mark-as-used is the same report, not a new one");
+        (await verify.VoucherRedemptions.CountAsync(r => r.VoucherId == voucherId))
+            .Should().Be(1, "a second mark-as-used must not open a second claim");
     }
 
     /// <summary>
@@ -166,7 +178,7 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             voucherId);
 
         await using var handlerContext = CreateContext();
-        var handler = new MarkVoucherAsUsedCommandHandler(handlerContext, TestJournal.For(handlerContext), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+        var handler = new MarkVoucherAsUsedCommandHandler(handlerContext, TestRedemptions.For(handlerContext), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
         var redemption = Task.Run(() => handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId)));
 
         // Long enough for the handler to clear its pre-check and reach the UPDATE, where it parks
@@ -197,6 +209,8 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
         await using var verifyEvents = CreateContext();
         (await verifyEvents.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
             .Should().Be(0, "the handler that lost the CAS did not redeem anything, so it records nothing");
+        (await verifyEvents.VoucherRedemptions.CountAsync(r => r.VoucherId == voucherId))
+            .Should().Be(0, "the loser of the race opened no claim either");
     }
 
     private async Task SeedAssignedVoucherAsync(Guid userId, Guid voucherId)
@@ -256,7 +270,15 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """
+            TRUNCATE TABLE
+                "journal_lines", "journal_entries", "document_sequences", "accounting_periods",
+                "voucher_redemptions", "redemption_statement_rows",
+                "voucher_events", "voucher_movements", "order_line_items", "orders",
+                "fuel_vouchers", "users", "payments", "fulfillments", "outbox_events",
+                "provider_event_outbox", "app_settings"
+            RESTART IDENTITY CASCADE
+            """);
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()

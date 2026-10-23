@@ -20,6 +20,13 @@ public enum VoucherStatus
 
     Available,
     Assigned,
+
+    /// <summary>
+    /// The holder has reported a redemption, but the supplier's evidence has not confirmed it yet.
+    /// The voucher can no longer be redeemed, and the sale is a provisional journal draft.
+    /// </summary>
+    PendingReconciliation,
+
     Used,
     Expired,
     Blocked,

@@ -1,27 +1,26 @@
-using FuelFlow.Features.Ledger;
-using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.SharedModels;
-using FuelFlow.SharedKernel.Database;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 
-public sealed partial class MarkVoucherAsUsedCommandHandler
+public sealed class MarkVoucherAsUsedCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly JournalPostingService _journal;
+    private readonly VoucherRedemptionService _redemptions;
     private readonly ILogger<MarkVoucherAsUsedCommandHandler> _logger;
 
     public MarkVoucherAsUsedCommandHandler(
         ApplicationDbContext context,
-        JournalPostingService journal,
+        VoucherRedemptionService redemptions,
         ILogger<MarkVoucherAsUsedCommandHandler> logger)
     {
         _context = context;
-        _journal = journal;
+        _redemptions = redemptions;
         _logger = logger;
     }
 
@@ -32,17 +31,13 @@ public sealed partial class MarkVoucherAsUsedCommandHandler
         var voucher = await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Id == command.VoucherId)
-            .Select(v => new RedeemedVoucher(
+            .Select(v => new
+            {
                 v.Id,
                 v.Status,
                 v.WorkerUserId,
                 v.AssignedToUserId,
-                v.Liters,
-                // The price WE paid the supplier, snapshotted at import from their invoice. Not the
-                // offer's current supplier_price_per_liter: offers are re-imported, and today's price
-                // is not what this voucher cost last month.
-                v.CostPerLiter,
-                v.OrderId))
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (voucher == null)
@@ -62,6 +57,13 @@ public sealed partial class MarkVoucherAsUsedCommandHandler
                 "Forbidden");
         }
 
+        if (voucher.Status == VoucherStatus.PendingReconciliation)
+        {
+            return new MarkVoucherAsUsedResponse(
+                true,
+                "Voucher is already awaiting supplier confirmation");
+        }
+
         if (voucher.Status == VoucherStatus.Used)
         {
             return new MarkVoucherAsUsedResponse(true, "Voucher already marked as used");
@@ -69,95 +71,50 @@ public sealed partial class MarkVoucherAsUsedCommandHandler
 
         if (voucher.Status != VoucherStatus.Assigned)
         {
-            return new MarkVoucherAsUsedResponse(false, $"Voucher cannot be marked as used (current status: {voucher.Status})", "InvalidState");
+            return new MarkVoucherAsUsedResponse(
+                false,
+                $"Voucher cannot be marked as used (current status: {voucher.Status})",
+                "InvalidState");
         }
 
-        // The status check above is advisory only: between it and the write, another request
-        // could redeem the same voucher. Repeating the predicate in the UPDATE's WHERE clause
-        // makes the transition atomic, so exactly one of two concurrent redemptions wins.
-        //
-        // One instant for both writes. The stamp that lands on the voucher and the one on the event
-        // have to be the same moment, or "when was this redeemed" answers differently depending on
-        // which table you ask - and the event is the one an audit reads.
         var occurredAtUtc = SystemClock.UtcNow;
 
-        // The transition and the record of it are one fact, so they commit together. Without the
-        // transaction a failed SaveChanges leaves status = Used with nothing naming who did it,
-        // which is exactly the action-without-an-author the actor CHECKs exist to prevent.
-        //
-        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
-        // it: a transient failure retries the body rather than losing the redemption, and the retry
-        // writes the event and the journal entry once. The redemption event is also the answer to
-        // "did it land?" - a commit whose answer was lost on the way back is asked about rather than
-        // repeated, because a second redemption is not a second handover of the same paper.
-        var outcome = await _context.ExecuteReplaySafeAsync<MarkVoucherAsUsedResponse?>(async ct =>
+        // The transition, the claim, the audit event and the provisional journal entries are one
+        // unit of work. A report that moved the status but left no draft would be a redemption
+        // nobody can confirm later; a draft without the claim has no one to confirm it.
+        var result = await _context.ExecuteReplaySafeAsync<RedemptionReportResult>(async ct =>
+            await _redemptions.ReportAsync(
+                command.VoucherId,
+                reportedByUserId: command.UserId,
+                actorUserId: command.UserId,
+                reportedLiters: null,
+                redeemedAtUtc: occurredAtUtc,
+                supplierReference: null,
+                reason: "Self-reported by the voucher holder",
+                ct),
+            cancellationToken,
+            verifySucceeded: async ct => await _context.VoucherEvents
+                .AsNoTracking()
+                .AnyAsync(
+                    e => e.VoucherId == command.VoucherId
+                        && e.EventType == FuelFlow.Features.Vouchers.Events.VoucherEventTypes.StatusChanged
+                        && e.ToStatus == nameof(VoucherStatus.PendingReconciliation),
+                    ct));
+
+        return result.Outcome switch
         {
-            var affected = await _context.FuelVouchers
-                .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Assigned)
-                .ExecuteUpdateAsync(
-                    s => s
-                        .SetProperty(v => v.Status, VoucherStatus.Used)
-                        // Stamped inside the same UPDATE that performs the transition, so the redemption
-                        // time is the one that won the race rather than whatever a caller decided earlier.
-                        // This is the "when used" a worker usage report reads (#150).
-                        .SetProperty(v => v.UsedAtUtc, occurredAtUtc)
-                        .SetProperty(v => v.UpdatedAtUtc, occurredAtUtc),
-                    ct);
-
-            if (affected == 0)
-            {
-                // Lost the race. Nothing was written, so there is nothing to roll back. Re-read so
-                // the caller is told the real outcome rather than a stale one.
-                var current = await _context.FuelVouchers
-                    .AsNoTracking()
-                    .Where(v => v.Id == command.VoucherId)
-                    .Select(v => (VoucherStatus?)v.Status)
-                    .FirstOrDefaultAsync(ct);
-
-                return current switch
-                {
-                    VoucherStatus.Used => new MarkVoucherAsUsedResponse(true, "Voucher already marked as used"),
-                    null => new MarkVoucherAsUsedResponse(false, "Voucher not found", "NotFound"),
-                    _ => new MarkVoucherAsUsedResponse(false, $"Voucher cannot be marked as used (current status: {current})", "InvalidState")
-                };
-            }
-
-            // A redemption moves no paper. The customer is holding the same ticket they were holding a
-            // moment ago; it has been spent, not relocated - so this is an event and not a movement, and
-            // the voucher's status is the only thing that changed, which is what from/to record.
-            //
-            // Written only after the CAS reports it won. The idempotent branches above and the lost-race
-            // branch deliberately write nothing: a second mark-as-used is not a second redemption, and
-            // recording it would put two rows on one physical handover.
-            _context.VoucherEvents.Add(new VoucherEvent
-            {
-                Id = Guid.NewGuid(),
-                VoucherId = command.VoucherId,
-                EventType = VoucherEventTypes.StatusChanged,
-                FromStatus = nameof(VoucherStatus.Assigned),
-                ToStatus = nameof(VoucherStatus.Used),
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.UserId,
-                OccurredAtUtc = occurredAtUtc
-            });
-
-            await _context.SaveChangesAsync(ct);
-
-            // Inside the same transaction as the transition above: a redemption that moved the status
-            // but left nothing in the books is a hole nobody finds until the month closes.
-            await PostSaleToJournalAsync(voucher, command.UserId, occurredAtUtc, ct);
-
-            return null;
-        },
-        cancellationToken,
-        verifySucceeded: async ct => await _context.VoucherEvents
-            .AsNoTracking()
-            .AnyAsync(
-                e => e.VoucherId == command.VoucherId
-                    && e.EventType == VoucherEventTypes.StatusChanged
-                    && e.ToStatus == nameof(VoucherStatus.Used),
-                ct));
-
-        return outcome ?? new MarkVoucherAsUsedResponse(true, "Voucher marked as used");
+            RedemptionReportOutcome.Reported =>
+                new MarkVoucherAsUsedResponse(true, "Voucher reported; waiting for supplier confirmation"),
+            RedemptionReportOutcome.AlreadyPending =>
+                new MarkVoucherAsUsedResponse(true, "Voucher is already awaiting supplier confirmation"),
+            RedemptionReportOutcome.AlreadyUsed =>
+                new MarkVoucherAsUsedResponse(true, "Voucher already marked as used"),
+            RedemptionReportOutcome.NotFound =>
+                new MarkVoucherAsUsedResponse(false, "Voucher not found", "NotFound"),
+            _ => new MarkVoucherAsUsedResponse(
+                false,
+                $"Voucher cannot be marked as used (current status: {result.CurrentStatus})",
+                "InvalidState"),
+        };
     }
 }

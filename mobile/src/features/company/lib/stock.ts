@@ -76,7 +76,9 @@ export interface CompanyStock {
  * Freeze/recall/unfreeze all require `Status == Assigned` on the server, so offering the
  * button on a redeemed voucher could only ever come back as «Ця дія конфліктує з поточним
  * станом». The screen used to render them anyway; the server guard stays as the real
- * protection, this only keeps the UI from proposing what cannot succeed.
+ * protection, this only keeps the UI from proposing what cannot succeed. A voucher whose
+ * report waits for supplier evidence is not Assigned either: it is under review, and the
+ * owner has no button on it until the review says what it is.
  *
  * `orphaned` says the voucher belongs to no current member — it is the fuel of somebody
  * who no longer works here. It changes one thing: the thaw is withdrawn, because a thaw
@@ -95,8 +97,9 @@ export function ownerActionsForVoucher(
   const s = (status ?? '').toLowerCase();
   return {
     // `used` is spent — nothing left to freeze or pull back. A `blocked` voucher is
-    // already frozen, so it offers only the way back.
-    canFreezeOrRecall: s !== 'used' && s !== 'blocked',
+    // already frozen, so it offers only the way back. A pending report is under review:
+    // the server only freezes an Assigned voucher, so the button could only fail.
+    canFreezeOrRecall: s !== 'used' && s !== 'blocked' && s !== 'pendingreconciliation',
     // A frozen voucher of a current worker can be handed back to them; a frozen voucher
     // of a former one cannot, because there is nobody to hand it to.
     canUnblock: s === 'blocked' && !orphaned,

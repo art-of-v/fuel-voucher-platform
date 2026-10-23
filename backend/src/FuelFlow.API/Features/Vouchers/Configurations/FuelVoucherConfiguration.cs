@@ -250,7 +250,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_voucher_held_has_order",
-                "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
+                "status NOT IN ('Assigned', 'PendingReconciliation', 'Used', 'Blocked') OR order_id IS NOT NULL");
             t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
             t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
             // The value set DataKinds.All documents - see DataKinds.
@@ -263,7 +263,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             // would have failed at write time.
             t.HasCheckConstraint("ck_voucher_status", """
                 status IN ('Imported', 'DecodeIntegrityWarning', 'DecodeIntegrityFailed', 'Available',
-                           'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')
+                           'Assigned', 'PendingReconciliation', 'Used', 'Expired', 'Blocked', 'Deactivated')
                 """);
 
             // We promise a customer fuel only while the supplier's paper is still alive. Without this

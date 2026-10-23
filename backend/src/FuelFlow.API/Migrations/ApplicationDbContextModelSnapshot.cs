@@ -2803,7 +2803,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_voucher_events_status_changed", "(event_type = 'StatusChanged') = (from_status IS NOT NULL AND to_status IS NOT NULL) AND (event_type <> 'StatusChanged' OR from_status <> to_status)");
 
-                            t.HasCheckConstraint("ck_voucher_events_statuses", "(from_status IS NULL OR from_status IN ('Imported','DecodeIntegrityWarning','DecodeIntegrityFailed','Available','Assigned','Used','Expired','Blocked','Deactivated')) AND (to_status IS NULL OR to_status IN ('Imported','DecodeIntegrityWarning','DecodeIntegrityFailed','Available','Assigned','Used','Expired','Blocked','Deactivated'))");
+                            t.HasCheckConstraint("ck_voucher_events_statuses", "(from_status IS NULL OR from_status IN ('Imported','DecodeIntegrityWarning','DecodeIntegrityFailed','Available','Assigned','PendingReconciliation','Used','Expired','Blocked','Deactivated')) AND (to_status IS NULL OR to_status IN ('Imported','DecodeIntegrityWarning','DecodeIntegrityFailed','Available','Assigned','PendingReconciliation','Used','Expired','Blocked','Deactivated'))");
 
                             t.HasCheckConstraint("ck_voucher_events_type", "event_type IN ('Imported','StatusChanged','Extended','Archived','Unarchived')");
                         });
@@ -3139,13 +3139,13 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_voucher_customer_term_within_supplier_term", "customer_expiration_date <= supplier_expiration_date");
 
-                            t.HasCheckConstraint("ck_voucher_held_has_order", "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
+                            t.HasCheckConstraint("ck_voucher_held_has_order", "status NOT IN ('Assigned', 'PendingReconciliation', 'Used', 'Blocked') OR order_id IS NOT NULL");
 
                             t.HasCheckConstraint("ck_voucher_holder", "(holder_kind = 'Stock'    AND assigned_to_user_id IS NULL)\nOR (holder_kind = 'Worker'   AND legal_entity_id IS NOT NULL AND worker_user_id IS NOT NULL)\nOR (holder_kind = 'Personal' AND worker_user_id IS NULL AND assigned_to_user_id IS NOT NULL)\nOR (holder_kind = 'Company'  AND worker_user_id IS NULL AND assigned_to_user_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
 
-                            t.HasCheckConstraint("ck_voucher_status", "status IN ('Imported', 'DecodeIntegrityWarning', 'DecodeIntegrityFailed', 'Available',\n           'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')");
+                            t.HasCheckConstraint("ck_voucher_status", "status IN ('Imported', 'DecodeIntegrityWarning', 'DecodeIntegrityFailed', 'Available',\n           'Assigned', 'PendingReconciliation', 'Used', 'Expired', 'Blocked', 'Deactivated')");
                         });
                 });
 
@@ -3352,6 +3352,225 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_qr_parameters_mask_pattern", "mask_pattern IS NULL OR mask_pattern BETWEEN 0 AND 7");
 
                             t.HasCheckConstraint("ck_qr_parameters_version", "version IS NULL OR version BETWEEN 1 AND 40");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Redemptions.RedemptionStatementRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_id")
+                        .HasComment("The supplier's stable line id. Unique, so a re-import is idempotent.");
+
+                    b.Property<DateTime>("ImportedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("imported_at_utc")
+                        .HasComment("When this line was imported.");
+
+                    b.Property<Guid>("ImportedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("imported_by_user_id")
+                        .HasComment("The operator who imported the statement. Bare uuid, no foreign key.");
+
+                    b.Property<decimal>("Liters")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("liters")
+                        .HasComment("The litres the statement attributes to this line.");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note")
+                        .HasComment("The line as the supplier sent it, kept for the operator.");
+
+                    b.Property<DateTime?>("RedeemedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at_utc")
+                        .HasComment("When the supplier says the fuel was taken, if the statement carries a time.");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("resolution_note")
+                        .HasComment("Why the operator closed the line.");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at_utc")
+                        .HasComment("When the line was closed.");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_by_user_id")
+                        .HasComment("The operator who closed the line. Bare uuid, no foreign key.");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status")
+                        .HasComment("Where this line stands: matched, confirmed, mismatch, unknown and the rest.");
+
+                    b.Property<Guid?>("VoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_id")
+                        .HasComment("The voucher this line matched. NULL when the number is unknown.");
+
+                    b.Property<string>("VoucherNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("voucher_number")
+                        .HasComment("The voucher number as the statement printed it.");
+
+                    b.Property<Guid?>("VoucherRedemptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_redemption_id")
+                        .HasComment("The claim this line matched. NULL when no active claim existed.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_redemption_statement_rows_external_id");
+
+                    b.HasIndex("VoucherId")
+                        .HasDatabaseName("ix_redemption_statement_rows_voucher_id");
+
+                    b.HasIndex("VoucherNumber")
+                        .HasDatabaseName("ix_redemption_statement_rows_voucher_number");
+
+                    b.HasIndex("VoucherRedemptionId")
+                        .HasDatabaseName("ix_redemption_statement_rows_voucher_redemption_id");
+
+                    b.HasIndex("Status", "ImportedAtUtc")
+                        .HasDatabaseName("ix_redemption_statement_rows_status_imported_at_utc");
+
+                    b.ToTable("redemption_statement_rows", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_redemption_statement_rows_liters_positive", "liters > 0");
+
+                            t.HasCheckConstraint("ck_redemption_statement_rows_matched_has_voucher", "status <> 'Matched' OR voucher_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_redemption_statement_rows_resolved_shape", "status NOT IN ('Confirmed', 'Rejected', 'Reversed', 'Dismissed') OR (resolved_at_utc IS NOT NULL AND resolved_by_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_redemption_statement_rows_status", "status IN ('Matched', 'Confirmed', 'Rejected', 'Reversed', 'UnknownVoucher',\n           'Mismatch', 'AlreadyConfirmed', 'NotAssigned', 'Dismissed')");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Redemptions.VoucherRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at_utc")
+                        .HasComment("When the claim was withdrawn, rejected or reversed.");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_by_user_id")
+                        .HasComment("The actor who closed the claim. Bare uuid, no foreign key.");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at_utc")
+                        .HasComment("When the evidence was accepted.");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by_user_id")
+                        .HasComment("The operator who accepted the evidence. Bare uuid, no foreign key.");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("RedeemedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("redeemed_at_utc")
+                        .HasComment("When the fuel was actually taken, as far as the evidence says.");
+
+                    b.Property<DateTime>("ReportedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reported_at_utc")
+                        .HasComment("When this claim entered the system.");
+
+                    b.Property<Guid?>("ReportedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reported_by_user_id")
+                        .HasComment("The customer who self-reported it. NULL means a supplier statement raised it.");
+
+                    b.Property<decimal>("ReportedLiters")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("reported_liters")
+                        .HasComment("The litres claimed by the reporter or statement. Normally the voucher's own litres.");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("resolution_note")
+                        .HasComment("Why the operator closed it, in their own words.");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status")
+                        .HasComment("Where the claim stands: reported, confirmed, withdrawn, rejected or reversed.");
+
+                    b.Property<string>("SupplierReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("supplier_reference")
+                        .HasComment("The supplier's line reference, when the claim came from a statement.");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("VoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_id")
+                        .HasComment("The voucher this claim is about.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierReference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_voucher_redemptions_supplier_reference")
+                        .HasFilter("supplier_reference IS NOT NULL");
+
+                    b.HasIndex("VoucherId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_voucher_redemptions_active_voucher")
+                        .HasFilter("status IN ('Reported', 'Confirmed')");
+
+                    b.HasIndex("ReportedByUserId", "Status")
+                        .HasDatabaseName("ix_voucher_redemptions_reported_by_user_id_status");
+
+                    b.HasIndex("Status", "ReportedAtUtc")
+                        .HasDatabaseName("ix_voucher_redemptions_status_reported_at_utc");
+
+                    b.ToTable("voucher_redemptions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_redemptions_closed_shape", "status NOT IN ('Withdrawn', 'Rejected', 'Reversed') OR (closed_at_utc IS NOT NULL AND closed_by_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_voucher_redemptions_confirmed_shape", "status <> 'Confirmed' OR (confirmed_at_utc IS NOT NULL AND confirmed_by_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_voucher_redemptions_liters_positive", "reported_liters > 0");
+
+                            t.HasCheckConstraint("ck_voucher_redemptions_status", "status IN ('Reported', 'Confirmed', 'Withdrawn', 'Rejected', 'Reversed')");
                         });
                 });
 
@@ -5539,6 +5758,34 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Redemptions.RedemptionStatementRow", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.Redemptions.VoucherRedemption", "VoucherRedemption")
+                        .WithMany()
+                        .HasForeignKey("VoucherRedemptionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Voucher");
+
+                    b.Navigation("VoucherRedemption");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Redemptions.VoucherRedemption", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Voucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImport", b =>

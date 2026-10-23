@@ -28,8 +28,10 @@ export interface WorkerUsageTotals {
   count: number;
   litersReceived: number;
   litersUsed: number;
+  litersPending: number;
   litersRemaining: number;
   countUsed: number;
+  countPending: number;
   countRemaining: number;
 }
 
@@ -97,8 +99,10 @@ export async function getWorkerUsage(legalEntityId: string): Promise<WorkerUsage
       count: 0,
       litersReceived: 0,
       litersUsed: 0,
+      litersPending: 0,
       litersRemaining: 0,
       countUsed: 0,
+      countPending: 0,
       countRemaining: 0,
     },
     items,

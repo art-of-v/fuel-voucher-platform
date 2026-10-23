@@ -4,8 +4,10 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.Movements;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -38,7 +40,9 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             """
             TRUNCATE TABLE
                 "journal_lines", "journal_entries", "document_sequences", "accounting_periods",
-                "voucher_events", "voucher_movements", "order_line_items", "orders", "fuel_vouchers", "users"
+                "voucher_redemptions", "redemption_statement_rows",
+                "voucher_events", "voucher_movements", "order_line_items", "orders",
+                "fuel_vouchers", "users"
             CASCADE;
             """);
 
@@ -134,12 +138,16 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         await using var context = CreateContext();
         var handler = new MarkVoucherAsUsedCommandHandler(
             context,
-            new FuelFlow.Features.Ledger.JournalPostingService(
-                context, NullLogger<FuelFlow.Features.Ledger.JournalPostingService>.Instance),
+            TestRedemptions.For(context),
             NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
         response.Success.Should().BeTrue();
+        response.Message.Should().Be("Voucher reported; waiting for supplier confirmation");
+
+        var confirmed = await context.ExecuteReplaySafeAsync(async ct =>
+            await TestRedemptions.For(context).ConfirmAsync(voucherId, userId, "test confirmation", ct));
+        confirmed.Outcome.Should().Be(RedemptionDecisionOutcome.Confirmed);
 
         await using var verify = CreateContext();
         var entries = await verify.JournalEntries
@@ -180,6 +188,61 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
     }
 
     [Fact]
+    public async Task A_Report_Writes_Drafts_And_Posts_Nothing_Until_The_Evidence_Is_Confirmed()
+    {
+        await using var setup = CreateContext();
+        await ResetAsync(setup);
+        var (userId, voucherId) = await SeedSaleAsync(setup, costPerLiter: 45m);
+
+        await using (var context = CreateContext())
+        {
+            var handler = new MarkVoucherAsUsedCommandHandler(
+                context,
+                TestRedemptions.For(context),
+                NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
+
+            var report = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
+            report.Success.Should().BeTrue();
+        }
+
+        await using (var verify = CreateContext())
+        {
+            var voucher = await verify.FuelVouchers
+                .Where(v => v.Id == voucherId)
+                .Select(v => new { v.Status, v.UsedAtUtc })
+                .SingleAsync();
+
+            voucher.Status.Should().Be(VoucherStatus.PendingReconciliation);
+            voucher.UsedAtUtc.Should().BeNull("a report is not a confirmation");
+
+            var redemption = await verify.VoucherRedemptions
+                .Where(r => r.VoucherId == voucherId)
+                .SingleAsync();
+            redemption.Status.Should().Be(VoucherRedemptionStatus.Reported);
+
+            var entries = await verify.JournalEntries
+                .Where(e => e.SourceId == voucherId)
+                .ToListAsync();
+            entries.Should().HaveCount(3);
+            entries.Should().OnlyContain(e => e.Status == JournalEntryStatus.Draft);
+        }
+
+        await using (var context = CreateContext())
+        {
+            var confirmed = await context.ExecuteReplaySafeAsync(async ct =>
+                await TestRedemptions.For(context).ConfirmAsync(voucherId, userId, "evidence accepted", ct));
+            confirmed.Outcome.Should().Be(RedemptionDecisionOutcome.Confirmed);
+        }
+
+        await using var final = CreateContext();
+        (await final.JournalEntries
+                .Where(e => e.SourceId == voucherId)
+                .Select(e => e.Status)
+                .ToListAsync())
+            .Should().OnlyContain(status => status == JournalEntryStatus.Posted);
+    }
+
+    [Fact]
     public async Task Every_Redemption_Entry_Is_Balanced_And_Posted()
     {
         await using var setup = CreateContext();
@@ -211,8 +274,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         await using var second = CreateContext();
         var handler = new MarkVoucherAsUsedCommandHandler(
             second,
-            new FuelFlow.Features.Ledger.JournalPostingService(
-                second, NullLogger<FuelFlow.Features.Ledger.JournalPostingService>.Instance),
+            TestRedemptions.For(second),
             NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         // The handler short-circuits on the idempotent branch, so this never reaches the posting.

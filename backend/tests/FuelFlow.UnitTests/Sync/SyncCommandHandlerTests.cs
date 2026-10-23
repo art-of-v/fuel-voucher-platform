@@ -197,6 +197,120 @@ public sealed class SyncCommandHandlerTests : IDisposable
         syncedOrder2.Vouchers.Should().Contain(v => v.Id == voucher3.Id);
     }
 
+    /// <summary>
+    /// The order-nested voucher list is the wallet's own payload, so it follows the same rule as
+    /// the wallet list: a report that waits for supplier evidence carries no bearer material.
+    /// Handing the QR back would invite a second dispense while the first one is still open.
+    /// </summary>
+    [Fact]
+    public async Task GetSync_WithholdsTheQrOfAVoucherWaitingForSupplierEvidence()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        _context.Orders.Add(OrderFor(userId, orderId));
+        _context.FuelVouchers.Add(VoucherFor(voucherId, userId, VoucherStatus.PendingReconciliation));
+        _context.Fulfillments.Add(new Fulfillment
+        {
+            OrderId = orderId,
+            VoucherId = voucherId,
+            FulfilledAtUtc = TestClock.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new GetSyncCommandHandler(_context, BuildGetUserPurchasesHandler());
+
+        var response = await handler.HandleAsync(new GetSyncCommand(userId));
+
+        var synced = response.Orders.Single().Vouchers.Should().ContainSingle().Subject;
+        synced.Status.Should().Be(nameof(VoucherStatus.PendingReconciliation));
+        synced.QrPayload.Should().BeEmpty("a pending report must not be presented again");
+        synced.QrCodeData.Should().BeEmpty();
+        synced.ImageUrl.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Issuing fuel to a worker leaves the owner on the voucher's AssignedToUserId, so the owner's
+    /// order still nests the voucher - but the worker holds it, and the owner's copy of the order
+    /// must not carry the instrument the worker can spend.
+    /// </summary>
+    [Fact]
+    public async Task GetSync_DoesNotHandTheIssuerTheQrOfFuelItIssuedToAWorker()
+    {
+        var ownerId = Guid.NewGuid();
+        var workerId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        _context.Orders.Add(OrderFor(ownerId, orderId));
+        _context.FuelVouchers.Add(VoucherFor(voucherId, ownerId, VoucherStatus.Assigned, workerId));
+        _context.Fulfillments.Add(new Fulfillment
+        {
+            OrderId = orderId,
+            VoucherId = voucherId,
+            FulfilledAtUtc = TestClock.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new GetSyncCommandHandler(_context, BuildGetUserPurchasesHandler());
+
+        var response = await handler.HandleAsync(new GetSyncCommand(ownerId));
+
+        // The row stays - the owner's hub reads what the order delivered - but the QR does not.
+        var synced = response.Orders.Single().Vouchers.Should().ContainSingle().Subject;
+        synced.Id.Should().Be(voucherId);
+        synced.QrPayload.Should().BeEmpty();
+        synced.QrCodeData.Should().BeEmpty();
+        synced.ImageUrl.Should().BeNull();
+    }
+
+    private Order OrderFor(Guid userId, Guid orderId) => new()
+    {
+        Id = orderId,
+        UserId = userId,
+        Price = 2500,
+        Status = OrderStatus.Fulfilled,
+        CreatedAtUtc = TestClock.UtcNow,
+        FulfilledAtUtc = TestClock.UtcNow,
+        LineItems =
+        {
+            new OrderLineItem
+            {
+                Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
+                Brand = "okko",
+                FuelTypeId = ToUuid("okko-95"),
+                Liters = 50,
+                Quantity = 1,
+                UnitPrice = 2500,
+                LineTotal = 2500
+            }
+        }
+    };
+
+    private FuelVoucher VoucherFor(
+        Guid voucherId,
+        Guid assignedToUserId,
+        VoucherStatus status,
+        Guid? workerUserId = null) => new()
+    {
+        Id = voucherId,
+        BrandId = BrandIds.ForSlug("okko"),
+        Brand = "okko",
+        FuelTypeId = ToUuid("okko-95"),
+        Liters = 50,
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+        VoucherNumber = $"OKKO-{voucherId:N}",
+        QrPayload = "redeemable-instrument",
+        Status = status,
+        AssignedToUserId = assignedToUserId,
+        WorkerUserId = workerUserId,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
+    };
+
     [Fact]
     public async Task GetSync_ShouldReturnEmptyResponse_WhenUserHasNoOrders()
     {

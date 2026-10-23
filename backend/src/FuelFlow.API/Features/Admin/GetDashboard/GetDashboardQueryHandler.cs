@@ -23,6 +23,7 @@ public sealed class GetDashboardQueryHandler
         var totalVouchers = await _context.FuelVouchers.CountAsync(cancellationToken);
         var availableVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Available || v.Status == VoucherStatus.Imported, cancellationToken);
         var assignedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Assigned, cancellationToken);
+        var pendingReconciliationVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.PendingReconciliation, cancellationToken);
         var usedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Used, cancellationToken);
         var decodeIntegrityFailedVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.DecodeIntegrityFailed, cancellationToken);
         var decodeIntegrityWarningVouchers = await _context.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.DecodeIntegrityWarning, cancellationToken);
@@ -73,7 +74,7 @@ public sealed class GetDashboardQueryHandler
 
         return new GetDashboardResponse(
             new GetDashboardResponse.UsersStats(totalUsers),
-            new GetDashboardResponse.VouchersStats(totalVouchers, availableVouchers, assignedVouchers, usedVouchers, decodeIntegrityFailedVouchers, decodeIntegrityWarningVouchers, byProvider),
+            new GetDashboardResponse.VouchersStats(totalVouchers, availableVouchers, assignedVouchers, pendingReconciliationVouchers, usedVouchers, decodeIntegrityFailedVouchers, decodeIntegrityWarningVouchers, byProvider),
             new GetDashboardResponse.OrdersStats(totalOrders, pendingOrders, fulfilledOrders, revenueUah));
     }
 }

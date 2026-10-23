@@ -238,7 +238,14 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                 }).ToList(),
                 Vouchers = orderVouchers.Select(v =>
                 {
-                    var imageUrl = GenerateQrImage(v);
+                    // The redemption material goes only to the holder, and never to a voucher whose
+                    // own report is still waiting for supplier evidence: handing the bearer payload
+                    // back would invite a second dispense while the first one waits. This is the
+                    // same rule the wallet list and the QR endpoint answer through.
+                    var canPresentRedemption =
+                        v.Status != VoucherStatus.PendingReconciliation
+                        && VoucherHolder.CanRedeem(v.WorkerUserId, v.AssignedToUserId, command.UserId);
+                    var imageUrl = canPresentRedemption ? GenerateQrImage(v) : null;
                     return new VoucherDto
                     {
                         Id = v.Id,
@@ -250,8 +257,8 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                         ExpirationDate = v.CustomerExpirationDate,
                         VoucherNumber = v.VoucherNumber,
                         ExternalId = v.VoucherNumber,
-                        QrPayload = v.QrPayload,
-                        QrCodeData = v.QrPayload,
+                        QrPayload = canPresentRedemption ? v.QrPayload : string.Empty,
+                        QrCodeData = canPresentRedemption ? v.QrPayload : string.Empty,
                         Status = v.Status.ToString(),
                         LegalEntityId = v.LegalEntityId,
                         WorkerUserId = v.WorkerUserId,
