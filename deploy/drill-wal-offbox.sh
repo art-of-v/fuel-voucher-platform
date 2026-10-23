@@ -12,18 +12,39 @@
 # WHAT IT DOES
 #   1. starts a throwaway postgres that archives to a temp directory;
 #   2. writes marker 1, switches WAL, waits for the segment to be archived;
-#   3. takes a base backup, encrypts it, and puts it in a local "remote";
+#   3. takes a base backup, encrypts it, and puts it in the "remote" (a local directory,
+#      or - with DRILL_REMOTE - a drill prefix in a real bucket);
 #   4. writes marker 2 (AFTER the base), switches WAL, waits for that segment;
-#   5. runs ship-wal-offbox.sh against the local "remote" (real age, real rclone);
+#   5. runs ship-wal-offbox.sh against that remote (real age, real rclone);
 #   6. STOPS the source - this is the host loss;
 #   7. runs restore-pitr.sh with --base-remote/--wal-remote only: no path on the source
 #      is read;
 #   8. asserts marker 2 is in the restored database, and prints the measured ship lag and
 #      the recovered point.
 #
-# Needs: docker, age, age-keygen, rclone (the local backend; no configured remote). The
-# postgres image is the same one production uses. It never touches the live database and
-# never writes to a real bucket.
+# Needs: docker, age, age-keygen, rclone. The postgres image is the same one production
+# uses. It never touches the live database.
+#
+# THE REMOTE
+# By default the "off-box" copy is a directory under /tmp: a local drill, safe anywhere,
+# and it is what CI runs. Set DRILL_REMOTE to run the same drill against a REAL remote -
+# the only way to prove that the bucket, the credentials and the encryption work outside
+# a CI runner:
+#
+#     DRILL_REMOTE=r2:fuelflow-backups/drill/695-20261023T090000Z \
+#       bash deploy/drill-wal-offbox.sh
+#
+# Two guards make that safe, and both refuse rather than warn:
+#   * the prefix must have a "/drill" path segment, so it can be neither the production
+#     bucket root nor the production wal/ prefix (see wal_drill_remote_is_safe);
+#   * the prefix must not be the production BACKUP_REMOTE.
+#
+# The drill's keypair is generated HERE, on the box. The production private key never
+# comes to the box, and the drill objects are therefore readable only by this run - the
+# point is to prove the mechanism, not to touch production data.
+#
+# The drill objects are scratch: they are listed in the transcript and then deleted.
+# DRILL_KEEP=1 keeps them.
 
 set -euo pipefail
 
@@ -33,6 +54,44 @@ SRC="${SRC:-fuelflow-wal-drill-src}"
 DST="${DST:-fuelflow-wal-drill-dst}"
 PORT="${PORT:-55498}"
 RESTORE_DATA_DIR=""
+DRILL_REMOTE="${DRILL_REMOTE:-}"
+DRILL_KEEP="${DRILL_KEEP:-0}"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
+RCLONE="${RCLONE_BIN:-rclone}"
+AGE="${AGE_BIN:-age}"
+
+# shellcheck source=wal-offbox.sh
+source "$SCRIPT_DIR/wal-offbox.sh"
+
+fail() { echo "ERROR: $*" >&2; exit 1; }
+
+# The guards run BEFORE anything else, so a wrong prefix is refused without starting a
+# container or touching the bucket.
+PROD_REMOTE=""
+if [[ -f "$ENV_FILE" ]]; then
+  # The production remote, when this runs on the box. Parsed, not sourced (load-env.sh).
+  # shellcheck source=load-env.sh
+  source "$SCRIPT_DIR/load-env.sh"
+  load_env "$ENV_FILE" || true
+  PROD_REMOTE="${BACKUP_REMOTE:-}"
+fi
+
+if [[ -n "$DRILL_REMOTE" ]]; then
+  wal_drill_remote_is_safe "$DRILL_REMOTE" || fail \
+    "DRILL_REMOTE=$DRILL_REMOTE is not a drill prefix.
+       It must have a '/drill' path segment, so a drill can never write to the
+       production bucket root or to the production wal/ prefix. For example:
+           DRILL_REMOTE=r2:fuelflow-backups/drill/695-\$(date -u +%Y%m%dT%H%M%SZ)"
+  if [[ -n "$PROD_REMOTE" && "${DRILL_REMOTE%/}" == "${PROD_REMOTE%/}" ]]; then
+    fail "DRILL_REMOTE=$DRILL_REMOTE is the production remote from $ENV_FILE."
+  fi
+fi
+
+# The production remote must not be INHERITED by anything this drill runs. If the drill's
+# own env file were ever missing, the shipper would fall back to the inherited value and
+# the drill would write into the production prefix. Unsetting it turns that into a
+# failure - "BACKUP_REMOTE is not set" - instead of a silent write to production.
+unset BACKUP_REMOTE BACKUP_AGE_RECIPIENT
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/wal-drill.XXXXXX")"
 chmod 755 "$TMP"
@@ -52,16 +111,22 @@ cleanup() {
     rmdir "$RESTORE_DATA_DIR" 2>/dev/null || true
     rm -rf "${RESTORE_DATA_DIR%/data}" 2>/dev/null || true
   fi
+  # The drill's objects are scratch. They are listed in the transcript before this runs,
+  # so the evidence survives the cleanup.
+  if [[ -n "$DRILL_REMOTE" && "$DRILL_KEEP" != "1" ]]; then
+    if wal_drill_remote_is_safe "$DRILL_REMOTE"; then
+      "$RCLONE" purge "$DRILL_REMOTE" >/dev/null 2>&1 || true
+    fi
+  fi
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 
-fail() { echo "ERROR: $*" >&2; exit 1; }
 
 command -v docker >/dev/null 2>&1 || fail "docker is required."
-command -v age >/dev/null 2>&1 || fail "age is required (apt-get install -y age)."
+command -v "$AGE" >/dev/null 2>&1 || fail "$AGE is required (apt-get install -y age)."
 command -v age-keygen >/dev/null 2>&1 || fail "age-keygen is required."
-command -v rclone >/dev/null 2>&1 || fail "rclone is required (apt-get install -y rclone)."
+command -v "$RCLONE" >/dev/null 2>&1 || fail "$RCLONE is required (apt-get install -y rclone)."
 
 for c in "$SRC" "$DST"; do
   docker rm -f "$c" >/dev/null 2>&1 || true
@@ -73,8 +138,11 @@ age-keygen -o "$TMP/key.txt" >/dev/null 2>&1
 RECIPIENT="$(sed -n 's/^# public key: //p' "$TMP/key.txt")"
 [[ -n "$RECIPIENT" ]] || fail "could not read the generated age public key."
 
+# Where the off-box copy goes: the local directory, or the drill prefix in the bucket.
+REMOTE="${DRILL_REMOTE:-$TMP/remote}"
+
 cat > "$TMP/env" <<EOF
-BACKUP_REMOTE=$TMP/remote
+BACKUP_REMOTE=$REMOTE
 BACKUP_AGE_RECIPIENT=$RECIPIENT
 EOF
 
@@ -120,7 +188,16 @@ echo "[$(date -Is)] Taking the base backup ..."
 docker exec "$SRC" pg_basebackup -U postgres -D - -Ft -X fetch --checkpoint=fast > "$TMP/base.tar"
 [[ -s "$TMP/base.tar" ]] || fail "pg_basebackup produced no data."
 BASE_NAME="fuelflow_base_$(date -u +%Y-%m-%d_%H%M%S).tar.age"
-age -r "$RECIPIENT" -o "$TMP/remote/$BASE_NAME" "$TMP/base.tar"
+if [[ -n "$DRILL_REMOTE" ]]; then
+  # Encrypt to a file first and upload the CIPHERTEXT: the plaintext never leaves the box,
+  # and the object in the bucket is the same kind of object the nightly backup writes.
+  "$AGE" -r "$RECIPIENT" -o "$TMP/base.tar.age" "$TMP/base.tar"
+  "$RCLONE" copyto "$TMP/base.tar.age" "$REMOTE/$BASE_NAME" \
+    || fail "could not upload the base backup to $REMOTE."
+  rm -f "$TMP/base.tar.age"
+else
+  "$AGE" -r "$RECIPIENT" -o "$TMP/remote/$BASE_NAME" "$TMP/base.tar"
+fi
 
 echo "[$(date -Is)] Writing marker 2 (after the base) and forcing a WAL switch ..."
 docker exec "$SRC" psql -U postgres -d fuelflow -v ON_ERROR_STOP=1 -q \
@@ -140,7 +217,7 @@ MARKER2="$(docker exec "$SRC" psql -U postgres -d fuelflow -Atc \
 docker exec "$SRC" chmod -R a+r /var/lib/postgresql/wal
 echo "[$(date -Is)] Shipping the archive off-box ..."
 SHIP_START="$(date +%s)"
-BACKUP_REMOTE="$TMP/remote" WAL_ARCHIVE_DIR="$TMP/archive" \
+BACKUP_REMOTE="$REMOTE" WAL_ARCHIVE_DIR="$TMP/archive" \
   WAL_SHIP_STATE_DIR="$TMP/state" WAL_REMOTE_RETENTION_DAYS=999 ENV_FILE="$TMP/env" \
   bash "$SCRIPT_DIR/ship-wal-offbox.sh"
 SHIPPED_AT="$(date +%s)"
@@ -157,8 +234,8 @@ echo "[$(date -Is)] Restoring from the off-box copy only ..."
 RESTORE_LOG="$TMP/restore.log"
 set +e
 AGE_KEY_FILE="$TMP/key.txt" bash "$SCRIPT_DIR/restore-pitr.sh" \
-  --base-remote "$TMP/remote" \
-  --wal-remote "$TMP/remote" \
+  --base-remote "$REMOTE" \
+  --wal-remote "$REMOTE" \
   --name "$DST" --port "$PORT" \
   --pg-user postgres --pg-db fuelflow --keep > "$RESTORE_LOG" 2>&1
 RESTORE_RC=$?
@@ -180,11 +257,26 @@ RECOVERED_AT="$(docker exec "$DST" psql -U postgres -d fuelflow -Atc \
 
 echo
 echo "HOST-LOSS DRILL PASSED"
+if [[ -n "$DRILL_REMOTE" ]]; then
+  SHIPPED_COUNT="$("$RCLONE" lsf "$REMOTE/wal" --files-only 2>/dev/null | grep -c '\.age$' || true)"
+else
+  SHIPPED_COUNT="$(find "$TMP/remote/wal" -maxdepth 1 -name '*.age' -type f | wc -l)"
+fi
 echo "  base backup         : $BASE_NAME"
-echo "  WAL segments shipped: $(find "$TMP/remote/wal" -maxdepth 1 -name '*.age' -type f | wc -l)"
+echo "  WAL segments shipped: $SHIPPED_COUNT"
 echo "  last committed row  : $MARKER2"
 echo "  recovered through   : $RECOVERED_AT (marker 2 is present)"
 echo "  measured ship lag   : ${SHIP_LAG}s (segment archived -> off-box; archive_timeout adds 15 min)"
+if [[ -n "$DRILL_REMOTE" ]]; then
+  echo "  drill remote        : $REMOTE"
+  echo "  objects in the drill prefix:"
+  "$RCLONE" lsf "$REMOTE" --recursive --files-only 2>/dev/null | sed 's/^/    /' || true
+  if [[ "$DRILL_KEEP" == "1" ]]; then
+    echo "  (DRILL_KEEP=1: the objects stay in the bucket)"
+  else
+    echo "  (the drill prefix is deleted when this run ends)"
+  fi
+fi
 if (( SHIP_LAG > 900 )); then
   fail "the ship lag (${SHIP_LAG}s) is outside the 15-minute gate."
 fi

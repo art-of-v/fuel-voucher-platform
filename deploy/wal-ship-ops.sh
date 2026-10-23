@@ -1,0 +1,454 @@
+#!/usr/bin/env bash
+# ------------------------------------------------------------------------------
+# Operator actions for the off-box WAL shipper on the production box.
+#
+#     bash /root/FuelFlow/deploy/wal-ship-ops.sh <command>
+#
+# WHY THIS EXISTS
+# The shipper, its timer and the host-loss drill were written and reviewed, but for a
+# long time the timer was never INSTALLED on the box, and no drill ever wrote to the
+# real bucket. Both halves of "the WAL leaves the box continuously" were therefore
+# beliefs: a script that was right on a CI runner, and a box that was not running it.
+#
+# This script is the one place that does the box-side work, so the evidence of a run is
+# a transcript rather than a recollection:
+#
+#   preflight    what is on the box, what is configured, what is already off-box
+#   install      install + enable + start fueflow-wal-ship.timer
+#   ship-once    run one shipment by hand and show what it did
+#   lag          how old the newest off-box segment is, right now
+#   alert-drill  break the remote on purpose and prove the alert fires
+#   drill        the real-R2 host-loss drill (real bucket, isolated prefix)
+#   report       everything above, in one transcript
+#   all          preflight -> install -> ship-once -> lag -> alert-drill -> drill -> report
+#
+# It runs on the box through the self-hosted GitHub Actions runner (see
+# .github/workflows/wal-ship-ops.yml), because SSH into the box is firewalled and the
+# runner is the only channel that reaches it. Every command is idempotent and can be
+# run on its own; `all` is just the sequence.
+#
+# NOTHING HERE DELETES PRODUCTION DATA.
+#   * the alert drill moves the rclone config aside for the length of one service run
+#     and puts it back - and the run after it must succeed, which is the proof that
+#     the failure was injected and not pre-existing;
+#   * the drill writes under a /drill prefix in the bucket and deletes that prefix
+#     afterwards;
+#   * the WAL switch closes the current segment early and writes no data.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
+WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
+WAL_SHIP_STATE_DIR="${WAL_SHIP_STATE_DIR:-/var/lib/fuelflow}"
+REPORT_FILE="${WAL_OPS_REPORT:-$WAL_SHIP_STATE_DIR/wal-ship-ops-$(date -u +%Y%m%dT%H%M%SZ).txt}"
+RCLONE="${RCLONE_BIN:-rclone}"
+TIMER="fuelflow-wal-ship.timer"
+SERVICE="fuelflow-wal-ship.service"
+ALERT_UNIT="fuelflow-wal-ship-alert@${SERVICE}.service"
+ALERT_TAG="fuelflow-wal-ship-alert"
+PG_CONTAINER="${PG_CONTAINER:-fuelflow-postgres}"
+# The gate from the backup policy: a finished segment must be off-box within 15 minutes
+# of PostgreSQL finishing it.
+SHIP_LAG_GATE_SECONDS="${WAL_OPS_SHIP_LAG_GATE_SECONDS:-900}"
+FORCE_SWITCH="${WAL_OPS_FORCE_SWITCH:-0}"
+DRILL_KEEP="${DRILL_KEEP:-0}"
+DRILL_REMOTE_OVERRIDE="${DRILL_REMOTE:-}"
+
+# shellcheck source=wal-offbox.sh
+source "$SCRIPT_DIR/wal-offbox.sh"
+
+BACKUP_REMOTE=""
+REMOTE_WAL=""
+POSTGRES_USER_NAME=""
+POSTGRES_DB_NAME=""
+
+usage() {
+  sed -n '2,/^set -euo pipefail$/{/^set -euo pipefail$/d;p}' "$0" | sed 's/^# \{0,1\}//'
+  exit 1
+}
+
+section() {
+  echo
+  echo "==============================================================================="
+  echo "$1"
+  echo "==============================================================================="
+}
+
+say() { printf '%s\n' "$*"; }
+
+# The env is PARSED, not sourced (see load-env.sh): a secret containing a space or a
+# shell metacharacter must not be able to change what this run does.
+load_box_env() {
+  if [[ -f "$ENV_FILE" ]]; then
+    # shellcheck source=load-env.sh
+    source "$SCRIPT_DIR/load-env.sh"
+    load_env "$ENV_FILE" || true
+  fi
+  BACKUP_REMOTE="${BACKUP_REMOTE:-}"
+  if [[ -n "$BACKUP_REMOTE" ]]; then
+    REMOTE_WAL="$(wal_remote_wal_dir "$BACKUP_REMOTE")"
+  fi
+  POSTGRES_USER_NAME="${POSTGRES_USER:-fuelflow}"
+  POSTGRES_DB_NAME="${POSTGRES_DB:-fuelflow}"
+}
+
+# --- preflight ------------------------------------------------------------------------
+cmd_preflight() {
+  section "Preflight"
+  local problems=0
+  say "  host       : $(hostname 2>/dev/null || echo unknown-host)"
+  say "  time       : $(date -Is)"
+  say "  script dir : $SCRIPT_DIR"
+  say "  archive dir: $WAL_ARCHIVE_DIR"
+  say "  state dir  : $WAL_SHIP_STATE_DIR"
+  say ""
+
+  local cmd
+  for cmd in systemctl rclone age age-keygen docker; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+      printf '  OK    %-14s %s\n' "$cmd" "$(command -v "$cmd")"
+    else
+      printf '  MISS  %-14s (not installed)\n' "$cmd"
+      problems=$((problems + 1))
+    fi
+  done
+
+  if [[ -f "$ENV_FILE" ]]; then
+    printf '  OK    %-14s %s\n' "env file" "$ENV_FILE"
+  else
+    printf '  MISS  %-14s %s is missing\n' "env file" "$ENV_FILE"
+    problems=$((problems + 1))
+  fi
+
+  if [[ -n "$BACKUP_REMOTE" ]]; then
+    printf '  OK    %-14s %s\n' "remote" "$BACKUP_REMOTE"
+  else
+    printf '  MISS  %-14s BACKUP_REMOTE is not set in %s\n' "remote" "$ENV_FILE"
+    problems=$((problems + 1))
+  fi
+
+  if [[ -n "${BACKUP_AGE_RECIPIENT:-}" ]]; then
+    printf '  OK    %-14s %s... (public key only)\n' "recipient" "${BACKUP_AGE_RECIPIENT:0:24}"
+  else
+    printf '  MISS  %-14s BACKUP_AGE_RECIPIENT is not set in %s\n' "recipient" "$ENV_FILE"
+    problems=$((problems + 1))
+  fi
+
+  if [[ -d "$WAL_ARCHIVE_DIR" ]]; then
+    local archived
+    archived="$(find "$WAL_ARCHIVE_DIR" -maxdepth 1 -name '0000000*' -type f 2>/dev/null | wc -l | tr -d ' ')"
+    printf '  OK    %-14s %s (%s segment(s))\n' "archive" "$WAL_ARCHIVE_DIR" "$archived"
+  else
+    printf '  MISS  %-14s %s does not exist - run deploy/enable-pitr.sh\n' "archive" "$WAL_ARCHIVE_DIR"
+    problems=$((problems + 1))
+  fi
+
+  if [[ -n "$BACKUP_REMOTE" ]]; then
+    if "$RCLONE" lsf "$REMOTE_WAL" --files-only >/dev/null 2>&1; then
+      printf '  OK    %-14s %s is reachable\n' "bucket" "$REMOTE_WAL"
+    else
+      printf '  MISS  %-14s %s is not reachable\n' "bucket" "$REMOTE_WAL"
+      problems=$((problems + 1))
+    fi
+  fi
+
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$PG_CONTAINER"; then
+    printf '  OK    %-14s %s is running\n' "database" "$PG_CONTAINER"
+  else
+    printf '  MISS  %-14s %s is not running\n' "database" "$PG_CONTAINER"
+    problems=$((problems + 1))
+  fi
+
+  # The timer is not installed yet on the box - that is what the install step is for, so
+  # it is reported, not counted as a problem.
+  if systemctl cat "$TIMER" >/dev/null 2>&1; then
+    printf '  INFO  %-14s installed (%s)\n' "timer" "$(systemctl is-enabled "$TIMER" 2>/dev/null || echo unknown)"
+  else
+    printf '  INFO  %-14s not installed yet - the install step installs it\n' "timer"
+  fi
+
+  say ""
+  if (( problems > 0 )); then
+    say "  $problems problem(s) found." >&2
+    return 1
+  fi
+  say "  Preflight clean."
+}
+
+# --- install --------------------------------------------------------------------------
+cmd_install() {
+  section "Install the timer"
+  bash "$SCRIPT_DIR/install-wal-ship-schedule.sh"
+  say ""
+  say "  is-enabled: $(systemctl is-enabled "$TIMER" 2>/dev/null || echo unknown)"
+  say "  is-active : $(systemctl is-active "$TIMER" 2>/dev/null || echo unknown)"
+  systemctl list-timers "$TIMER" --no-pager || true
+}
+
+# --- one shipment ---------------------------------------------------------------------
+cmd_ship_once() {
+  section "One shipment, by hand"
+  if ! systemctl start "$SERVICE"; then
+    say "ERROR: the shipment failed. The journal below says why." >&2
+    journalctl -u "$SERVICE" -n 40 --no-pager || true
+    return 1
+  fi
+  journalctl -u "$SERVICE" -n 40 --no-pager || true
+  say ""
+  say "  the status object ($REMOTE_WAL/status.txt):"
+  "$RCLONE" cat "$REMOTE_WAL/status.txt" 2>/dev/null | sed 's/^/    /' || say "    <no status object>"
+  say ""
+  say "  the newest objects in $REMOTE_WAL:"
+  "$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null | sort | tail -20 | sed 's/^/    /' || true
+}
+
+# --- the lag --------------------------------------------------------------------------
+cmd_lag() {
+  section "How old is the newest off-box segment?"
+
+  if [[ "$FORCE_SWITCH" == "1" ]]; then
+    say "  Forcing a WAL switch, so the measurement is not 'the database was quiet' ..."
+    docker exec "$PG_CONTAINER" psql -U "$POSTGRES_USER_NAME" -d "$POSTGRES_DB_NAME" \
+      -Atc 'SELECT pg_switch_wal()' 2>/dev/null || say "  (the switch did not report; the archiver may still catch up)"
+    sleep 5
+  fi
+
+  say "  Shipping what is on the box ..."
+  systemctl start "$SERVICE" || {
+    say "ERROR: the shipment failed; see the journal." >&2
+    journalctl -u "$SERVICE" -n 30 --no-pager >&2 || true
+    return 1
+  }
+
+  local status ship_lag
+  status="$("$RCLONE" cat "$REMOTE_WAL/status.txt" 2>/dev/null || true)"
+  ship_lag="$(sed -n 's/^last_upload_lag_seconds=//p' <<<"$status" | tail -1)"
+  say ""
+  say "  the status object:"
+  printf '%s\n' "$status" | sed 's/^/    /'
+  say ""
+
+  # The newest segment on the box.
+  local newest="" f name
+  for f in "$WAL_ARCHIVE_DIR"/0000000*; do
+    [[ -f "$f" ]] || continue
+    name="$(basename "$f")"
+    wal_object_is_segment "$name" || continue
+    if [[ -z "$newest" || "$name" > "$newest" ]]; then
+      newest="$name"
+    fi
+  done
+  if [[ -z "$newest" ]]; then
+    say "  There is no finished segment in $WAL_ARCHIVE_DIR, so there is nothing to measure." >&2
+    return 1
+  fi
+  say "  newest segment on the box : $newest ($(stat -c %Y "$WAL_ARCHIVE_DIR/$newest") epoch)"
+
+  # The newest segment that is off-box.
+  local newest_off="" object
+  while IFS= read -r object; do
+    [[ -n "$object" ]] || continue
+    [[ "$object" == *.age ]] || continue
+    name="${object%.age}"
+    wal_object_is_segment "$name" || continue
+    if [[ -z "$newest_off" || "$name" > "$newest_off" ]]; then
+      newest_off="$name"
+    fi
+  done < <("$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null || true)
+
+  if [[ -z "$newest_off" ]]; then
+    say "  nothing is off-box yet." >&2
+    return 1
+  fi
+  say "  newest segment off-box    : $newest_off"
+  if [[ -f "$WAL_ARCHIVE_DIR/$newest_off" ]]; then
+    local off_age
+    off_age=$(( $(date +%s) - $(stat -c %Y "$WAL_ARCHIVE_DIR/$newest_off") ))
+    say "  its age                   : ${off_age}s (this is the host-loss recovery point)"
+  else
+    say "  its age                   : unknown (the segment is not in the local archive any more)"
+  fi
+
+  if [[ -z "$ship_lag" ]]; then
+    say "  the shipper reported no lag, so the archived-to-off-box time is unknown." >&2
+    return 1
+  fi
+  say "  archived-to-off-box lag   : ${ship_lag}s (the gate is ${SHIP_LAG_GATE_SECONDS}s)"
+  if (( ship_lag > SHIP_LAG_GATE_SECONDS )); then
+    say "  => OUTSIDE the gate. The copy that survives the host is too old." >&2
+    return 1
+  fi
+  say "  => within the gate."
+}
+
+# --- the alert drill ------------------------------------------------------------------
+cmd_alert_drill() {
+  section "Alert drill: break the remote on purpose"
+
+  local config
+  config="$("$RCLONE" config file 2>/dev/null || true)"
+  if [[ -z "$config" || ! -f "$config" ]]; then
+    say "ERROR: rclone has no config file to move aside, so the failure cannot be" >&2
+    say "       injected safely. Find out how the remote is configured first." >&2
+    return 1
+  fi
+  say "  rclone config: $config"
+
+  local moved="$config.disabled-by-wal-ship-ops"
+  if [[ -e "$moved" ]]; then
+    say "ERROR: $moved already exists; refusing to touch it." >&2
+    return 1
+  fi
+
+  restore_config() {
+    if [[ -e "$moved" ]]; then
+      mv "$moved" "$config" && say "  (the rclone config is back in place)"
+    fi
+  }
+  trap restore_config EXIT
+
+  mv "$config" "$moved"
+  say "  the config is moved aside: the remote is now unreachable."
+  say ""
+
+  local started rc
+  started="$(date '+%Y-%m-%d %H:%M:%S')"
+  rc=0
+  systemctl start "$SERVICE" || rc=$?
+  say "  systemctl start $SERVICE -> exit $rc"
+  if (( rc == 0 )); then
+    say "ERROR: the shipment SUCCEEDED with the remote unreachable, so this drill" >&2
+    say "       did not test anything." >&2
+    return 1
+  fi
+  say "  the shipment failed, as it should."
+  sleep 5
+
+  say ""
+  say "  the alert unit's journal:"
+  journalctl -u "$ALERT_UNIT" --since "$started" --no-pager 2>/dev/null | sed 's/^/    /' || true
+
+  local alert_log
+  alert_log="$(journalctl -t "$ALERT_TAG" --since "$started" --no-pager -o cat 2>/dev/null || true)"
+  say ""
+  say "  the alert's own log:"
+  printf '%s\n' "$alert_log" | sed 's/^/    /'
+
+  if ! grep -q "WAL OFF-BOX SHIPPING FAILED" <<<"$alert_log"; then
+    say "ERROR: the alert did not fire. The journal above is the evidence." >&2
+    return 1
+  fi
+  say ""
+  say "  the alert fired."
+
+  if grep -q "alert delivered to Telegram" <<<"$alert_log"; then
+    say "  and it was delivered to Telegram."
+  elif grep -q "Telegram delivery failed" <<<"$alert_log"; then
+    say "  but the Telegram delivery FAILED: the alert is in the journal only." >&2
+    return 1
+  else
+    say "  but Telegram is not configured, so the alert is in the journal only." >&2
+    return 1
+  fi
+
+  say ""
+  say "  putting the config back; the next shipment must succeed:"
+  trap - EXIT
+  restore_config
+  rc=0
+  systemctl start "$SERVICE" || rc=$?
+  if (( rc != 0 )); then
+    say "ERROR: the shipment still fails with the config back in place, so the fault" >&2
+    say "       is not the injected one." >&2
+    journalctl -u "$SERVICE" -n 30 --no-pager >&2 || true
+    return 1
+  fi
+  say "  the shipment succeeded again: the failure was injected, and it is over."
+}
+
+# --- the real-R2 host-loss drill ------------------------------------------------------
+cmd_drill() {
+  section "The real-R2 host-loss drill"
+
+  local remote="$DRILL_REMOTE_OVERRIDE"
+  if [[ -z "$remote" ]]; then
+    remote="$BACKUP_REMOTE/drill/695-$(date -u +%Y%m%dT%H%M%SZ)"
+  fi
+  say "  drill prefix : $remote"
+  say "  the drill generates its own age keypair; the production private key is not here."
+  say ""
+
+  DRILL_REMOTE="$remote" DRILL_KEEP="$DRILL_KEEP" bash "$SCRIPT_DIR/drill-wal-offbox.sh"
+}
+
+# --- the report -----------------------------------------------------------------------
+cmd_report() {
+  section "Report"
+  say "  timer:"
+  systemctl list-timers "$TIMER" --no-pager 2>/dev/null | sed 's/^/    /' || true
+  say "    is-enabled: $(systemctl is-enabled "$TIMER" 2>/dev/null || echo unknown)"
+  say "    is-active : $(systemctl is-active "$TIMER" 2>/dev/null || echo unknown)"
+
+  say ""
+  say "  the shipper's journal:"
+  journalctl -u "$SERVICE" -n 30 --no-pager 2>/dev/null | sed 's/^/    /' || true
+
+  say ""
+  say "  the alert unit's journal:"
+  journalctl -u "$ALERT_UNIT" -n 20 --no-pager 2>/dev/null | sed 's/^/    /' || true
+
+  say ""
+  say "  the status object:"
+  "$RCLONE" cat "$REMOTE_WAL/status.txt" 2>/dev/null | sed 's/^/    /' || say "    <no status object>"
+
+  say ""
+  say "  the newest objects in $REMOTE_WAL:"
+  "$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null | sort | tail -20 | sed 's/^/    /' || true
+
+  say ""
+  say "  the newest files in $WAL_ARCHIVE_DIR:"
+  ls -l --time-style=long-iso "$WAL_ARCHIVE_DIR" 2>/dev/null | tail -10 | sed 's/^/    /' || true
+}
+
+# --- the whole campaign ---------------------------------------------------------------
+cmd_all() {
+  local rc=0 step
+  for step in preflight install ship-once lag alert-drill drill; do
+    rc=0
+    "cmd_$step" || rc=$?
+    if (( rc != 0 )); then
+      say "ERROR: the '$step' step failed; stopping here." >&2
+      break
+    fi
+  done
+  cmd_report || true
+  return "$rc"
+}
+
+main() {
+  load_box_env
+  case "${1:-help}" in
+    preflight)   cmd_preflight ;;
+    install)     cmd_install ;;
+    ship-once)   cmd_ship_once ;;
+    lag)         cmd_lag ;;
+    alert-drill) cmd_alert_drill ;;
+    drill)       cmd_drill ;;
+    report)      cmd_report ;;
+    all)         cmd_all ;;
+    help|-h|--help) usage ;;
+    *) echo "unknown command: $1" >&2; usage ;;
+  esac
+}
+
+mkdir -p "$(dirname "$REPORT_FILE")"
+# The transcript is the evidence, so it is written whatever happens - including when a
+# step fails and the run stops.
+set +e
+main "$@" 2>&1 | tee -a "$REPORT_FILE"
+rc="${PIPESTATUS[0]}"
+set -e
+echo
+echo "The transcript of this run is in $REPORT_FILE"
+exit "$rc"
