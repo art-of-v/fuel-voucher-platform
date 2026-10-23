@@ -114,14 +114,37 @@ export function isWalletEmpty(section: WalletSection, counts: WalletCounts): boo
   }
 }
 
-/** Litres still unused across a set of vouchers. */
+/**
+ * Whether a voucher is waiting for supplier evidence after its holder reported it as used.
+ *
+ * The API sends the status PascalCase and the wallet mapper lower-cases it, so the comparison
+ * is case-insensitive. A pending voucher is neither spendable nor spent: the fuel left the
+ * wallet's hands, but the sale is not settled until the supplier's statement says so.
+ */
+export function isPendingReconciliation(voucher: { status?: string | null }): boolean {
+  return (voucher.status ?? '').toLowerCase() === 'pendingreconciliation';
+}
+
+/**
+ * Litres still unused across a set of vouchers.
+ *
+ * A pending voucher is not counted: its fuel has already been dispensed and is waiting for
+ * evidence, so counting it as "left" would promise litres the holder cannot present.
+ */
 export function unusedLitres(vouchers: { status: string; amount?: number | null }[]): number {
-  return vouchers.filter((v) => v.status !== 'used').reduce((sum, v) => sum + (v.amount ?? 0), 0);
+  return vouchers
+    .filter((v) => v.status !== 'used' && !isPendingReconciliation(v))
+    .reduce((sum, v) => sum + (v.amount ?? 0), 0);
 }
 
 /** How many of a set of vouchers have been used. */
 export function countUsed(vouchers: { status: string }[]): number {
   return vouchers.filter((v) => v.status === 'used').length;
+}
+
+/** How many of a set of vouchers are waiting for supplier evidence. */
+export function countPending(vouchers: { status: string }[]): number {
+  return vouchers.filter((v) => isPendingReconciliation(v)).length;
 }
 
 /**
@@ -148,10 +171,18 @@ export function brandColorFor(
  * kept in the set because client fixtures and older payloads used it, and reading it costs nothing.
  * What matters is the contrast: `used`, `expired`, `blocked` and `deactivated` fuel is spent, so an
  * order left holding only those has nothing to show and leaves the wallet (planning #176).
+ *
+ * A pending redemption stays on the card: the holder reported it and is waiting for the supplier's
+ * evidence, so hiding it would leave them with a voucher that silently vanished from the wallet.
  */
 export function isLiveWalletVoucher(voucher: { status?: string | null }): boolean {
   const status = (voucher.status ?? '').toLowerCase();
-  return status === 'active' || status === 'available' || status === 'assigned';
+  return (
+    status === 'active' ||
+    status === 'available' ||
+    status === 'assigned' ||
+    status === 'pendingreconciliation'
+  );
 }
 
 /**

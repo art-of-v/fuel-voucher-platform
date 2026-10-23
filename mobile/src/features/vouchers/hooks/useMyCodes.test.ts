@@ -327,6 +327,26 @@ describe('useMyCodes', () => {
     });
   });
 
+  // A report that waits for supplier evidence is already out of the holder's hands. The button on
+  // it is the holder's undo, so it must call restore - reporting it again would be a second
+  // claim on the same tank.
+  it('withdraws a pending report instead of reporting it again', async () => {
+    asMock(markVoucherAsUsed).mockClear();
+    asMock(restoreVoucher).mockClear();
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.toggleUsed(
+        makeVoucher({ id: 'v-pending', status: 'pendingreconciliation' }),
+      );
+    });
+
+    expect(restoreVoucher).toHaveBeenCalledWith('v-pending');
+    expect(markVoucherAsUsed).not.toHaveBeenCalled();
+  });
+
   it('maps a VoucherActionError to its localized message on a failed mark-used', async () => {
     asMock(markVoucherAsUsed).mockRejectedValue(new VoucherActionError(403, 'forbidden'));
 

@@ -76,6 +76,7 @@ using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
@@ -210,6 +211,8 @@ internal static class ServiceSetup
         services.AddScoped<GetUserVouchersCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();
         services.AddScoped<RestoreVoucherCommandHandler>();
+        services.AddScoped<VoucherRedemptionService>();
+        services.AddScoped<RedemptionJournalPoster>();
         services.AddScoped<GetAdminVouchersQueryHandler>();
         services.AddScoped<GetAdminVoucherByIdQueryHandler>();
         services.AddScoped<UpdateVoucherCommandHandler>();

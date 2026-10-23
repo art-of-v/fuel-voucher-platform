@@ -39,11 +39,15 @@ public sealed class GetWorkerUsageReportQueryHandler
                 Count: g.Count(),
                 LitersReceived: g.Sum(v => v.Liters),
                 LitersUsed: g.Where(v => v.Status == VoucherStatus.Used).Sum(v => v.Liters),
-                LitersRemaining: g.Where(v => v.Status != VoucherStatus.Used).Sum(v => v.Liters),
+                LitersPending: g.Where(v => v.Status == VoucherStatus.PendingReconciliation).Sum(v => v.Liters),
+                LitersRemaining: g.Where(v => v.Status != VoucherStatus.Used
+                    && v.Status != VoucherStatus.PendingReconciliation).Sum(v => v.Liters),
                 CountUsed: g.Count(v => v.Status == VoucherStatus.Used),
-                CountRemaining: g.Count(v => v.Status != VoucherStatus.Used)))
+                CountPending: g.Count(v => v.Status == VoucherStatus.PendingReconciliation),
+                CountRemaining: g.Count(v => v.Status != VoucherStatus.Used
+                    && v.Status != VoucherStatus.PendingReconciliation)))
             .FirstOrDefaultAsync(cancellationToken)
-            ?? new WorkerUsageTotals(0, 0, 0, 0, 0, 0);
+            ?? new WorkerUsageTotals(0, 0, 0, 0, 0, 0, 0, 0);
 
         var rows = await held
             .OrderByDescending(v => v.IssuedAtUtc)

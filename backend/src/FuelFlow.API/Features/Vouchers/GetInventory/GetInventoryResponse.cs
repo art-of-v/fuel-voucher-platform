@@ -7,6 +7,7 @@ public sealed record InventoryItemDto(
     decimal Liters,
     int Available,
     int Assigned,
+    int PendingReconciliation,
     int Used,
     int Expired,
     int Total

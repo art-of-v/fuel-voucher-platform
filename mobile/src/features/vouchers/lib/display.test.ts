@@ -5,9 +5,11 @@ import {
   isWalletEmpty,
   unusedLitres,
   countUsed,
+  countPending,
   brandColorFor,
   splitByIssuanceReceipt,
   isLiveWalletVoucher,
+  isPendingReconciliation,
   type WalletCounts,
   type WalletSection,
 } from './display';
@@ -191,8 +193,50 @@ describe('unusedLitres', () => {
     expect(unusedLitres([{ status: 'active' }, { status: 'active', amount: 10 }])).toBe(10);
   });
 
+  it("does not count a pending voucher as litres still in the holder's hands", () => {
+    // Its fuel is out and waits for the supplier's evidence: counting it as "left" would promise
+    // litres the holder cannot present.
+    expect(
+      unusedLitres([
+        { status: 'active', amount: 40 },
+        { status: 'pendingreconciliation', amount: 50 },
+      ]),
+    ).toBe(40);
+  });
+
   it('is zero for an empty list', () => {
     expect(unusedLitres([])).toBe(0);
+  });
+});
+
+describe('isPendingReconciliation', () => {
+  it('recognises the pending status whatever the casing', () => {
+    expect(isPendingReconciliation({ status: 'pendingreconciliation' })).toBe(true);
+    expect(isPendingReconciliation({ status: 'PendingReconciliation' })).toBe(true);
+  });
+
+  it('does not confuse another status with it', () => {
+    expect(isPendingReconciliation({ status: 'assigned' })).toBe(false);
+    expect(isPendingReconciliation({ status: 'used' })).toBe(false);
+    expect(isPendingReconciliation({ status: null })).toBe(false);
+    expect(isPendingReconciliation({})).toBe(false);
+  });
+});
+
+describe('countPending', () => {
+  it('counts only the vouchers waiting for supplier evidence', () => {
+    expect(
+      countPending([
+        { status: 'pendingreconciliation' },
+        { status: 'PendingReconciliation' },
+        { status: 'active' },
+        { status: 'used' },
+      ]),
+    ).toBe(2);
+  });
+
+  it('is zero for an empty list', () => {
+    expect(countPending([])).toBe(0);
   });
 });
 
@@ -281,6 +325,13 @@ describe('isLiveWalletVoucher', () => {
     expect(isLiveWalletVoucher({ status: 'Assigned' })).toBe(true);
     expect(isLiveWalletVoucher({ status: 'Available' })).toBe(true);
     expect(isLiveWalletVoucher({ status: 'active' })).toBe(true);
+  });
+
+  it('keeps a voucher that waits for supplier evidence on the card', () => {
+    // The holder reported it and is waiting: hiding it would leave them with a voucher that
+    // silently vanished from the wallet.
+    expect(isLiveWalletVoucher({ status: 'PendingReconciliation' })).toBe(true);
+    expect(isLiveWalletVoucher({ status: 'pendingreconciliation' })).toBe(true);
   });
 
   it('rejects spent, lapsed and unavailable fuel', () => {

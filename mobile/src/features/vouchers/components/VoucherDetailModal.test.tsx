@@ -1,4 +1,5 @@
 import React from 'react';
+import { Image } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
 import { VoucherDetailModal } from './VoucherDetailModal';
@@ -85,5 +86,50 @@ describe('VoucherDetailModal history', () => {
 
     expect(screen.getByText(/voucher\.history\.purchased/)).toBeTruthy();
     expect(screen.getByText(/voucher\.history\.renewed/)).toBeTruthy();
+  });
+});
+
+/**
+ * A report that waits for supplier evidence is not a spendable voucher: the QR must not be on
+ * screen and the only action left is the holder's undo.
+ */
+describe('VoucherDetailModal pending reconciliation', () => {
+  it('shows the waiting state and no QR', () => {
+    render(
+      <VoucherDetailModal
+        visible
+        voucher={makeVoucher({
+          status: 'pendingreconciliation',
+          imageUrl: 'data:image/png;base64,QR',
+        })}
+        onClose={noop}
+        onToggleUsed={noop}
+        brandColor="#123456"
+      />,
+    );
+
+    expect(screen.getByText('voucher.pending.awaitingConfirmation')).toBeTruthy();
+    expect(screen.getByText('codes.pendingReconciliation')).toBeTruthy();
+    // No picture of the code: presenting it again would invite a second dispense.
+    expect(screen.UNSAFE_queryByType(Image)).toBeNull();
+  });
+
+  it('offers the holder the undo, not a second redemption', () => {
+    const onToggleUsed = jest.fn();
+    render(
+      <VoucherDetailModal
+        visible
+        voucher={makeVoucher({ status: 'pendingreconciliation' })}
+        onClose={noop}
+        onToggleUsed={onToggleUsed}
+        brandColor="#123456"
+      />,
+    );
+
+    expect(screen.getByText('codes.withdrawReport')).toBeTruthy();
+    expect(screen.queryByText('codes.markAsUsed')).toBeNull();
+
+    fireEvent.press(screen.getByText('codes.withdrawReport'));
+    expect(onToggleUsed).toHaveBeenCalledTimes(1);
   });
 });

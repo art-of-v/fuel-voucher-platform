@@ -35,6 +35,7 @@ public sealed class GetUserVouchersCommandHandler
             // them (#103 S3b); workers never see a blocked voucher — it drops out of their wallet
             // until the owner lifts the freeze.
             .Where(v => v.Status == VoucherStatus.Assigned
+                        || v.Status == VoucherStatus.PendingReconciliation
                         || v.Status == VoucherStatus.Used
                         || (v.Status == VoucherStatus.Blocked && v.AssignedToUserId == command.UserId));
 
@@ -65,9 +66,13 @@ public sealed class GetUserVouchersCommandHandler
             // MarkVoucherAsUsed refuses them on.
             var isHolder = VoucherHolder.CanRedeem(v.WorkerUserId, v.AssignedToUserId, command.UserId);
 
+            // A pending voucher has already been reported as used. Handing the bearer payload back
+            // to the wallet would invite a second dispense while the first one is still unconfirmed.
+            var canPresentRedemption = isHolder && v.Status != VoucherStatus.PendingReconciliation;
+
             // Rendered only for the holder: generating the PNG is the expensive half of this
             // handler, and a non-holder has no use for the image either.
-            var qrImage = isHolder ? GenerateQrImage(v) : null;
+            var qrImage = canPresentRedemption ? GenerateQrImage(v) : null;
             return new VoucherDto(
                 v.Id,
                 v.Brand,
@@ -77,8 +82,8 @@ public sealed class GetUserVouchersCommandHandler
                 v.CustomerExpirationDate,
                 v.VoucherNumber,
                 v.VoucherNumber,
-                isHolder ? v.QrPayload : string.Empty,
-                isHolder ? v.QrPayload : string.Empty,
+                canPresentRedemption ? v.QrPayload : string.Empty,
+                canPresentRedemption ? v.QrPayload : string.Empty,
                 v.Status.ToString(),
                 v.WorkerUserId == command.UserId ? "gifted" : "own",
                 v.LegalEntityId,

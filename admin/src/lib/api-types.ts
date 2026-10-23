@@ -266,6 +266,90 @@ export interface ImportBatchPnl {
   netRealizedResult: number | null;
 }
 
+/** One statement line attached to a pending redemption claim. */
+export interface RedemptionStatementLineDetail {
+  redemptionId: string;
+  rowId: string;
+  externalId: string;
+  liters: number;
+  redeemedAtUtc: string | null;
+  status: string;
+  note: string | null;
+}
+
+/** One claim waiting for an operator's decision. */
+export interface PendingRedemptionDetail {
+  redemptionId: string;
+  voucherId: string;
+  voucherNumber: string;
+  reportedByUserId: string | null;
+  reportedLiters: number;
+  redeemedAtUtc: string;
+  reportedAtUtc: string;
+  supplierReference: string | null;
+  hasMismatch: boolean;
+  severity: string;
+  statementLines: RedemptionStatementLineDetail[];
+}
+
+/** One statement line that needs an operator, with no live claim attached. */
+export interface StatementExceptionDetail {
+  rowId: string;
+  externalId: string;
+  voucherNumber: string;
+  liters: number;
+  redeemedAtUtc: string | null;
+  status: string;
+  voucherId: string | null;
+  redemptionId: string | null;
+  importedAtUtc: string;
+  note: string | null;
+  severity: string;
+}
+
+/** The redemption exception queue (`GET /api/admin/redemptions/exceptions`). */
+export interface RedemptionExceptionsResponse {
+  pendingClaims: number;
+  mismatchedClaims: number;
+  statementExceptions: number;
+  pending: PendingRedemptionDetail[];
+  statements: StatementExceptionDetail[];
+}
+
+/** One line accepted by the supplier statement import. */
+export interface ImportedStatementRow {
+  externalId: string;
+  status: string | null;
+  voucherId: string | null;
+  redemptionId: string | null;
+  message: string | null;
+}
+
+/** The answer of `POST /api/admin/redemptions/statement`. */
+export interface ImportRedemptionStatementResponse {
+  success: boolean;
+  error: string | null;
+  imported: number;
+  duplicates: number;
+  awaitingReview: number;
+  exceptions: number;
+  rows: ImportedStatementRow[];
+}
+
+/** The answer of a confirm/reject/reverse decision. */
+export interface RedemptionDecisionResponse {
+  success: boolean;
+  message: string;
+  errorCode: string | null;
+}
+
+/** The answer of dismissing one statement line. */
+export interface DismissRedemptionStatementRowResponse {
+  success: boolean;
+  message: string;
+  errorCode: string | null;
+}
+
 /** The counters the reconciliation screen puts at the top. */
 export interface ReconciliationSummary {
   totalOrders: number;

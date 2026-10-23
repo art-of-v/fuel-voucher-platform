@@ -60,6 +60,7 @@ import {
   isWalletEmpty,
   unusedLitres,
   countUsed,
+  countPending,
   type WalletSection,
 } from '../src/features/vouchers/lib/display';
 
@@ -405,12 +406,16 @@ export default function MyCodesScreen() {
   }
 
   // Worker context (multi-company epic #103 S5): the fuel this company issued to
-  // me — issued / used / remaining counters, then the handover receipts. The
+  // me — issued / used / remaining / pending counters, then the handover receipts. The
   // counters cover every voucher the worker holds, whether it sits inside a
   // receipt or predates them, so the header never disagrees with the list.
+  //
+  // A pending voucher is counted on its own: its fuel is already dispensed and waits for the
+  // supplier's evidence, so it is neither used nor still in the worker's hands.
   const workerIssued = vouchers;
   const workerUsedCount = countUsed(workerIssued);
-  const workerLeftCount = workerIssued.length - workerUsedCount;
+  const workerPendingCount = countPending(workerIssued);
+  const workerLeftCount = workerIssued.length - workerUsedCount - workerPendingCount;
   const workerLitersLeft = unusedLitres(workerIssued);
 
   // Emptiness is context-dependent: a company context shows its receipts and any
@@ -538,6 +543,7 @@ export default function MyCodesScreen() {
                   workerIssued={workerIssued}
                   workerUsedCount={workerUsedCount}
                   workerLeftCount={workerLeftCount}
+                  workerPendingCount={workerPendingCount}
                   workerLitersLeft={workerLitersLeft}
                 />
                 <WorkerUsageSection report={workerUsage.report} isLoading={workerUsage.isLoading} />

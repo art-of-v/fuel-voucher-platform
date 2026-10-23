@@ -56,6 +56,7 @@ internal static class VoucherDeletionGuard
         var what = voucher.Status switch
         {
             VoucherStatus.Assigned => $"status is {VoucherStatus.Assigned} - it is in a customer's hands",
+            VoucherStatus.PendingReconciliation => "it is awaiting supplier reconciliation",
             VoucherStatus.Used => "it has already been used",
             VoucherStatus.Expired => "it has already expired",
             VoucherStatus.Blocked => "it is blocked",

@@ -32,6 +32,7 @@ public sealed class GetInventoryCommandHandler
                 g.Key.Liters,
                 g.Count(v => v.Status == VoucherStatus.Available),
                 g.Count(v => v.Status == VoucherStatus.Assigned),
+                g.Count(v => v.Status == VoucherStatus.PendingReconciliation),
                 g.Count(v => v.Status == VoucherStatus.Used),
                 g.Count(v => v.Status == VoucherStatus.Expired),
                 g.Count()))
@@ -55,6 +56,7 @@ public sealed class GetInventoryCommandHandler
                 g.Liters,
                 g.Available,
                 g.Assigned,
+                g.PendingReconciliation,
                 g.Used,
                 g.Expired,
                 g.Total))
@@ -73,6 +75,7 @@ public sealed class GetInventoryCommandHandler
         decimal Liters,
         int Available,
         int Assigned,
+        int PendingReconciliation,
         int Used,
         int Expired,
         int Total);

@@ -1,8 +1,8 @@
 using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Database;
-using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.RestoreVoucher;
@@ -10,19 +10,26 @@ namespace FuelFlow.Features.Vouchers.RestoreVoucher;
 public sealed class RestoreVoucherCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly VoucherRedemptionService _redemptions;
 
-    public RestoreVoucherCommandHandler(ApplicationDbContext context)
+    public RestoreVoucherCommandHandler(
+        ApplicationDbContext context,
+        VoucherRedemptionService redemptions)
     {
         _context = context;
+        _redemptions = redemptions;
     }
 
     /// <summary>
-    /// Undoes a customer's own redemption: <c>Used</c> back to <c>Assigned</c>. The mirror image of
+    /// Withdraws the holder's own pending claim: <c>PendingReconciliation</c> back to
+    /// <c>Assigned</c>. The mirror image of
     /// <see cref="MarkVoucherAsUsed.MarkVoucherAsUsedCommandHandler"/> under
-    /// <c>FuelFlow.Features.Vouchers</c>, and deliberately built the
-    /// same way rather than patched - the previous version had neither an ownership check nor an
-    /// atomic transition, and only the endpoint's <c>Staff</c> policy was keeping it from acting on
-    /// other people's vouchers.
+    /// <c>FuelFlow.Features.Vouchers</c>.
+    /// <para>
+    /// A <c>Used</c> voucher is deliberately not restorable here. Once the evidence has been
+    /// accepted the sale is posted, and undoing it is an operator reversal in an open period, not a
+    /// customer toggle. The customer can still withdraw a report while it waits.
+    /// </para>
     /// <para>
     /// This is <b>not</b> an un-delete. The global <c>!IsDeleted</c> query filter stays in force here,
     /// so an archived voucher is invisible and returns <c>NotFound</c> on purpose: un-archiving is an
@@ -60,82 +67,47 @@ public sealed class RestoreVoucherCommandHandler
             return new RestoreVoucherResponse(true, "Voucher is already in Assigned status");
         }
 
-        if (voucher.Status != VoucherStatus.Used)
+        if (voucher.Status != VoucherStatus.PendingReconciliation)
         {
-            return new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {voucher.Status})", "InvalidState");
+            return new RestoreVoucherResponse(
+                false,
+                $"Voucher cannot be restored (current status: {voucher.Status}). "
+                + "A confirmed redemption is reversed by an operator.",
+                "InvalidState");
         }
 
-        // The status check above is advisory only: between it and the write, another request could
-        // restore the same voucher. Repeating the predicate in the UPDATE's WHERE clause makes the
-        // transition atomic, so exactly one of two concurrent restores wins.
-        //
-        // One instant for both writes, for the same reason as MarkVoucherAsUsed: the voucher's stamp
-        // and the event's have to agree or the two tables answer "when" differently.
-        var occurredAtUtc = SystemClock.UtcNow;
-
-        // The transition and the record of it are one fact, so they commit together - see the same
-        // note in MarkVoucherAsUsedCommandHandler.
-        //
-        // The transaction runs through ReplaySafeTransaction, so the execution strategy may replay
-        // it: a transient failure retries the body rather than failing the request, and the retry
-        // writes the event row once.
-        RestoreVoucherResponse? lostRace = await _context.ExecuteReplaySafeAsync<RestoreVoucherResponse?>(async ct =>
-        {
-            var affected = await _context.FuelVouchers
-                .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Used)
-                .ExecuteUpdateAsync(
-                    s => s
-                        .SetProperty(v => v.Status, VoucherStatus.Assigned)
-                        // Cleared in the same statement that undoes the redemption. UsedAtUtc answers
-                        // "when was this redeemed", and leaving it set hands the voucher a redemption
-                        // that no longer happened - which a worker usage report would then count.
-                        .SetProperty(v => v.UsedAtUtc, (DateTime?)null)
-                        .SetProperty(v => v.UpdatedAtUtc, occurredAtUtc),
-                    ct);
-
-            if (affected == 0)
+        var result = await _context.ExecuteReplaySafeAsync(async ct =>
+            await _redemptions.WithdrawAsync(
+                command.VoucherId,
+                command.UserId,
+                note: "Withdrawn by the voucher holder",
+                ct),
+            cancellationToken,
+            verifySucceeded: async ct =>
             {
-                // Nothing was written, so there is nothing to roll back: the empty transaction
-                // commits as it stands.
-                //
-                // Lost the race. Re-read so the caller is told the real outcome rather than a stale one.
-                var current = await _context.FuelVouchers
+                var latest = await _context.VoucherRedemptions
                     .AsNoTracking()
-                    .Where(v => v.Id == command.VoucherId)
-                    .Select(v => (VoucherStatus?)v.Status)
+                    .Where(r => r.VoucherId == command.VoucherId)
+                    .OrderByDescending(r => r.ReportedAtUtc)
+                    .ThenByDescending(r => r.Id)
+                    .Select(r => (VoucherRedemptionStatus?)r.Status)
                     .FirstOrDefaultAsync(ct);
 
-                return current switch
-                {
-                    VoucherStatus.Assigned => new RestoreVoucherResponse(true, "Voucher is already in Assigned status"),
-                    null => new RestoreVoucherResponse(false, "Voucher not found", "NotFound"),
-                    _ => new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {current})", "InvalidState")
-                };
-            }
-
-            // A restore moves no paper either. The customer's ticket never left them, so undoing the
-            // redemption returns no voucher to any pool - which is why there is no `returned` movement
-            // here, and why this is the exact inverse of the mark-used event rather than a new shape.
-            //
-            // Written only after the CAS reports it won, so the idempotent and lost-race branches record
-            // nothing: one handover, one row.
-            _context.VoucherEvents.Add(new VoucherEvent
-            {
-                Id = Guid.NewGuid(),
-                VoucherId = command.VoucherId,
-                EventType = VoucherEventTypes.StatusChanged,
-                FromStatus = nameof(VoucherStatus.Used),
-                ToStatus = nameof(VoucherStatus.Assigned),
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.UserId,
-                OccurredAtUtc = occurredAtUtc
+                return latest == VoucherRedemptionStatus.Withdrawn;
             });
 
-            await _context.SaveChangesAsync(ct);
-
-            return null;
-        }, cancellationToken: cancellationToken);
-
-        return lostRace ?? new RestoreVoucherResponse(true, "Voucher restored to Assigned status");
+        return result.Outcome switch
+        {
+            RedemptionDecisionOutcome.Withdrawn =>
+                new RestoreVoucherResponse(true, "Voucher restored to Assigned status"),
+            RedemptionDecisionOutcome.AlreadyWithdrawn =>
+                new RestoreVoucherResponse(true, "Voucher is already in Assigned status"),
+            RedemptionDecisionOutcome.NotFound =>
+                new RestoreVoucherResponse(false, "Voucher not found", "NotFound"),
+            _ => new RestoreVoucherResponse(
+                false,
+                $"Voucher cannot be restored (current status: {result.CurrentStatus})",
+                "InvalidState"),
+        };
     }
 }

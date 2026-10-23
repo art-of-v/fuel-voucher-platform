@@ -20,8 +20,10 @@ public sealed record WorkerUsageTotals(
     int Count,
     decimal LitersReceived,
     decimal LitersUsed,
+    decimal LitersPending,
     decimal LitersRemaining,
     int CountUsed,
+    int CountPending,
     int CountRemaining);
 
 public sealed record GetWorkerUsageReportResponse(

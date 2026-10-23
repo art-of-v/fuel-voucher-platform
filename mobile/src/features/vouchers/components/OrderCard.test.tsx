@@ -155,6 +155,13 @@ describe('OrderCard - the vouchers it lists', () => {
     expect(screen.getAllByText('codes.used').length).toBeGreaterThanOrEqual(1);
   });
 
+  it('marks a voucher waiting for supplier evidence as pending, not ready', () => {
+    renderCard([mkVoucher({ status: 'pendingreconciliation' })]);
+
+    expect(screen.getByText('codes.pendingReconciliation')).toBeTruthy();
+    expect(screen.queryByText('READY')).toBeNull();
+  });
+
   it('says so when the order delivered nothing yet', () => {
     renderCard([]);
 

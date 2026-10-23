@@ -212,6 +212,8 @@ export const es: Record<string, string> = {
   'codes.noVouchersYet': 'Aún no hay vales',
   'codes.used': 'USADO',
   'codes.redeemed': 'CANJEADO',
+  'codes.pendingReconciliation': 'PENDIENTE',
+  'codes.withdrawReport': 'Retirar informe',
   'codes.markAsUsed': 'Marcar como usado',
   'codes.restoreCode': 'Restaurar código',
   'codes.active': 'ACTIVO',
@@ -232,6 +234,7 @@ export const es: Record<string, string> = {
   'codes.stock.issuedShort': 'ENTREGADOS',
   'codes.stock.leftShort': 'RESTANTES',
   'codes.stock.usedShort': 'USADOS',
+  'codes.stock.pendingShort': 'PENDIENTES',
   'codes.stock.workerEmpty': 'SIN COMBUSTIBLE',
   'codes.stock.workerEmptySub': 'La empresa todavía no te ha entregado combustible',
   'codes.stock.workerNoBuying': 'Para comprar combustible, cambia a tu contexto personal',
@@ -565,6 +568,8 @@ export const es: Record<string, string> = {
   'voucher.history.replacedHint': 'Nuevo vale emitido — el anterior ha caducado',
   'voucher.history.validRange': 'válido {0} a {1}',
   'codes.qrUnavailable': 'QR NO DISPONIBLE',
+  'voucher.pending.awaitingConfirmation':
+    'Marcado como usado — pendiente de confirmación del proveedor',
 
   'voucher.error.workerOnly': 'Solo el trabajador asignado puede usar este vale.',
   'voucher.error.blocked': 'Este vale está bloqueado y no se puede usar.',

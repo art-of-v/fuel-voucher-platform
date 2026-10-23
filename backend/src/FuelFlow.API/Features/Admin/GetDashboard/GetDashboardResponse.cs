@@ -11,6 +11,7 @@ public sealed record GetDashboardResponse(
         int Total,
         int Available,
         int Assigned,
+        int PendingReconciliation,
         int Used,
         int DecodeIntegrityFailed,
         int DecodeIntegrityWarning,

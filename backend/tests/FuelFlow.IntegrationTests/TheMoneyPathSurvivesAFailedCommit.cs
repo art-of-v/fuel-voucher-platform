@@ -65,7 +65,7 @@ public sealed class TheMoneyPathSurvivesAFailedCommit : IClassFixture<TestDataba
         await using var context = CreateContext(interceptor);
         var handler = new MarkVoucherAsUsedCommandHandler(
             context,
-            TestJournal.For(context),
+            TestRedemptions.For(context),
             NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
@@ -74,7 +74,7 @@ public sealed class TheMoneyPathSurvivesAFailedCommit : IClassFixture<TestDataba
             "the commit has to fail once, or the test proves nothing about the retry");
 
         response.Success.Should().BeTrue();
-        response.Message.Should().Be("Voucher marked as used");
+        response.Message.Should().Be("Voucher reported; waiting for supplier confirmation");
 
         await using var verify = CreateContext();
 
@@ -83,12 +83,15 @@ public sealed class TheMoneyPathSurvivesAFailedCommit : IClassFixture<TestDataba
             .Select(v => v.Status)
             .SingleAsync();
 
-        status.Should().Be(VoucherStatus.Used,
-            "the redemption is applied by the retry — the failed attempt wrote nothing");
+        status.Should().Be(VoucherStatus.PendingReconciliation,
+            "the report is applied by the retry - the failed attempt wrote nothing");
 
         (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
             .Should().Be(1,
                 "one handover of one paper is one row, however many times the commit was retried");
+        (await verify.VoucherRedemptions.CountAsync(r => r.VoucherId == voucherId))
+            .Should().Be(1,
+                "the claim is written once, not once per commit attempt");
     }
 
     /// <summary>
@@ -148,7 +151,15 @@ public sealed class TheMoneyPathSurvivesAFailedCommit : IClassFixture<TestDataba
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """
+            TRUNCATE TABLE
+                "journal_lines", "journal_entries", "document_sequences", "accounting_periods",
+                "voucher_redemptions", "redemption_statement_rows",
+                "voucher_events", "voucher_movements", "order_line_items", "orders",
+                "fuel_vouchers", "users", "payments", "fulfillments", "outbox_events",
+                "provider_event_outbox", "app_settings"
+            RESTART IDENTITY CASCADE
+            """);
 
     /// <summary>
     /// The context the handler runs on. The retrying execution strategy is configured here, the way

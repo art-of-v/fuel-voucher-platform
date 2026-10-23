@@ -29,6 +29,7 @@ public static class VoucherStatuses
         VoucherStatus.DecodeIntegrityWarning,
         VoucherStatus.Available,
         VoucherStatus.Assigned,
+        VoucherStatus.PendingReconciliation,
         VoucherStatus.Blocked,
     ];
 

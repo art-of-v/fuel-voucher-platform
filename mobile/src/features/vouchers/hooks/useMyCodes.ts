@@ -14,7 +14,11 @@ import {
   filterOrdersByContext,
   groupCompanyStock,
 } from '../../company/lib/stock';
-import { splitByIssuanceReceipt, isLiveWalletVoucher } from '../lib/display';
+import {
+  splitByIssuanceReceipt,
+  isLiveWalletVoucher,
+  isPendingReconciliation,
+} from '../lib/display';
 import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
 
 /**
@@ -109,11 +113,15 @@ export function useMyCodes() {
       Alert.alert(t('common.error'), t('voucher.error.workerOnly'));
       return;
     }
-    const newStatus = voucher.status === 'used' ? 'active' : 'used';
+    // A pending report is already out of the holder's hands and waits for the supplier's
+    // evidence. The only action left on it is the holder's undo, so the same restore endpoint
+    // that withdraws a pending claim is what the button calls.
+    const isPending = isPendingReconciliation(voucher);
+    const newStatus = voucher.status === 'used' || isPending ? 'active' : 'used';
     setSelectedVoucher((prev) => (prev?.id === voucher.id ? { ...prev, status: newStatus } : prev));
     setVouchers((prev) => prev.map((v) => (v.id === voucher.id ? { ...v, status: newStatus } : v)));
     try {
-      if (voucher.status === 'used') {
+      if (voucher.status === 'used' || isPending) {
         await restoreVoucher(voucher.id);
       } else {
         await markVoucherAsUsed(voucher.id);

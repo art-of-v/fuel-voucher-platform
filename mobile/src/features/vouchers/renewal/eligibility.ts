@@ -1,5 +1,6 @@
 import { classifyVoucher } from '../../../core/types/api';
 import type { Voucher } from '../../../core/types/api';
+import { isPendingReconciliation } from '../lib/display';
 
 /** The renewal-config subset the eligibility predicate needs (from getRenewalConfig). */
 export interface RenewableConfig {
@@ -15,12 +16,14 @@ export interface RenewableConfig {
  * previously inlined as `selectedCanRenew` in my-codes. The backend quote/checkout
  * remains the authority; this only decides what the entry UI surfaces.
  *
- * Eligible when: the feature is on; the voucher is not already used; it is not
- * blocked, not gifted to a worker (an owner cannot act on those) and not issued to
- * the current user by a company (renewal requires `AssignedToUserId == caller`, so an
- * issued voucher would only earn a "not your voucher" rejection); it has an expiry
- * date; and that expiry is within `thresholdDays` of `now`. An already-expired
- * voucher has a negative day count, so it still passes — that is the replace branch.
+ * Eligible when: the feature is on; the voucher is not already used and not waiting for
+ * supplier evidence (a pending report is being reviewed, not spent - renewing it would
+ * create a second paper for the same tank); it is not blocked, not gifted to a worker (an
+ * owner cannot act on those) and not issued to the current user by a company (renewal
+ * requires `AssignedToUserId == caller`, so an issued voucher would only earn a "not your
+ * voucher" rejection); it has an expiry date; and that expiry is within `thresholdDays` of
+ * `now`. An already-expired voucher has a negative day count, so it still passes — that is
+ * the replace branch.
  */
 export function isRenewableVoucher(
   v: Voucher,
@@ -30,6 +33,7 @@ export function isRenewableVoucher(
 ): boolean {
   if (!cfg?.enabled) return false;
   if (v.status === 'used') return false;
+  if (isPendingReconciliation(v)) return false;
   const kind = classifyVoucher(v, userId);
   if (kind === 'blocked' || kind === 'gifted_to_worker' || kind === 'gifted_to_me') return false;
   if (!v.expirationDate) return false;

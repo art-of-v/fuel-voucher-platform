@@ -10,19 +10,25 @@ type WorkerFuelHeaderProps = {
   workerIssued: Voucher[];
   workerUsedCount: number;
   workerLeftCount: number;
+  /**
+   * Vouchers whose report is waiting for the supplier's evidence. They are neither used nor
+   * left: the fuel is out of the worker's hands, but the sale is not settled yet.
+   */
+  workerPendingCount: number;
   workerLitersLeft: number;
 };
 
 /**
  * Worker-context header (multi-company epic #103 S5): the fuel this company issued
- * to me — issued / used / remaining, then a flat list. No pool, no other workers, no
- * orders: those belong to the employer, not to me.
+ * to me — issued / used / remaining / pending, then a flat list. No pool, no other
+ * workers, no orders: those belong to the employer, not to me.
  */
 export function WorkerFuelHeader({
   currentCompany,
   workerIssued,
   workerUsedCount,
   workerLeftCount,
+  workerPendingCount,
   workerLitersLeft,
 }: WorkerFuelHeaderProps) {
   const tokens = useDesignTokens();
@@ -163,6 +169,39 @@ export function WorkerFuelHeader({
             }}
           >
             {t('codes.stock.usedShort')}
+          </Text>
+        </View>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: tokens.colors.status.warning.subtle,
+            borderRadius: 8,
+            padding: 10,
+            borderWidth: 1,
+            borderColor: tokens.colors.status.warning.border,
+          }}
+        >
+          <Text
+            allowFontScaling={false}
+            style={{
+              fontSize: 16,
+              fontWeight: '800',
+              color: tokens.colors.status.warning.base,
+              textAlign: 'center',
+            }}
+          >
+            {workerPendingCount}
+          </Text>
+          <Text
+            allowFontScaling={false}
+            style={{
+              fontSize: 9,
+              color: tokens.colors.text.muted,
+              textAlign: 'center',
+              marginTop: 2,
+            }}
+          >
+            {t('codes.stock.pendingShort')}
           </Text>
         </View>
       </View>

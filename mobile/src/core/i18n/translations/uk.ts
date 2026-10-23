@@ -213,6 +213,8 @@ export const uk: Record<string, string> = {
   'codes.noVouchersYet': 'Талонів ще немає',
   'codes.used': 'ВИКОРИСТАНО',
   'codes.redeemed': 'ВИКОРИСТАНО',
+  'codes.pendingReconciliation': 'ОЧІКУЄ ПІДТВЕРДЖЕННЯ',
+  'codes.withdrawReport': 'Відкликати позначку',
   'codes.markAsUsed': 'Позначити використаним',
   'codes.restoreCode': 'Відновити талон',
   'codes.active': 'АКТИВНІ',
@@ -232,6 +234,7 @@ export const uk: Record<string, string> = {
   'codes.stock.issuedShort': 'ВИДАНО',
   'codes.stock.leftShort': 'ЛИШИЛОСЬ',
   'codes.stock.usedShort': 'ВИКОРИСТАНО',
+  'codes.stock.pendingShort': 'ОЧІКУЄ',
   'codes.stock.workerEmpty': 'ТАЛОНІВ НЕМАЄ',
   'codes.stock.workerEmptySub': 'Компанія ще не видала вам пального',
   'codes.stock.workerNoBuying': 'Щоб придбати пально, перейдіть в особистий контекст',
@@ -567,6 +570,8 @@ export const uk: Record<string, string> = {
   'voucher.history.replacedHint': 'Видано новий талон — попередній протерміновано',
   'voucher.history.validRange': 'дійсний з {0} по {1}',
   'codes.qrUnavailable': 'QR НЕДОСТУПНИЙ',
+  'voucher.pending.awaitingConfirmation':
+    'Позначено як використаний — очікуємо підтвердження постачальника',
 
   'voucher.error.workerOnly': 'Використати цей талон може лише призначений працівник.',
   'voucher.error.blocked': 'Цей талон заблоковано і його не можна використати.',

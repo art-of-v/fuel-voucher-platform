@@ -6,7 +6,7 @@
 // colour. An unknown brand falls back to the action colour rather than
 // guessing a network — a near-miss would paint the wrong brand on the card.
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
-import { AlertTriangle, Ban, Copy } from 'lucide-react-native';
+import { AlertTriangle, Ban, Clock, Copy } from 'lucide-react-native';
 import type { Voucher } from '../../../core/types/api';
 import { classifyVoucher } from '../../../core/types/api';
 import { MeshBackground } from '../../../core/ui';
@@ -15,7 +15,12 @@ import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
 import { VoucherBadge } from './VoucherBadge';
-import { brandColorFor, daysUntilExpiration, isExpiringSoon } from '../lib/display';
+import {
+  brandColorFor,
+  daysUntilExpiration,
+  isExpiringSoon,
+  isPendingReconciliation,
+} from '../lib/display';
 
 type VoucherCardProps = {
   voucher: Voucher;
@@ -30,6 +35,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
   const tokens = useDesignTokens();
   const { t } = useI18n();
   const isUsed = voucher.status === 'used';
+  const isPending = isPendingReconciliation(voucher);
   const kind = classifyVoucher(voucher, userId);
   const isBlocked = kind === 'blocked';
   const workerName = [voucher.workerFirstName, voucher.workerLastName]
@@ -153,6 +159,31 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
                 }}
               >
                 {t('voucher.badge.blocked')}
+              </Text>
+            </View>
+          ) : isPending ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 14,
+                paddingVertical: 6,
+                borderRadius: 20,
+                backgroundColor: tokens.colors.status.warning.subtle,
+                gap: 6,
+              }}
+            >
+              <Clock size={12} color={tokens.colors.status.warning.base} />
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontSize: 11,
+                  fontFamily: 'Inter-Black',
+                  letterSpacing: 0.8,
+                  color: tokens.colors.status.warning.base,
+                }}
+              >
+                {t('codes.pendingReconciliation')}
               </Text>
             </View>
           ) : !isUsed ? (

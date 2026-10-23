@@ -262,6 +262,15 @@ describe('ownerActionsForVoucher (#159)', () => {
     });
   });
 
+  it('offers nothing on a voucher that waits for supplier evidence', () => {
+    // The report is under review and the voucher is no longer Assigned, so the server refuses
+    // every owner action on it.
+    const actions = ownerActionsForVoucher('pendingreconciliation');
+    expect(actions.canFreezeOrRecall).toBe(false);
+    expect(actions.canUnblock).toBe(false);
+    expect(actions.canReturnToPool).toBe(false);
+  });
+
   it('withdraws the thaw on the fuel of somebody who no longer works here', () => {
     // Planning #558: a thaw hands the paper back to its holder, so on the fuel of a
     // fired worker it would hand the fuel back to the person who was just fired.

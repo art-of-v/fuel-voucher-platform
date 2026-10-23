@@ -218,6 +218,8 @@ export const de: Record<string, string> = {
   'codes.noVouchersYet': 'Noch keine Gutscheine',
   'codes.used': 'VERWENDET',
   'codes.redeemed': 'EINGELÖST',
+  'codes.pendingReconciliation': 'AUSSTEHEND',
+  'codes.withdrawReport': 'Meldung zurückziehen',
   'codes.markAsUsed': 'Als verwendet markieren',
   'codes.restoreCode': 'Code wiederherstellen',
   'codes.active': 'AKTIV',
@@ -238,6 +240,7 @@ export const de: Record<string, string> = {
   'codes.stock.issuedShort': 'AUSGEGEBEN',
   'codes.stock.leftShort': 'ÜBRIG',
   'codes.stock.usedShort': 'GENUTZT',
+  'codes.stock.pendingShort': 'OFFEN',
   'codes.stock.workerEmpty': 'KEIN KRAFTSTOFF',
   'codes.stock.workerEmptySub': 'Das Unternehmen hat Ihnen noch keinen Kraftstoff ausgegeben',
   'codes.stock.workerNoBuying':
@@ -575,6 +578,8 @@ export const de: Record<string, string> = {
   'voucher.history.replacedHint': 'Neuer Gutschein ausgestellt — der alte ist abgelaufen',
   'voucher.history.validRange': 'gültig {0} bis {1}',
   'codes.qrUnavailable': 'QR NICHT VERFÜGBAR',
+  'voucher.pending.awaitingConfirmation':
+    'Als verwendet gemeldet — Bestätigung des Lieferanten steht aus',
 
   'voucher.error.workerOnly': 'Nur der zugewiesene Mitarbeiter kann diesen Gutschein verwenden.',
   'voucher.error.blocked': 'Dieser Gutschein ist gesperrt und kann nicht verwendet werden.',
