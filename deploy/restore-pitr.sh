@@ -191,6 +191,13 @@ if [[ -n "$WAL_REMOTE" ]]; then
     echo "       The base backup alone is a snapshot, not a point-in-time restore." >&2
     exit 1
   fi
+  # The server reads these files through a read-only mount, as the postgres user (uid 70)
+  # inside the container. A restrictive umask made them 600 and root-owned once, the
+  # container could not read a single one ("cp: can't stat ... Permission denied"), and
+  # recovery ended at the base backup's own WAL - successfully, as far as PostgreSQL was
+  # concerned, with every segment after it unreplayed. WORK is 700 and root-owned, so
+  # making the files readable inside it exposes nothing.
+  chmod -R a+rX "$WAL_DIR"
   echo "         decrypted $WAL_COUNT segment(s)"
 fi
 

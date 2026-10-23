@@ -327,11 +327,16 @@ cmd_alert_drill() {
   # and it cannot create anything, because no request reaches the network.
   local fake_env="$WAL_SHIP_STATE_DIR/wal-ship-ops-alert-drill.env"
   local fake_remote="wal-ship-ops-alert-drill:no-such-bucket"
-  umask 077
-  {
-    printf 'BACKUP_REMOTE=%s\n' "$fake_remote"
-    printf 'BACKUP_AGE_RECIPIENT=%s\n' "$BACKUP_AGE_RECIPIENT"
-  } > "$fake_env"
+  # The umask is confined to a subshell on purpose. Setting it here leaked into the rest
+  # of the process - and in the `all` campaign the drill runs after this step, so the
+  # restore it makes fetched its WAL files with mode 600, the restored container's
+  # postgres user could not read them ("cp: can't stat ... Permission denied"), and
+  # recovery ended at the base backup's own WAL. One `umask` cost the drill its proof.
+  ( umask 077
+    printf 'BACKUP_REMOTE=%s\n' "$fake_remote" > "$fake_env"
+    printf 'BACKUP_AGE_RECIPIENT=%s\n' "$BACKUP_AGE_RECIPIENT" >> "$fake_env"
+  )
+  chmod 600 "$fake_env"
   say "  the shipper is pointed at $fake_remote (a remote that does not exist)"
   say ""
 
