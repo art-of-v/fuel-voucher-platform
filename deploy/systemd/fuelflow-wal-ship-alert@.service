@@ -1,0 +1,15 @@
+# Fired by `OnFailure=` on fuelflow-wal-ship.service when a shipment fails (encryption,
+# upload, or the status object). Mirrors fuelflow-backup-alert@.service.
+#
+# Templated (`@`): the failing unit's name is the instance (%i), so the notifier can say
+# WHICH unit failed. Started as fuelflow-wal-ship-alert@fuelflow-wal-ship.service.
+[Unit]
+Description=Alert that %i failed
+# No OnFailure here: the alert must not itself trigger alert handling (no loop).
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+# %i is the failed unit name. The notifier reads deploy/.env for the Telegram creds.
+ExecStart=/root/FuelFlow/deploy/notify-wal-ship-failure.sh %i
+SyslogIdentifier=fuelflow-wal-ship-alert
