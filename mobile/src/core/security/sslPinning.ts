@@ -41,8 +41,9 @@ let sslPinningModule: SslPinningModule | null | undefined;
  */
 function loadSslPinning(): SslPinningModule | null {
   if (sslPinningModule === undefined) {
-    sslPinningModule = loadOptionalNativeModule('react-native-ssl-public-key-pinning', () =>
-      require('react-native-ssl-public-key-pinning') as SslPinningModule,
+    sslPinningModule = loadOptionalNativeModule(
+      'react-native-ssl-public-key-pinning',
+      () => require('react-native-ssl-public-key-pinning') as SslPinningModule,
     );
   }
   return sslPinningModule;

@@ -12,8 +12,9 @@ let cryptoModule: CryptoModule | null | undefined;
  */
 function loadCrypto(): CryptoModule | null {
   if (cryptoModule === undefined) {
-    cryptoModule = loadOptionalNativeModule('expo-crypto', () =>
-      require('expo-crypto') as CryptoModule,
+    cryptoModule = loadOptionalNativeModule(
+      'expo-crypto',
+      () => require('expo-crypto') as CryptoModule,
     );
   }
   return cryptoModule;

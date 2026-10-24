@@ -38,8 +38,9 @@ let appIntegrityModule: AppIntegrityModule | null | undefined;
  */
 function loadAppIntegrity(): AppIntegrityModule | null {
   if (appIntegrityModule === undefined) {
-    appIntegrityModule = loadOptionalNativeModule('@expo/app-integrity', () =>
-      require('@expo/app-integrity') as AppIntegrityModule,
+    appIntegrityModule = loadOptionalNativeModule(
+      '@expo/app-integrity',
+      () => require('@expo/app-integrity') as AppIntegrityModule,
     );
   }
   return appIntegrityModule;
@@ -197,7 +198,8 @@ async function ensureGoogleProvider(): Promise<boolean> {
     return false;
   }
 
-  googleProviderPromise = appIntegrity.prepareIntegrityTokenProviderAsync(projectNumber)
+  googleProviderPromise = appIntegrity
+    .prepareIntegrityTokenProviderAsync(projectNumber)
     .then(() => true)
     .catch((error) => {
       // Do not cache a transient Play Services/network failure for the life of the process:
