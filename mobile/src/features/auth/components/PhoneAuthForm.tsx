@@ -35,7 +35,12 @@ interface PhoneAuthFormProps {
  * went through `Text`, and the copy — previously hardcoded Ukrainian in a
  * four-language app — now uses the `phoneAuth.*` keys that already existed.
  */
-export function PhoneAuthForm({ onSuccess, onBack, initialPhone, initialCode }: PhoneAuthFormProps) {
+export function PhoneAuthForm({
+  onSuccess,
+  onBack,
+  initialPhone,
+  initialCode,
+}: PhoneAuthFormProps) {
   const tokens = useDesignTokens();
   const t = useI18n((s) => s.t);
   const {
