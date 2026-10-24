@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { useRouter, Redirect } from 'expo-router';
+import { useRouter, Redirect, useLocalSearchParams } from 'expo-router';
 import { GridPageLayout, GridBackground } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useStore } from '../src/core/state/appStore';
@@ -14,6 +14,11 @@ export default function LandingScreen() {
   const storeAuth = useStore((state) => state.isAuthenticated);
   const { isAuthenticated: hookAuth, isLoading } = useAuth();
   const isAuthenticated = storeAuth || hookAuth;
+
+  // A sign-in code that arrived by push lands here through the tap routing (see
+  // src/core/notifications/notificationResponse): the phone and the code come with the
+  // navigation, so the form starts on the code step instead of asking for both again.
+  const { otpPhone, otpCode } = useLocalSearchParams<{ otpPhone?: string; otpCode?: string }>();
 
   if (isAuthenticated && !isLoading) {
     return <Redirect href="/" />;
@@ -33,6 +38,8 @@ export default function LandingScreen() {
             field/button states and translated copy. The old file is deleted.
           */}
           <PhoneAuthForm
+            initialPhone={otpPhone}
+            initialCode={otpCode}
             onSuccess={() => {
               login();
               router.replace('/');

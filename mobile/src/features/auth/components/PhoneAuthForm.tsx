@@ -20,6 +20,10 @@ const PRIVACY_POLICY_URL = 'https://palne.shop/privacy/';
 interface PhoneAuthFormProps {
   onSuccess: () => void;
   onBack?: () => void;
+  /** The phone the code was requested for - pre-filled when the code arrived by push. */
+  initialPhone?: string;
+  /** The code itself, when it arrived by push instead of over SMS. */
+  initialCode?: string;
 }
 
 /**
@@ -31,7 +35,7 @@ interface PhoneAuthFormProps {
  * went through `Text`, and the copy — previously hardcoded Ukrainian in a
  * four-language app — now uses the `phoneAuth.*` keys that already existed.
  */
-export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
+export function PhoneAuthForm({ onSuccess, onBack, initialPhone, initialCode }: PhoneAuthFormProps) {
   const tokens = useDesignTokens();
   const t = useI18n((s) => s.t);
   const {
@@ -49,7 +53,7 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
     handleVerifyCode,
     handleVerifyTwoFactor,
     resetToPhone,
-  } = useLogin(onSuccess);
+  } = useLogin(onSuccess, { initialPhone, initialCode });
 
   // Explicit consent before an account is ever created (the first successful
   // code verification registers the user). The send button stays disabled

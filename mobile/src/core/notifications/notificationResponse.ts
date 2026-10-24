@@ -59,7 +59,32 @@ export function useNotificationTapRouting(): void {
       // to the in-app notifications list. See NotificationService.TrySendPushAsync
       // for the payload contract.
       const data = response?.notification?.request?.content?.data as
-        { type?: unknown; orderId?: unknown; legalEntityId?: unknown } | undefined;
+        {
+          type?: unknown;
+          orderId?: unknown;
+          legalEntityId?: unknown;
+          code?: unknown;
+          phone?: unknown;
+        } | undefined;
+
+      // A sign-in code that arrived by push. The code is useless without the phone it was
+      // issued for, so the push carries both and the tap lands on the sign-in form with the
+      // code already filled in. A push without a code falls through to the list - a sign-in
+      // screen with a half-filled code is worse than the bell.
+      if (
+        data?.type === 'auth_otp' &&
+        typeof data.code === 'string' &&
+        data.code &&
+        typeof data.phone === 'string' &&
+        data.phone
+      ) {
+        router.push({
+          pathname: '/landing',
+          params: { otpPhone: data.phone, otpCode: data.code },
+        });
+        return;
+      }
+
       if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
         router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
         return;
