@@ -1,9 +1,7 @@
-import {
-  addSslPinningErrorListener,
-  initializeSslPinning,
-  isSslPinningAvailable,
-  type PinningOptions,
-} from 'react-native-ssl-public-key-pinning';
+import type { PinningOptions } from 'react-native-ssl-public-key-pinning';
+import { loadOptionalNativeModule } from './optionalNativeModule';
+
+type SslPinningModule = typeof import('react-native-ssl-public-key-pinning');
 
 /**
  * SPKI pins for the production API. The leaf is deliberately absent: it rotates whenever the
@@ -34,6 +32,22 @@ export const PINNED_DOMAINS: PinningOptions = {
 let initialization: Promise<void> | null = null;
 let listenerRegistered = false;
 let initializationFailed = false;
+let sslPinningModule: SslPinningModule | null | undefined;
+
+/**
+ * The pinning module is native code. A binary built before it existed cannot resolve it, so it is
+ * resolved on demand - that is what lets an OTA bundle run on an older binary instead of dying on
+ * the import.
+ */
+function loadSslPinning(): SslPinningModule | null {
+  if (sslPinningModule === undefined) {
+    sslPinningModule = loadOptionalNativeModule(
+      'react-native-ssl-public-key-pinning',
+      () => require('react-native-ssl-public-key-pinning') as SslPinningModule,
+    );
+  }
+  return sslPinningModule;
+}
 
 function hostOf(apiBaseUrl: string): string | null {
   try {
@@ -59,7 +73,8 @@ export function ensureSslPinningInitialized(apiBaseUrl: string): Promise<void> {
     return Promise.resolve();
   }
 
-  if (!isSslPinningAvailable()) {
+  const pinning = loadSslPinning();
+  if (!pinning || !pinning.isSslPinningAvailable()) {
     console.warn('[SslPinning] native module unavailable; pinning is not active');
     initializationFailed = true;
     return Promise.resolve();
@@ -67,12 +82,12 @@ export function ensureSslPinningInitialized(apiBaseUrl: string): Promise<void> {
 
   if (!listenerRegistered) {
     listenerRegistered = true;
-    addSslPinningErrorListener((error) => {
+    pinning.addSslPinningErrorListener((error) => {
       console.error('[SslPinning] request blocked:', error.serverHostname, error.message ?? '');
     });
   }
 
-  initialization = initializeSslPinning({ [host]: PINNED_DOMAINS[host] }).catch((error) => {
+  initialization = pinning.initializeSslPinning({ [host]: PINNED_DOMAINS[host] }).catch((error) => {
     initializationFailed = true;
     console.error('[SslPinning] initialization failed; continuing without pinning:', error);
   });

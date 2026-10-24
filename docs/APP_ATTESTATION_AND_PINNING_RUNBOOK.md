@@ -17,6 +17,7 @@ The two controls:
 | File | Purpose |
 |---|---|
 | `src/core/security/attestationProtocol.ts` | Canonical request hash, proof input, protected-path matching |
+| `src/core/security/optionalNativeModule.ts` | Resolves a native module at call time, so a bundle can run on a binary that predates it |
 | `src/core/security/appAttestation.ts` | Apple/Google proof generation, key storage and recovery |
 | `src/core/security/sslPinning.ts` | Pin set, initialisation, fail-open logging |
 | `src/core/api/apiConfig.ts` | `BASE_URL` and platform constants |
@@ -60,9 +61,11 @@ npm install
 npx tsc --noEmit
 npx eslint src/core/api/apiClient.ts src/core/api/apiConfig.ts `
   src/core/security/attestationProtocol.ts src/core/security/appAttestation.ts `
-  src/core/security/sslPinning.ts src/core/utils/versionCheck.ts
+  src/core/security/optionalNativeModule.ts src/core/security/sslPinning.ts `
+  src/core/utils/versionCheck.ts
 npx jest src/core/api/apiClient.test.ts `
-  src/core/security/attestationProtocol.test.ts `
+  src/core/security/attestationProtocol.test.ts src/core/security/appAttestation.noNativeModule.test.ts `
+  src/core/security/attestationProtocol.noNativeModule.test.ts src/core/security/sslPinning.noNativeModule.test.ts `
   src/core/utils/versionCheck.test.ts --runInBand
 ```
 
@@ -84,8 +87,11 @@ work. The preview Android build is an APK and will not have Play Integrity until
 through Play.
 
 Adding `@expo/app-integrity` and `react-native-ssl-public-key-pinning` changes the native
-fingerprint. Existing builds cannot receive an OTA containing this feature; this is a new native
-build, not an OTA-only change.
+fingerprint, so a build made before them asks for a runtime version no current publish produces.
+It does **not** mean they cannot receive an OTA: the security layer resolves both modules at call
+time, inside a try/catch, so today's bundle runs on those binaries - with no attestation and no
+pinning, exactly as they behaved before. What needs a new native build is the *capability*, not
+the code.
 
 ## Production rollout: report-only first
 
@@ -192,7 +198,7 @@ This is the one-time bootstrap that must exist before an Android proof can be `V
 | `GOOGLE_TEST_RESPONSE` | Play marked the response as a test response | Do not set `GoogleAllowTestingResponses=true` in production; install from a normal Play track and re-test. |
 | `GOOGLE_HASH_MISMATCH` | Proxy or interceptor changed the body/path after the proof | Compute the hash from the exact bytes sent; check retries that rewrite the body. |
 | Pinning error / no network | Certificate changed, pin set wrong, or a proxy | Compare the live SPKI hashes (below); ship a corrected pin; if impossible, wait for the expiry dead-man switch. |
-| `native module unavailable` in pinning logs | Expo Go, web, or a build without the native module | Expected outside a native build; a production build logging this is broken. |
+| `native module unavailable` in pinning logs | Expo Go, web, a build without the native module, or an old binary running a newer bundle | Expected in all four; a current production build logging this is broken. |
 
 The server sends `X-Attestation-Error` on attestation refusals. The client uses that header to avoid
 treating the 401 as an expired access token: it must not refresh or clear the session for an
