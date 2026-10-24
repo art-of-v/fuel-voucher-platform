@@ -1,16 +1,8 @@
 {
   "level": "high",
-  "reviewedOn": "2026-10-22",
+  "reviewedOn": "2026-10-24",
   "note": "The advisories the JavaScript dependency gate accepts, each with the reason it is accepted. The gate (scripts/npm-audit-gate.mjs) fails the build on any advisory at or above the level above that is NOT listed here; the advisories below the level are listed as well, so the whole set of known advisories is on the record instead of a number. Every entry names the path the advisory reaches this repository through, the fix - or says there is none - and the reason the risk is accepted.",
   "advisories": {
-    "GHSA-vfj7-8cjw-p6xm": {
-      "package": "braces",
-      "severity": "high",
-      "apps": ["mobile"],
-      "path": "braces <- micromatch <- (jest, jest-haste-map, jest-message-util, metro-file-map, tailwindcss, fast-glob); braces <- chokidar <- tailwindcss",
-      "fix": "None. 3.0.3 is the latest published release and the advisory's range is <= 3.0.3, so every version that exists is affected.",
-      "reason": "Build and test tooling only. The glob patterns come from the repository's own configuration - jest's testMatch, metro's asset globs, tailwind's content globs - and never from a request. The failure is a stack overflow on the machine that runs the build, and it needs a pattern with thousands of nested braces to be committed."
-    },
     "GHSA-5p2g-fcmc-qvqq": {
       "package": "image-size",
       "severity": "high",
@@ -34,14 +26,6 @@
       "path": "node-forge 1.4.0 <- @expo/code-signing-certificates <- expo-updates; node-forge 1.4.0 <- @expo/cli",
       "fix": "None. 1.4.0 is the latest published release and the advisory's range is <= 1.4.0, so there is no version to pin to.",
       "reason": "The vulnerable function is RSA PKCS#1 v1.5 signature VERIFICATION accepting extra nested DigestAlgorithm elements, and it is not on this app's update-signing path. mobile/scripts/publish-ota.mjs signs the update manifest with Node's built-in node:crypto (`sign('RSA-SHA256', manifestBytes, privateKey)`), and the client verifies the manifest in the native Expo Updates module - neither uses node-forge. node-forge is in the tree because @expo/code-signing-certificates, the Expo CLI's code-signing certificate tooling, uses it to check the self-signed certificate the tool generated against its own key pair: the signature being verified there is one the tool produced itself, over a key pair the operator holds. The fix has to come from Expo's dependency."
-    },
-    "GHSA-hp3w-g68c-fv3c": {
-      "package": "sprintf-js",
-      "severity": "moderate",
-      "apps": ["mobile"],
-      "path": "sprintf-js 1.0.3 <- argparse <- js-yaml <- @istanbuljs/load-nyc-config <- babel-plugin-istanbul <- @jest/transform (jest's coverage toolchain)",
-      "fix": "None. 1.1.3 is the latest published release and the advisory's range is <= 1.1.3, so the latest release is affected too - and argparse pins sprintf-js ~1.0.2.",
-      "reason": "The format string comes from the repository's own coverage configuration. The denial of service needs a precision specifier with an enormous width, in a file the operator wrote."
     },
     "GHSA-rj75-hqrm-r3gf": {
       "package": "postcss-selector-parser",
