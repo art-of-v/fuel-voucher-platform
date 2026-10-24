@@ -6,6 +6,21 @@ import { TokenStorage } from './tokenStorage';
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 
+// The backend sends the refresh token in the response body only to a client that says it is
+// native - the browser gets it in the HttpOnly cookie and never in the body, because a script
+// on the origin can read a response body and cannot read an HttpOnly cookie. React Native has
+// no cookie jar, so the body is the only place the token can live here.
+// Mirrors the backend's ClientPlatform (SharedKernel/Security/ClientPlatform.cs).
+const CLIENT_PLATFORM_HEADER = 'X-Client-Platform';
+const NATIVE_CLIENT_PLATFORM = 'mobile';
+
+// What this build can do. The backend refuses a staff sign-in it cannot finish, so a client
+// that cannot show the second factor says so up front instead of failing later with a 401 on
+// a bearer it never had.
+// Mirrors the backend's ClientCapabilities (SharedKernel/Security/ClientCapabilities.cs).
+const CLIENT_CAPABILITIES_HEADER = 'X-Client-Capabilities';
+const STAFF_SECOND_FACTOR_CAPABILITY = 'staff-second-factor';
+
 let pendingRefreshPromise: Promise<boolean> | null = null;
 
 // Single committed production URL — mirrored in app.json (expo.extra.apiUrl) and the
@@ -82,7 +97,10 @@ async function tryRefreshToken(): Promise<boolean> {
 
       const response = await fetchWithTimeout(`${BASE_URL}/api/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          [CLIENT_PLATFORM_HEADER]: NATIVE_CLIENT_PLATFORM,
+        },
         body: JSON.stringify({ refreshToken }),
       });
 
@@ -166,6 +184,11 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-device-id': deviceId,
+    // Says what this client is, so the backend puts the refresh token in the body - the only
+    // place a native app can keep it.
+    [CLIENT_PLATFORM_HEADER]: NATIVE_CLIENT_PLATFORM,
+    // Says what this client can do, so the backend can refuse a sign-in it cannot finish.
+    [CLIENT_CAPABILITIES_HEADER]: STAFF_SECOND_FACTOR_CAPABILITY,
     ...(options.headers as Record<string, string>),
   };
 
@@ -196,7 +219,17 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     credentials: 'include',
   });
 
-  if (response.status === 401 && !endpoint.includes('/api/auth/refresh')) {
+  // A request that carries its own bearer token is not the app's session: the sign-in flow
+  // hands one over explicitly, and that token belongs to the step that is running, not to the
+  // stored session. Refreshing it and clearing the stored session on a 401 would throw away a
+  // perfectly good session because one sign-in step failed.
+  const callerSuppliedToken = Boolean(headers['Authorization']);
+
+  if (
+    response.status === 401 &&
+    !endpoint.includes('/api/auth/refresh') &&
+    !callerSuppliedToken
+  ) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       const storedToken = await TokenStorage.getAccessToken();

@@ -15,7 +15,7 @@ export async function verifyPhoneCode(phoneNumber: string, code: string): Promis
       throw err;
     }
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Невірний код');
+    throw new Error(error.detail || error.title || 'Невірний код');
   }
   return response.json();
 }

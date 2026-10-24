@@ -24,7 +24,7 @@ describe('sendVerificationCode', () => {
     mockApiRequest.mockResolvedValue({
       ok: false,
       status: 400,
-      json: async () => ({ message: 'Phone number is required' }),
+      json: async () => ({ title: 'Bad Request', status: 400, detail: 'Phone number is required' }),
     });
 
     await expect(sendVerificationCode('')).rejects.toThrow('Phone number is required');

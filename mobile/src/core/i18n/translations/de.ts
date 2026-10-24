@@ -583,6 +583,13 @@ export const de: Record<string, string> = {
   'phoneAuth.tooManyAttempts':
     'Zu viele Versuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
 
+  /* Der zweite Faktor der Anmeldung eines Mitarbeiters. */
+  'phoneAuth.twoFactorTitle': 'ZWEITER FAKTOR',
+  'phoneAuth.twoFactorHint': 'Gib den Code aus deiner Authenticator-App ein',
+  'phoneAuth.twoFactorEnrollHint':
+    'Füge diesen Schlüssel deiner Authenticator-App hinzu und gib dann den angezeigten Code ein:',
+  'phoneAuth.twoFactorCodeLabel': '6-STELLIGER CODE',
+
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Überspringen',
   'onboarding.next': 'Weiter',
