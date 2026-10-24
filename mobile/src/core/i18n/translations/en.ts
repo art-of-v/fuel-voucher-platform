@@ -619,6 +619,8 @@ export const en: Record<string, string> = {
   'phoneAuth.twoFactorEnrollHint':
     'Add this key to your authenticator app, then enter the code it shows:',
   'phoneAuth.twoFactorCodeLabel': '6-DIGIT CODE',
+  'phoneAuth.twoFactorSecretCopy': 'Copy key',
+  'phoneAuth.twoFactorSecretCopied': 'Key copied',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Skip',

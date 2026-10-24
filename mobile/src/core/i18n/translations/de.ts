@@ -636,6 +636,8 @@ export const de: Record<string, string> = {
   'phoneAuth.twoFactorEnrollHint':
     'Füge diesen Schlüssel deiner Authenticator-App hinzu und gib dann den angezeigten Code ein:',
   'phoneAuth.twoFactorCodeLabel': '6-STELLIGER CODE',
+  'phoneAuth.twoFactorSecretCopy': 'Schlüssel kopieren',
+  'phoneAuth.twoFactorSecretCopied': 'Schlüssel kopiert',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Überspringen',

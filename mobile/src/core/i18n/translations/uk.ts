@@ -626,6 +626,8 @@ export const uk: Record<string, string> = {
   'phoneAuth.twoFactorEnrollHint':
     'Додайте цей ключ у застосунок автентифікації, потім введіть код, який він показує:',
   'phoneAuth.twoFactorCodeLabel': '6-ЗНАЧНИЙ КОД',
+  'phoneAuth.twoFactorSecretCopy': 'Копіювати ключ',
+  'phoneAuth.twoFactorSecretCopied': 'Ключ скопійовано',
 
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Пропустити',

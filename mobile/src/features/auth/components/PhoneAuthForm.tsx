@@ -13,6 +13,7 @@ import {
   TextField,
 } from '../../../core/ui';
 import { useLogin } from '../hooks/useLogin';
+import { TwoFactorSecretField } from './TwoFactorSecretField';
 
 const PRIVACY_POLICY_URL = 'https://palne.shop/privacy/';
 
@@ -233,23 +234,8 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
           )}
 
           <View style={[styles.form, { gap: tokens.spacing.xl }]}>
-            {twoFactor?.needsEnrollment && (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderColor: tokens.colors.border ?? tokens.colors.text.muted,
-                  borderRadius: tokens.radius.md,
-                  padding: tokens.spacing.md,
-                  gap: tokens.spacing.xs,
-                }}
-              >
-                <Text role="caption" tone="secondary">
-                  {t('phoneAuth.twoFactorEnrollHint')}
-                </Text>
-                <Text role="body" style={{ fontFamily: undefined }}>
-                  {twoFactor.enrollmentSecret}
-                </Text>
-              </View>
+            {twoFactor?.needsEnrollment && twoFactor.enrollmentSecret && (
+              <TwoFactorSecretField secret={twoFactor.enrollmentSecret} />
             )}
 
             <TextField
