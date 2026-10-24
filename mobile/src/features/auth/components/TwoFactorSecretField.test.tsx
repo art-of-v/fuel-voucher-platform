@@ -33,7 +33,9 @@ jest.mock('../../../core/utils/haptics', () => ({
   },
 }));
 
-const SECRET = 'AMT2LLXQCJG4OIEHZRDY5HNS2WZNBEHY';
+// A fake enrollment secret. The field only shows and copies the string, and a random-looking
+// base32 value here is read by the secret scanner as a leaked key (gitleaks: generic-api-key).
+const SECRET = 'test-totp-secret';
 
 describe('TwoFactorSecretField', () => {
   it('shows the enrollment secret as selectable text', () => {
