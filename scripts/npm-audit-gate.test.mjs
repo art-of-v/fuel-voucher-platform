@@ -55,6 +55,25 @@ function report(advisories) {
   };
 }
 
+// A list of the shape the gate reads, carrying one accepted advisory. The tests that are about the
+// gate's behaviour use a list they own: the shipped list changes whenever an advisory is fixed or
+// withdrawn, and a test that names an entry of it breaks on that day without the gate changing.
+function listWith(id, pkg) {
+  return {
+    level: "high",
+    advisories: {
+      [id]: {
+        package: pkg,
+        severity: "high",
+        apps: ["mobile"],
+        path: `${pkg} <- something in the tree`,
+        fix: "None. Every published version is affected.",
+        reason: "A reason long enough to say why the risk is accepted, and what the attack needs.",
+      },
+    },
+  };
+}
+
 function withReportDir(files, run) {
   const dir = mkdtempSync(join(tmpdir(), "ff-npm-audit-"));
   try {
@@ -105,7 +124,7 @@ test("an advisory that is on the list passes, and the reason is printed", () => 
     {
       "mobile.json": report(
         advisory({
-          id: "GHSA-vfj7-8cjw-p6xm",
+          id: "GHSA-test5-test5-test5",
           severity: "high",
           pkg: "braces",
           title: "braces vulnerable to stack-exhaustion denial of service through deeply nested patterns",
@@ -113,7 +132,10 @@ test("an advisory that is on the list passes, and the reason is printed", () => 
       ),
     },
     (dir) => {
-      const result = runGate(dir, ["--allow-list", join(repoRoot, "scripts", "npm-audit-accepted-risk.json"), "mobile"]);
+      const listFile = join(dir, "list.json");
+      writeFileSync(listFile, JSON.stringify(listWith("GHSA-test5-test5-test5", "braces")), "utf8");
+
+      const result = runGate(dir, ["--allow-list", listFile, "mobile"]);
 
       assert.equal(result.status, 0, `the gate should have passed: ${result.stdout}${result.stderr}`);
       assert.match(result.stdout, /accepted/);
@@ -138,10 +160,13 @@ test("an entry on the list that no longer applies is a warning, not a failure", 
   withReportDir(
     { "mobile.json": report({}) },
     (dir) => {
-      const result = runGate(dir, ["--allow-list", join(repoRoot, "scripts", "npm-audit-accepted-risk.json"), "mobile"]);
+      const listFile = join(dir, "list.json");
+      writeFileSync(listFile, JSON.stringify(listWith("GHSA-test6-test6-test6", "braces")), "utf8");
+
+      const result = runGate(dir, ["--allow-list", listFile, "mobile"]);
 
       assert.equal(result.status, 0, `the gate should have passed: ${result.stdout}${result.stderr}`);
-      assert.match(result.stdout, /warning: GHSA-vfj7-8cjw-p6xm/);
+      assert.match(result.stdout, /warning: GHSA-test6-test6-test6/);
     }
   );
 });
