@@ -108,6 +108,15 @@ module.exports = [
     rules: { 'tokens/use-design-tokens': 'error' },
   },
   {
+    // The security layer resolves its native modules inside a try/catch, at call time, so an OTA
+    // bundle can run on a binary that predates them: a static import of a module the binary does
+    // not have throws while the bundle is still being evaluated and takes the app down before it
+    // can show anything. `require` is the only form whose failure a try/catch can catch, so the
+    // rule that bans it is off here and nowhere else.
+    files: ['src/core/security/**/*.ts'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+  {
     // Jest globals (describe/it/expect/jest/beforeEach,...) for the test suite and
     // the shared setup file. Without this, `no-undef` fires on every test —
     // the project had no tests when this config was written. Scoped to test files so

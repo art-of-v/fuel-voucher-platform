@@ -1,4 +1,23 @@
-import * as Crypto from 'expo-crypto';
+import { loadOptionalNativeModule } from './optionalNativeModule';
+
+type CryptoModule = typeof import('expo-crypto');
+
+let cryptoModule: CryptoModule | null | undefined;
+
+/**
+ * `expo-crypto` is a native module: a binary built before it existed cannot resolve it, and the
+ * import throws while the bundle is being evaluated. Resolving it on demand is what lets an OTA
+ * bundle run on an older binary - the hash is simply unavailable there, so the request goes out
+ * without a proof instead of taking the app down.
+ */
+function loadCrypto(): CryptoModule | null {
+  if (cryptoModule === undefined) {
+    cryptoModule = loadOptionalNativeModule('expo-crypto', () =>
+      require('expo-crypto') as CryptoModule,
+    );
+  }
+  return cryptoModule;
+}
 
 // Must stay in sync with AttestationOptions.ProtectedEndpoints on the server.
 const EXACT_PROTECTED_PATHS = [
@@ -23,9 +42,13 @@ export function isAttestationProtected(endpoint: string): boolean {
   return EXACT_PROTECTED_PATHS.includes(path) || VOUCHER_ACTION_PATH.test(path);
 }
 
-async function sha256Base64Url(value: string): Promise<string> {
-  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value, {
-    encoding: Crypto.CryptoEncoding.BASE64,
+/** Null when the binary has no crypto module: there is no hash to bind a proof to. */
+async function sha256Base64Url(value: string): Promise<string | null> {
+  const crypto = loadCrypto();
+  if (!crypto) return null;
+
+  const digest = await crypto.digestStringAsync(crypto.CryptoDigestAlgorithm.SHA256, value, {
+    encoding: crypto.CryptoEncoding.BASE64,
   });
 
   return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -39,7 +62,7 @@ export async function computeRequestHash(
   method: string,
   path: string,
   body: string,
-): Promise<string> {
+): Promise<string | null> {
   return sha256Base64Url(`${method.toUpperCase()}\n${path}\n${body}`);
 }
 
@@ -50,6 +73,6 @@ export async function computeRequestHash(
 export async function computeProofRequestHash(
   challenge: string,
   requestHash: string,
-): Promise<string> {
+): Promise<string | null> {
   return sha256Base64Url(`${challenge}:${requestHash}`);
 }

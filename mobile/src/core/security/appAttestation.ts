@@ -1,10 +1,10 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import * as AppIntegrity from '@expo/app-integrity';
 import { BASE_URL, CLIENT_PLATFORM_HEADER, NATIVE_CLIENT_PLATFORM } from '../api/apiConfig';
 import { SecurityService } from '../api/securityService';
 import { computeProofRequestHash, computeRequestHash } from './attestationProtocol';
+import { loadOptionalNativeModule } from './optionalNativeModule';
 import { ensureSslPinningInitialized } from './sslPinning';
 
 export { isAttestationProtected } from './attestationProtocol';
@@ -14,6 +14,7 @@ const CHALLENGE_TIMEOUT_MS = 15_000;
 
 type ChallengeResponse = { challenge?: unknown };
 type AttestationHeaders = Record<string, string>;
+type AppIntegrityModule = typeof import('@expo/app-integrity');
 
 export class AttestationError extends Error {
   constructor(
@@ -27,6 +28,22 @@ export class AttestationError extends Error {
 
 let appleRegistrationPromise: Promise<string | null> | null = null;
 let googleProviderPromise: Promise<boolean> | null = null;
+let appIntegrityModule: AppIntegrityModule | null | undefined;
+
+/**
+ * `@expo/app-integrity` resolves its native side while it is being imported, so a binary built
+ * before it existed throws there - and a throw during import takes the whole bundle down.
+ * Resolving it on demand is what keeps an OTA bundle runnable on an older binary: there is no
+ * attestation there, so the request goes out without a proof instead of crashing the app.
+ */
+function loadAppIntegrity(): AppIntegrityModule | null {
+  if (appIntegrityModule === undefined) {
+    appIntegrityModule = loadOptionalNativeModule('@expo/app-integrity', () =>
+      require('@expo/app-integrity') as AppIntegrityModule,
+    );
+  }
+  return appIntegrityModule;
+}
 
 function googleCloudProjectNumber(): string | null {
   const fromExtra = Constants.expoConfig?.extra?.googleCloudProjectNumber;
@@ -100,11 +117,12 @@ async function registerAppleKey(): Promise<string | null> {
   if (appleRegistrationPromise) return appleRegistrationPromise;
 
   appleRegistrationPromise = (async () => {
-    if (Platform.OS !== 'ios' || !AppIntegrity.isSupported) return null;
+    const appIntegrity = loadAppIntegrity();
+    if (Platform.OS !== 'ios' || !appIntegrity?.isSupported) return null;
 
     const challenge = await requestChallenge('apple-attest', '');
-    const keyId = await AppIntegrity.generateKeyAsync();
-    const attestationObject = await AppIntegrity.attestKeyAsync(keyId, challenge);
+    const keyId = await appIntegrity.generateKeyAsync();
+    const attestationObject = await appIntegrity.attestKeyAsync(keyId, challenge);
 
     await postAttestationJson('/api/attestation/apple/register', {
       keyId,
@@ -122,7 +140,8 @@ async function registerAppleKey(): Promise<string | null> {
 }
 
 async function getAppleKeyId(): Promise<string | null> {
-  if (Platform.OS !== 'ios' || !AppIntegrity.isSupported) return null;
+  const appIntegrity = loadAppIntegrity();
+  if (Platform.OS !== 'ios' || !appIntegrity?.isSupported) return null;
 
   const existing = await SecureStore.getItemAsync(APPLE_KEY_ID);
   if (existing) return existing;
@@ -131,6 +150,9 @@ async function getAppleKeyId(): Promise<string | null> {
 }
 
 async function getAppleHeaders(requestHash: string): Promise<AttestationHeaders | null> {
+  const appIntegrity = loadAppIntegrity();
+  if (!appIntegrity) return null;
+
   let keyId = await getAppleKeyId();
   if (!keyId) return null;
 
@@ -138,7 +160,7 @@ async function getAppleHeaders(requestHash: string): Promise<AttestationHeaders 
     const challenge = await requestChallenge('mobile-request', requestHash);
 
     try {
-      const proof = await AppIntegrity.generateAssertionAsync(keyId, `${challenge}:${requestHash}`);
+      const proof = await appIntegrity.generateAssertionAsync(keyId, `${challenge}:${requestHash}`);
 
       return {
         'X-Attestation-Provider': 'apple',
@@ -164,6 +186,9 @@ async function ensureGoogleProvider(): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
   if (googleProviderPromise) return googleProviderPromise;
 
+  const appIntegrity = loadAppIntegrity();
+  if (!appIntegrity) return false;
+
   const projectNumber = googleCloudProjectNumber();
   if (!projectNumber) {
     console.warn(
@@ -172,7 +197,7 @@ async function ensureGoogleProvider(): Promise<boolean> {
     return false;
   }
 
-  googleProviderPromise = AppIntegrity.prepareIntegrityTokenProviderAsync(projectNumber)
+  googleProviderPromise = appIntegrity.prepareIntegrityTokenProviderAsync(projectNumber)
     .then(() => true)
     .catch((error) => {
       // Do not cache a transient Play Services/network failure for the life of the process:
@@ -188,9 +213,14 @@ async function ensureGoogleProvider(): Promise<boolean> {
 async function getGoogleHeaders(requestHash: string): Promise<AttestationHeaders | null> {
   if (!(await ensureGoogleProvider())) return null;
 
+  const appIntegrity = loadAppIntegrity();
+  if (!appIntegrity) return null;
+
   const challenge = await requestChallenge('mobile-request', requestHash);
   const proofRequestHash = await computeProofRequestHash(challenge, requestHash);
-  const proof = await AppIntegrity.requestIntegrityCheckAsync(proofRequestHash);
+  if (!proofRequestHash) return null;
+
+  const proof = await appIntegrity.requestIntegrityCheckAsync(proofRequestHash);
 
   return {
     'X-Attestation-Provider': 'google',
@@ -209,6 +239,7 @@ export async function getAttestationHeaders(
   body: string,
 ): Promise<AttestationHeaders | null> {
   const requestHash = await computeRequestHash(method, path, body);
+  if (!requestHash) return null;
 
   if (Platform.OS === 'ios') return getAppleHeaders(requestHash);
   if (Platform.OS === 'android') return getGoogleHeaders(requestHash);
