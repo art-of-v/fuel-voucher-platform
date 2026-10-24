@@ -20,6 +20,8 @@
 #     (voucher_events, payments, provider_event_outbox) - database-privileges.tsv is
 #     the source of truth, and the test reads its intent from there;
 #   - the application role may close an outbox event and may not delete it;
+#   - the application role may move the statement's last-seen column and may not
+#     rewrite or delete the statement itself;
 #   - the maintenance role may purge the retention tables (DELETE) and may NOT insert
 #     or update anywhere - a defect in the traffic role must not be able to erase the
 #     ledger, and the destructive half of the lifecycle must not be able to forge it;
@@ -297,6 +299,7 @@ else
       CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, payload text);
       CREATE TABLE public.voucher_redemptions(id integer PRIMARY KEY, status text, confirmed_at_utc timestamptz, confirmed_by_user_id uuid, closed_at_utc timestamptz, closed_by_user_id uuid, resolution_note text, updated_at_utc timestamptz, reported_liters numeric);
       CREATE TABLE public.redemption_statement_rows(id integer PRIMARY KEY, status text, resolved_at_utc timestamptz, resolved_by_user_id uuid, resolution_note text, external_id text);
+      CREATE TABLE public.monobank_statement_entries(id integer PRIMARY KEY, amount_kopecks numeric, last_seen_at_utc timestamptz NOT NULL, raw_payload text);
       CREATE TABLE public.\"__EFMigrationsHistory\"(\"MigrationId\" text PRIMARY KEY, \"ProductVersion\" text);
     " 2>&1)"; rc=$?
     check "the migration role may create the stub tables" "0" "$rc"
@@ -366,6 +369,18 @@ else
     check "the application role may settle a webhook delivery" "0" "$rc"
     out="$(as_app "UPDATE public.webhook_events SET payload = payload WHERE false" 2>&1)"; rc=$?
     check_denied "the application role may NOT rewrite a stored webhook delivery" "$rc"
+
+    # monobank_statement_entries: SI + U(last_seen_at_utc) for the app. The hourly import
+    # moves the last-seen column on every re-import of a period it already has, and
+    # touches nothing else - the row is the acquirer's evidence.
+    out="$(as_app "INSERT INTO public.monobank_statement_entries(id, amount_kopecks, last_seen_at_utc) VALUES (1, 100, now())" 2>&1)"; rc=$?
+    check "the application role may import a statement row" "0" "$rc"
+    out="$(as_app "UPDATE public.monobank_statement_entries SET last_seen_at_utc = now() WHERE false" 2>&1)"; rc=$?
+    check "the application role may move the last-seen column" "0" "$rc"
+    out="$(as_app "UPDATE public.monobank_statement_entries SET amount_kopecks = amount_kopecks WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite the acquirer's amount" "$rc"
+    out="$(as_app "DELETE FROM public.monobank_statement_entries WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT delete a statement row" "$rc"
 
     # provider_event_outbox: SI for the app, SD for the maintenance role.
     out="$(as_app "UPDATE public.provider_event_outbox SET payload = payload WHERE false" 2>&1)"; rc=$?

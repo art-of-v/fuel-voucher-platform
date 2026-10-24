@@ -764,6 +764,26 @@ else
   say "webhook_events does not exist yet - the CI test probes this against a stub table"
 fi
 
+if have_relation public.monobank_statement_entries; then
+  # The acquirer's statement row is the evidence a dispute is settled from: it is inserted
+  # once and never rewritten. The one exception is last_seen_at_utc - when the import last
+  # saw the row - and the hourly import moves exactly that column on every re-import of a
+  # period it already has. Without the column grant the import fails on every pass after
+  # the first, and the statement stops being imported at all.
+  if ! psql_as "$APP_ROLE" -c "UPDATE public.monobank_statement_entries SET last_seen_at_utc = last_seen_at_utc WHERE false" >/dev/null 2>&1; then
+    die "the application role may not move monobank_statement_entries.last_seen_at_utc. The hourly import touches that column on every re-import - database-privileges.tsv grants SI+U(last_seen_at_utc)."
+  fi
+  if psql_as "$APP_ROLE" -c "UPDATE public.monobank_statement_entries SET amount_kopecks = amount_kopecks WHERE false" >/dev/null 2>&1; then
+    die "the application role may UPDATE monobank_statement_entries.amount_kopecks. The acquirer's figure is the evidence the statement is worth - database-privileges.tsv grants the last_seen_at_utc column and nothing else."
+  fi
+  if psql_as "$APP_ROLE" -c "DELETE FROM public.monobank_statement_entries WHERE false" >/dev/null 2>&1; then
+    die "the application role may DELETE from monobank_statement_entries. A statement row nobody can prove the acquirer sent is not evidence."
+  fi
+  say "the application role may move the last-seen column and may not rewrite the statement"
+else
+  say "monobank_statement_entries does not exist yet - the CI test probes this against a stub table"
+fi
+
 if have_relation public.provider_event_outbox; then
   if psql_as "$APP_ROLE" -c "UPDATE public.provider_event_outbox SET payload = payload WHERE false" >/dev/null 2>&1; then
     die "the application role may UPDATE provider_event_outbox. The admin change audit trail is insert-only for it - database-privileges.tsv says SI."
