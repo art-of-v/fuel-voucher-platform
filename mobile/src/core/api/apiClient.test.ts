@@ -1,5 +1,6 @@
-import { apiRequest } from './apiClient';
+import { apiFetch, apiRequest } from './apiClient';
 import { SecurityService } from './securityService';
+import { TokenStorage } from './tokenStorage';
 import {
   clearAppleAttestationKey,
   getAttestationHeaders,
@@ -170,5 +171,105 @@ describe('apiClient', () => {
 
     // One protected call, no refresh call: an attestation refusal is not an expired session.
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The session the app keeps may die only when the SERVER says so.
+ *
+ * A 401 on a request that carried the app's own token is an expired token, and the app renews
+ * it. A 401 on a request that carried no session token - a public endpoint, or a sign-in step -
+ * says nothing about the session: a wrong verification code answers 401 too, and clearing the
+ * tokens there signed the customer out while their session was still alive.
+ */
+describe('apiClient session lifetime', () => {
+  const fetchMock = jest.fn();
+
+  const unauthorized = { ok: false, status: 401, json: async () => ({}) };
+  const ok = (body: unknown = {}) => ({ ok: true, status: 200, json: async () => body });
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    (global as unknown as { fetch: unknown }).fetch = fetchMock;
+    (TokenStorage.getAccessToken as jest.Mock).mockReset().mockResolvedValue(null);
+    (TokenStorage.getRefreshToken as jest.Mock).mockReset().mockResolvedValue(null);
+    (TokenStorage.saveTokens as jest.Mock).mockReset().mockResolvedValue(undefined);
+    (TokenStorage.clearTokens as jest.Mock).mockReset().mockResolvedValue(undefined);
+  });
+
+  it('renews an expired access token and retries the request with the fresh one', async () => {
+    (TokenStorage.getAccessToken as jest.Mock)
+      .mockResolvedValueOnce('expired-token')
+      .mockResolvedValueOnce('fresh-token');
+    (TokenStorage.getRefreshToken as jest.Mock).mockResolvedValue('refresh-token');
+    fetchMock
+      .mockResolvedValueOnce(unauthorized)
+      .mockResolvedValueOnce(ok({ accessToken: 'fresh-token', refreshToken: 'rotated-token' }))
+      .mockResolvedValueOnce(ok({ id: 'user-1' }));
+
+    const response = await apiFetch('/api/auth/user/me');
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/api/auth/refresh');
+    const [, retry] = fetchMock.mock.calls[2];
+    expect(retry.headers['Authorization']).toBe('Bearer fresh-token');
+    expect(TokenStorage.saveTokens).toHaveBeenCalledWith('fresh-token', 'rotated-token');
+    expect(TokenStorage.clearTokens).not.toHaveBeenCalled();
+  });
+
+  it('ends the session when the request that carried it is rejected again', async () => {
+    (TokenStorage.getAccessToken as jest.Mock)
+      .mockResolvedValueOnce('expired-token')
+      .mockResolvedValueOnce('fresh-token');
+    (TokenStorage.getRefreshToken as jest.Mock).mockResolvedValue('refresh-token');
+    fetchMock
+      .mockResolvedValueOnce(unauthorized)
+      .mockResolvedValueOnce(ok({ accessToken: 'fresh-token', refreshToken: 'rotated-token' }))
+      .mockResolvedValueOnce(unauthorized);
+
+    const response = await apiFetch('/api/auth/user/me');
+
+    expect(response.status).toBe(401);
+    expect(TokenStorage.clearTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not end the session because a public endpoint answered 401', async () => {
+    (TokenStorage.getAccessToken as jest.Mock).mockResolvedValue('stored-token');
+    (TokenStorage.getRefreshToken as jest.Mock).mockResolvedValue('refresh-token');
+    fetchMock
+      .mockResolvedValueOnce(unauthorized)
+      .mockResolvedValueOnce(ok({ accessToken: 'fresh-token', refreshToken: 'rotated-token' }))
+      .mockResolvedValueOnce(unauthorized);
+
+    const response = await apiFetch('/api/brands');
+
+    expect(response.status).toBe(401);
+    expect(TokenStorage.clearTokens).not.toHaveBeenCalled();
+  });
+
+  it('leaves the session alone when the request carries a token of its own', async () => {
+    (TokenStorage.getRefreshToken as jest.Mock).mockResolvedValue('refresh-token');
+    fetchMock.mockResolvedValueOnce(unauthorized);
+
+    const response = await apiFetch('/api/auth/device/register', {
+      headers: { Authorization: 'Bearer step-token' },
+    });
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(TokenStorage.saveTokens).not.toHaveBeenCalled();
+    expect(TokenStorage.clearTokens).not.toHaveBeenCalled();
+  });
+
+  it('ends the session when the refresh token itself is rejected', async () => {
+    (TokenStorage.getAccessToken as jest.Mock).mockResolvedValue('expired-token');
+    (TokenStorage.getRefreshToken as jest.Mock).mockResolvedValue('dead-refresh-token');
+    fetchMock.mockResolvedValueOnce(unauthorized).mockResolvedValueOnce(unauthorized);
+
+    const response = await apiRequest('GET', '/api/auth/user/me');
+
+    expect(response.status).toBe(401);
+    expect(TokenStorage.clearTokens).toHaveBeenCalledTimes(1);
   });
 });

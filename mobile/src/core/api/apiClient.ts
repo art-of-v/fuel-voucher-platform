@@ -174,11 +174,21 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     ...(options.headers as Record<string, string>),
   };
 
+  // A request that carries its own bearer token is not the app's session: the sign-in flow
+  // hands one over explicitly, and that token belongs to the step that is running, not to the
+  // stored session. Refreshing it and clearing the stored session on a 401 would throw away a
+  // perfectly good session because one sign-in step failed.
+  const callerSuppliedToken = Boolean(
+    (options.headers as Record<string, string> | undefined)?.['Authorization'],
+  );
+
   // Skip auto-auth for public endpoints (like challenge)
+  let usedSessionToken = false;
   if (!headers['Authorization'] && !isPublicEndpoint(endpoint)) {
     const storedToken = await TokenStorage.getAccessToken();
     if (storedToken) {
       headers['Authorization'] = `Bearer ${storedToken}`;
+      usedSessionToken = true;
     }
   }
 
@@ -228,6 +238,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   if (
     response.status === 401 &&
     !endpoint.includes('/api/auth/refresh') &&
+    !callerSuppliedToken &&
     !isAttestationRejection(response)
   ) {
     const refreshed = await tryRefreshToken();
@@ -245,7 +256,15 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
         headers,
         credentials: 'include',
       });
-      if (retryResponse.status === 401 && !isAttestationRejection(retryResponse)) {
+      // Only a request that carried the app's own session may end that session. A 401 on a
+      // public endpoint says nothing about the session - a wrong verification code is one,
+      // and so is an endpoint this caller may not use - and clearing the tokens there threw
+      // signed-in users out of the app.
+      if (
+        retryResponse.status === 401 &&
+        usedSessionToken &&
+        !isAttestationRejection(retryResponse)
+      ) {
         await TokenStorage.clearTokens();
       }
       return retryResponse;
