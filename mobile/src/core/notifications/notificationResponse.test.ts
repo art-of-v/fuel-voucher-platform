@@ -146,6 +146,34 @@ describe('useNotificationTapRouting', () => {
     expect(mockPush).toHaveBeenCalledWith('/notifications');
   });
 
+  it('opens the sign-in form with the code a push carried', async () => {
+    let captured: ((response: unknown) => void) | undefined;
+    addResponseListener.mockImplementation((listener: (r: unknown) => void) => {
+      captured = listener;
+      return { remove: jest.fn() };
+    });
+
+    renderHook(() => useNotificationTapRouting());
+    await waitFor(() => expect(getLastResponse).toHaveBeenCalled());
+
+    act(() => {
+      captured?.(fakeResponse({ type: 'auth_otp', code: '123456', phone: '+380991234567' }));
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/landing',
+      params: { otpPhone: '+380991234567', otpCode: '123456' },
+    });
+  });
+
+  it('falls back to the list when an otp push carries no code', async () => {
+    getLastResponse.mockResolvedValue(fakeResponse({ type: 'auth_otp', phone: '+380991234567' }));
+
+    renderHook(() => useNotificationTapRouting());
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/notifications'));
+  });
+
   it('falls back to the list when an order-fulfilled push carries no orderId', async () => {
     getLastResponse.mockResolvedValue(fakeResponse({ type: 'order_fulfilled' }));
 

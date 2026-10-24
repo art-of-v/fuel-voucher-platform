@@ -40,10 +40,16 @@ interface UseLoginReturn {
   resetToPhone: () => void;
 }
 
-export function useLogin(onSuccess: () => void): UseLoginReturn {
-  const [step, setStep] = useState<AuthStep>('phone');
-  const [phone, setPhoneState] = useState('+380');
-  const [code, setCodeState] = useState('');
+/** What the sign-in form starts with. A code that arrived by push lands here. */
+interface UseLoginOptions {
+  initialPhone?: string;
+  initialCode?: string;
+}
+
+export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseLoginReturn {
+  const [step, setStep] = useState<AuthStep>(options?.initialCode ? 'code' : 'phone');
+  const [phone, setPhoneState] = useState(options?.initialPhone ?? '+380');
+  const [code, setCodeState] = useState(options?.initialCode ?? '');
   const [twoFactorCode, setTwoFactorCodeState] = useState('');
   const [twoFactor, setTwoFactor] = useState<TwoFactorState | null>(null);
   const [loading, setLoading] = useState(false);
