@@ -57,7 +57,7 @@ public	journal_entries	SIUD	-	Draft entries are inserted, posted (updated) and d
 public	journal_lines	SIUD	-	Lines belong to the draft lifecycle; trg_journal_lines_posted_is_immutable freezes posted lines.
 public	ledger_mapping_rules	SIUD	-	Admin CRUD.
 public	legal_entities	SIUD	-	Company profile CRUD; RLS-covered.
-public	monobank_statement_entries	SI	-	The acquirer's immutable evidence: inserted on import, never rewritten (acquiring-statement-118).
+public	monobank_statement_entries	SI+U(last_seen_at_utc)	-	The acquirer's immutable evidence: inserted on import, never rewritten (acquiring-statement-118). The one column the import moves is last_seen_at_utc - when we last saw the row, not what the acquirer said - so a re-import can say so without touching the evidence itself.
 public	movement_batches	SIUD	-	Settlement batch lifecycle (opened, confirmed, rejected).
 public	natural_persons	SIUD	-	Customer profile CRUD; RLS-covered.
 public	notifications	SIU	SD	Retention purges read notifications as fuelflow_maintenance.

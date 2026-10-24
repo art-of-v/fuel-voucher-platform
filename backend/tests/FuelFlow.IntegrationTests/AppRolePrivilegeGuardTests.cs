@@ -127,6 +127,29 @@ public sealed class AppRolePrivilegeGuardTests : IClassFixture<TestDatabaseFixtu
     }
 
     [Fact]
+    public async Task The_traffic_role_may_move_the_statement_last_seen_column_and_may_not_rewrite_it()
+    {
+        await using var connection = await OpenAsync(_fixture.AppConnectionString);
+
+        await AllowedAsync(
+            connection,
+            "UPDATE public.monobank_statement_entries SET last_seen_at_utc = last_seen_at_utc WHERE false",
+            "the hourly import moves that column on every re-import of a period it already has, "
+            + "and a grant without it stops the statement from being imported at all");
+
+        await DeniedAsync(
+            connection,
+            "UPDATE public.monobank_statement_entries SET amount_kopecks = amount_kopecks WHERE false",
+            "the acquirer's figure is the evidence the statement is worth: a role that may "
+            + "rewrite it may rewrite the evidence");
+
+        await DeniedAsync(
+            connection,
+            "DELETE FROM public.monobank_statement_entries WHERE false",
+            "a statement row nobody can prove the acquirer sent is not evidence");
+    }
+
+    [Fact]
     public async Task The_maintenance_role_may_purge_and_may_not_write()
     {
         await using var connection = await OpenAsync(_fixture.MaintenanceConnectionString);
