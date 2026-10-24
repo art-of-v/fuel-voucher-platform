@@ -208,6 +208,13 @@ services:
       # cannot test a candidate. Changing it invalidates the codes in flight (five minutes).
       Auth__OtpPepper: ${OTP_PEPPER:?set OTP_PEPPER (>=32 chars) in .env (openssl rand -base64 32)}
 
+      # --- OTP delivery channel ---
+      # true = the sign-in code rides a free Expo push to the account's own registered
+      # devices (any phone signed into the app once). An account with no active device
+      # token, or a push Expo rejects, still falls back to SMS - nobody is locked out.
+      # Flip to true when the SMS balance is gone; SMS Club stays configured either way.
+      Auth__OtpDeliveryViaPush: ${OTP_DELIVERY_VIA_PUSH:-false}
+
       # --- ProductOwner bootstrap ---
       # The single ProductOwner is pinned here, NOT created through the app (the role is not
       # assignable via the admin panel by anyone). On boot the app promotes this phone to

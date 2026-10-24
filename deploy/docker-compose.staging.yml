@@ -100,6 +100,10 @@ services:
       # Optional on staging: left unset, the API generates a pepper for that process and codes
       # stop verifying after a restart. Set OTP_PEPPER in .env.staging to keep them stable.
       Auth__OtpPepper: ${OTP_PEPPER:-}
+      # Optional: deliver the OTP over an Expo push to registered devices instead of the
+      # fake SMS. Off by default - the fake SMS writes codes to the container log, which is
+      # the convenient way to sign in on staging. Turn on to exercise the push channel.
+      Auth__OtpDeliveryViaPush: ${OTP_DELIVERY_VIA_PUSH:-false}
       Auth__BootstrapProductOwnerPhone: ${BOOTSTRAP_PRODUCT_OWNER_PHONE:-}
       Auth__QaTestAccessCode: ${AUTH_QA_TEST_ACCESS_CODE:-}
 
