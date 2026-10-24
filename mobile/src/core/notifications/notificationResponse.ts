@@ -59,13 +59,14 @@ export function useNotificationTapRouting(): void {
       // to the in-app notifications list. See NotificationService.TrySendPushAsync
       // for the payload contract.
       const data = response?.notification?.request?.content?.data as
-        {
-          type?: unknown;
-          orderId?: unknown;
-          legalEntityId?: unknown;
-          code?: unknown;
-          phone?: unknown;
-        } | undefined;
+        | {
+            type?: unknown;
+            orderId?: unknown;
+            legalEntityId?: unknown;
+            code?: unknown;
+            phone?: unknown;
+          }
+        | undefined;
 
       // A sign-in code that arrived by push. The code is useless without the phone it was
       // issued for, so the push carries both and the tap lands on the sign-in form with the
