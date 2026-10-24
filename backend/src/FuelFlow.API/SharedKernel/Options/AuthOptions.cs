@@ -47,8 +47,8 @@ public sealed class AuthOptions
     /// Turning it on is a break-glass, not a setting: it is meant for the day the SMS gateway is
     /// down. It requires an explicit acknowledgement in Production
     /// (<see cref="AdminOtpViaEmailBreakGlassAcknowledged"/>), every use of it is recorded as a
-    /// security event, and it is not offered to an account that already has a second factor -
-    /// a weaker channel must not become available to the accounts that do not need it.
+    /// security event, and it is not offered to an account without a second factor -
+    /// a weaker first factor must not become the whole sign-in for an account that lacks one.
     /// </para>
     /// </summary>
     public bool AdminOtpViaEmail { get; set; } = false;
@@ -63,6 +63,28 @@ public sealed class AuthOptions
     /// on and this is not, so the two cannot drift apart silently.
     /// </remarks>
     public bool AdminOtpViaEmailBreakGlassAcknowledged { get; set; } = false;
+
+    /// <summary>
+    /// When true, the sign-in code is delivered over push (Expo) to the account's own devices
+    /// instead of over SMS.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An SMS costs money and the brand balance is finite. When it runs out the budget guard
+    /// refuses every send, so nobody can sign in at all - a push costs nothing, and the platform
+    /// already ships one to every device that registered its token.
+    /// </para>
+    /// <para>
+    /// <b>The default is false</b>, because the code then rides through a third-party push
+    /// service instead of the carrier, and the device that receives it is not necessarily the
+    /// device that is signing in. The flag turns the cheaper channel on for a deployment that
+    /// has run out of SMS credit; SMS stays the fallback for an account with no active device
+    /// token, so a device that never registered is never locked out. When both this and the
+    /// email break-glass are on, push is tried first: it is free and device-bound, and the
+    /// mailbox is neither.
+    /// </para>
+    /// </remarks>
+    public bool OtpDeliveryViaPush { get; set; } = false;
 
     /// <summary>
     /// Whether a staff sign-in has to prove a second factor.
