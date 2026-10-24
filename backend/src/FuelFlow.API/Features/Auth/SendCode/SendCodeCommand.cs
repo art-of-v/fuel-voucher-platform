@@ -4,6 +4,7 @@ using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Notifications.Push;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
@@ -29,6 +30,7 @@ public sealed class SendCodeCommandHandler
     private readonly ILogger<SendCodeCommandHandler> _logger;
     private readonly IOptions<AuthOptions> _authOptions;
     private readonly IEmailSender _emailSender;
+    private readonly IExpoPushSender? _pushSender;
     private readonly AuditEventService _eventService;
     private readonly QaTestAccessService? _qaTestAccess;
     private readonly FuelFlowMetrics? _metrics;
@@ -44,7 +46,8 @@ public sealed class SendCodeCommandHandler
         IEmailSender emailSender,
         AuditEventService eventService,
         QaTestAccessService? qaTestAccess = null,
-        FuelFlowMetrics? metrics = null)
+        FuelFlowMetrics? metrics = null,
+        IExpoPushSender? pushSender = null)
     {
         _context = context;
         _smsService = smsService;
@@ -52,6 +55,7 @@ public sealed class SendCodeCommandHandler
         _logger = logger;
         _authOptions = authOptions;
         _emailSender = emailSender;
+        _pushSender = pushSender;
         _eventService = eventService;
         _qaTestAccess = qaTestAccess;
         _metrics = metrics;
@@ -119,15 +123,26 @@ public sealed class SendCodeCommandHandler
     }
 
     /// <summary>
-    /// Routes the OTP to the SIM for everyone (spec §3/§15), with one exception: the email
-    /// break-glass, which is off by default and has to be acknowledged, recorded and earned.
-    /// Any gap in the email path - disabled, not configured, no email on file, or a send failure -
-    /// falls back to SMS, so a staff member is never locked out and a brand-new or
-    /// not-yet-activated user always receives their code. IsActive gates only voucher purchase,
-    /// never OTP delivery, so it is not consulted here.
+    /// Picks the channel the code rides on, strongest and cheapest first (spec §3/§15):
+    /// push to the account's own devices, then the email break-glass, then the SIM. The push
+    /// channel is a deployment switch and needs an active device token; the break-glass is off
+    /// by default and has to be acknowledged, recorded and earned. Any gap in the chosen path -
+    /// disabled, not configured, no token or email on file, or a send failure - falls back to
+    /// SMS, so a staff member is never locked out and a brand-new or not-yet-activated user
+    /// always receives their code. IsActive gates only voucher purchase, never OTP delivery,
+    /// so it is not consulted here.
     /// </summary>
     private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
+        // Push before the break-glass: when both are available the push is the stronger channel
+        // (device-bound, free) and the mailbox is neither, so the acknowledged-weaker path stays
+        // for accounts with no registered device.
+        if (_authOptions.Value.OtpDeliveryViaPush
+            && await TryDeliverViaPushAsync(phoneNumber, code, cancellationToken))
+        {
+            return;
+        }
+
         if (BreakGlassIsOpen() && _emailSender.IsConfigured)
         {
             var staff = await TryResolveStaffAsync(phoneNumber, cancellationToken);
@@ -172,6 +187,75 @@ public sealed class SendCodeCommandHandler
         await _smsService.SendVerificationCodeAsync(phoneNumber, code, cancellationToken);
         _logger.LogInformation("Verification code sent to {PhoneNumber}",
             SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+    }
+
+    /// <summary>
+    /// Delivers the sign-in code to the account's own devices over push (Expo), when the
+    /// deployment runs with the push channel on and the account has an active device token.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An SMS costs money and the brand balance is finite; when it runs out the budget guard
+    /// refuses every send, so nobody can sign in at all. A push costs nothing, and the platform
+    /// already ships one to every device that registered its token.
+    /// </para>
+    /// <para>
+    /// It is a fallback, not a replacement: an account with no active token, or a push Expo
+    /// rejects, still gets its code over SMS. That is what keeps a device that never registered
+    /// - or one whose token went stale - from being locked out.
+    /// </para>
+    /// </remarks>
+    /// <returns>True when the code went out over push; false when SMS has to carry it.</returns>
+    private async Task<bool> TryDeliverViaPushAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+    {
+        if (_pushSender is null)
+            return false;
+
+        var user = await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber && !u.IsDeleted, cancellationToken);
+
+        if (user is null)
+            return false;
+
+        var tokens = await _context.PushTokens
+            .AsNoTracking()
+            .Where(t => t.UserId == user.Id && t.IsActive)
+            .Select(t => t.Token)
+            .ToListAsync(cancellationToken);
+
+        if (tokens.Count == 0)
+            return false;
+
+        var data = new Dictionary<string, object>
+        {
+            ["type"] = "auth_otp",
+            ["code"] = code,
+            ["phone"] = phoneNumber
+        };
+
+        // Ukrainian, like the SMS copy and the other pushes the platform sends.
+        var messages = tokens
+            .Select(token => new ExpoPushMessage(token, "FuelFlow", $"Ваш код для входу: {code}", data))
+            .ToList();
+
+        var results = await _pushSender.SendAsync(messages, cancellationToken);
+
+        var delivered = results.Count == messages.Count && results.All(r => r.Status == ExpoPushStatus.Ok);
+        if (!delivered)
+        {
+            _logger.LogWarning(
+                "Push delivery of the verification code to {DeviceCount} device(s) for {PhoneNumber} did not succeed; falling back to SMS",
+                tokens.Count,
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+            return false;
+        }
+
+        _logger.LogInformation(
+            "Verification code sent by push to {DeviceCount} device(s) for {PhoneNumber}",
+            tokens.Count,
+            SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+        return true;
     }
 
     /// <summary>
