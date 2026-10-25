@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
@@ -8,10 +9,14 @@ namespace FuelFlow.Features.Notifications.RegisterPushToken;
 public sealed class RegisterPushTokenCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<RegisterPushTokenCommandHandler> _logger;
 
-    public RegisterPushTokenCommandHandler(ApplicationDbContext context)
+    public RegisterPushTokenCommandHandler(
+        ApplicationDbContext context,
+        ILogger<RegisterPushTokenCommandHandler> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<RegisterPushTokenResponse> HandleAsync(
@@ -26,6 +31,13 @@ public sealed class RegisterPushTokenCommandHandler
         var existing = await _context.PushTokens
             .FirstOrDefaultAsync(t => t.Token == command.Token, cancellationToken);
 
+        // The client re-registers its push token right after the logout: its access token is
+        // still valid for a moment, so the registration lands after the parking and would
+        // undo it. A signed-out device has to stay parked - otherwise it keeps receiving the
+        // business notifications the parking was meant to stop. The device registers itself
+        // as Active when it signs in again, and that registration brings the full audience back.
+        var deviceIsSignedOut = await IsDeviceSignedOutAsync(command.DeviceId, cancellationToken);
+
         if (existing == null)
         {
             _context.PushTokens.Add(new UserPushToken
@@ -36,7 +48,7 @@ public sealed class RegisterPushTokenCommandHandler
                 Platform = command.Platform,
                 DeviceId = command.DeviceId,
                 IsActive = true,
-                AuthOtpOnly = false,
+                AuthOtpOnly = deviceIsSignedOut,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
                 LastSeenAtUtc = now,
@@ -48,9 +60,20 @@ public sealed class RegisterPushTokenCommandHandler
             existing.Platform = command.Platform;
             existing.DeviceId = command.DeviceId;
             existing.IsActive = true;
-            // The device is signing in, so it is a full audience again: the business
-            // notifications it was parked from (on logout) start coming back.
-            existing.AuthOtpOnly = false;
+            if (deviceIsSignedOut)
+            {
+                // The device is signed out, so it stays parked: the sign-in code may still
+                // come here, the business notifications may not.
+                _logger.LogInformation(
+                    "The push token of the signed-out device {DeviceId} stayed parked",
+                    command.DeviceId);
+            }
+            else
+            {
+                // The device is signing in, so it is a full audience again: the business
+                // notifications it was parked from (on logout) start coming back.
+                existing.AuthOtpOnly = false;
+            }
             existing.UpdatedAtUtc = now;
             existing.LastSeenAtUtc = now;
             // Global NoTracking: the fetched row is detached, so re-attach as Modified
@@ -60,5 +83,25 @@ public sealed class RegisterPushTokenCommandHandler
 
         await _context.SaveChangesAsync(cancellationToken);
         return new RegisterPushTokenResponse(true);
+    }
+
+    /// <summary>
+    /// Whether the device that owns this token has signed out.
+    /// </summary>
+    /// <remarks>
+    /// The device row carries the sign-in state of the device: the logout flips it to Revoked,
+    /// the device registration flips it back to Active. A device id with no row - a device the
+    /// retention job has already removed - counts as signed in: there is no state to read.
+    /// </remarks>
+    private async Task<bool> IsDeviceSignedOutAsync(string? deviceId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+            return false;
+
+        return await _context.Devices
+            .AsNoTracking()
+            .AnyAsync(
+                d => d.DeviceId == deviceId && d.Status == DeviceStatus.Revoked,
+                cancellationToken);
     }
 }
