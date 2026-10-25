@@ -90,7 +90,7 @@ if [[ "$TARGET" == "staging" ]]; then
   HEALTH_URL="${HEALTH_URL:-http://fuelflow-backend:8080/health}"
   WORK="${WORK:-/root/collation-rebuild-staging}"
 else
-  ENV_FILE="${ENV_FILE:-.env}"
+  ENV_FILE="${ENV_FILE:-.env.production}"
   COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
   CONTAINER="${CONTAINER:-fuelflow-postgres}"
   BACKEND="${BACKEND:-fuelflow-backend}"
@@ -106,7 +106,7 @@ die()  { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
 [[ -f "$SCRIPT_DIR/$ENV_FILE" ]] || die "no $ENV_FILE next to this script - run it from ~/FuelFlow/deploy"
 
-# The database name and user are read from the CONTAINER, not from .env. Sourcing .env is not
+# The database name and user are read from the CONTAINER, not from .env.production. Sourcing .env.production is not
 # safe: it holds a value with spaces in it (a mail app password) that a shell would split into
 # words and try to run. Every other deploy script here uses `docker compose --env-file` for
 # exactly that reason, and this one does the same - it only needs two names, and the container

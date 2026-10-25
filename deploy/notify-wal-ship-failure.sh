@@ -46,13 +46,13 @@ ${ADVICE}"
 # Always record it in the journal - the fallback when Telegram is not configured or fails.
 echo "$MESSAGE" | logger -t fuelflow-wal-ship-alert
 
-# Load Telegram creds from the same .env the stack uses. Parse, don't source (see
+# Load Telegram creds from the same .env.production the stack uses. Parse, don't source (see
 # load-env.sh): the failure notifier above all must not itself die on a spaced/quoted
 # secret.
-if [[ -f "$SCRIPT_DIR/.env" ]]; then
+if [[ -f "$SCRIPT_DIR/.env.production" ]]; then
   # shellcheck source=load-env.sh
   source "$SCRIPT_DIR/load-env.sh"
-  load_env "$SCRIPT_DIR/.env" || true
+  load_env "$SCRIPT_DIR/.env.production" || true
 fi
 
 if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then

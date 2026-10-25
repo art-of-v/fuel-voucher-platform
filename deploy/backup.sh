@@ -31,7 +31,7 @@
 # One-time setup, on your laptop and NOT on the server:
 #     age-keygen -o fuelflow-backup.key      # store this file in your password manager
 #     # it prints: Public key: age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-# then add to deploy/.env on the server:
+# then add to deploy/.env.production on the server:
 #     BACKUP_AGE_RECIPIENT=age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 #
 # Install age on the server:  apt-get install -y age
@@ -100,17 +100,17 @@ STAGING_WAL_MAX_BYTES="${STAGING_WAL_MAX_BYTES:-1073741824}" # 1 GiB
 # Exported, because deploy/prune-wal-archive.sh - the script that actually trims the
 # archive now, and the one the six-hourly timer runs - is a SEPARATE process and
 # would otherwise fall back to its own defaults. These values are the ones this
-# script resolved (from .env, via load_env, below), so the backup and the timer
+# script resolved (from .env.production, via load_env, below), so the backup and the timer
 # cannot end up trimming to different bounds.
 export WAL_ARCHIVE_DIR WAL_RETENTION_DAYS WAL_MAX_BYTES
 export STAGING_WAL_ARCHIVE_DIR STAGING_WAL_MAX_BYTES
 
-# Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env the stack uses.
-# load_env PARSES .env instead of sourcing it, so a secret containing a space (e.g. a
+# Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env.production the stack uses.
+# load_env PARSES .env.production instead of sourcing it, so a secret containing a space (e.g. a
 # Gmail app password) or shell metacharacters can't break or inject into this run.
 # shellcheck source=load-env.sh
 source "$SCRIPT_DIR/load-env.sh"
-load_env "$SCRIPT_DIR/.env"
+load_env "$SCRIPT_DIR/.env.production"
 
 # --- Refuse to write a plaintext dump ----------------------------------------------
 # This check is deliberately fatal. A backup script that quietly degrades to plaintext
@@ -123,9 +123,9 @@ if ! command -v age >/dev/null 2>&1; then
   exit 1
 fi
 if [[ -z "${BACKUP_AGE_RECIPIENT:-}" ]]; then
-  echo "ERROR: BACKUP_AGE_RECIPIENT is not set in $SCRIPT_DIR/.env." >&2
+  echo "ERROR: BACKUP_AGE_RECIPIENT is not set in $SCRIPT_DIR/.env.production." >&2
   echo "       Generate a keypair on your LAPTOP (not here):  age-keygen -o fuelflow-backup.key" >&2
-  echo "       Put the printed public key in .env as BACKUP_AGE_RECIPIENT=age1..." >&2
+  echo "       Put the printed public key in .env.production as BACKUP_AGE_RECIPIENT=age1..." >&2
   echo "       Refusing to write an unencrypted database dump." >&2
   exit 1
 fi
@@ -293,7 +293,7 @@ fi
 # --- Off-host copy -----------------------------------------------------------------
 # Encryption protects the contents. It does nothing about the server being destroyed,
 # which is the other half of the problem: a backup stored only on the machine it backs
-# up is not a backup. Set BACKUP_REMOTE in .env to an rclone remote. The remote is
+# up is not a backup. Set BACKUP_REMOTE in .env.production to an rclone remote. The remote is
 # Cloudflare R2 (S3-compatible), configured once with `rclone config`, e.g.
 #     BACKUP_REMOTE=r2:fuelflow-backups
 # See docs/DEPLOYMENT.md (private docs repo) "Off-site backups (Cloudflare R2)" for the one-time setup.

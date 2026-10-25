@@ -39,7 +39,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env.production}"
 WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 WAL_SHIP_STATE_DIR="${WAL_SHIP_STATE_DIR:-/var/lib/fuelflow}"
 REPORT_FILE="${WAL_OPS_REPORT:-$WAL_SHIP_STATE_DIR/wal-ship-ops-$(date -u +%Y%m%dT%H%M%SZ).txt}"

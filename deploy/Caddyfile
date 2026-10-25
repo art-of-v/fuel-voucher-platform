@@ -6,7 +6,7 @@
 #   2. Ports 80 and 443 must be open in the firewall
 # Certificates are stored in the `caddy_data` Docker volume, so they survive restarts.
 #
-# ROOT_DOMAIN / API_DOMAIN / ACME_EMAIL come from deploy/.env via docker-compose.
+# ROOT_DOMAIN / API_DOMAIN / ACME_EMAIL come from deploy/.env.production via docker-compose.
 {
 	email {$ACME_EMAIL}
 }
@@ -196,11 +196,11 @@ palne.shop, www.palne.shop {
 # Routing MIRRORS the three prod blocks above on purpose, so staging exercises the
 # same allow-lists prod does — keep them in sync when you touch either. All three
 # vhosts are INERT until the STAGING_* / STAGING_BASICAUTH_* env vars are set in
-# deploy/.env; the deploy runs `caddy validate` first, so an unset var fails the
+# deploy/.env.production; the deploy runs `caddy validate` first, so an unset var fails the
 # deploy loudly instead of restarting caddy with a broken config.
 #
 # STAGING_BASICAUTH_HASH is a bcrypt hash from `caddy hash-password`, and it is
-# read from deploy/.env - caddy is the production service, so "STAGING_" here
+# read from deploy/.env.production - caddy is the production service, so "STAGING_" here
 # means "the staging vhosts prod's caddy fronts", not a variable .env.staging owns.
 #
 # Every `$` in the hash is doubled to `$$` so compose collapses it back to `$`;

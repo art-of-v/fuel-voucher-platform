@@ -42,8 +42,8 @@ if [[ ! -f "$DUMP" ]]; then
   echo "ERROR: file not found: $DUMP" >&2
   exit 1
 fi
-if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
-  echo "ERROR: $SCRIPT_DIR/.env not found." >&2
+if [[ ! -f "$SCRIPT_DIR/.env.production" ]]; then
+  echo "ERROR: $SCRIPT_DIR/.env.production not found." >&2
   exit 1
 fi
 
@@ -51,7 +51,7 @@ fi
 # break restore any more than it breaks backup).
 # shellcheck source=load-env.sh
 source "$SCRIPT_DIR/load-env.sh"
-load_env "$SCRIPT_DIR/.env"
+load_env "$SCRIPT_DIR/.env.production"
 
 # --- Decrypt, if handed an encrypted backup ------------------------------------------
 PLAINTEXT_IS_TEMPORARY=0
@@ -86,7 +86,7 @@ read -r -p "Type 'yes' to continue: " CONFIRM
 
 # Stop the API first so it isn't writing while tables are being swapped.
 echo "[1/3] Stopping the API..."
-docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" stop fuelflow-backend
+docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" stop fuelflow-backend
 
 echo "[2/3] Restoring..."
 # --clean --if-exists drops existing objects first; --no-owner/--no-privileges
@@ -108,7 +108,7 @@ if (( RC != 0 )); then
 fi
 
 echo "[3/3] Starting the API again..."
-docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" start fuelflow-backend
+docker compose --env-file "$SCRIPT_DIR/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" start fuelflow-backend
 
 echo
 echo "Done. Verify with:"

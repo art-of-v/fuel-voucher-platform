@@ -4,7 +4,7 @@
 # OnFailure= hook on fuelflow-backup.service — never run it by hand except to test.
 #
 # It reuses the SAME Telegram bot the observability stack already uses
-# (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in deploy/.env), so a failed backup lands in
+# (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in deploy/.env.production), so a failed backup lands in
 # the same group as "app is down" alerts. If those vars are not set, it degrades to a
 # loud journal line rather than failing — the point is to never be the reason an alert
 # is lost.
@@ -57,12 +57,12 @@ ${FOOTER}"
 # or the API call fails.
 echo "$MESSAGE" | logger -t fuelflow-backup-alert
 
-# Load Telegram creds from the same .env the stack uses. Parse, don't source: this is the
+# Load Telegram creds from the same .env.production the stack uses. Parse, don't source: this is the
 # failure notifier, so it above all must not itself die on a spaced/quoted secret.
-if [[ -f "$SCRIPT_DIR/.env" ]]; then
+if [[ -f "$SCRIPT_DIR/.env.production" ]]; then
   # shellcheck source=load-env.sh
   source "$SCRIPT_DIR/load-env.sh"
-  load_env "$SCRIPT_DIR/.env" || true
+  load_env "$SCRIPT_DIR/.env.production" || true
 fi
 
 if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then

@@ -77,21 +77,21 @@ WATCH_PATH="${WATCH_PATH:-}"
 
 log() { echo "[$(date -Is)] $*"; }
 
-# The .env is loaded for the same reason backup.sh loads it: an operator who
+# The .env.production is loaded for the same reason backup.sh loads it: an operator who
 # overrides a path or a bound must not get two different answers from two scripts.
 # It is OPTIONAL here - this script has safe defaults for everything it needs, and
-# a missing .env must not stop the disk from being trimmed. load_env parses the
+# a missing .env.production must not stop the disk from being trimmed. load_env parses the
 # file; it never sources it, so a value with a space in it cannot break this.
-if [[ -f "$SCRIPT_DIR/.env" ]]; then
+if [[ -f "$SCRIPT_DIR/.env.production" ]]; then
   if [[ -f "$SCRIPT_DIR/load-env.sh" ]]; then
     # shellcheck source=load-env.sh
     source "$SCRIPT_DIR/load-env.sh"
-    load_env "$SCRIPT_DIR/.env" || log "WARNING: could not read $SCRIPT_DIR/.env - using the built-in defaults."
+    load_env "$SCRIPT_DIR/.env.production" || log "WARNING: could not read $SCRIPT_DIR/.env.production - using the built-in defaults."
   else
     log "WARNING: no $SCRIPT_DIR/load-env.sh - using the built-in defaults."
   fi
 else
-  log "NOTE: no $SCRIPT_DIR/.env - using the built-in defaults."
+  log "NOTE: no $SCRIPT_DIR/.env.production - using the built-in defaults."
 fi
 
 # shellcheck source=pitr-common.sh
