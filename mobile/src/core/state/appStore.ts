@@ -19,7 +19,7 @@ interface AppStore {
 
   /**
    * Active account context (multi-company epic #103, S1). `null` = the personal
-   * (???-?????) root, which is always the default on a fresh open; a company
+   * (фіз-особа) root, which is always the default on a fresh open; a company
    * UUID selects that legal entity. Persisted so a chosen context survives a
    * relaunch, but reset to `null` on logout so it never leaks across accounts.
    */
