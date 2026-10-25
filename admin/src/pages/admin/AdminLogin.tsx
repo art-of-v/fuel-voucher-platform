@@ -95,6 +95,10 @@ export default function AdminLogin() {
         });
         setTwoFactorCode("");
         setLoginStep("two_factor");
+        // This branch returns, so the trailing setLoginLoading(false) below never runs —
+        // and a spinner that survives the step change keeps the second code's button
+        // disabled forever. Reset it here, before handing the screen to the second factor.
+        setLoginLoading(false);
         return;
       }
       acceptUser(outcome.user);
@@ -259,8 +263,13 @@ export default function AdminLogin() {
                     </code>
                   </div>
                 )}
+                <p className="text-sm font-semibold text-center mb-1">
+                  Step 2 of 2 — the authenticator code
+                </p>
                 <p className="text-muted-foreground text-sm mb-4 text-center">
-                  Enter the 6-digit code from your authenticator app
+                  The SMS code is confirmed. Now open your authenticator app and
+                  enter the fresh 6-digit code it shows — not the code from the
+                  SMS.
                 </p>
                 <Input
                   placeholder="000000"
