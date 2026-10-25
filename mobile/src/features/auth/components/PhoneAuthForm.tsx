@@ -269,7 +269,11 @@ export function PhoneAuthForm({
             />
 
             <Button
-              label={t('phoneAuth.changePhone')}
+              // On this step the ghost button does not change the number - it takes the
+              // person back to the start of the sign-in. A challenge that was spent or
+              // expired cannot be redeemed with any code, so "start over" is the only
+              // way forward, and "change phone number" would not say that.
+              label={t('phoneAuth.startOver')}
               variant="ghost"
               size="md"
               hapticStyle="light"

@@ -13,7 +13,7 @@ import { sendVerificationCode } from '../api/sendCode';
 import { verifyPhoneCode } from '../api/verifyCode';
 import { verifyTwoFactor } from '../api/verifyTwoFactor';
 import { registerDevice, getChallenge, verifyChallenge } from '../api/registerDevice';
-import type { AuthStep } from '../types';
+import type { AuthResponse, AuthStep } from '../types';
 
 /** The outstanding second factor of a staff sign-in. */
 interface TwoFactorState {
@@ -152,11 +152,23 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
 
     const logs: string[] = [];
 
+    // The code and the device are two different failures with two different messages, so
+    // they are two different try blocks: a refused code must not be reported as a device
+    // problem, and a device that cannot sign must not be reported as a wrong code.
+    let response: AuthResponse;
     try {
       logs.push('--- STEP: verifyPhoneCode ---');
-      const response = await verifyPhoneCode(phone, code);
+      response = await verifyPhoneCode(phone, code);
       logs.push('OK phone verified');
+    } catch (err: any) {
+      setError(describeCodeFailure(err, t, logs));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setStep('code');
+      setLoading(false);
+      return;
+    }
 
+    try {
       // A staff account does not sign in with the first factor alone: the backend answers
       // with a challenge, and the sign-in continues at the authenticator app.
       if (response.twoFactor) {
@@ -202,11 +214,23 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
 
     const logs: string[] = [];
 
+    // The code and the device are two different failures with two different messages, so
+    // they are two different try blocks: a refused code must not be reported as a device
+    // problem, and a device that cannot sign must not be reported as a wrong code.
+    let response: AuthResponse;
     try {
       logs.push('--- STEP: verifyTwoFactor ---');
-      const response = await verifyTwoFactor(twoFactor.challenge, twoFactorCode);
+      response = await verifyTwoFactor(twoFactor.challenge, twoFactorCode);
       logs.push('OK second factor verified');
+    } catch (err: any) {
+      setError(describeTwoFactorFailure(err, t, logs));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setStep('two_factor');
+      setLoading(false);
+      return;
+    }
 
+    try {
       await completeSignIn(
         response.accessToken as string,
         response.refreshToken as string,
@@ -344,6 +368,72 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     handleVerifyTwoFactor,
     resetToPhone,
   };
+}
+
+/**
+ * The failure the user sees at the second factor.
+ *
+ * <p>
+ * The second factor has its own mistakes: the code from the authenticator app can be wrong,
+ * and the challenge can be spent. Both used to be reported as "could not confirm the device",
+ * which pointed at a device problem instead of the code the person had just typed - and pushed
+ * people to retype the push code that the first factor had already accepted.
+ * </p>
+ *
+ * <p>
+ * Only the code's own step is described here. The device binding that follows it is a separate
+ * step with its own messages (see {@link describeFailure}).
+ * </p>
+ */
+function describeTwoFactorFailure(err: any, t: (key: string) => string, logs: string[]): string {
+  logs.push(`ERROR: ${err?.message}`);
+  if (__DEV__) {
+    // The diagnostic trail is the developer's window into the failure - and it is the only
+    // place the raw cause appears at all.
+    return logs.join('\n');
+  }
+  if (err?.status === 429) {
+    return t('phoneAuth.tooManyAttempts');
+  }
+  if (err?.status === 401 || err?.status === 400) {
+    // The server refuses a wrong code, a spent challenge and an expired one with the same
+    // 401 - on purpose, so the endpoint cannot be used to tell them apart. To the person at
+    // the screen the outcome is the same anyway: the code they entered was not accepted.
+    return t('phoneAuth.twoFactorCodeRejected');
+  }
+  // Anything else is the network's or the server's fault - never the person's code.
+  reportError(err);
+  return t('phoneAuth.networkError');
+}
+
+/**
+ * The failure the user sees at the first factor.
+ *
+ * <p>
+ * The code that arrives by push or SMS is refused with a 401 - and it used to be reported as
+ * "could not confirm the device", which names the device instead of the six digits the person
+ * typed.
+ * </p>
+ */
+function describeCodeFailure(err: any, t: (key: string) => string, logs: string[]): string {
+  logs.push(`ERROR: ${err?.message}`);
+  if (__DEV__) {
+    // The diagnostic trail is the developer's window into the failure - and it is the only
+    // place the raw cause appears at all.
+    return logs.join('\n');
+  }
+  if (err?.status === 429) {
+    return t('phoneAuth.tooManyAttempts');
+  }
+  if (err?.status === 401 || err?.status === 400) {
+    // The server refuses a wrong code and an expired one with the same 401 - on purpose, so
+    // the endpoint cannot be used to tell them apart. To the person at the screen the outcome
+    // is the same anyway: the code they entered was not accepted.
+    return t('phoneAuth.verifyFailed');
+  }
+  // Anything else is the network's or the server's fault - never the person's code.
+  reportError(err);
+  return t('phoneAuth.networkError');
 }
 
 /**

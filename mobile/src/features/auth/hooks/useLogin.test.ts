@@ -3,11 +3,22 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useLogin } from './useLogin';
 import { sendVerificationCode } from '../api/sendCode';
+import { verifyPhoneCode } from '../api/verifyCode';
+import { verifyTwoFactor } from '../api/verifyTwoFactor';
+import { SecurityService, DeviceSecurityError } from '../../../core/api/securityService';
 import { useStore } from '../../../core/state/appStore';
 
 // The network boundary is mocked: the sign-in flow is what is under test, not the transport.
 jest.mock('../api/sendCode', () => ({
   sendVerificationCode: jest.fn(),
+}));
+
+jest.mock('../api/verifyCode', () => ({
+  verifyPhoneCode: jest.fn(),
+}));
+
+jest.mock('../api/verifyTwoFactor', () => ({
+  verifyTwoFactor: jest.fn(),
 }));
 
 // t() returns the key verbatim so the assertions check WHICH message was chosen
@@ -35,7 +46,15 @@ jest.mock('../../../core/api/securityService', () => ({
     getDeviceMetadata: jest.fn(),
     signPayload: jest.fn(),
   },
-  DeviceSecurityError: class DeviceSecurityError extends Error {},
+  DeviceSecurityError: class DeviceSecurityError extends Error {
+    code: string;
+
+    constructor(message: string, errorCode: string) {
+      super(message);
+      this.code = errorCode;
+      this.name = 'DeviceSecurityError';
+    }
+  },
 }));
 
 jest.mock('../../../core/api/tokenStorage', () => ({
@@ -51,6 +70,9 @@ jest.mock('../../../core/api/apiClient', () => ({
 }));
 
 const sendVerificationCodeMock = sendVerificationCode as jest.Mock;
+const verifyPhoneCodeMock = verifyPhoneCode as jest.Mock;
+const verifyTwoFactorMock = verifyTwoFactor as jest.Mock;
+const setupDeviceSecurityMock = SecurityService.setupDeviceSecurity as jest.Mock;
 
 const REMEMBERED = '+380991234567';
 
@@ -157,5 +179,187 @@ describe('useLogin', () => {
     });
 
     expect(useStore.getState().lastPhone).toBeNull();
+  });
+
+  /*
+   * The first factor had the same defect: a refused push or SMS code was reported as
+   * "could not confirm the device", naming the device instead of the digits the person
+   * typed. The step has to name the code.
+   */
+  describe('the first factor', () => {
+    const devFlag = (global as any).__DEV__;
+
+    beforeEach(() => {
+      (global as any).__DEV__ = false;
+      verifyPhoneCodeMock.mockReset();
+    });
+
+    afterEach(() => {
+      (global as any).__DEV__ = devFlag;
+    });
+
+    it('says the code is wrong instead of blaming the device', async () => {
+      verifyPhoneCodeMock.mockRejectedValue(
+        Object.assign(new Error('Invalid or expired verification code'), { status: 401 }),
+      );
+
+      const { result } = renderLogin();
+
+      act(() => {
+        result.current.setPhone(REMEMBERED);
+      });
+      act(() => {
+        result.current.setCode('123456');
+      });
+      await act(async () => {
+        await result.current.handleVerifyCode();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.verifyFailed');
+      expect(result.current.error).not.toBe('phoneAuth.deviceVerifyFailed');
+    });
+
+    it('keeps the rate-limit message for a throttled first factor', async () => {
+      verifyPhoneCodeMock.mockRejectedValue(
+        Object.assign(new Error('RATE_LIMITED'), { status: 429 }),
+      );
+
+      const { result } = renderLogin();
+
+      act(() => {
+        result.current.setPhone(REMEMBERED);
+      });
+      act(() => {
+        result.current.setCode('123456');
+      });
+      await act(async () => {
+        await result.current.handleVerifyCode();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.tooManyAttempts');
+    });
+  });
+
+  /*
+   * The second factor has its own mistakes, and they used to be reported as "could not
+   * confirm the device" - which pointed at the device instead of the code the person had
+   * just typed, and pushed people to retype the push code the first factor had already
+   * accepted. The message has to name the authenticator code instead.
+   *
+   * A dev build shows the diagnostic trail instead of the message (that is what the
+   * __DEV__ branch in the hook is for), so the production wording is only reachable with
+   * the flag off - which is what a release build does.
+   */
+  describe('the second factor', () => {
+    const devFlag = (global as any).__DEV__;
+
+    beforeEach(() => {
+      (global as any).__DEV__ = false;
+      verifyPhoneCodeMock.mockReset();
+      verifyPhoneCodeMock.mockResolvedValue({
+        accessToken: null,
+        refreshToken: null,
+        twoFactor: { status: 'required', challenge: 'challenge-1' },
+      });
+      verifyTwoFactorMock.mockReset();
+      setupDeviceSecurityMock.mockReset();
+    });
+
+    afterEach(() => {
+      (global as any).__DEV__ = devFlag;
+    });
+
+    async function reachTwoFactorStep(result: { current: ReturnType<typeof useLogin> }) {
+      act(() => {
+        result.current.setPhone(REMEMBERED);
+      });
+      await act(async () => {
+        await result.current.handleSendCode();
+      });
+      act(() => {
+        result.current.setCode('123456');
+      });
+      await act(async () => {
+        await result.current.handleVerifyCode();
+      });
+      expect(result.current.step).toBe('two_factor');
+    }
+
+    it('says the authenticator code is wrong instead of blaming the device', async () => {
+      verifyTwoFactorMock.mockRejectedValue(
+        Object.assign(new Error('Invalid or expired verification code'), { status: 401 }),
+      );
+
+      const { result } = renderLogin();
+      await reachTwoFactorStep(result);
+
+      act(() => {
+        result.current.setTwoFactorCode('654321');
+      });
+      await act(async () => {
+        await result.current.handleVerifyTwoFactor();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.twoFactorCodeRejected');
+      expect(result.current.error).not.toBe('phoneAuth.deviceVerifyFailed');
+    });
+
+    it('keeps the rate-limit message for a throttled second factor', async () => {
+      verifyTwoFactorMock.mockRejectedValue(
+        Object.assign(new Error('RATE_LIMITED'), { status: 429 }),
+      );
+
+      const { result } = renderLogin();
+      await reachTwoFactorStep(result);
+
+      act(() => {
+        result.current.setTwoFactorCode('654321');
+      });
+      await act(async () => {
+        await result.current.handleVerifyTwoFactor();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.tooManyAttempts');
+    });
+
+    it('does not blame the code when the failure is not about the code', async () => {
+      verifyTwoFactorMock.mockRejectedValue(new Error('Network request failed'));
+
+      const { result } = renderLogin();
+      await reachTwoFactorStep(result);
+
+      act(() => {
+        result.current.setTwoFactorCode('654321');
+      });
+      await act(async () => {
+        await result.current.handleVerifyTwoFactor();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.networkError');
+      expect(result.current.error).not.toBe('phoneAuth.twoFactorCodeRejected');
+    });
+
+    it('blames the device when the device fails after the code was accepted', async () => {
+      verifyTwoFactorMock.mockResolvedValue({
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+      });
+      setupDeviceSecurityMock.mockRejectedValue(
+        new DeviceSecurityError('no biometrics', 'DEVICE_AUTH_UNAVAILABLE'),
+      );
+
+      const { result } = renderLogin();
+      await reachTwoFactorStep(result);
+
+      act(() => {
+        result.current.setTwoFactorCode('654321');
+      });
+      await act(async () => {
+        await result.current.handleVerifyTwoFactor();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.biometricsRequired');
+      expect(result.current.error).not.toBe('phoneAuth.twoFactorCodeRejected');
+    });
   });
 });
