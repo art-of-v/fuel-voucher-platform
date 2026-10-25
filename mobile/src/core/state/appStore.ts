@@ -19,11 +19,20 @@ interface AppStore {
 
   /**
    * Active account context (multi-company epic #103, S1). `null` = the personal
-   * (фіз-особа) root, which is always the default on a fresh open; a company
+   * (???-?????) root, which is always the default on a fresh open; a company
    * UUID selects that legal entity. Persisted so a chosen context survives a
    * relaunch, but reset to `null` on logout so it never leaks across accounts.
    */
   currentLegalEntityId: string | null;
+
+  /**
+   * The phone number the last sign-in used. Persisted on purpose: the sign-in form is
+   * where a worker comes back to, and making them type their own number again after every
+   * logout is a step that only ever loses people - especially when the code arrives as a
+   * push and the form is supposed to be ready for it. It survives the logout (that is the
+   * whole point) and it is only ever shown back to the person holding the device.
+   */
+  lastPhone: string | null;
 
   login: () => void;
   logout: () => void;
@@ -31,6 +40,7 @@ interface AppStore {
   lockApp: () => void;
   completeOnboarding: () => void;
   setCurrentContext: (legalEntityId: string | null) => void;
+  setLastPhone: (phone: string | null) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -43,6 +53,7 @@ export const useStore = create<AppStore>()(
       isAppUnlocked: false,
       hasCompletedOnboarding: false,
       currentLegalEntityId: null,
+      lastPhone: null,
 
       login: () => set({ isAuthenticated: true }),
       logout: () =>
@@ -51,6 +62,7 @@ export const useStore = create<AppStore>()(
       lockApp: () => set({ isAppUnlocked: false }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       setCurrentContext: (legalEntityId) => set({ currentLegalEntityId: legalEntityId }),
+      setLastPhone: (phone) => set({ lastPhone: phone }),
     }),
     {
       name: 'fuel-app-state',

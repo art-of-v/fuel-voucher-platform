@@ -27,9 +27,9 @@ using FuelFlow.Features.Contracts.GetSignedContractSignature;
 using FuelFlow.Features.Contracts.GetSignedContracts;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Monobank.ProcessWebhook;
-using FuelFlow.Features.Notifications.DeregisterPushToken;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
+using FuelFlow.Features.Notifications.ParkPushToken;
 using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Support;
 using FuelFlow.Features.Support.CreateSupportMessage;
@@ -484,7 +484,7 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         services.AddScoped<GetNotificationsQueryHandler>();
         services.AddScoped<MarkNotificationReadCommandHandler>();
         services.AddScoped<FuelFlow.Features.Notifications.RegisterPushToken.RegisterPushTokenCommandHandler>();
-        services.AddScoped<DeregisterPushTokenCommandHandler>();
+        services.AddScoped<ParkPushTokenCommandHandler>();
         // Typed client for the Expo Push service. Credential-free by default (see ExpoPushOptions);
         // the send is best-effort and fired from NotificationService when an in-app notification is
         // created.

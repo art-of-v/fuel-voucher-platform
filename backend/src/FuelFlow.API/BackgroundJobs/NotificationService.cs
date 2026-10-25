@@ -268,6 +268,11 @@ public sealed class NotificationService
     /// reports as DeviceNotRegistered (app uninstalled, token rotated) are deactivated so we stop
     /// targeting them.
     /// <para>
+    /// A device that signed out is parked (<c>auth_otp_only</c>), and a parked device is skipped
+    /// here: it only stays addressable for the sign-in code, which is the one thing that has to
+    /// reach a device with no session.
+    /// </para>
+    /// <para>
     /// The <c>data</c> payload carries <c>type: "order_fulfilled"</c> and the <c>orderId</c> (as a
     /// string) so a tapped push deep-links to that specific order in the mobile wallet instead of
     /// the generic notifications list. The mobile tap handler branches on these — see
@@ -284,7 +289,7 @@ public sealed class NotificationService
         try
         {
             var tokens = await _context.PushTokens
-                .Where(t => t.UserId == userId && t.IsActive)
+                .Where(t => t.UserId == userId && t.IsActive && !t.AuthOtpOnly)
                 .ToListAsync(cancellationToken);
 
             if (tokens.Count == 0)

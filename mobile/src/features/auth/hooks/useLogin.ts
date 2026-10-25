@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { SecurityService, DeviceSecurityError } from '../../../core/api/securityService';
@@ -56,6 +56,11 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
   const [error, setError] = useState('');
   const [diagResult, setDiagResult] = useState('');
   const unlockApp = useStore((state) => state.unlockApp);
+  const lastPhone = useStore((state) => state.lastPhone);
+  const setLastPhone = useStore((state) => state.setLastPhone);
+  // Whether the person has typed their own number. The remembered number is a convenience,
+  // not an override: a number typed by hand always wins.
+  const phoneTouched = useRef(false);
   const queryClient = useQueryClient();
   /*
    * The four user-facing failure strings below used to be hardcoded Ukrainian
@@ -65,7 +70,19 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
    */
   const t = useI18n((state) => state.t);
 
+  // The remembered number arrives AFTER the first render - zustand rehydrates the store from
+  // AsyncStorage - so the prefill is applied when it lands, not at mount. A number that came
+  // with the push (initialPhone) wins outright, and a number the person typed is never
+  // overwritten.
+  useEffect(() => {
+    if (options?.initialPhone || phoneTouched.current) return;
+    if (lastPhone && lastPhone !== phone) {
+      setPhoneState(lastPhone);
+    }
+  }, [lastPhone, options?.initialPhone, phone]);
+
   const setPhone = (value: string) => {
+    phoneTouched.current = true;
     setPhoneState(value);
     if (value.length >= 13) {
       Keyboard.dismiss();
@@ -101,6 +118,9 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
 
     try {
       await sendVerificationCode(phone);
+      // The number worked: remember it, so the next sign-in on this device starts from the
+      // number instead of asking for it again. It survives the logout on purpose.
+      setLastPhone(phone);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('code');
     } catch (err: any) {

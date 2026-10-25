@@ -36,6 +36,7 @@ public sealed class RegisterPushTokenCommandHandler
                 Platform = command.Platform,
                 DeviceId = command.DeviceId,
                 IsActive = true,
+                AuthOtpOnly = false,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
                 LastSeenAtUtc = now,
@@ -47,6 +48,9 @@ public sealed class RegisterPushTokenCommandHandler
             existing.Platform = command.Platform;
             existing.DeviceId = command.DeviceId;
             existing.IsActive = true;
+            // The device is signing in, so it is a full audience again: the business
+            // notifications it was parked from (on logout) start coming back.
+            existing.AuthOtpOnly = false;
             existing.UpdatedAtUtc = now;
             existing.LastSeenAtUtc = now;
             // Global NoTracking: the fetched row is detached, so re-attach as Modified

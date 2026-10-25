@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using FuelFlow.Features.Notifications.DeregisterPushToken;
+using FuelFlow.Features.Notifications.ParkPushToken;
 using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
 using FuelFlow.Features.Notifications.RegisterPushToken;
@@ -17,18 +17,18 @@ public sealed class NotificationsController : ControllerBase
     private readonly GetNotificationsQueryHandler _getHandler;
     private readonly MarkNotificationReadCommandHandler _markReadHandler;
     private readonly RegisterPushTokenCommandHandler _registerPushTokenHandler;
-    private readonly DeregisterPushTokenCommandHandler _deregisterPushTokenHandler;
+    private readonly ParkPushTokenCommandHandler _parkPushTokenHandler;
 
     public NotificationsController(
         GetNotificationsQueryHandler getHandler,
         MarkNotificationReadCommandHandler markReadHandler,
         RegisterPushTokenCommandHandler registerPushTokenHandler,
-        DeregisterPushTokenCommandHandler deregisterPushTokenHandler)
+        ParkPushTokenCommandHandler parkPushTokenHandler)
     {
         _getHandler = getHandler;
         _markReadHandler = markReadHandler;
         _registerPushTokenHandler = registerPushTokenHandler;
-        _deregisterPushTokenHandler = deregisterPushTokenHandler;
+        _parkPushTokenHandler = parkPushTokenHandler;
     }
 
     [HttpGet]
@@ -90,12 +90,36 @@ public sealed class NotificationsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Parks this device's push token: the device stops receiving the platform's business
+    /// notifications, but it stays addressable for the sign-in code.
+    /// </summary>
+    [HttpPost("push-tokens/park")]
+    [ProducesResponseType(typeof(ParkPushTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ParkPushToken(
+        [FromQuery] string? token,
+        CancellationToken cancellationToken)
+        => await ParkAsync(token, cancellationToken);
+
+    /// <summary>
+    /// The same parking, on the route the shipped fleet build (236) calls when it logs out.
+    /// </summary>
+    /// <remarks>
+    /// That build cannot be moved to the POST route without a new OTA, and a token this route
+    /// deactivated meant the next sign-in code fell back to the paid SMS channel - the one the
+    /// push channel exists to avoid. So the route parks, exactly like POST push-tokens/park:
+    /// it no longer removes anything.
+    /// </remarks>
     [HttpDelete("push-tokens")]
-    [ProducesResponseType(typeof(DeregisterPushTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ParkPushTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> DeregisterPushToken(
         [FromQuery] string? token,
         CancellationToken cancellationToken)
+        => await ParkAsync(token, cancellationToken);
+
+    private async Task<IActionResult> ParkAsync(string? token, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
         if (userId == null) return ApiError.Unauthorized("Unauthorized");
@@ -107,8 +131,8 @@ public sealed class NotificationsController : ControllerBase
         // ?token= is honoured when a caller has it. The handler no-ops if neither is present.
         var deviceId = Request.Headers["x-device-id"].FirstOrDefault()?.Trim();
 
-        var result = await _deregisterPushTokenHandler.HandleAsync(
-            new DeregisterPushTokenCommand(
+        var result = await _parkPushTokenHandler.HandleAsync(
+            new ParkPushTokenCommand(
                 userId.Value,
                 string.IsNullOrEmpty(trimmedToken) ? null : trimmedToken,
                 string.IsNullOrEmpty(deviceId) ? null : deviceId),

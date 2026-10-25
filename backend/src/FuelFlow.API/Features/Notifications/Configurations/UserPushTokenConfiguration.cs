@@ -38,6 +38,13 @@ internal sealed class UserPushTokenConfiguration : IEntityTypeConfiguration<User
             .IsRequired().HasComment("Cleared when Expo later reports the token is no longer registered. A token that is not" +
                     "active is not a failure - it is a phone that was replaced.");
 
+        builder.Property(e => e.AuthOtpOnly)
+            .HasColumnName("auth_otp_only")
+            .IsRequired().HasComment("True when the device has signed out: it no longer receives the platform's business " +
+                    "notifications, but it stays addressable for the sign-in code. A signed-out device is where a worker " +
+                    "signs back in from, so deactivating its token would push the code back onto the paid SMS channel. " +
+                    "A successful sign-in clears the flag.");
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired().HasComment("When the row was written.");
