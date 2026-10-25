@@ -1866,6 +1866,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AuthOtpOnly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auth_otp_only")
+                        .HasComment("True when the device has signed out: it no longer receives the platform's business notifications, but it stays addressable for the sign-in code. A signed-out device is where a worker signs back in from, so deactivating its token would push the code back onto the paid SMS channel. A successful sign-in clears the flag.");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc")

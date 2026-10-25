@@ -165,6 +165,31 @@ public sealed class ApiNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ProcessOrderFulfilledEventsAsync_ShouldSkipAParkedDevice()
+    {
+        // A device that signed out is parked: it only stays addressable for the sign-in code.
+        // The business notifications it was parked from must not reach it.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        await SeedPushTokenAsync(userId, "ExponentPushToken[active]", isActive: true);
+        await SeedPushTokenAsync(userId, "ExponentPushToken[parked]", isActive: true, authOtpOnly: true);
+
+        IReadOnlyList<ExpoPushMessage>? sent = null;
+        _pushSender
+            .Setup(x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()))
+            .Callback<IReadOnlyList<ExpoPushMessage>, CancellationToken>((m, _) => sent = m)
+            .ReturnsAsync(new List<ExpoPushResult>());
+
+        _context.OutboxEvents.Add(CreateOrderFulfilledEvent(orderId, userId, processed: false));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessOrderFulfilledEventsAsync();
+
+        sent.Should().NotBeNull();
+        sent!.Select(m => m.Token).Should().BeEquivalentTo("ExponentPushToken[active]");
+    }
+
+    [Fact]
     public async Task ProcessOrderFulfilledEventsAsync_ShouldTagPushWithOrderDeepLinkData()
     {
         var userId = Guid.NewGuid();
@@ -249,7 +274,7 @@ public sealed class ApiNotificationServiceTests : IDisposable
             x => x.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
-    private async Task SeedPushTokenAsync(Guid userId, string token, bool isActive)
+    private async Task SeedPushTokenAsync(Guid userId, string token, bool isActive, bool authOtpOnly = false)
     {
         var now = TestClock.UtcNow;
         _context.PushTokens.Add(new UserPushToken
@@ -260,6 +285,7 @@ public sealed class ApiNotificationServiceTests : IDisposable
             Platform = "ios",
             DeviceId = null,
             IsActive = isActive,
+            AuthOtpOnly = authOtpOnly,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
             LastSeenAtUtc = now

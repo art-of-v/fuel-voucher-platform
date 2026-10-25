@@ -17,16 +17,23 @@ export async function registerPushToken(token: string, platform: string): Promis
 }
 
 /**
- * Best-effort deregister of THIS device's push token on logout. The backend matches on the
+ * Best-effort park of THIS device's push token on logout. The backend matches on the
  * x-device-id header apiRequest always attaches (the same id slice 1 stored on the row), so
  * no token argument is needed and none can be cheaply re-minted here. MUST run before
  * SecurityService.revokeSecurity() clears the device id, or the server has nothing to match.
- * Any failure is swallowed — a failed deregister must never block logout.
+ * Any failure is swallowed — a failed park must never block logout.
+ *
+ * Parking is not deregistering. The device stops receiving the platform's business
+ * notifications, but it stays addressable for the SIGN-IN CODE: a device that signed out is
+ * exactly where the worker signs back in from, and a code that cannot reach it falls back to
+ * the paid SMS channel — the channel the push channel exists to avoid. The old build (236)
+ * on the fleet still calls DELETE /api/notifications/push-tokens on logout; the backend parks
+ * on that route too, so the fleet does not need a new bundle to be fixed.
  */
-export async function deregisterPushToken(): Promise<void> {
+export async function parkPushToken(): Promise<void> {
   try {
-    await apiRequest('DELETE', '/api/notifications/push-tokens');
+    await apiRequest('POST', '/api/notifications/push-tokens/park');
   } catch {
-    // best-effort: never block logout on a failed deregister
+    // best-effort: never block logout on a failed park
   }
 }

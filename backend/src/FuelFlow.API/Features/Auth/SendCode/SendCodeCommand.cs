@@ -191,7 +191,7 @@ public sealed class SendCodeCommandHandler
 
     /// <summary>
     /// Delivers the sign-in code to the account's own devices over push (Expo), when the
-    /// deployment runs with the push channel on and the account has an active device token.
+    /// backend runs with the push channel on and the account has an active device token.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -200,9 +200,15 @@ public sealed class SendCodeCommandHandler
     /// already ships one to every device that registered its token.
     /// </para>
     /// <para>
+    /// The audience is the account's devices, never the device that asked for the code - so a
+    /// code cannot be handed to whoever happens to hold the requesting phone. A device that
+    /// signed out keeps its token (it is parked, not dead), because a signed-out device is
+    /// exactly where a worker signs back in from.
+    /// </para>
+    /// <para>
     /// It is a fallback, not a replacement: an account with no active token, or a push Expo
-    /// rejects, still gets its code over SMS. That is what keeps a device that never registered
-    /// - or one whose token went stale - from being locked out.
+    /// rejects on every device, still gets its code over SMS. That is what keeps a device that
+    /// never registered - or one whose token went stale - from being locked out.
     /// </para>
     /// </remarks>
     /// <returns>True when the code went out over push; false when SMS has to carry it.</returns>
@@ -221,7 +227,7 @@ public sealed class SendCodeCommandHandler
         var tokens = await _context.PushTokens
             .AsNoTracking()
             .Where(t => t.UserId == user.Id && t.IsActive)
-            .Select(t => t.Token)
+            .Select(t => new { t.Id, t.Token })
             .ToListAsync(cancellationToken);
 
         if (tokens.Count == 0)
@@ -236,13 +242,29 @@ public sealed class SendCodeCommandHandler
 
         // Ukrainian, like the SMS copy and the other pushes the platform sends.
         var messages = tokens
-            .Select(token => new ExpoPushMessage(token, "FuelFlow", $"Ваш код для входу: {code}", data))
+            .Select(token => new ExpoPushMessage(token.Token, "FuelFlow", $"Ваш код для входу: {code}", data))
             .ToList();
 
         var results = await _pushSender.SendAsync(messages, cancellationToken);
 
-        var delivered = results.Count == messages.Count && results.All(r => r.Status == ExpoPushStatus.Ok);
-        if (!delivered)
+        // A token Expo reports as gone (the app was uninstalled, the token rotated) is a phone
+        // that is not there any more - stop counting it as an audience, and stop paying Expo
+        // for the error on every send.
+        var dead = results
+            .Where(r => r.Status == ExpoPushStatus.Error
+                        && string.Equals(r.ErrorCode, "DeviceNotRegistered", StringComparison.Ordinal))
+            .Select(r => r.Token)
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (dead.Count > 0)
+            await DeactivateDeadTokensAsync(user.Id, dead, cancellationToken);
+
+        // One accepted push is a delivered code. It used to require EVERY device to accept, and
+        // that rule made a single dead phone push the whole sign-in back onto the paid SMS
+        // channel - even when the code had already reached the device in the user's hand, and
+        // even when the SMS budget was empty and the fallback could not be delivered at all.
+        var delivered = results.Count(r => r.Status == ExpoPushStatus.Ok);
+        if (delivered == 0)
         {
             _logger.LogWarning(
                 "Push delivery of the verification code to {DeviceCount} device(s) for {PhoneNumber} did not succeed; falling back to SMS",
@@ -253,9 +275,35 @@ public sealed class SendCodeCommandHandler
 
         _logger.LogInformation(
             "Verification code sent by push to {DeviceCount} device(s) for {PhoneNumber}",
-            tokens.Count,
+            delivered,
             SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
         return true;
+    }
+
+    /// <summary>
+    /// Marks the tokens Expo reports as unregistered as dead, so the next sign-in does not try
+    /// them again. Scoped to the account: a token of somebody else's is never touched.
+    /// </summary>
+    private async Task DeactivateDeadTokensAsync(
+        Guid userId,
+        HashSet<string> deadTokens,
+        CancellationToken cancellationToken)
+    {
+        var rows = await _context.PushTokens
+            .Where(t => t.UserId == userId && deadTokens.Contains(t.Token))
+            .ToListAsync(cancellationToken);
+
+        var now = SystemClock.UtcNow;
+        foreach (var row in rows)
+        {
+            row.IsActive = false;
+            row.UpdatedAtUtc = now;
+            // Global NoTracking: the fetched rows are detached, so re-attach as Modified or
+            // SaveChanges silently no-ops (see RegisterPushTokenCommandHandler).
+            _context.PushTokens.Update(row);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
