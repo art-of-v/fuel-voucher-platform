@@ -47,7 +47,7 @@ public sealed class StagingQrCipherKeySeparationTests
     /// </summary>
     private static readonly (string Compose, string EnvFile)[] Environments =
     [
-        ("docker-compose.prod.yml", ".env"),
+        ("docker-compose.prod.yml", ".env.production"),
         ("docker-compose.staging.yml", ".env.staging"),
     ];
 
