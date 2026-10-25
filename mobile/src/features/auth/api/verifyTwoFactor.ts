@@ -24,7 +24,13 @@ export async function verifyTwoFactor(challenge: string, code: string): Promise<
       throw err;
     }
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Невірний код');
+    // The status travels with the error: a refused code (401) is the person's mistake and gets
+    // its own message, a server failure is ours and must not be shown as "wrong code".
+    const err = new Error(error.detail || error.title || 'Invalid verification code') as Error & {
+      status?: number;
+    };
+    err.status = response.status;
+    throw err;
   }
   return response.json();
 }

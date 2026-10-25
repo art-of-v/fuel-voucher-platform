@@ -20,18 +20,36 @@ describe('verifyTwoFactor', () => {
     });
   });
 
-  it('throws a plain error (no 429 status) for other failures', async () => {
+  it('tags a refused code with its status, so the UI can say the code is wrong', async () => {
+    // The API answers in the one RFC 9457 envelope (see ApiError.cs): the sentence is in
+    // `detail`, not in a `message` field. The status is what the UI needs to tell a
+    // refused code (401) from a server failure (5xx).
     mockApiRequest.mockResolvedValue({
       ok: false,
       status: 401,
-      json: async () => ({ message: 'Invalid or expired verification code' }),
+      json: async () => ({ title: 'Unauthorized', detail: 'Invalid or expired verification code' }),
     });
 
+    await expect(verifyTwoFactor('challenge', '000000')).rejects.toMatchObject({
+      status: 401,
+    });
     await expect(verifyTwoFactor('challenge', '000000')).rejects.toThrow(
       'Invalid or expired verification code',
     );
-    await expect(verifyTwoFactor('challenge', '000000')).rejects.not.toMatchObject({
-      status: 429,
+  });
+
+  it('keeps the status of a server failure, so it is not shown as a wrong code', async () => {
+    mockApiRequest.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        title: 'Internal Server Error',
+        detail: 'An unexpected error occurred',
+      }),
+    });
+
+    await expect(verifyTwoFactor('challenge', '000000')).rejects.toMatchObject({
+      status: 500,
     });
   });
 

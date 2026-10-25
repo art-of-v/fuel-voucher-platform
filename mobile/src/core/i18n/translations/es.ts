@@ -364,6 +364,7 @@ export const es: Record<string, string> = {
   'phoneAuth.verify': 'VERIFICAR',
   'phoneAuth.verifying': 'VERIFICANDO...',
   'phoneAuth.changePhone': 'Cambiar número de teléfono',
+  'phoneAuth.startOver': 'Reiniciar el inicio de sesión',
   'phoneAuth.success': '¡VERIFICADO!',
   'phoneAuth.enterPhone': 'Ingresa tu número de teléfono',
   'phoneAuth.consentPrefix': 'Acepto la',
@@ -620,10 +621,13 @@ export const es: Record<string, string> = {
 
   /* El segundo factor del inicio de sesión de un empleado. */
   'phoneAuth.twoFactorTitle': 'CÓDIGO DE DOS FACTORES',
-  'phoneAuth.twoFactorHint': 'Introduce el código de tu aplicación de autenticación',
+  'phoneAuth.twoFactorHint':
+    'Este es el segundo factor: introduce el código de tu aplicación de autenticación, no el código que llegó por push o SMS',
   'phoneAuth.twoFactorEnrollHint':
     'Añade esta clave a tu aplicación de autenticación y luego introduce el código que muestre:',
-  'phoneAuth.twoFactorCodeLabel': 'CÓDIGO DE 6 DÍGITOS',
+  'phoneAuth.twoFactorCodeLabel': 'CÓDIGO DEL AUTENTICADOR',
+  'phoneAuth.twoFactorCodeRejected':
+    'El código del autenticador no fue aceptado. Introduce el código que muestra ahora la aplicación o reinicia el inicio de sesión.',
   'phoneAuth.twoFactorSecretCopy': 'Copiar clave',
   'phoneAuth.twoFactorSecretCopied': 'Clave copiada',
 

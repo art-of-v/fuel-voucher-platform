@@ -371,6 +371,7 @@ export const de: Record<string, string> = {
   'phoneAuth.verify': 'BESTÄTIGEN',
   'phoneAuth.verifying': 'ÜBERPRÜFE...',
   'phoneAuth.changePhone': 'Telefonnummer ändern',
+  'phoneAuth.startOver': 'Anmeldung neu starten',
   'phoneAuth.success': 'BESTÄTIGT!',
   'phoneAuth.enterPhone': 'Geben Sie Ihre Telefonnummer ein',
   'phoneAuth.consentPrefix': 'Ich akzeptiere die',
@@ -632,10 +633,13 @@ export const de: Record<string, string> = {
 
   /* Der zweite Faktor der Anmeldung eines Mitarbeiters. */
   'phoneAuth.twoFactorTitle': 'ZWEITER FAKTOR',
-  'phoneAuth.twoFactorHint': 'Gib den Code aus deiner Authenticator-App ein',
+  'phoneAuth.twoFactorHint':
+    'Das ist der zweite Faktor: Gib den Code aus deiner Authenticator-App ein, nicht den Code aus der Push-Nachricht oder SMS',
   'phoneAuth.twoFactorEnrollHint':
     'Füge diesen Schlüssel deiner Authenticator-App hinzu und gib dann den angezeigten Code ein:',
-  'phoneAuth.twoFactorCodeLabel': '6-STELLIGER CODE',
+  'phoneAuth.twoFactorCodeLabel': 'AUTHENTIFICATOR-CODE',
+  'phoneAuth.twoFactorCodeRejected':
+    'Der Authenticator-Code wurde nicht akzeptiert. Gib den Code ein, den die App gerade anzeigt, oder starte die Anmeldung neu.',
   'phoneAuth.twoFactorSecretCopy': 'Schlüssel kopieren',
   'phoneAuth.twoFactorSecretCopied': 'Schlüssel kopiert',
 

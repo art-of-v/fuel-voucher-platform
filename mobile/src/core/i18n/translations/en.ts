@@ -359,6 +359,7 @@ export const en: Record<string, string> = {
   'phoneAuth.verify': 'VERIFY',
   'phoneAuth.verifying': 'VERIFYING...',
   'phoneAuth.changePhone': 'Change phone number',
+  'phoneAuth.startOver': 'Start the sign-in again',
   'phoneAuth.success': 'VERIFIED!',
   'phoneAuth.enterPhone': 'Enter your phone number',
   'phoneAuth.consentPrefix': 'I agree to the',
@@ -615,10 +616,13 @@ export const en: Record<string, string> = {
 
   /* The second factor of a staff sign-in. */
   'phoneAuth.twoFactorTitle': 'TWO-FACTOR CODE',
-  'phoneAuth.twoFactorHint': 'Enter the code from your authenticator app',
+  'phoneAuth.twoFactorHint':
+    'This is the second factor: enter the code from your authenticator app, not the code that arrived by push or SMS',
   'phoneAuth.twoFactorEnrollHint':
     'Add this key to your authenticator app, then enter the code it shows:',
-  'phoneAuth.twoFactorCodeLabel': '6-DIGIT CODE',
+  'phoneAuth.twoFactorCodeLabel': 'AUTHENTICATOR CODE',
+  'phoneAuth.twoFactorCodeRejected':
+    'The authenticator code was not accepted. Enter the code the app shows now, or start the sign-in again.',
   'phoneAuth.twoFactorSecretCopy': 'Copy key',
   'phoneAuth.twoFactorSecretCopied': 'Key copied',
 

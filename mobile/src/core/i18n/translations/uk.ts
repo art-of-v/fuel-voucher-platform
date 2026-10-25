@@ -363,6 +363,7 @@ export const uk: Record<string, string> = {
   'phoneAuth.verify': 'ПІДТВЕРДИТИ',
   'phoneAuth.verifying': 'ПЕРЕВІРКА...',
   'phoneAuth.changePhone': 'Змінити номер телефону',
+  'phoneAuth.startOver': 'Почати вхід заново',
   'phoneAuth.success': 'ПІДТВЕРДЖЕНО!',
   'phoneAuth.enterPhone': 'Введіть номер телефону',
   'phoneAuth.consentPrefix': 'Я погоджуюсь з',
@@ -622,10 +623,13 @@ export const uk: Record<string, string> = {
 
   /* Другий фактор для входу співробітника. */
   'phoneAuth.twoFactorTitle': 'ДВОФАКТОРНИЙ КОД',
-  'phoneAuth.twoFactorHint': 'Введіть код із застосунку автентифікації',
+  'phoneAuth.twoFactorHint':
+    'Це другий фактор: введіть код із застосунку автентифікації, а не код, який прийшов у пуші чи SMS',
   'phoneAuth.twoFactorEnrollHint':
     'Додайте цей ключ у застосунок автентифікації, потім введіть код, який він показує:',
-  'phoneAuth.twoFactorCodeLabel': '6-ЗНАЧНИЙ КОД',
+  'phoneAuth.twoFactorCodeLabel': 'КОД З АВТЕНТИФІКАТОРА',
+  'phoneAuth.twoFactorCodeRejected':
+    'Код з автентифікатора не прийнято. Введіть код, який зараз показує застосунок, або почніть вхід заново.',
   'phoneAuth.twoFactorSecretCopy': 'Копіювати ключ',
   'phoneAuth.twoFactorSecretCopied': 'Ключ скопійовано',
 
