@@ -123,7 +123,7 @@ check_contains "it says which container it wanted" "fuelflow-no-such-container" 
 
 echo "=== the passwords-only mode writes the passwords and touches no database ==="
 # The PRODUCTION compose file names the role passwords, and the staging deploy's
-# preflight resolves that file against the production .env - so the passwords have to be
+# preflight resolves that file against .env.production - so the passwords have to be
 # in that file before the staging deploy runs. This mode does it without the database,
 # so a staging deploy does not depend on the production database being up.
 PASSWORDS_ENV="$(mktemp)"
@@ -180,7 +180,7 @@ else
   else
     # The environment drives the script: the env file is EMPTY, so the script has to
     # generate the three passwords the application needs and write them there. That is
-    # the path the deploy takes on a box whose .env predates this change, and it is the
+    # the path the deploy takes on a box whose .env.production predates this change, and it is the
     # path that would otherwise stop the deploy at the preflight.
     export POSTGRES_USER=postgres
     export POSTGRES_DB=fuelflow

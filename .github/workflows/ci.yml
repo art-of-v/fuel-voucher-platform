@@ -1688,7 +1688,7 @@ jobs:
       # template test explicitly cannot reach. --env-only stops after the env scan, so it
       # costs a second and never touches a container.
       # The production compose file names the two database role passwords, and the check
-      # below resolves THAT file against the production .env - so the passwords have to be
+      # below resolves THAT file against .env.production - so the passwords have to be
       # in the env file before this job runs, not only before the production one.
       #
       # The script writes them when they are missing. This mode touches no database, so a
@@ -1866,17 +1866,17 @@ jobs:
       # them the cluster's superuser, which is what the application used to connect as.
       #
       # It runs BEFORE the preflight because it also generates the two role passwords
-      # and writes them into .env: the compose file names them, and a preflight that
+      # and writes them into .env.production: the compose file names them, and a preflight that
       # could not resolve them would stop the deploy over a value nobody has typed yet.
       # The script is idempotent, so it is safe on every deploy.
       - name: Ensure the database roles exist
         run: bash /root/FuelFlow/deploy/ensure-database-roles.sh
 
-      # ...and then run the whole preflight against the live box, so a bad .env, a bad
+      # ...and then run the whole preflight against the live box, so a bad .env.production, a bad
       # Caddyfile, an ambiguous upstream or a stale :main tag stops THIS deploy rather
       # than the next person who restarts something by hand.
       - name: Preflight the box
-        # PREFLIGHT_DB_STRICT is read from this process environment, not from deploy/.env - the
+        # PREFLIGHT_DB_STRICT is read from this process environment, not from deploy/.env.production - the
         # script never sources anything into its own shell, it only passes --env-file to compose.
         # Set the repository variable to 1 to make a violated data precondition block the deploy.
         # Defaults to 0 because the check must warn rather than block until the data is clean.
@@ -1910,10 +1910,10 @@ jobs:
           # `caddy` here is the compose service name; `--entrypoint caddy` makes the
           # container run the caddy binary, so the args become `caddy validate ...`.
           # Without it the container tries to exec `validate` directly (not on PATH) and
-          # the step dies before validating anything. --env-file .env still applies, so an
+          # the step dies before validating anything. --env-file .env.production still applies, so an
           # unset STAGING_* still fails validation (the intended fail-safe) — this only
           # fixes how caddy is invoked, not what it checks.
-          docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
       - name: Pull and restart
         env:
@@ -1927,19 +1927,19 @@ jobs:
           # built, `main` (last successful build) for one that did not. set -e makes a
           # failed pull abort BEFORE `up`, so a missing or unauthorized image can never
           # silently fall back to an on-box build.
-          docker compose --env-file .env -f docker-compose.prod.yml pull
+          docker compose --env-file .env.production -f docker-compose.prod.yml pull
           # --remove-orphans: see the staging step above. The orphan is the container of the
           # service the compose file no longer has, and it holds the name the new one wants.
-          docker compose --env-file .env -f docker-compose.prod.yml up -d --remove-orphans
+          docker compose --env-file .env.production -f docker-compose.prod.yml up -d --remove-orphans
           # What is actually running, by digest - the authoritative answer to "which
           # version is prod on?", and the way to spot a component left on its old build.
-          docker compose --env-file .env -f docker-compose.prod.yml images
+          docker compose --env-file .env.production -f docker-compose.prod.yml images
           # The Caddyfile is bind-mounted as a SINGLE file. Git updates files by
           # atomic rename, so after `git reset` the container's bind mount still
           # pins the OLD inode - even `caddy reload` re-reads the stale contents
           # and edge config edits silently never apply. Force-recreate instead:
           # a fresh container re-binds the new file.
-          docker compose --env-file .env -f docker-compose.prod.yml up -d --force-recreate caddy
+          docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate caddy
 
       - name: Smoke test
         run: |
@@ -1956,7 +1956,7 @@ jobs:
             if [ "$i" -eq 30 ]; then
               echo "backend did not become healthy within ~90s" >&2
               cd /root/FuelFlow/deploy
-              docker compose --env-file .env -f docker-compose.prod.yml logs --tail 100 fuelflow-backend >&2 || true
+              docker compose --env-file .env.production -f docker-compose.prod.yml logs --tail 100 fuelflow-backend >&2 || true
               exit 1
             fi
             sleep 3

@@ -25,7 +25,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$SCRIPT_DIR/docker-compose.prod.yml}"
-ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env.production}"
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 DRILL_CONTAINER="${DRILL_CONTAINER:-fuelflow-pitr-drill}"

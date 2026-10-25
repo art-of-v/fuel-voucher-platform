@@ -8,7 +8,7 @@
 #
 # One PostgreSQL role used to serve both the application's traffic and the schema
 # migrations, and that role was the cluster's SUPERUSER - the one role the
-# postgres:16-alpine image creates, with the password that sits in .env. The
+# postgres:16-alpine image creates, with the password that sits in .env.production. The
 # consequence was never "an API bug leaks a table"; it was "an API bug owns the
 # cluster": read every role's password hash out of pg_authid, create a new superuser,
 # drop the database, or write straight into audit_events and voucher_events and
@@ -58,7 +58,7 @@
 # nothing, which is what lets the deploy job call it unconditionally.
 #
 # IT NEEDS THE CLUSTER'S SUPERUSER, because creating a role needs one. The superuser
-# is the operator's credential (POSTGRES_USER in .env), not the application's: the
+# is the operator's credential (POSTGRES_USER in .env.production), not the application's: the
 # application never sees it.
 # ------------------------------------------------------------------------------
 set -euo pipefail
@@ -87,12 +87,12 @@ for argument in "$@"; do
   esac
 done
 
-ENV_FILE="${FUELFLOW_ENV_FILE:-.env}"
+ENV_FILE="${FUELFLOW_ENV_FILE:-.env.production}"
 CONTAINER="${POSTGRES_CONTAINER:-fuelflow-postgres}"
 
 # The role names are a CONTRACT, not a setting: the compose file names them, the
 # application's startup guard compares them, and the CI test asserts them. They are
-# spelled out here rather than read from .env so that the four places cannot drift
+# spelled out here rather than read from .env.production so that the four places cannot drift
 # apart silently - a role that exists under one name and is looked for under another is
 # a deploy that fails with "role does not exist" and nothing that says why.
 APP_ROLE="fuelflow_app"
@@ -108,7 +108,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 say() { echo "  $*"; }
 
 # ------------------------------------------------------------------------------
-# The .env, read without executing it.
+# The .env.production, read without executing it.
 #
 # load_env parses KEY=VALUE lines and never runs the file, which matters because this
 # file holds the cluster's superuser password and the roles' passwords: a value with a
@@ -230,10 +230,10 @@ if ! container_is_running; then
   if [[ "$CONTAINER" == "$DEFAULT_CONTAINER" && -f "$SCRIPT_DIR/docker-compose.prod.yml" ]]; then
     echo "the database is not running yet - starting it"
     # The env file is `.env` and not the variable: the production stack reads its key
-    # from `.env`, and the wiring test (StagingQrCipherKeySeparationTests) reads this
+    # from `.env.production`, and the wiring test (StagingQrCipherKeySeparationTests) reads this
     # line the same way - a variable here would hide which file the stack was started
     # with, which is the whole point of that guard.
-    docker compose --env-file .env -f "$SCRIPT_DIR/docker-compose.prod.yml" \
+    docker compose --env-file .env.production -f "$SCRIPT_DIR/docker-compose.prod.yml" \
       up -d postgres > /dev/null 2>&1 || true
     for _ in $(seq 1 60); do
       container_is_running && break
@@ -243,7 +243,7 @@ if ! container_is_running; then
 fi
 
 if ! container_is_running; then
-  die "the database container '$CONTAINER' is not running. Start it first: docker compose --env-file .env -f docker-compose.prod.yml up -d postgres"
+  die "the database container '$CONTAINER' is not running. Start it first: docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres"
 fi
 
 # psql as the cluster's superuser, over the container's unix socket. The socket is

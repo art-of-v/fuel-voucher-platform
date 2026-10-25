@@ -39,7 +39,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$SCRIPT_DIR/docker-compose.prod.yml}"
-ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env.production}"
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 # This path is literal in the compose file and has to match. It cannot be a compose
@@ -72,7 +72,7 @@ echo "  database: $CONTAINER"
 echo "  archive : $ARCHIVE_DIR"
 echo
 
-# Load POSTGRES_USER / POSTGRES_DB from the same .env the stack uses. The role is NOT
+# Load POSTGRES_USER / POSTGRES_DB from the same .env.production the stack uses. The role is NOT
 # "postgres" - it is whatever the deployment was created with (fuelflow), and connecting
 # as postgres fails with "role postgres does not exist".
 #

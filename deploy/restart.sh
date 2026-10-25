@@ -90,15 +90,15 @@ else
   echo
   echo "== using the requested tag $TAG =="
   export BACKEND_IMAGE_TAG="$TAG" ADMIN_IMAGE_TAG="$TAG" WEBSITE_IMAGE_TAG="$TAG"
-  docker compose --env-file .env -f docker-compose.prod.yml pull
+  docker compose --env-file .env.production -f docker-compose.prod.yml pull
 fi
 
 echo
 echo "== restarting =="
 if [[ ${#SERVICES[@]} -gt 0 ]]; then
-  docker compose --env-file .env -f docker-compose.prod.yml up -d "${SERVICES[@]}"
+  docker compose --env-file .env.production -f docker-compose.prod.yml up -d "${SERVICES[@]}"
 else
-  docker compose --env-file .env -f docker-compose.prod.yml up -d
+  docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 fi
 
 # The Caddyfile is bind-mounted as a SINGLE file. Git updates files by atomic
@@ -106,11 +106,11 @@ fi
 # even `caddy reload` re-reads the stale contents and a hand edit never applies.
 # Force-recreate so a fresh container re-binds the new file. This mirrors the
 # deploy workflow, which does the same for the same reason.
-docker compose --env-file .env -f docker-compose.prod.yml up -d --force-recreate caddy
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate caddy
 
 echo
 echo "== what is running =="
-docker compose --env-file .env -f docker-compose.prod.yml images
+docker compose --env-file .env.production -f docker-compose.prod.yml images
 
 echo
 echo "== waiting for health =="

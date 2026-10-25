@@ -11,7 +11,7 @@ Description=Alert that %i failed
 [Service]
 Type=oneshot
 WorkingDirectory=/root/FuelFlow/deploy
-# %i is the failed unit name. The notifier reads deploy/.env for the Telegram creds and the
+# %i is the failed unit name. The notifier reads deploy/.env.production for the Telegram creds and the
 # journal for the message disk-check.sh already wrote.
 ExecStart=/root/FuelFlow/deploy/notify-disk-check.sh %i
 SyslogIdentifier=fuelflow-disk-check-alert

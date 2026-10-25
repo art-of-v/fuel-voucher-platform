@@ -68,7 +68,7 @@ check "CRLF line endings are tolerated" 0 "$?"
 # ------------------------------------------------------------------------------
 # The staging basic-auth hash, checked on the value caddy will actually receive.
 #
-# Measured on the box: .env held 63 chars with SIX `$`, caddy received 60 with
+# Measured on the box: .env.production held 63 chars with SIX `$`, caddy received 60 with
 # THREE - compose collapses `$$` to `$` and passes a lone `$` through unchanged.
 #
 # So a partially escaped hash still collapses into a well-formed one and still
@@ -130,7 +130,7 @@ check "a quoted bcrypt hash is accepted" 0 "$?"
 #
 # caddy is the production service; STAGING_BASICAUTH_* means "the staging vhosts
 # prod's caddy fronts", not "a variable the staging backend owns". docker-compose.
-# prod.yml lists it under caddy's `environment:` and pulls it from .env; the
+# prod.yml lists it under caddy's `environment:` and pulls it from .env.production; the
 # staging compose file never mentions it.
 #
 # The check ran once per env file anyway, so every single preflight run on the box
@@ -158,7 +158,7 @@ cp "$SCRIPT_DIR/.env.production.example" "$SCRIPT_DIR/.env.staging.example" "$FI
 grep -hoE '\$\{[A-Za-z0-9_]+' "$FIXTURE"/docker-compose.*.yml \
   | sed 's/^\${//' | sort -u > "$TMP/required-vars"
 # The env files have to stay COMPLETE. preflight.sh parse-checks the compose files on every
-# run, and compose resolves ${VAR:?} against .env, so a deliberately minimal .env - which most of
+# run, and compose resolves ${VAR:?} against .env.production, so a deliberately minimal .env.production - which most of
 # the assertions below want - would make the compose step fail and take the exit code with it. So
 # the fixture carries every required variable, and the tests that need one absent remove it
 # temporarily and restore GOOD_ENV afterwards.
@@ -168,7 +168,7 @@ grep -hoE '\$\{[A-Za-z0-9_]+' "$FIXTURE"/docker-compose.*.yml \
   while read -r var; do
     [[ -n "$var" ]] && printf '%s=dummy-for-parse-check\n' "$var"
   done < "$TMP/required-vars"
-} > "$FIXTURE/.env"
+} > "$FIXTURE/.env.production"
 {
   echo "ROOT_DOMAIN=staging-app.palne.shop"
   while read -r var; do
@@ -178,24 +178,24 @@ grep -hoE '\$\{[A-Za-z0-9_]+' "$FIXTURE"/docker-compose.*.yml \
 # A variable that is both set above and listed by compose ends up here twice, and check_env_file
 # reads the FIRST occurrence - so the dummy would win and STAGING_BASICAUTH_HASH would be
 # rejected as "not a bcrypt hash". Keep the first line for each key, which is the explicit one.
-for envfile in "$FIXTURE/.env" "$FIXTURE/.env.staging"; do
+for envfile in "$FIXTURE/.env.production" "$FIXTURE/.env.staging"; do
   awk -F= '!seen[$1]++' "$envfile" > "$envfile.tmp" && mv "$envfile.tmp" "$envfile"
 done
 GOOD_ENV="$TMP/env-complete"
 GOOD_ENV_STAGING="$TMP/env-staging-complete"
-cp "$FIXTURE/.env" "$GOOD_ENV"
+cp "$FIXTURE/.env.production" "$GOOD_ENV"
 cp "$FIXTURE/.env.staging" "$GOOD_ENV_STAGING"
 
 # The two environments must not share the QR cipher key, so the fixture gives them different
 # ones - the dummy above wrote the SAME value into both files, which is exactly the defect the
 # new check looks for.
-sed -i 's|^QR_CIPHER_KEY=.*|QR_CIPHER_KEY=prod-only-key|' "$FIXTURE/.env"
+sed -i 's|^QR_CIPHER_KEY=.*|QR_CIPHER_KEY=prod-only-key|' "$FIXTURE/.env.production"
 sed -i 's|^QR_CIPHER_KEY=.*|QR_CIPHER_KEY=staging-only-key|' "$FIXTURE/.env.staging"
-cp "$FIXTURE/.env" "$GOOD_ENV"
+cp "$FIXTURE/.env.production" "$GOOD_ENV"
 cp "$FIXTURE/.env.staging" "$GOOD_ENV_STAGING"
 
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
-check "a defaults run with a valid prod .env passes" 0 "$rc"
+check "a defaults run with a valid prod .env.production passes" 0 "$rc"
 # .env.staging SHOULD still be scanned - for structure. It is caddy's credential
 # it has no business holding, so assert only that the false warning is gone.
 [[ "$out" != *".env.staging: STAGING_BASICAUTH_HASH"* ]] \
@@ -204,17 +204,17 @@ check "a defaults run with a valid prod .env passes" 0 "$rc"
 [[ "$out" == *".env.staging: ok"* ]] \
   && { echo "  PASS  .env.staging is still scanned for structure"; pass=$((pass+1)); } \
   || { echo "  FAIL  the fix went too far and stopped checking .env.staging at all: $out"; fail=$((fail+1)); }
-[[ "$out" == *".env: STAGING_BASICAUTH_HASH reaches caddy"* ]] \
+[[ "$out" == *".env.production: STAGING_BASICAUTH_HASH reaches caddy"* ]] \
   && { echo "  PASS  the credential check runs against .env"; pass=$((pass+1)); } \
-  || { echo "  FAIL  the credential check does not name .env: $out"; fail=$((fail+1)); }
+  || { echo "  FAIL  the credential check does not name .env.production: $out"; fail=$((fail+1)); }
 
 # The converse must still hold, or the fix would have silenced a real warning.
-sed -i '/^STAGING_BASICAUTH_HASH=/d' "$FIXTURE/.env"
+sed -i '/^STAGING_BASICAUTH_HASH=/d' "$FIXTURE/.env.production"
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
-cp "$GOOD_ENV" "$FIXTURE/.env"
-check "a prod .env missing the hash still warns" 0 "$rc"
-[[ "$out" == *".env"* && "$out" == *"not set"* ]] \
-  && { echo "  PASS  the warning names .env, the file caddy actually reads"; pass=$((pass+1)); } \
+cp "$GOOD_ENV" "$FIXTURE/.env.production"
+check "a prod .env.production missing the hash still warns" 0 "$rc"
+[[ "$out" == *".env.production"* && "$out" == *"not set"* ]] \
+  && { echo "  PASS  the warning names .env.production, the file caddy actually reads"; pass=$((pass+1)); } \
   || { echo "  FAIL  lost the warning for the file that matters: $out"; fail=$((fail+1)); }
 
 # ------------------------------------------------------------------------------
@@ -251,8 +251,8 @@ check "different QR cipher keys pass" 0 "$rc"
 # ------------------------------------------------------------------------------
 for var in JWT_SECRET OTP_PEPPER QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD; do
   template_value="$(grep -E "^${var}=" "$SCRIPT_DIR/.env.production.example" | head -1 | cut -d= -f2-)"
-  cp "$GOOD_ENV" "$FIXTURE/.env"
-  sed -i "s|^${var}=.*|${var}=${template_value}|" "$FIXTURE/.env"
+  cp "$GOOD_ENV" "$FIXTURE/.env.production"
+  sed -i "s|^${var}=.*|${var}=${template_value}|" "$FIXTURE/.env.production"
   out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
   check "a $var that still holds the template's value is refused" 1 "$rc"
   [[ "$out" == *"$var"* ]] \
@@ -264,7 +264,7 @@ for var in JWT_SECRET OTP_PEPPER QR_CIPHER_KEY POSTGRES_PASSWORD REDIS_PASSWORD;
   [[ "$out" != *"$template_value"* ]] \
     && { echo "  PASS  the refusal does not print the value"; pass=$((pass+1)); } \
     || { echo "  FAIL  the refusal printed the value: $out"; fail=$((fail+1)); }
-  cp "$GOOD_ENV" "$FIXTURE/.env"
+  cp "$GOOD_ENV" "$FIXTURE/.env.production"
 done
 
 # ------------------------------------------------------------------------------
@@ -277,19 +277,19 @@ done
 # ------------------------------------------------------------------------------
 sed -i 's|^JWT_SECRET=.*|JWT_SECRET=dummy-value-from-the-template|' \
   "$FIXTURE/.env.production.example"
-cp "$GOOD_ENV" "$FIXTURE/.env"
-sed -i 's|^JWT_SECRET=.*|JWT_SECRET=dummy-value-from-the-template|' "$FIXTURE/.env"
+cp "$GOOD_ENV" "$FIXTURE/.env.production"
+sed -i 's|^JWT_SECRET=.*|JWT_SECRET=dummy-value-from-the-template|' "$FIXTURE/.env.production"
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
 check "a value taken verbatim from an edited template is refused" 1 "$rc"
 [[ "$out" == *"still holds the value from"* ]] \
   && { echo "  PASS  the refusal says the value came from the template"; pass=$((pass+1)); } \
   || { echo "  FAIL  the refusal does not name the template: $out"; fail=$((fail+1)); }
-cp "$GOOD_ENV" "$FIXTURE/.env"
+cp "$GOOD_ENV" "$FIXTURE/.env.production"
 cp "$SCRIPT_DIR/.env.production.example" "$FIXTURE/.env.production.example"
 
 # And a value that is neither a placeholder nor a template value passes - the check that refuses
 # everything is not a check, it is an outage.
-cp "$GOOD_ENV" "$FIXTURE/.env"
+cp "$GOOD_ENV" "$FIXTURE/.env.production"
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
 check "real secrets pass the placeholder check" 0 "$rc"
 [[ "$out" == *"no env template is available here"* ]] \
@@ -319,7 +319,7 @@ out=$("$PREFLIGHT" --no-defaults --env-only --env-file "$TMP/hash-garbage2.env" 
 # `QrCipher__Key` was added at eight spaces into a block whose siblings sit at six.
 # go-yaml then refused the entire file, staging deploy failed, the chained production
 # deploy was skipped, and main stayed red across two merges. Every C# test stayed
-# green, and so did the preflight, because until now it only ever read the .env.
+# green, and so did the preflight, because until now it only ever read the .env.production.
 #
 # The gate is worthless if it cannot fail, so assert that it fires - and that the
 # message names the real cause rather than something invented.

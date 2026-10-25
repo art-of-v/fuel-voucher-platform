@@ -64,16 +64,16 @@ command -v age >/dev/null 2>&1 || fail \
   "age is not installed. The shipper refuses to upload a plaintext WAL segment."
 
 # The shipper reads the same .env the stack uses. Parse, don't source (see load-env.sh).
-[[ -f "$SCRIPT_DIR/.env" ]] || fail \
-  "$SCRIPT_DIR/.env is missing. Copy .env.production.example to .env and fill it in first."
+[[ -f "$SCRIPT_DIR/.env.production" ]] || fail \
+  "$SCRIPT_DIR/.env.production is missing. Copy .env.production.example to .env.production and fill it in first."
 # shellcheck source=load-env.sh
 source "$SCRIPT_DIR/load-env.sh"
-load_env "$SCRIPT_DIR/.env"
+load_env "$SCRIPT_DIR/.env.production"
 
 [[ -n "${BACKUP_REMOTE:-}" ]] || fail \
-  "BACKUP_REMOTE is not set in $SCRIPT_DIR/.env (e.g. BACKUP_REMOTE=r2:fuelflow-backups)."
+  "BACKUP_REMOTE is not set in $SCRIPT_DIR/.env.production (e.g. BACKUP_REMOTE=r2:fuelflow-backups)."
 [[ -n "${BACKUP_AGE_RECIPIENT:-}" ]] || fail \
-  "BACKUP_AGE_RECIPIENT is not set in $SCRIPT_DIR/.env. The shipper cannot encrypt without it."
+  "BACKUP_AGE_RECIPIENT is not set in $SCRIPT_DIR/.env.production. The shipper cannot encrypt without it."
 
 WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 [[ -d "$WAL_ARCHIVE_DIR" ]] || fail \

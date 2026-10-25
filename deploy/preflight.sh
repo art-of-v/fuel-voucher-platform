@@ -24,7 +24,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PROD_COMPOSE=(docker compose --env-file .env -f docker-compose.prod.yml)
+PROD_COMPOSE=(docker compose --env-file .env.production -f docker-compose.prod.yml)
 
 warnings=()
 fail() { echo "ERROR: $*" >&2; exit 1; }
@@ -83,9 +83,9 @@ done
 #
 # WARNINGS, not failures, and that is a deliberate temporary state: production currently violates
 # 010, so a blocking check would stop every deploy behind one unresolved group. Flip
-# PREFLIGHT_DB_STRICT comes from the environment of this process, NOT from .env. The script passes
+# PREFLIGHT_DB_STRICT comes from the environment of this process, NOT from .env.production. The script passes
 # --env-file to docker compose and never sources anything into its own shell, so writing it to
-# deploy/.env has no effect on this line. The workflow step that runs this sets it from a repository
+# deploy/.env.production has no effect on this line. The workflow step that runs this sets it from a repository
 # variable; see preflight-db/README.md.
 #
 # Defined with the other checks rather than inline at the bottom, because --data-only calls it
@@ -346,7 +346,7 @@ check_qr_key_separation() {
 # Telegram integration refuses to start on it ("cannot unmarshal number into Go
 # struct field Config.chatid of type string") - which takes the whole alerting
 # provisioning down, rules included, and leaves Grafana restart-looping.
-# deploy/.env carries the same number for the systemd scripts that send the
+# deploy/.env.production carries the same number for the systemd scripts that send the
 # backup and disk alerts.
 #
 # Two places, one fact, so this check says whether they still agree. Without it
@@ -355,7 +355,7 @@ check_qr_key_separation() {
 # ------------------------------------------------------------------------------
 check_telegram_chat_id() {
   local file="../backend/observability/grafana/provisioning/alerting-telegram/contact-points.yml"
-  local env_file=".env"
+  local env_file=".env.production"
 
   if [[ ! -f "$file" ]]; then
     warn "$file is missing (skipping the Telegram chat id check)"
@@ -395,7 +395,7 @@ check_telegram_chat_id() {
 # which is exactly the state the box was in: a random 63-character string, and a
 # staging site that had never had a working credential.
 #
-# What compose does to the value matters here. Measured on the box: .env held 63
+# What compose does to the value matters here. Measured on the box: .env.production held 63
 # characters with SIX `$` and caddy received 60 with THREE, so compose collapses
 # `$$` to `$` and passes a lone `$` through unchanged.
 #
@@ -406,7 +406,7 @@ check_telegram_chat_id() {
 # a hash. So this checks the thing that actually breaks caddy: what caddy will
 # receive once compose has had its way with it.
 #
-# It runs against deploy/.env ONLY, and only because that is where caddy reads it
+# It runs against deploy/.env.production ONLY, and only because that is where caddy reads it
 # from - caddy is the production service, and STAGING_BASICAUTH_* means "the
 # staging vhosts prod's caddy fronts", not "a variable the staging backend owns".
 # Scanning .env.staging for it produced a warning that was simply false: staging
@@ -449,7 +449,7 @@ fi
 
 echo "== env files =="
 if [[ "$NO_DEFAULTS" -eq 0 ]]; then
-  check_env_file .env required
+  check_env_file .env.production required
   check_env_file .env.staging optional
   # The two environments must not share the voucher QR cipher key - see the function.
   check_qr_key_separation
@@ -468,9 +468,9 @@ done
 # disproved wording. Two copies of one rule drift apart exactly like that.
 echo "== caddy credentials =="
 if [[ "$NO_DEFAULTS" -eq 0 ]]; then
-  [[ -f .env ]] && check_basic_auth_hash .env
+  [[ -f .env.production ]] && check_basic_auth_hash .env.production
 else
-  # A CI --env-file run is a stand-in for deploy/.env, so validate it there too.
+  # A CI --env-file run is a stand-in for deploy/.env.production, so validate it there too.
   for extra in ${EXTRA_ENV_FILES+"${EXTRA_ENV_FILES[@]}"}; do
     check_basic_auth_hash "$extra"
   done
@@ -479,7 +479,7 @@ fi
 # ------------------------------------------------------------------------------
 # The compose files actually parse
 #
-# check_env_file proves the .env is well-formed. It says nothing about the YAML, and
+# check_env_file proves the .env.production is well-formed. It says nothing about the YAML, and
 # the YAML is where the 2026-10-17 deploy died: `QrCipher__Key` was added at eight
 # spaces into a block whose siblings sit at six, and go-yaml rejected the whole file
 # with "did not find expected key". Staging failed, so the chained production deploy
@@ -530,7 +530,7 @@ check_compose_parses() {
 # never intended to deploy it.
 if [[ "$NO_DEFAULTS" -eq 0 ]]; then
   echo "== compose files =="
-  check_compose_parses docker-compose.prod.yml .env
+  check_compose_parses docker-compose.prod.yml .env.production
   check_compose_parses docker-compose.staging.yml .env.staging
 fi
 
@@ -550,10 +550,10 @@ fi
 # means prod's only public ingress is down until someone notices.
 # ------------------------------------------------------------------------------
 echo "== caddy config =="
-if ! docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps \
+if ! docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps \
       --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
   echo "  (re-running with output)" >&2
-  docker compose --env-file .env -f docker-compose.prod.yml run --rm --no-deps \
+  docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps \
     --entrypoint caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 \
     | grep -viE '^\{"level":"info"' >&2 || true
   fail "Caddyfile does not validate. Nothing has been restarted."
@@ -625,7 +625,7 @@ fi
 # that exist.
 #
 # The check is its own script because it must also run in CI, and it needs no container,
-# no box and no .env - the compose service names are read out of the compose file itself.
+# no box and no .env.production - the compose service names are read out of the compose file itself.
 # ------------------------------------------------------------------------------
 echo "== the alerting chain's names =="
 if ! bash "$SCRIPT_DIR/check-alerting-names.sh"; then

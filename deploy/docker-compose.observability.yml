@@ -10,10 +10,10 @@
 #
 # Start (after the app stack is up — it needs the fuelflow_default network):
 #   cd ~/FuelFlow/deploy
-#   docker compose --env-file .env -f docker-compose.observability.yml up -d
+#   docker compose --env-file .env.production -f docker-compose.observability.yml up -d
 #
-# With Telegram alerts (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in .env):
-#   docker compose --env-file .env \
+# With Telegram alerts (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in .env.production):
+#   docker compose --env-file .env.production \
 #     -f docker-compose.observability.yml \
 #     -f docker-compose.observability.telegram.yml up -d
 #
@@ -80,8 +80,8 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      LOKI_PUSH_USERNAME: ${LOKI_PUSH_USERNAME:?set LOKI_PUSH_USERNAME in .env}
-      LOKI_PUSH_PASSWORD: ${LOKI_PUSH_PASSWORD:?set LOKI_PUSH_PASSWORD in .env}
+      LOKI_PUSH_USERNAME: ${LOKI_PUSH_USERNAME:?set LOKI_PUSH_USERNAME in .env.production}
+      LOKI_PUSH_PASSWORD: ${LOKI_PUSH_PASSWORD:?set LOKI_PUSH_PASSWORD in .env.production}
     entrypoint: ["/bin/sh", "/opt/loki-gateway/entrypoint.sh"]
     volumes:
       - ./observability/loki-gateway/nginx.conf:/opt/loki-gateway/nginx.conf.template:ro
@@ -100,7 +100,7 @@ services:
       - no-new-privileges:true
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env.production}
       GF_USERS_ALLOW_SIGN_UP: "false"
       # Referenced by the Telegram contact point in the provisioned alerting config
       # (activated by docker-compose.observability.telegram.yml).

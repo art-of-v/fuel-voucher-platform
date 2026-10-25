@@ -25,7 +25,7 @@ OnFailure=fuelflow-backup-alert@%n.service
 Type=oneshot
 WorkingDirectory=/root/FuelFlow/deploy
 ExecStart=/root/FuelFlow/deploy/backup.sh
-# backup.sh reads deploy/.env itself (BACKUP_AGE_RECIPIENT, POSTGRES_*, ...), so no
+# backup.sh reads deploy/.env.production itself (BACKUP_AGE_RECIPIENT, POSTGRES_*, ...), so no
 # EnvironmentFile here — systemd's env parser is not shell and would mishandle values
 # with quotes or `$`.
 #

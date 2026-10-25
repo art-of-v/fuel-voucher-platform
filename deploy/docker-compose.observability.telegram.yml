@@ -4,7 +4,7 @@
 # and refuses to boot if it is empty — so the base stack stays runnable with no
 # secrets configured.
 #
-# Requires in deploy/.env (git-ignored):
+# Requires in deploy/.env.production (git-ignored):
 #   TELEGRAM_BOT_TOKEN=123456:ABC-your-token
 #   TELEGRAM_CHAT_ID=-5510388216
 #
@@ -17,18 +17,18 @@
 # "cannot unmarshal number into Go struct field Config.chatid of type string" —
 # which takes the whole alerting provisioning (rules included) down with it.
 # The chat id is an identifier, not a credential, so it lives in the repository;
-# the token, which is the credential, stays in .env.
+# the token, which is the credential, stays in .env.production.
 #
 # Setup steps are in docs/OBSERVABILITY.md (private docs repo) ("Telegram alerts"); the short version:
 #   1. Telegram → @BotFather → /newbot → copy the token.
 #   2. Create a private group, add the bot, post any message into it.
 #   3. curl "https://api.telegram.org/bot<TOKEN>/getUpdates" and read
-#      result[].chat.id (a negative number), and put it in deploy/.env AND in
+#      result[].chat.id (a negative number), and put it in deploy/.env.production AND in
 #      backend/observability/grafana/provisioning/alerting-telegram/contact-points.yml.
 #
 # Run with:
 #   cd ~/FuelFlow/deploy
-#   docker compose --env-file .env \
+#   docker compose --env-file .env.production \
 #     -f docker-compose.observability.yml \
 #     -f docker-compose.observability.telegram.yml up -d
 #
@@ -47,6 +47,6 @@ services:
       # The token is interpolated into the contact point. The chat id is not:
       # it is a literal in the provisioning file, because a number that arrives
       # through the substitution is a YAML number, and Grafana will not start.
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env.production}
     volumes:
       - ../backend/observability/grafana/provisioning/alerting-telegram:/etc/grafana/provisioning/alerting:ro
