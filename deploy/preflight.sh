@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --env-only) ENV_ONLY=1; shift ;;
     --data-only) DATA_ONLY=1; shift ;;
-    # --no-defaults skips .env/.env.staging so the scan can be exercised against a
+    # --no-defaults skips .env.production/.env.staging so the scan can be exercised against a
     # fixture; on the box the real files are always wanted.
     --no-defaults) NO_DEFAULTS=1; shift ;;
     --env-file) EXTRA_ENV_FILES+=("${2:?--env-file needs a path}"); shift 2 ;;
@@ -313,7 +313,7 @@ check_placeholder_secrets() {
 # it, and these files hold secrets.
 # ------------------------------------------------------------------------------
 check_qr_key_separation() {
-  local prod_file=".env" staging_file=".env.staging"
+  local prod_file=".env.production" staging_file=".env.staging"
 
   if [[ ! -f "$prod_file" || ! -f "$staging_file" ]]; then
     warn "one of the two env files is missing (skipping the QR cipher key separation check)"
@@ -333,7 +333,7 @@ check_qr_key_separation() {
     fail "production and staging share the same QR_CIPHER_KEY. It encrypts every voucher's redeemable payload, so anyone who reaches staging can decrypt production's vouchers. Generate a different one for staging (openssl rand -base64 32) and put it in .env.staging - the two are not interchangeable, and the staging database holds no vouchers that would need re-encrypting."
   fi
 
-  echo "  .env and .env.staging: the QR cipher keys differ"
+  echo "  .env.production and .env.staging: the QR cipher keys differ"
 }
 
 # ------------------------------------------------------------------------------
@@ -454,7 +454,7 @@ if [[ "$NO_DEFAULTS" -eq 0 ]]; then
   # The two environments must not share the voucher QR cipher key - see the function.
   check_qr_key_separation
   # The four secrets the templates ship must not have survived into the deployed files.
-  check_placeholder_secrets .env .env.production.example .env.staging.example
+  check_placeholder_secrets .env.production .env.production.example .env.staging.example
   check_placeholder_secrets .env.staging .env.production.example .env.staging.example
 fi
 for extra in ${EXTRA_ENV_FILES+"${EXTRA_ENV_FILES[@]}"}; do
@@ -525,7 +525,7 @@ check_compose_parses() {
 }
 
 # Part of the defaults scan, not of the targeted one. --no-defaults means "check only the files I
-# named", and it skips .env/.env.staging - so resolving ${VAR:?} here would fail against a .env
+# named", and it skips .env/.env.staging - so resolving ${VAR:?} here would fail against a .env.production
 # this run never claimed to look at, and the gate would report a broken compose file for a run that
 # never intended to deploy it.
 if [[ "$NO_DEFAULTS" -eq 0 ]]; then

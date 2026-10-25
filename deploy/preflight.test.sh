@@ -126,7 +126,7 @@ printf "ROOT_DOMAIN=x\nSTAGING_BASICAUTH_HASH='%s'\n" "$DOUBLED" > "$TMP/hash-qu
 check "a quoted bcrypt hash is accepted" 0 "$?"
 
 # ------------------------------------------------------------------------------
-# The hash is caddy's credential, read from deploy/.env - not from .env.staging.
+# The hash is caddy's credential, read from deploy/.env.production - not from .env.staging.
 #
 # caddy is the production service; STAGING_BASICAUTH_* means "the staging vhosts
 # prod's caddy fronts", not "a variable the staging backend owns". docker-compose.
@@ -205,7 +205,7 @@ check "a defaults run with a valid prod .env.production passes" 0 "$rc"
   && { echo "  PASS  .env.staging is still scanned for structure"; pass=$((pass+1)); } \
   || { echo "  FAIL  the fix went too far and stopped checking .env.staging at all: $out"; fail=$((fail+1)); }
 [[ "$out" == *".env.production: STAGING_BASICAUTH_HASH reaches caddy"* ]] \
-  && { echo "  PASS  the credential check runs against .env"; pass=$((pass+1)); } \
+  && { echo "  PASS  the credential check runs against .env.production"; pass=$((pass+1)); } \
   || { echo "  FAIL  the credential check does not name .env.production: $out"; fail=$((fail+1)); }
 
 # The converse must still hold, or the fix would have silenced a real warning.
