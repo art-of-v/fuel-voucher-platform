@@ -100,25 +100,52 @@ The checked-in production config is `ATTESTATION_ENABLED=true`,
 verifies and logs a proof that is present but never blocks a request, so the older fleet keeps
 working while the new build is measured.
 
-The live `.env` is not updated by a git deploy. On the droplet:
+**Where it actually stands (2026-10-26 11:58 UTC):** production is in report-only and **measuring**.
+The switch was off until that moment - the droplet's env file said `ATTESTATION_ENABLED=false` while
+the checked-in template said `true`, and nothing compared the two, so three days passed with the
+middleware returning before it looked at a request. The first verdict is in Loki:
+
+```
+Attestation Missing for "POST" "/api/auth/verify" from device "-" os null version null; report-only, request continues
+```
+
+A git deploy does not touch the droplet's env file, so the live value is the droplet's value. On the
+droplet:
 
 ```bash
 cd /root/FuelFlow/deploy
-grep -E '^ATTESTATION_' .env
+grep -E '^ATTESTATION_' .env.production
 # Set ATTESTATION_ENABLED=true, ATTESTATION_MODE=ReportOnly and
-# ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true in .env if they differ.
-docker compose -f docker-compose.prod.yml up -d fuelflow-backend
+# ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true in .env.production if they differ.
+./restart.sh --services fuelflow-backend
 ```
 
-Before restarting, confirm `OTP_PEPPER` is set in the same `.env`: the current API refuses to
-start in Production without it. The restart also applies the pending `attestation_keys` migration;
+Before restarting, confirm `OTP_PEPPER` is set in the same `.env.production`: the current API refuses
+to start in Production without it. The restart also applies the pending `attestation_keys` migration;
 take the normal pre-deploy backup and let the deploy job's migration dry run pass.
+
+**Use `deploy/restart.sh`, not a hand-written `docker compose up`.** It runs `preflight.sh`, pins the
+image tags to the images that are running right now and restarts with
+`--env-file .env.production`. A hand-written restart gets two things wrong, and both have bitten this
+box:
+
+- **No `BACKEND_IMAGE_TAG` means the mutable `:main` tag.**
+  `deploy/docker-compose.prod.yml:113` resolves `${BACKEND_IMAGE_TAG:-${IMAGE_TAG:-main}}`, so
+  `docker compose -f docker-compose.prod.yml up -d fuelflow-backend` recreates the container on
+  whatever `:main` happens to be - not the release that was running. On 2026-10-26 a restart written
+  that way pulled `:main` and replaced the pinned release container with it. The app assembly in
+  `:main` happened to be byte-identical to the release (`FuelFlow.API.dll`, sha256 `612a5a03…`), so no
+  code changed - but the container was left on a moving tag until it was put back on the SHA and the
+  local `:main` tag was removed.
+- **No `--env-file .env.production`** means the compose file reads its defaults instead of the
+  tier's file. The file was renamed from `.env` to `.env.production` in commit `8b5abb19`; a command
+  that still names `.env` reads nothing at all.
 
 Verify the state and the logs:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps fuelflow-backend
-docker compose -f docker-compose.prod.yml logs --since 15m fuelflow-backend \
+docker compose --env-file .env.production -f docker-compose.prod.yml ps fuelflow-backend
+docker compose --env-file .env.production -f docker-compose.prod.yml logs --since 15m fuelflow-backend \
   | grep -E 'Attestation (Valid|Missing|Invalid)'
 ```
 
@@ -126,6 +153,13 @@ Expected: `Missing` for the 1.1.0 fleet, no attestation-caused 401/503, and `Val
 new native build is installed. Do not set `ATTESTATION_MODE=Enforce` yet. To roll the measurement
 back, set `ATTESTATION_ENABLED=false` (keep the acknowledgement true) and restart; no client
 release is involved.
+
+**What the measurement can and cannot see.** The protected set is
+`backend/src/FuelFlow.API/SharedKernel/Options/AttestationOptions.cs:126`: `/api/auth/send-code`,
+`/api/auth/verify`, the purchase routes and the voucher mark-used/restore routes. Ordinary app
+traffic - `/api/brands`, `/api/app-version`, `/api/updates/manifest`, `/api/auth/user/me` - is **not**
+protected, so a fleet that never signs in or buys produces no lines at all. The count this rollout
+needs is a count of **sign-ins and purchases**, and the installed fleet sends no proof on any of them.
 
 ## Android Play and Google Cloud setup
 
@@ -245,8 +279,8 @@ removes the safety net for installs that cannot update.
 ## Rollback and kill switch
 
 - **Attestation misbehaving**: set `ATTESTATION_MODE=ReportOnly` (or `ATTESTATION_ENABLED=false`)
-  in the droplet `.env` and restart. The app keeps sending proofs; the server stops blocking. This
-  is the fastest lever and does not need a client release.
+  in the droplet `.env.production` and restart. The app keeps sending proofs; the server stops
+  blocking. This is the fastest lever and does not need a client release.
 - **Pinning misbehaving**: ship a corrected native build, or a signed OTA if the current pin still
   permits the update host. If neither is possible, the `expirationDate` stops pinning enforcement.
   There is no server-side pin kill switch.
