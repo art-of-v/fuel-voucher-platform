@@ -25,28 +25,28 @@
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Fido2" Version="5.0.0-preview.8" />
     <PackageReference Include="Google.Apis.PlayIntegrity.v1" Version="1.76.0.4270" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
-    <PackageReference Include="MailKit" Version="4.18.1" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
+    <PackageReference Include="MailKit" Version="4.18.2" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.14" />
     <!-- The outbound HTTP clients: a timeout on every one, a circuit breaker on every one, and a
          retry with backoff on the ones that only read. The package is the official home of the
          resilience pipeline (Polly) for IHttpClientFactory - see
          SharedKernel/Resilience/OutboundHttpClient.cs for the policy and for why the acquirer
          is not retried. -->
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
     <PackageReference Include="Net.Codecrete.QrCodeGenerator" Version="2.1.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.18.0-rc.1" />
     <PackageReference Include="QuestPDF" Version="2026.9.1" />
     <PackageReference Include="Scrutor" Version="7.0.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="9.0.2" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
-    <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.13.0" />
     
     <!-- Shared packages from Application and Infrastructure -->
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
@@ -60,7 +60,7 @@
          Newtonsoft.Json 13.x. Remove this pin once Hangfire.Core resolves Newtonsoft.Json
          >= 13 itself. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
@@ -69,15 +69,15 @@
     <PackageReference Include="ZXing.Net.Bindings.ImageSharp.V2" Version="0.16.20" />
 
     <!-- Observability: metrics, traces, structured logs, health checks -->
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.20.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.20.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.1" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.18.0-beta.1" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
     <PackageReference Include="Npgsql.OpenTelemetry" Version="9.0.5" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
-    <PackageReference Include="Sentry.AspNetCore" Version="6.11.1" />
+    <PackageReference Include="Sentry.AspNetCore" Version="6.12.1" />
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
 
@@ -94,7 +94,7 @@
 
          Unlike the ImageSharp advisories the CI gate accepts, this is a patch bump inside the same
          major, so there is nothing to weigh against - just move. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
 
     <!-- Customer documents (per-order receipt, #119). QuestPDF ships no fonts of its own, so PT Sans
          is embedded below - see SharedKernel/Pdf/PdfFonts.cs for why the document must not depend on
