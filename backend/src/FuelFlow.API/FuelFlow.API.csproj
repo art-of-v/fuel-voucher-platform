@@ -46,7 +46,7 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="9.0.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
-    <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.11.0" />
     
     <!-- Shared packages from Application and Infrastructure -->
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
