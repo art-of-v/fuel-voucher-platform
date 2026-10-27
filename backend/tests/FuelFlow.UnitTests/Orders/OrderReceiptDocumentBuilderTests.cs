@@ -56,7 +56,7 @@ public sealed class OrderReceiptDocumentBuilderTests
         AcquirerName = "Monobank",
         AcquirerStatus = "Success",
         CompanyName = "ТОВ «Європейський Паливо»",
-        Lines = [new ReceiptLine("okko-dp", 25.5m, 2, 24.20m, 1234.56m)]
+        Lines = [new ReceiptLine(2, 24.20m, 1234.56m)]
     };
 
     [Fact]
@@ -86,24 +86,12 @@ public sealed class OrderReceiptDocumentBuilderTests
     }
 
     [Fact]
-    public void The_document_sells_the_service_and_names_the_fuel_only_as_the_nominal()
+    public void The_document_sells_the_advertising_service_and_names_nothing_else()
     {
-        // The QR code is bought under the advertising contract; the fuel is sold by the station. A
-        // receipt whose first column reads as the fuel describes a sale of fuel, which is the claim
-        // this document must not make.
+        // The QR code is bought under the advertising contract; the fuel is sold and dispensed by the
+        // station. A receipt whose line names a fuel describes a sale of fuel, and that is the claim
+        // this document must not make. ReceiptLine carries no fuel and no volume, so no line can.
         OrderReceiptDocumentBuilder.ServiceLabel.Should().Be("Рекламні послуги");
-
-        OrderReceiptDocumentBuilder.NominalOf(new ReceiptLine("А-95", 10m, 1, 862.00m, 862.00m))
-            .Should().Be("А-95 / 10 л");
-    }
-
-    [Theory]
-    [InlineData("ДП ЄВРО", 1f, "ДП ЄВРО / 1 л")]
-    [InlineData("А 95+", 39.5f, "А 95+ / 39.5 л")]
-    public void The_nominal_reads_the_volume_without_inventing_decimals(string fuel, float liters, string expected)
-    {
-        OrderReceiptDocumentBuilder.NominalOf(new ReceiptLine(fuel, (decimal)liters, 1, 0m, 0m))
-            .Should().Be(expected);
     }
 
     [Theory]

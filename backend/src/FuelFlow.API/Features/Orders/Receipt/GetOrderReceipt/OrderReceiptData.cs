@@ -29,17 +29,13 @@ public sealed class OrderReceiptData
     /// admin UI, so the two must not be able to drift apart.
     /// </remarks>
     public required decimal RefundableKopecks { get; init; }
-
-    /// <summary>
-    /// Fuel type id to the name a customer should read, e.g. "3808d410-..." to "А 95+".
-    /// </summary>
-    public required IReadOnlyDictionary<Guid, string> FuelNames { get; init; }
 }
 
-/// <summary>One line of the receipt: what was bought, at what price.</summary>
+/// <summary>
+/// One paid line of the order, reduced to what the payment document prints: how many codes, at what
+/// price, for what sum. The fuel and the volume stay out - they describe the code, not the sale.
+/// </summary>
 public sealed record OrderReceiptLineData(
-    Guid FuelTypeId,
-    decimal Liters,
     int Quantity,
     decimal UnitPrice,
     decimal LineTotal);
