@@ -42,7 +42,7 @@ public static class BusinessGaugeSetup
                 using var scope = scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                return db.FuelVouchers
+                var byBrandAndFuel = db.FuelVouchers
                     .Where(v => v.AssignedToUserId == null
                         && !v.IsDeleted
                         && v.Status == VoucherStatus.Available)
@@ -54,6 +54,8 @@ public static class BusinessGaugeSetup
                         new KeyValuePair<string, object?>("brand", x.Brand),
                         new KeyValuePair<string, object?>("fuel_type", x.FuelTypeId)))
                     .ToList();
+
+                return ZeroWhenEmpty(byBrandAndFuel);
             }
             catch (Exception ex)
             {
@@ -79,7 +81,7 @@ public static class BusinessGaugeSetup
                 // otherwise sit here forever, unpaid and unfulfillable, with nothing to show for it.
                 var stuckBefore = SystemClock.UtcNow.AddMinutes(-options.ReconciliationMinAgeMinutes);
 
-                return db.Orders
+                var byMerchant = db.Orders
                     .Where(o => o.Status == OrderStatus.PendingPayment
                              && o.MonobankInvoiceId != null
                              && o.CreatedAtUtc < stuckBefore)
@@ -90,6 +92,8 @@ public static class BusinessGaugeSetup
                         x.Count,
                         new KeyValuePair<string, object?>("merchant", x.Merchant.ToString())))
                     .ToList();
+
+                return ZeroWhenEmpty(byMerchant);
             }
             catch (Exception ex)
             {
@@ -100,4 +104,24 @@ public static class BusinessGaugeSetup
 
         return host;
     }
+
+    /// <summary>
+    /// A gauge with nothing to count still has something to report: zero.
+    /// <para>
+    /// An observable gauge returns measurements, and an empty sequence emits no series at all.
+    /// Prometheus therefore has no sample for <c>fuelflow_vouchers_pool_available_vouchers</c> when
+    /// the pool is empty, the rule evaluating it sees no data instead of a 0, and a system with
+    /// nothing left to sell is indistinguishable from an exporter that stopped reporting. That is
+    /// what production did until 2026-10-27: the gauge was registered correctly and emitted nothing,
+    /// so <c>VoucherPoolLow</c> sat in NoData instead of saying the pool was empty.
+    /// </para>
+    /// <para>
+    /// An empty <em>result</em> becomes 0. A failed read deliberately does not: the callers return
+    /// an empty sequence from their catch block, and that must stay NoData - "could not count" is
+    /// not "counted, and it is zero", and reporting a broken read as a healthy zero would silence
+    /// the one alert that can see it.
+    /// </para>
+    /// </summary>
+    private static IEnumerable<Measurement<int>> ZeroWhenEmpty(List<Measurement<int>> measurements) =>
+        measurements.Count > 0 ? measurements : [new Measurement<int>(0)];
 }
