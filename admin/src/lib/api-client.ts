@@ -170,12 +170,11 @@ async function readError(response: Response): Promise<{
     // The fuel list a refused activation names. Same care as `data`: the body arrives untyped, and a
     // half-shaped entry would reach the toast as "undefined (undefined)".
     if (Array.isArray(errorData?.unpricedFuels)) {
-      const named = (errorData.unpricedFuels as unknown[])
-        .filter(
-          (entry): entry is UnpricedFuel =>
-            typeof (entry as UnpricedFuel)?.name === "string" &&
-            typeof (entry as UnpricedFuel)?.gap === "string",
-        );
+      const named = (errorData.unpricedFuels as unknown[]).filter(
+        (entry): entry is UnpricedFuel =>
+          typeof (entry as UnpricedFuel)?.name === "string" &&
+          typeof (entry as UnpricedFuel)?.gap === "string",
+      );
       if (named.length > 0) unpricedFuels = named;
     }
   } catch {
@@ -351,8 +350,12 @@ export const apiBlob = async (
   }
 
   if (!response.ok) {
-    const { message, code, data: errorData, unpricedFuels } =
-      await readError(response);
+    const {
+      message,
+      code,
+      data: errorData,
+      unpricedFuels,
+    } = await readError(response);
     throw new ApiError(message, code, errorData, unpricedFuels);
   }
 
