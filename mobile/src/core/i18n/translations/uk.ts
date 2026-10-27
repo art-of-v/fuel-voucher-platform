@@ -116,6 +116,7 @@ export const uk: Record<string, string> = {
   'stations.title2': 'МЕРЕЖУ',
   'stations.initializing': 'ІНІЦІАЛІЗАЦІЯ МЕРЕЖІ...',
   'stations.onlineReady': 'ONLINE \u2022 READY',
+  'stations.outOfStock': 'Немає на складі',
 
   'packages.title': 'ОБЕРІТЬ ПАКЕТ',
   'packages.subtitle': "ВИБІР ОБ'ЄМУ",

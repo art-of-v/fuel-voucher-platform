@@ -119,6 +119,7 @@ export const de: Record<string, string> = {
   'stations.title2': 'WÄHLEN',
   'stations.initializing': 'NETZWERK WIRD INITIALISIERT...',
   'stations.onlineReady': 'ONLINE \u2022 READY',
+  'stations.outOfStock': 'Nicht auf Lager',
 
   'packages.title': 'PAKET WÄHLEN',
   'packages.subtitle': 'VOLUMENOPTIONEN',

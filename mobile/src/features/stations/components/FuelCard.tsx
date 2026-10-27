@@ -2,13 +2,14 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
 import { Fuel } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
 import { formatMoney } from '../../../core/utils/currency';
 import { Haptics } from '../../../core/utils/haptics';
 import { MeshBackground } from '../../../core/ui';
 import { GlowText } from '../../../components/glow-text';
 import type { Station, FuelType } from '../../../core/types/api';
 import { BRAND_COLORS } from '../../../core/design/tokens';
-import { fuelHeadlinePrice, fuelSaving } from '../lib/pricing';
+import { canSell, fuelHeadlinePrice, fuelSaving } from '../lib/pricing';
 
 const ACCENT_WIDTH = 12;
 
@@ -21,6 +22,7 @@ interface FuelCardProps {
 
 export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   const tokens = useDesignTokens();
+  const { t } = useI18n();
   const soft = tokens.surface.soft;
   // Keyed by slug, not by id: the palette holds the networks we carry, and the id is a uuid
   // that would miss every entry.
@@ -87,6 +89,10 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   // Which price this row shows: ours when the shop can sell the fuel, the column price when it
   // cannot - and nothing at all when we have no number, because "0 ₴" is a free fuel.
   const price = fuelHeadlinePrice(fuel);
+  // The same question the price and the saving ask. The row answers it in COLOUR as well as in
+  // words: an empty shelf keeps the brand accent and the brand price, a fuel we cannot sell drops
+  // to grey and says so, so the customer can tell the two apart without opening the fuel.
+  const sellable = canSell(fuel);
 
   return (
     <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
@@ -108,15 +114,18 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
               backgroundColor: tokens.colors.card,
               borderColor: tokens.colors.borderLight,
               borderRadius: soft ? tokens.surface.card : undefined,
+              // An empty shelf sits back rather than competing with the fuels we can sell. The dim
+              // is on the card and not on the entrance animation's opacity, which owns that value.
+              opacity: sellable ? 1 : 0.55,
             },
           ]}
         >
-          <MeshBackground color={brandColor} intensity={0.05} />
+          <MeshBackground color={brandColor} intensity={sellable ? 0.05 : 0.02} />
           <View
             style={[
               styles.accent,
               {
-                backgroundColor: brandColor,
+                backgroundColor: sellable ? brandColor : tokens.colors.text.disabled,
                 width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH,
               },
             ]}
@@ -128,12 +137,17 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                 style={[
                   styles.iconBox,
                   {
-                    backgroundColor: brandColor,
+                    backgroundColor: sellable ? brandColor : tokens.colors.surfaceSunken,
+                    borderColor: tokens.colors.border,
+                    borderWidth: sellable ? 0 : 1,
                     borderRadius: soft ? tokens.surface.icon : undefined,
                   },
                 ]}
               >
-                <Fuel size={24} color={tokens.colors.text.onPrimary} />
+                <Fuel
+                  size={24}
+                  color={sellable ? tokens.colors.text.onPrimary : tokens.colors.text.muted}
+                />
               </View>
               <View style={styles.textStack}>
                 <Text
@@ -161,6 +175,15 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                     >
                       —
                     </Text>
+                  ) : !sellable ? (
+                    // The column price is a number the customer still needs - it is what the market
+                    // charges - but it is not OUR price, so it does not wear the brand's colour.
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.discountPrice, { color: tokens.colors.text.secondary }]}
+                    >
+                      {formatMoney(price)}
+                    </Text>
                   ) : soft ? (
                     <Text
                       allowFontScaling={false}
@@ -182,7 +205,28 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
               </View>
             </View>
 
-            {hasSaving && (
+            {/* One slot, two answers: what the customer saves, or why they cannot buy at all. The
+                two never appear together, because a fuel we cannot sell has no saving. */}
+            {!sellable ? (
+              <View
+                style={[
+                  styles.outOfStockBadge,
+                  {
+                    backgroundColor: tokens.colors.surfaceSunken,
+                    borderColor: tokens.colors.border,
+                    borderRadius: tokens.surface.pill,
+                  },
+                ]}
+              >
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  style={[styles.outOfStockText, { color: tokens.colors.text.muted }]}
+                >
+                  {t('stations.outOfStock')}
+                </Text>
+              </View>
+            ) : hasSaving ? (
               <View
                 style={[
                   styles.savingsBadge,
@@ -215,7 +259,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
                   </Text>
                 </View>
               </View>
-            )}
+            ) : null}
           </View>
         </Animated.View>
       </Pressable>
@@ -301,5 +345,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Black',
     fontSize: 14,
     opacity: 0.9,
+  },
+  outOfStockBadge: {
+    // Sits in the savings pill's slot: the row is 118 tall and has no second line to spend, so the
+    // answer to "can I buy this" goes where the answer to "what do I save" would have gone.
+    flexShrink: 0,
+    height: 36,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outOfStockText: {
+    fontFamily: 'Inter-Black',
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
 });

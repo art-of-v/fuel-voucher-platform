@@ -1,4 +1,4 @@
-import { fuelHeadlinePrice, fuelSaving } from './pricing';
+import { canSell, fuelHeadlinePrice, fuelSaving } from './pricing';
 
 describe('fuelSaving', () => {
   it('reports a real discount when basePrice is above discountPrice', () => {
@@ -141,5 +141,14 @@ describe('the price and the saving answer the same question', () => {
       amount: 0,
       hasSaving: false,
     });
+  });
+
+  it('counts only an explicit true as sellable', () => {
+    // The card dims itself and prints the out-of-stock label on this predicate, so a payload that
+    // does not carry the flag - a cached or an older one - must not light the row up as if the
+    // fuel were on the shelf.
+    expect(canSell({ isAvailable: true })).toBe(true);
+    expect(canSell({ isAvailable: false })).toBe(false);
+    expect(canSell({})).toBe(false);
   });
 });

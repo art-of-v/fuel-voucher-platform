@@ -115,6 +115,7 @@ export const en: Record<string, string> = {
   'stations.title2': 'NETWORK',
   'stations.initializing': 'INITIALIZING NETWORK...',
   'stations.onlineReady': 'ONLINE \u2022 READY',
+  'stations.outOfStock': 'Out of stock',
 
   'packages.title': 'SELECT PACKAGE',
   'packages.subtitle': 'VOLUME OPTIONS',
