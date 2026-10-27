@@ -47,11 +47,11 @@
     {
       "type": "stat",
       "title": "Requests / sec",
-      "description": "API only. The worker exposes no HTTP surface beyond /metrics and health.",
+      "description": "API only. The worker exposes no HTTP surface beyond /metrics and health. The `or vector(0)` is not decoration: sum() over an empty set is an empty result, not a zero, so an idle service would otherwise show No data instead of 0 req/s.",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
-        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=~\"$job\"}[5m]))", "legendFormat": "req/s", "refId": "A" }
+        { "expr": "sum(rate(http_server_request_duration_seconds_count{job=~\"$job\"}[5m])) or vector(0)", "legendFormat": "req/s", "refId": "A" }
       ],
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 }, "overrides": [] }
@@ -59,12 +59,12 @@
     {
       "type": "stat",
       "title": "5xx ratio",
-      "description": "Matches the HighServerErrorRate alert, which fires above 5% for 5m.",
+      "description": "Matches the HighServerErrorRate alert, which fires above 5% for 5m. The ratio is bracketed before `or vector(0)`, because `or` binds looser than `/`: without the brackets the fallback would join only the divisor and the ratio would stay empty.",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{job=~\"$job\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{job=~\"$job\"}[5m])), 1e-9)",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{job=~\"$job\",http_response_status_code=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{job=~\"$job\"}[5m])), 1e-9)) or vector(0)",
           "legendFormat": "5xx",
           "refId": "A"
         }
@@ -82,7 +82,7 @@
     {
       "type": "stat",
       "title": "p95 latency",
-      "description": "Matches the HighRequestLatency alert, which fires above 2s for 10m.",
+      "description": "Matches the HighRequestLatency alert, which fires above 2s for 10m. No data here means no request was served in the window - a correct reading for an idle service, not a broken query.",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
@@ -105,6 +105,7 @@
     {
       "type": "timeseries",
       "title": "Request rate by status code",
+      "description": "No data means nothing was requested in the window. The 401 and 429 lines are the scanners, not the customers.",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
@@ -119,6 +120,7 @@
     {
       "type": "timeseries",
       "title": "Request latency percentiles",
+      "description": "No data means no request was served in the window - an idle service, not a broken query.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
@@ -131,12 +133,12 @@
     {
       "type": "timeseries",
       "title": "Slowest endpoints (p95)",
-      "description": "Route templates, not raw paths, so cardinality stays bounded.",
+      "description": "Route templates, not raw paths, so cardinality stays bounded. The `and on (http_route)` drops the routes that served nothing in the window: histogram_quantile returns NaN for those, and topk keeps NaN, so without it the panel fills with NaN lines instead of the slowest routes.",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
         {
-          "expr": "topk(5, histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\"}[5m]))))",
+          "expr": "topk(5, histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=~\"$job\"}[5m]))) and on (http_route) (sum by (http_route) (rate(http_server_request_duration_seconds_count{job=~\"$job\"}[5m])) > 0))",
           "legendFormat": "{{http_route}}",
           "refId": "A"
         }
@@ -146,11 +148,12 @@
     {
       "type": "timeseries",
       "title": "Database query duration (p95)",
+      "description": "No data means no query ran in the window. The `and on (job)` drops the jobs that queried nothing: histogram_quantile returns NaN for those.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, job) (rate(db_client_operation_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, job) (rate(db_client_operation_duration_seconds_bucket{job=~\"$job\"}[5m]))) and on (job) (sum by (job) (rate(db_client_operation_duration_seconds_count{job=~\"$job\"}[5m])) > 0)",
           "legendFormat": "{{job}}",
           "refId": "A"
         }
@@ -160,21 +163,23 @@
     {
       "type": "timeseries",
       "title": "Managed memory",
+      "description": "Working set (the process RSS) against the managed heap the GC reports after the last collection - the gap between them is what the runtime holds outside the heap.",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
         { "expr": "process_memory_usage_bytes{job=~\"$job\"}", "legendFormat": "{{job}} working set", "refId": "A" },
-        { "expr": "sum by (job) (process_runtime_dotnet_gc_heap_size_bytes{job=~\"$job\"})", "legendFormat": "{{job}} heap", "refId": "B" }
+        { "expr": "sum by (job) (dotnet_gc_last_collection_heap_size_bytes{job=~\"$job\"})", "legendFormat": "{{job}} heap", "refId": "B" }
       ],
       "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
     },
     {
       "type": "timeseries",
       "title": "GC collections / sec",
+      "description": "Every generation together. A rate that climbs with the request rate means the allocation rate is climbing with it.",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
-        { "expr": "sum by (job) (rate(process_runtime_dotnet_gc_collections_count_total{job=~\"$job\"}[5m]))", "legendFormat": "{{job}} collections", "refId": "A" }
+        { "expr": "sum by (job) (rate(dotnet_gc_collections_total{job=~\"$job\"}[5m]))", "legendFormat": "{{job}} collections", "refId": "A" }
       ],
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
     },
