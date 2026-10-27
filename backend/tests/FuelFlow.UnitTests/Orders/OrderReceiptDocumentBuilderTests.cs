@@ -55,7 +55,10 @@ public sealed class OrderReceiptDocumentBuilderTests
         AcquirerInvoiceId = "2A3B4C5D",
         AcquirerName = "Monobank",
         AcquirerStatus = "Success",
-        CompanyName = "ТОВ «Європейський Паливо»",
+        // A buyer's company, which is what the receipt's "Компанія:" line prints. Deliberately
+        // anonymous: a fixture named after a real-looking fuel company reads like our own name and
+        // sent someone looking for it in the code.
+        CompanyName = "ТОВ «Тестова компанія»",
         Lines = [new ReceiptLine(2, 24.20m, 1234.56m)]
     };
 
