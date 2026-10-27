@@ -29,6 +29,9 @@ public class LogAlertRuleContractTests
     private static string DbContextPath() => Path.Combine(
         RepositoryRoot(), "backend", "src", "FuelFlow.API", "Persistence", "ApplicationDbContext.cs");
 
+    private static string MetricsJobFilterPath() => Path.Combine(
+        RepositoryRoot(), "backend", "src", "FuelFlow.API", "SharedKernel", "Observability", "MetricsJobFilter.cs");
+
     private static string RepositoryRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -85,6 +88,48 @@ public class LogAlertRuleContractTests
         // start paging) and it should be a deliberate one, caught here.
         context.Should().Contain("LogWarning",
             "the detector logs at Warning; raising it to Error would page the operator on every collision");
+    }
+
+    /// <summary>
+    /// A job failure has to be readable and told on the first hit, not only counted.
+    /// <para>
+    /// <c>HangfireJobFailures</c> thresholds a rate over ten minutes and only after ten minutes of
+    /// it, so a daily job that fails once resolves before it can ever fire - the failure is real,
+    /// the counter records it, and nobody is told. The log line is the durable record and the
+    /// place the exception lives, which is why it gets a rule of its own rather than being left to
+    /// <c>LogErrorBurst</c> (five error lines a minute for five minutes).
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void JobFailures_AreAlertedOnFromTheLogLine_NotOnlyTheMetric()
+    {
+        var rules = ReadFile(RulesPath());
+
+        rules.Should().Contain("fuelflow-job-failed",
+            "a single failure of a daily job can resolve before the rate-based HangfireJobFailures rule fires");
+        rules.Should().Contain("|= \"Background job\"",
+            "the rule matches the prefix MetricsJobFilter writes for every finished run");
+    }
+
+    /// <summary>
+    /// The rule groups by the JSON body fields, so the sink has to write them and the filter has
+    /// to fill them with the job's own names. Both ends are pinned here because a renamed template
+    /// would leave the rule matching zero lines, which reads as "no job ever fails".
+    /// </summary>
+    [Fact]
+    public void JobFailureLine_CarriesTheFieldsTheRuleGroupsBy_AndIsWrittenAtError()
+    {
+        var rules = ReadFile(RulesPath());
+        rules.Should().Contain(
+            "sum by (JobType, JobName) (count_over_time({level=\"error\"} |= \"Background job\" | json [30m]))",
+            "dropping | json or level=\"error\" would silently turn the rule into one that matches nothing");
+
+        var source = ReadFile(MetricsJobFilterPath());
+        source.Should().MatchRegex(
+            @"LogError\(\s*context\.Exception,\s*""Background job \{JobType\}\.\{JobName\} failed after",
+            "the rule matches this exact prefix at level=error, so the filter has to write it");
+        source.Should().Contain("LogWarning",
+            "a cancelled run is a deploy, not a defect - raising it to Error would page the operator for a restart");
     }
 
     [Fact]
