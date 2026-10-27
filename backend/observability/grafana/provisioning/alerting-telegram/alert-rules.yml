@@ -336,7 +336,12 @@ groups:
         execErrState: OK
         annotations:
           summary: "Voucher pool is running low"
-          description: "Only {{ $values.B }} unassigned vouchers remain."
+          # The gauge reports one series per brand and fuel type, so this rule has one instance per
+          # combination - and without the labels in the message, three exhausted combinations would
+          # arrive as three identical lines. The pool gauge also emits a single untagged zero when
+          # there is no inventory at all, and then the labels are empty and the sentence stays as it
+          # was.
+          description: "Only {{ $values.B }} unassigned vouchers remain{{ if $labels.brand }} for {{ $labels.brand }} {{ $labels.fuel_type }}{{ end }}."
         labels:
           severity: warning
         data:
