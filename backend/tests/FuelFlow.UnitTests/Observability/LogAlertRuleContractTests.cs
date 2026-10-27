@@ -100,6 +100,30 @@ public class LogAlertRuleContractTests
         uids.Should().OnlyHaveUniqueItems("Grafana silently drops a duplicate uid, so two rules would collapse into one");
     }
 
+    /// <summary>
+    /// A price move has to leave a line the operator can find, and production logs at Information.
+    /// <para>
+    /// Measured on 2026-10-27: UPG's gas and three WOG grades had moved since the log window opened,
+    /// and neither sync had written anything - the summary was Debug. OKKO and KLO log the same
+    /// event at Information, so the only search that answered "when did this move?" was
+    /// <c>fuel_price_history</c>. Nothing failed and nothing alerted; the record simply was not there.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void UpgWogRepricing_IsLoggedAtInformation()
+    {
+        var source = ReadFile(Path.Combine(
+            RepositoryRoot(), "backend", "src", "FuelFlow.API", "BackgroundJobs", "UpgWogPriceSyncService.cs"));
+
+        source.Should().MatchRegex(
+            @"LogInformation\(\s*""\{Brand\} sync repriced",
+            "production's minimum level is Information, so the repricing summary has to be written at Information");
+
+        source.Should().NotMatchRegex(
+            @"LogDebug\(\s*""\{Brand\} sync repriced",
+            "a repricing summary at Debug reaches no log, no search and no alert");
+    }
+
     [Fact]
     public void EveryLokiRule_DeclaresATitle()
     {

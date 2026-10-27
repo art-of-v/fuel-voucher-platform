@@ -6,6 +6,18 @@ apiVersion: 1
 #
 # Grafana sends BOTH firing and resolved notifications, so "app is down" (firing) and
 # "app is up" (resolved) are the same rule - see contact-points.yml message template.
+#
+# A rule whose HEALTHY value is zero has to say so, and it is not decoration. PromQL returns no
+# series at all for a counter/label pair that has never been observed, and an observable gauge fed
+# no rows emits nothing either; a Loki query over zero matching lines returns nothing by its own
+# nature. So a system behaving perfectly produces an empty result, the rule sits in NoData for
+# ever, and that looks exactly like an exporter that stopped reporting. Measured on 2026-10-27:
+# nine of thirteen rules had been in NoData since the volumes were recreated, and a Telegram was
+# going out every four hours. Two mechanisms, one per datasource:
+#   - Prometheus rules carry `or vector(0)`: the healthy case becomes an honest 0 = Normal. A
+#     scrape that genuinely fails is ServiceDown's job to report, not theirs.
+#   - Loki rules carry `noDataState: OK`: "no matching lines" IS the healthy state, so NoData
+#     must not be a state that notifies.
 groups:
   - orgId: 1
     name: fuelflow-availability
@@ -70,10 +82,15 @@ groups:
             datasourceUid: fuelflow-prometheus
             model:
               refId: A
+              # Grouped, because `or` has the lowest precedence: without the parentheses the
+              # right-hand vector(0) would join only the divisor and the ratio would stay empty.
               expr: |
-                sum by (job, service, environment) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
-                  /
-                clamp_min(sum by (job, service, environment) (rate(http_server_request_duration_seconds_count[5m])), 0.0001)
+                (
+                  sum by (job, service, environment) (rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m]))
+                    /
+                  clamp_min(sum by (job, service, environment) (rate(http_server_request_duration_seconds_count[5m])), 0.0001)
+                )
+                  or vector(0)
               instant: false
               range: true
           - refId: B
@@ -211,7 +228,7 @@ groups:
         title: ConcurrencyConflict
         condition: C
         for: 0m
-        noDataState: NoData
+        noDataState: OK
         execErrState: OK
         annotations:
           summary: "{{ $labels.service }} hit a concurrency conflict ({{ $values.B }})"
@@ -246,7 +263,7 @@ groups:
         title: LogErrorBurst
         condition: C
         for: 5m
-        noDataState: NoData
+        noDataState: OK
         execErrState: OK
         annotations:
           summary: "{{ $labels.service }} is logging errors"
@@ -279,7 +296,7 @@ groups:
         title: LogFatal
         condition: C
         for: 0m
-        noDataState: NoData
+        noDataState: OK
         execErrState: OK
         annotations:
           summary: "{{ $labels.service }} logged a FATAL error"
@@ -328,7 +345,7 @@ groups:
             datasourceUid: fuelflow-prometheus
             model:
               refId: A
-              expr: fuelflow_vouchers_pool_available_vouchers
+              expr: fuelflow_vouchers_pool_available_vouchers or vector(0)
               instant: false
               range: true
           - refId: B
@@ -360,7 +377,7 @@ groups:
             datasourceUid: fuelflow-prometheus
             model:
               refId: A
-              expr: sum by (job, service, environment) (rate(fuelflow_fulfillment_failed_orders_total[10m]))
+              expr: sum by (job, service, environment) (rate(fuelflow_fulfillment_failed_orders_total[10m])) or vector(0)
               instant: false
               range: true
           - refId: B
@@ -392,7 +409,7 @@ groups:
             datasourceUid: fuelflow-prometheus
             model:
               refId: A
-              expr: sum by (job, service, environment) (rate(fuelflow_jobs_failed_jobs_total[10m]))
+              expr: sum by (job, service, environment) (rate(fuelflow_jobs_failed_jobs_total[10m])) or vector(0)
               instant: false
               range: true
           - refId: B
@@ -434,7 +451,7 @@ groups:
               refId: A
               # sum(), not the per-merchant series: the alert is about money being stuck, and
               # one message per stuck order would be noise during an incident.
-              expr: sum(fuelflow_payments_stuck_pending_payment)
+              expr: sum(fuelflow_payments_stuck_pending_payment) or vector(0)
               instant: false
               range: true
           - refId: B
@@ -476,7 +493,7 @@ groups:
             datasourceUid: fuelflow-prometheus
             model:
               refId: A
-              expr: sum by (service, environment) (rate(fuelflow_auth_refresh_events_total{outcome="reuse_revoked"}[10m]))
+              expr: sum by (service, environment) (rate(fuelflow_auth_refresh_events_total{outcome="reuse_revoked"}[10m])) or vector(0)
               instant: false
               range: true
           - refId: B

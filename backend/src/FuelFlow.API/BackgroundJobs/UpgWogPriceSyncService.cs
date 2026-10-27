@@ -154,10 +154,21 @@ public sealed class UpgWogPriceSyncService
                     string.Join(" | ", result.Held.Select(g => $"{g.Code} = \"{g.OurFuelName}\"")));
             }
 
-            if (result.Repriced.Count > 0)
+            // Repriced lists every fuel the sheet matched, changed or not - "the sheet says 92.90 and
+            // so do we" is not news every fifteen minutes. Only a move is.
+            var moved = result.Repriced.Where(f => f.Changed).ToList();
+            if (moved.Count > 0)
             {
-                _logger.LogDebug(
-                    "{Brand} sync repriced {Count} fuel(s).", brand, result.Repriced.Count);
+                // Information, not Debug, and it has to stay that way: a price move is the one thing
+                // this job exists to do, and production logs at Information. Measured on 2026-10-27,
+                // UPG's gas and three WOG grades had moved since the window opened and left no line
+                // anywhere - OKKO and KLO log the same event at Information, so the only search that
+                // answered "when did this move?" was fuel_price_history.
+                _logger.LogInformation(
+                    "{Brand} sync repriced {Count} of {Matched} fuel(s): {Fuels}.",
+                    brand, moved.Count, result.Repriced.Count,
+                    string.Join(", ", moved.Select(f =>
+                        $"{f.Name} {f.PreviousPumpPerLiter?.ToString("F2") ?? "none"} → {f.PumpPerLiter:F2}")));
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
