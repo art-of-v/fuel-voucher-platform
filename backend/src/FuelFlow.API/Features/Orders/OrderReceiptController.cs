@@ -81,12 +81,11 @@ public sealed class OrderReceiptController : ControllerBase
             AcquirerName = receipt.MonobankInvoiceId is null ? null : "Monobank",
             AcquirerStatus = receipt.MonobankStatus?.ToString(),
             CompanyName = receipt.CompanyName,
+            // A line contributes its count and its money, and nothing else: the document sells one
+            // service, and what the code is redeemable for is a property of the code, not of the
+            // payment - naming it here would put a sale of fuel back on the receipt.
             Lines = receipt.Lines
-                .Select(l => new ReceiptLine(
-                    // The line stores a fuel type ID, which for real fuels is a GUID. The nominal
-                    // column says what the code is redeemable for, so it prints the catalog name.
-                    receipt.FuelNames.TryGetValue(l.FuelTypeId, out var name) ? name : l.FuelTypeId.ToString(),
-                    l.Liters, l.Quantity, l.UnitPrice, l.LineTotal))
+                .Select(l => new ReceiptLine(l.Quantity, l.UnitPrice, l.LineTotal))
                 .ToList(),
             Refund = BuildRefundSection(receipt.Status, receipt.RefundableKopecks, receipt.RefundedAtUtc, receipt.Id)
         };

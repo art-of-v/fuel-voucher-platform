@@ -54,13 +54,6 @@ public sealed class GetOrderReceiptQueryHandler
                 .Select(le => le.Name)
                 .FirstOrDefaultAsync(cancellationToken);
 
-        // The line stores the fuel type ID, which for real fuels is a GUID. Printing it makes the
-        // receipt's fuel column unreadable, so the names come from the catalog the customer saw.
-        var fuelIds = order.LineItems.Select(li => li.FuelTypeId).Distinct().ToList();
-        var fuelNames = await _context.FuelTypes
-            .Where(ft => fuelIds.Contains(ft.Id))
-            .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
-
         // The refund row knows when the refund was actually recorded; UpdatedAtUtc moves on any
         // later edit to the order, which is not when the money went back.
         var refundedAtUtc = await _context.Payments
@@ -80,13 +73,12 @@ public sealed class GetOrderReceiptQueryHandler
             MonobankInvoiceId = order.MonobankInvoiceId,
             MonobankStatus = order.MonobankStatus,
             CompanyName = companyName,
-            FuelNames = fuelNames,
             // Computed once, by the one function that defines it: the receipt and the refund
             // button have to agree, and calling it twice to share a condition and a value would
             // let them disagree if it ever stopped being pure.
             RefundableKopecks = RefundOrderCommandHandler.ComputeRefundAmountKopecks(order),
             Lines = order.LineItems
-                .Select(li => new OrderReceiptLineData(li.FuelTypeId, li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))
+                .Select(li => new OrderReceiptLineData(li.Quantity, li.UnitPrice, li.LineTotal))
                 .ToList()
         };
     }
