@@ -143,10 +143,17 @@ public class MetricNameContractTests
     private static bool IsCounter(Instrument instrument) =>
         instrument.GetType().GetGenericTypeDefinition() == typeof(Counter<>);
 
+    /// <summary>
+    /// Reads the Grafana rules, not a copy of them. Prometheus used to carry a second set in
+    /// observability/prometheus/rules/; nothing delivered those (no Alertmanager is configured),
+    /// so this test guarded the copy that could not notify while the rules that do notify were
+    /// unchecked. The file is gone and the guard points at the only source.
+    /// </summary>
     [Fact]
     public void EveryFuelFlowMetricReferencedByAlertRules_ExistsAsAnInstrument()
     {
-        var rulesPath = Path.Combine(RepositoryRoot(), "backend", "observability", "prometheus", "rules", "fuelflow-alerts.yml");
+        var rulesPath = Path.Combine(
+            RepositoryRoot(), "backend", "observability", "grafana", "provisioning", "alerting-telegram", "alert-rules.yml");
         File.Exists(rulesPath).Should().BeTrue($"alert rules were expected at {rulesPath}");
 
         var exported = GetExportedMetricNames();

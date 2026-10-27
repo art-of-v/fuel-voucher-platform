@@ -20,8 +20,9 @@
 # Dashboards and alert rules are provisioned from backend/observability/ (shared
 # with local development, guarded by MetricNameContractTests); the production
 # Prometheus targets live in observability/prometheus/prometheus.yml next to this
-# file. Loki reuses the dev config, which already caps retention at 7 days with
-# the compactor enabled.
+# file. Prometheus evaluates no rules of its own - every alert is a Grafana rule,
+# which is the only path that can notify. Loki reuses the dev config, which keeps
+# 15 days and runs the compactor, so the window matches Prometheus' 15d.
 #
 # Logs reach Loki through the API's in-app Serilog sink
 # (Observability__Loki__Enabled in docker-compose.prod.yml), so events carry
@@ -55,7 +56,6 @@ services:
       - --web.enable-lifecycle
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../backend/observability/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     networks: [fuelflow, observability]
 

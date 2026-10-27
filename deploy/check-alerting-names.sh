@@ -21,9 +21,9 @@
 # fulfilment, the failed Hangfire job, the payment stuck in pending, the refresh-token
 # reuse spike - was an `absent()` that could never fire.
 #
-# The Prometheus rules file says in its own header that no Alertmanager is configured, so
-# the Grafana-managed rules are the only channel that actually notifies anybody. They read
-# the same metrics, so the Telegram channel was blind for the same reason.
+# No Alertmanager is configured, so the Grafana-managed rules are the only channel that
+# actually notifies anybody (the second, native copy of them was removed for exactly that
+# reason). They read the same metrics, so the Telegram channel was blind for the same reason.
 #
 # The fix landed, and nothing checks it. This is the SECOND time a rename has silently
 # broken a name in this file, and the first time it did, the whole chain went dark for a

@@ -29,8 +29,13 @@ schema_config:
 
 limits_config:
   reject_old_samples: false
-  # Local dev only; keeps the volume from growing without bound.
-  retention_period: 168h
+  # Production mounts this same file, so the number is a production decision, not a dev default.
+  # Seven days was shorter than the questions the dashboards ask: a weekly job is only visible in
+  # the window between two runs, and its last failure could age out before anyone looked. Fifteen
+  # days matches Prometheus' --storage.tsdb.retention.time=15d on both stacks, so a metric and the
+  # log line that explains it are always queryable over the same window. The compactor deletes
+  # what falls out, which is what `retention_enabled` below turns on.
+  retention_period: 360h
 
 compactor:
   working_directory: /loki/compactor

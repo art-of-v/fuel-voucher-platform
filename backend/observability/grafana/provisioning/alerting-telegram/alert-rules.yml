@@ -4,6 +4,11 @@ apiVersion: 1
 # about itself (a dead process cannot send a Telegram message), so they are evaluated
 # by Grafana against Prometheus and delivered through the `telegram` contact point.
 #
+# This file is the only alert-rule source. Prometheus used to carry a second copy of
+# the same thresholds in observability/prometheus/rules/; no Alertmanager was ever
+# configured, so that copy could not notify anybody and could only drift - the two
+# had already diverged on labels. It was removed, and Prometheus now scrapes only.
+#
 # Grafana sends BOTH firing and resolved notifications, so "app is down" (firing) and
 # "app is up" (resolved) are the same rule - see contact-points.yml message template.
 #
@@ -520,8 +525,7 @@ groups:
       # Strict refresh-token reuse detection revoked a token family. Benign lost-rotation
       # replays are absorbed by the grace window (#26) as grace_recovered and are NOT counted
       # here, so a sustained reuse_revoked rate is a genuine stolen-token replay or a client
-      # leaking rotations past RefreshReuseGraceSeconds. Keep in sync with the Prometheus
-      # RefreshTokenReuseSpike rule in prometheus/rules/fuelflow-alerts.yml.
+      # leaking rotations past RefreshReuseGraceSeconds.
       - uid: fuelflow-refresh-reuse-spike
         title: RefreshTokenReuseSpike
         condition: C
