@@ -92,12 +92,30 @@ export class ApiError extends Error {
    * inside an English sentence, so it travels beside the code as data.
    */
   readonly data?: Record<string, number>;
-  constructor(message: string, code?: string, data?: Record<string, number>) {
+  /**
+   * The fuels a refused activation named, with the half of the price each of them lacks
+   * (`"cost"`, `"margin"`, `"cost_and_margin"`). Names are not numbers, so they do not fit in
+   * `data` and travel under their own key of the problem document instead.
+   */
+  readonly unpricedFuels?: UnpricedFuel[];
+  constructor(
+    message: string,
+    code?: string,
+    data?: Record<string, number>,
+    unpricedFuels?: UnpricedFuel[],
+  ) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.data = data;
+    this.unpricedFuels = unpricedFuels;
   }
+}
+
+/** One fuel an activation refused over: what it is called, and what its price is missing. */
+export interface UnpricedFuel {
+  name: string;
+  gap: string;
 }
 
 // Pulls the most specific reason out of a failure body. The API answers every failure in one
@@ -113,15 +131,19 @@ async function readErrorMessage(response: Response): Promise<string> {
   return (await readError(response)).message;
 }
 
-async function readError(
-  response: Response,
-): Promise<{ message: string; code?: string; data?: Record<string, number> }> {
+async function readError(response: Response): Promise<{
+  message: string;
+  code?: string;
+  data?: Record<string, number>;
+  unpricedFuels?: UnpricedFuel[];
+}> {
   const errorText = await response.text();
   let extracted: string | undefined;
   let title: string | undefined;
   let traceId: string | undefined;
   let code: string | undefined;
   let data: Record<string, number> | undefined;
+  let unpricedFuels: UnpricedFuel[] | undefined;
 
   try {
     const errorData = JSON.parse(errorText);
@@ -145,6 +167,17 @@ async function readError(
       }
       if (Object.keys(numeric).length > 0) data = numeric;
     }
+    // The fuel list a refused activation names. Same care as `data`: the body arrives untyped, and a
+    // half-shaped entry would reach the toast as "undefined (undefined)".
+    if (Array.isArray(errorData?.unpricedFuels)) {
+      const named = (errorData.unpricedFuels as unknown[])
+        .filter(
+          (entry): entry is UnpricedFuel =>
+            typeof (entry as UnpricedFuel)?.name === "string" &&
+            typeof (entry as UnpricedFuel)?.gap === "string",
+        );
+      if (named.length > 0) unpricedFuels = named;
+    }
   } catch {
     // The body was not JSON - a proxy's HTML error page, say. There is no code and no data to
     // read out of it, so the raw text below is the best reason the operator can be given.
@@ -159,7 +192,7 @@ async function readError(
         (response.status >= 500 && extracted === title);
 
   if (!opaqueServerFault)
-    return { message: extracted ?? errorText, code, data };
+    return { message: extracted ?? errorText, code, data, unpricedFuels };
 
   return {
     message: traceId
@@ -254,8 +287,8 @@ export const apiRequest = async <T, R = unknown>(
   }
 
   if (!response.ok) {
-    const { message, code, data } = await readError(response);
-    throw new ApiError(message, code, data);
+    const { message, code, data, unpricedFuels } = await readError(response);
+    throw new ApiError(message, code, data, unpricedFuels);
   }
 
   return parseJsonBody<R>(response);
@@ -318,8 +351,9 @@ export const apiBlob = async (
   }
 
   if (!response.ok) {
-    const { message, code, data: errorData } = await readError(response);
-    throw new ApiError(message, code, errorData);
+    const { message, code, data: errorData, unpricedFuels } =
+      await readError(response);
+    throw new ApiError(message, code, errorData, unpricedFuels);
   }
 
   return toBlob(response, fileName);
@@ -331,8 +365,8 @@ async function toBlob(
   fallbackFileName: string,
 ): Promise<{ blob: Blob; fileName: string }> {
   if (!response.ok) {
-    const { message, code, data } = await readError(response);
-    throw new ApiError(message, code, data);
+    const { message, code, data, unpricedFuels } = await readError(response);
+    throw new ApiError(message, code, data, unpricedFuels);
   }
 
   // The server sends the real name (receipt-<id>.pdf); the fallback only covers a response

@@ -95,6 +95,9 @@ public sealed class ImportBatchBulkActionQueryHandler
             // its own, because the pricing engine would have nothing to price from. The cost lives
             // on the voucher, so the check is per voucher - a batch is only costed once every
             // voucher in it is, and a partly-entered batch must not put the costed part on sale.
+            //
+            // The count travels beside the sentence: the admin localises this refusal, and a
+            // translated sentence cannot carry a figure that only exists inside English prose.
             var uncosted = vouchers.Where(v => v.CostPerLiter is null).ToList();
             if (uncosted.Count > 0)
             {
@@ -102,7 +105,9 @@ public sealed class ImportBatchBulkActionQueryHandler
                     false,
                     $"Cannot activate - enter the cost first for {uncosted.Count} voucher(s): " +
                     string.Join(", ", uncosted.Take(10).Select(v => v.VoucherNumber)),
-                    0);
+                    0,
+                    ActivationCodes.VoucherCostMissing,
+                    UncostedVoucherCount: uncosted.Count);
             }
 
             // The same gate the id-based action has, for the same reason: the price the customer is
@@ -113,7 +118,12 @@ public sealed class ImportBatchBulkActionQueryHandler
                 _context, liveFuelIds, cancellationToken);
             if (economicsRefusal is not null)
             {
-                return new ImportBatchBulkActionResult(false, economicsRefusal, 0);
+                return new ImportBatchBulkActionResult(
+                    false,
+                    economicsRefusal.Message,
+                    0,
+                    economicsRefusal.Code,
+                    economicsRefusal.UnpricedFuels);
             }
         }
 
@@ -151,5 +161,20 @@ public sealed class ImportBatchBulkActionQueryHandler
     }
 }
 
-/// <summary>What a batch action did, and what stopped it if it did not.</summary>
-public sealed record ImportBatchBulkActionResult(bool Success, string? Error, int Affected);
+/// <summary>
+/// What a batch action did, and what stopped it if it did not.
+/// </summary>
+/// <param name="Code">
+/// The stable machine code of the refusal, when there was one — see <see cref="ActivationCodes"/>.
+/// The admin renders its own sentence from this and shows <paramref name="Error"/> only for a code
+/// it has not learnt.
+/// </param>
+/// <param name="UnpricedFuels">Which fuels have no price of their own, and what each lacks.</param>
+/// <param name="UncostedVoucherCount">How many vouchers of this batch still carry no cost.</param>
+public sealed record ImportBatchBulkActionResult(
+    bool Success,
+    string? Error,
+    int Affected,
+    string? Code = null,
+    IReadOnlyList<UnpricedFuel>? UnpricedFuels = null,
+    int? UncostedVoucherCount = null);

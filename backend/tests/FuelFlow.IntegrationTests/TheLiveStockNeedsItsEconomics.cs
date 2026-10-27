@@ -92,6 +92,9 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse("a fuel with no margin has no price to sell at");
         result.Error.Should().Contain("no margin");
+        result.Code.Should().Be(ActivationCodes.FuelNotPriced,
+            "the admin writes the sentence in the operator's language and needs a code to do it");
+        result.UnpricedFuels.Should().Equal([new UnpricedFuel("A-95", "margin")]);
 
         using var verify = CreateContext();
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId)).Status
@@ -171,6 +174,9 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("no margin");
+        result.Code.Should().Be(ActivationCodes.FuelNotPriced,
+            "both doors refuse in the same words, so both carry the same code");
+        result.UnpricedFuels.Should().Equal([new UnpricedFuel("A-95", "margin")]);
         result.Affected.Should().Be(0);
 
         using var verify = CreateContext();

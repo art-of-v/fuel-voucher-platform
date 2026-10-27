@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Database;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -194,6 +195,8 @@ public sealed class BulkActionVouchersCommandHandler
                     return new BulkActionResult
                     {
                         Success = false,
+                        Code = ActivationCodes.VoucherCostMissing,
+                        UncostedVoucherCount = uncosted.Count,
                         Error = $"Cannot activate — enter the cost (собівартість) first for {uncosted.Count} voucher(s): {string.Join(", ", uncosted.Take(10).Select(e => e.VoucherNumber))}"
                     };
 
@@ -207,7 +210,13 @@ public sealed class BulkActionVouchersCommandHandler
                     _context, liveFuelIds, cancellationToken);
                 if (economicsRefusal is not null)
                 {
-                    return new BulkActionResult { Success = false, Error = economicsRefusal };
+                    return new BulkActionResult
+                    {
+                        Success = false,
+                        Error = economicsRefusal.Message,
+                        Code = economicsRefusal.Code,
+                        UnpricedFuels = economicsRefusal.UnpricedFuels
+                    };
                 }
 
                 foreach (var e in entities) { e.Status = VoucherStatus.Available; e.UpdatedAtUtc = now; RecordStatusChange(e, preImages[e.Id], VoucherStatus.Available, now, actor); }
@@ -388,4 +397,17 @@ public sealed class BulkActionResult
     public bool Success { get; set; }
     public int Count { get; set; }
     public string? Error { get; set; }
+
+    /// <summary>
+    /// The stable machine code of the refusal, when there was one — see <see cref="ActivationCodes"/>.
+    /// The admin renders its own sentence from this and shows <see cref="Error"/> only for a code it
+    /// has not learnt.
+    /// </summary>
+    public string? Code { get; set; }
+
+    /// <summary>Which fuels have no price of their own, and what each of them lacks.</summary>
+    public IReadOnlyList<UnpricedFuel>? UnpricedFuels { get; set; }
+
+    /// <summary>How many vouchers of this selection still carry no supplier cost.</summary>
+    public int? UncostedVoucherCount { get; set; }
 }

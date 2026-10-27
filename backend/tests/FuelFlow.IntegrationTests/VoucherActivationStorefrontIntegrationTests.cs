@@ -262,6 +262,43 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     }
 
     /// <summary>
+    /// The refusal an operator reads is written by the admin, not by this API: the body carries a
+    /// machine code and the fuel it refused over, so a panel set to Ukrainian says it in Ukrainian
+    /// instead of pasting the English sentence onto a Ukrainian screen. The sentence stays in
+    /// <c>detail</c> — for the logs, and for a client that has not learnt the code yet.
+    /// </summary>
+    [Fact]
+    public async Task AFuelWithNoPriceOfItsOwn_RefusesActivationWithACodeAndTheFuel()
+    {
+        await AuthenticateStaffAsync();
+
+        // The state an imported grade is in until somebody prices it: the card has neither a
+        // supplier cost nor a margin, so the price of a litre cannot be computed at all.
+        await SeedFuelAndPackageAsync(BrandIds.Okko, "act-unpriced", 3m);
+
+        Guid id;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var voucher = ImportedVoucher("okko", "act-unpriced", 3m, costPerLiter: 45m);
+            id = voucher.Id;
+            context.FuelVouchers.Add(voucher);
+            await context.SaveChangesAsync();
+        }
+
+        var (status, body) = await ActivateAsync(id);
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        using var problem = JsonDocument.Parse(body);
+        Assert.Equal("fuel_not_priced", problem.RootElement.GetProperty("code").GetString());
+
+        var fuel = problem.RootElement.GetProperty("unpricedFuels")[0];
+        Assert.Equal("act-unpriced", fuel.GetProperty("name").GetString());
+        Assert.Equal("cost_and_margin", fuel.GetProperty("gap").GetString());
+        Assert.Contains("Cannot activate", problem.RootElement.GetProperty("detail").GetString());
+    }
+
+    /// <summary>
     /// Activating is the on-switch, so deactivating has to be the off-switch — otherwise the demo's
     /// first step (activate one package) could never be undone without a database edit.
     /// </summary>

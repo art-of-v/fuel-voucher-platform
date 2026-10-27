@@ -61,6 +61,29 @@ public sealed class FuelEconomicsTests
     }
 
     [Fact]
+    public void The_unpriced_fuels_carry_the_token_the_admin_translates()
+    {
+        // The English sentence is for the log. What the operator reads is written by the admin, in the
+        // language the panel speaks, and it can only do that from a token — not from prose.
+        FuelEconomics.Unpriced([
+            ("A-95", FuelEconomics.State(50m, null)),
+            ("ДП", FuelEconomics.State(null, null)),
+            ("Паливо без ціни", FuelEconomics.State(null, 5m)),
+            ("Продане", FuelEconomics.State(50m, 5m))
+        ]).Should().Equal(
+            new UnpricedFuel("A-95", "margin"),
+            new UnpricedFuel("ДП", "cost_and_margin"),
+            new UnpricedFuel("Паливо без ціни", "cost"));
+    }
+
+    [Fact]
+    public void A_zero_margin_is_a_decision_and_carries_no_gap()
+    {
+        FuelEconomics.State(50m, 0m).Gap.Should().BeNull();
+        FuelEconomics.Unpriced([("A-95", FuelEconomics.State(50m, 0m))]).Should().BeEmpty();
+    }
+
+    [Fact]
     public void A_zero_cost_is_a_fault()
     {
         var fault = FuelEconomics.Fault(0m, 5m, allowBelowCost: false);

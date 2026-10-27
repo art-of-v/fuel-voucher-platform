@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, ChevronRight, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api-client";
+import { activationErrorMessage } from "@/lib/activation-error";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/session-store";
 import { formatDateTime } from "@/lib/utils";
@@ -132,7 +133,7 @@ export default function ImportBatchesTab() {
         });
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(activationErrorMessage(e, t)),
   });
 
   const deactivateOneVoucherMutation = useMutation({
@@ -157,7 +158,7 @@ export default function ImportBatchesTab() {
         });
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(activationErrorMessage(e, t)),
   });
 
   // The whole batch, in one action, decided by the server.
@@ -183,7 +184,7 @@ export default function ImportBatchesTab() {
         });
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(activationErrorMessage(e, t)),
   });
 
   const deactivateVoucherMutation = useMutation({
@@ -208,7 +209,7 @@ export default function ImportBatchesTab() {
         });
       }
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(activationErrorMessage(e, t)),
   });
 
   return (
