@@ -159,6 +159,41 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
     }
 
     [Fact]
+    public async Task Import_ShouldStampTheRecord_EvenWhenNoPriceMoved()
+    {
+        await SeedCatalogAsync();
+        await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+
+        // Rewind the stamp the way a quiet fortnight leaves it: the number stands, and the record has
+        // not been confirmed against the source since.
+        foreach (var fuel in _context.FuelTypes.Where(f => f.BrandId == BrandIds.Okko))
+        {
+            fuel.PriceUpdatedAt = null;
+        }
+
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        var historyBefore = await _context.FuelPriceHistory.CountAsync();
+        var auditBefore = await _context.AuditEventOutbox.CountAsync();
+
+        var second = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+        _context.ChangeTracker.Clear();
+
+        second.FuelsChanged.Should().Be(0, "the sheet is identical to the one already applied");
+
+        var okko = await _context.FuelTypes.Where(f => f.BrandId == BrandIds.Okko).ToListAsync();
+        okko.Should().OnlyContain(f => f.PriceUpdatedAt != null,
+            "price_updated_at says when the record was last confirmed against the source, so an "
+            + "unchanged sheet still moves it - otherwise a quiet OKKO looks like a stopped sync");
+
+        (await _context.FuelPriceHistory.CountAsync()).Should().Be(historyBefore,
+            "a price that did not move opens no history row; the history answers a different question");
+        (await _context.AuditEventOutbox.CountAsync()).Should().Be(auditBefore,
+            "an unchanged price is not an audit event");
+    }
+
+    [Fact]
     public async Task Import_ShouldHoldSupplierCost_AndOnlyMoveTheCeiling()
     {
         await SeedCatalogAsync();
