@@ -65,3 +65,29 @@ describe('FuelCard saving (#552)', () => {
     expect(screen.getAllByText(/102,90/).length).toBeGreaterThan(0);
   });
 });
+
+describe('FuelCard stock state', () => {
+  it('says an empty shelf is out of stock on the row itself', () => {
+    // The row is the only place a customer decides whether to open the fuel. Leaving them to find
+    // out inside - where every package is then unavailable - is the round trip this label removes.
+    renderCard({ isAvailable: false });
+
+    expect(screen.getByText('Немає на складі')).toBeTruthy();
+  });
+
+  it('leaves a fuel we can sell unlabelled', () => {
+    renderCard();
+
+    expect(screen.queryByText('Немає на складі')).toBeNull();
+  });
+
+  it('says out of stock rather than showing a saving, never both', () => {
+    // A payload that claims both a saving and no stock is contradictory; the shelf answers the
+    // question the customer is asking - whether they can buy it - and shows no saving on a fuel
+    // nobody can buy.
+    renderCard({ isAvailable: false });
+
+    expect(screen.getByText('Немає на складі')).toBeTruthy();
+    expect(screen.queryByText('5,04')).toBeNull();
+  });
+});

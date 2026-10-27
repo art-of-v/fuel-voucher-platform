@@ -21,8 +21,13 @@ export interface FuelSaving {
  * that case, and a saving measured against a price the customer is not paying is exactly the lie
  * the pricing model forbids. The price and the saving answer the same question, so they ask it in
  * the same place — one predicate, so they cannot drift apart.
+ *
+ * <p>The row's COLOUR asks the same question too: an empty shelf is greyed out and says so, a
+ * sellable one keeps the brand accent. That is why this is exported rather than private — a card
+ * that dims itself on a different rule than the price it prints would show a pale row at a price
+ * we do not charge.
  */
-function canSell(fuel: Pick<FuelType, 'isAvailable'>): boolean {
+export function canSell(fuel: Pick<FuelType, 'isAvailable'>): boolean {
   return fuel.isAvailable === true;
 }
 
