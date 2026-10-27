@@ -20,7 +20,7 @@ export default function TermsPage() {
             <header className={styles.head}>
               <span className="lf-eyebrow">Документи</span>
               <h1 className={styles.title}>Публічна оферта</h1>
-              <p className={styles.updated}>Останнє оновлення: 27 жовтня 2026</p>
+              <p className={styles.updated}>Останнє оновлення: 28 жовтня 2026</p>
             </header>
 
             <div className={styles.prose}>
@@ -37,10 +37,10 @@ export default function TermsPage() {
               <h2>1. Терміни</h2>
               <ul>
                 <li>
-                  <strong>Оператор Сервісу</strong> — оператор Сервісу FuelFlow,
-                  який надає Покупцю рекламні і промоційні послуги (контактна
-                  особа — Колесніков Сергій Юрійович, м. Львів,
-                  вул. Городоцька, 128а).
+                  <strong>Оператор Сервісу</strong> — ТОВ «Ф&apos;юел флоу
+                  маркетплейс», яке надає Покупцю через Сервіс FuelFlow
+                  рекламні і промоційні послуги (контактна особа — Колесніков
+                  Сергій Юрійович, м. Львів, вул. Городоцька, 128а).
                 </li>
                 <li>
                   <strong>Покупець</strong> — користувач Сервісу, який оформив
@@ -147,7 +147,7 @@ export default function TermsPage() {
 
               <h2>9. Реквізити та контакти</h2>
               <p>
-                FuelFlow — м. Львів, вул. Городоцька, 128а.
+                ТОВ «Ф&apos;юел флоу маркетплейс», м. Львів, вул. Городоцька, 128а.
                 <br />
                 Підтримка: <a href="mailto:palne.shopua@gmail.com">palne.shopua@gmail.com</a>,{' '}
                 <a href="tel:+380970011771">+380 97 001 1771</a> (Пн–Пт,

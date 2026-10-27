@@ -20,7 +20,7 @@ export default function PrivacyPage() {
             <header className={styles.head}>
               <span className="lf-eyebrow">Документи</span>
               <h1 className={styles.title}>Політика конфіденційності</h1>
-              <p className={styles.updated}>Останнє оновлення: 10 вересня 2026</p>
+              <p className={styles.updated}>Останнє оновлення: 28 жовтня 2026</p>
             </header>
 
             <div className={styles.prose}>
@@ -32,8 +32,9 @@ export default function PrivacyPage() {
 
               <h2>1. Хто обробляє ваші дані</h2>
               <p>
-                Оператором обробки персональних даних є FuelFlow (контактна особа —
-                Колесніков Сергій Юрійович), м. Львів, вул. Городоцька, 128а.
+                Оператором обробки персональних даних є ТОВ «Ф&apos;юел флоу
+                маркетплейс» (сервіс FuelFlow; контактна особа — Колесніков
+                Сергій Юрійович), м. Львів, вул. Городоцька, 128а.
                 Зв&apos;язок з питань обробки даних:{' '}
                 <a href="mailto:palne.shopua@gmail.com">palne.shopua@gmail.com</a>,
                 <a href="tel:+380970011771"> +380 97 001 1771</a>.
