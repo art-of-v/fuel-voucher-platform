@@ -1,4 +1,4 @@
-import { isFrameLoadableUrl, isOpenableUrl, schemeOf } from './linkPolicy';
+import { isFrameLoadableUrl, isMonobankAppLink, isOpenableUrl, schemeOf } from './linkPolicy';
 
 /**
  * The rules the payment screen runs on, tested on their own.
@@ -47,6 +47,34 @@ describe('a link the app may hand to the operating system', () => {
   it('is not a URL at all', () => {
     expect(isOpenableUrl(undefined)).toBe(false);
     expect(isOpenableUrl('')).toBe(false);
+  });
+});
+
+describe('a link that belongs to the Monobank app', () => {
+  it('is the universal link Monobank issues for an invoice', () => {
+    expect(isMonobankAppLink('https://mbnk.app/or/261027FDmSv4cweX3Vh1')).toBe(true);
+    expect(isMonobankAppLink('  https://mbnk.app/or/x  ')).toBe(true);
+    expect(isMonobankAppLink('HTTPS://MBNK.APP/or/x')).toBe(true);
+  });
+
+  it('is the custom scheme Monobank’s own page navigates to', () => {
+    expect(isMonobankAppLink('app://com.ftband.mono')).toBe(true);
+    expect(isMonobankAppLink('app://com.ftband.mono/or/261027FDmSv4cweX3Vh1?a=1')).toBe(true);
+  });
+
+  it('is nothing that merely looks like it', () => {
+    // The host and the bundle id are checked literally: a lookalike domain, a path that
+    // happens to contain the name, and the same host over plain HTTP are all refused, and
+    // so is the generic `app:` scheme pointing at another app.
+    expect(isMonobankAppLink('https://mbnk.app.evil.example/or/x')).toBe(false);
+    expect(isMonobankAppLink('https://evil.example/mbnk.app/or/x')).toBe(false);
+    expect(isMonobankAppLink('http://mbnk.app/or/x')).toBe(false);
+    expect(isMonobankAppLink('app://evil.example/com.ftband.mono')).toBe(false);
+    expect(isMonobankAppLink('app://com.ftband.mono.evil.example/or/x')).toBe(false);
+    expect(isMonobankAppLink('intent://evil#Intent;component=com.evil/.Main;end')).toBe(false);
+    expect(isMonobankAppLink('https://pay.monobank.ua/frame/inv-1')).toBe(false);
+    expect(isMonobankAppLink(undefined)).toBe(false);
+    expect(isMonobankAppLink('')).toBe(false);
   });
 });
 
