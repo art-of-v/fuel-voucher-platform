@@ -181,10 +181,10 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         var changedCount = 0;
         var packagesRepriced = 0;
 
-        // The fuels this run touched, for the one history write at the end. Collected rather than
-        // recorded inside the loop, which would cost a query per fuel on a path that runs unattended
-        // over the whole catalogue every quarter hour.
-        var repricedFuels = new List<FuelTypeEntity>();
+        // Every fuel this run matched, whether its pump moved or not, for the one recorder call at the
+        // end. Collected rather than recorded inside the loop, which would cost a query per fuel on a
+        // path that runs unattended over the whole catalogue every quarter hour.
+        var matchedFuels = new List<FuelTypeEntity>();
 
         foreach (var ft in okkoFuelTypes)
         {
@@ -254,7 +254,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 // every quarter hour - and erased any per-nominal override the moment a pump moved. The
                 // fuel is the single price now, which is what `PackagesRepriced` counts and what the
                 // operator screen shows.
-                repricedFuels.Add(ft);
+                matchedFuels.Add(ft);
             }
 
             if (changed) changedCount++;
@@ -266,18 +266,27 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // The "a fuel matched but has nothing to price" row is gone with the offer it belonged to.
         // There is no state in which a catalogue fuel has no cost row to write the pump into, so
         // the branch could only ever fire on data that no longer exists.
-        if (!dryRun && changedCount > 0)
+        //
+        // The recorder runs on every matched fuel, changed or not, because two different questions
+        // live on that row: price_updated_at answers "when was this record last confirmed against the
+        // source", and the history row the recorder appends answers "when did the number actually
+        // move". Recording only when something changed froze the first answer at the last move, so a
+        // quiet OKKO was indistinguishable from a sync that had stopped. UPG/WOG and KLO already record
+        // on every run; this path was the exception.
+        if (!dryRun)
         {
-            // One row per fuel whose price actually moved, all stamped with this run's `now` so the
-            // run reads as one moment rather than twenty-five - and all appended in one call, so the
-            // recorder fetches the existing history in a single query instead of one per fuel. It
-            // also re-stamps price_updated_at / price_updated_by_user_id.
+            // One call for the whole run, stamped with this run's `now` so it reads as one moment
+            // rather than five - and all appended in one call, so the recorder fetches the existing
+            // history in a single query instead of one per fuel.
             await _priceRecorder.RecordRangeAsync(
-                repricedFuels, PriceHistoryReasons.PumpImport, actor, now, ct);
+                matchedFuels, PriceHistoryReasons.PumpImport, actor, now, ct);
 
-            // Tracked before the save, so the audit rows, the price history and the new pump prices
-            // commit together - and in one save, where before this was a save per fuel (planning #533).
-            RecordEvents(applied, actor, actingUserName);
+            if (changedCount > 0)
+            {
+                // Tracked before the save, so the audit rows, the price history and the new pump prices
+                // commit together - and in one save, where before this was a save per fuel (planning #533).
+                RecordEvents(applied, actor, actingUserName);
+            }
 
             await _context.SaveChangesAsync(ct);
         }
