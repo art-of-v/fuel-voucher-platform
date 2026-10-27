@@ -76,6 +76,7 @@ public class AlertRuleNoDataContractTests
     [InlineData("fuelflow-log-error-burst")]
     [InlineData("fuelflow-log-fatal")]
     [InlineData("fuelflow-concurrency-conflict")]
+    [InlineData("fuelflow-job-failed")]
     public void LogRule_TreatsNoMatchingLinesAsOkay(string uid)
     {
         RuleBlocks().Should().ContainKey(uid);

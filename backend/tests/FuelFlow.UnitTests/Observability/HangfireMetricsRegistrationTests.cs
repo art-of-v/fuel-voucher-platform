@@ -45,6 +45,7 @@ public class HangfireMetricsRegistrationTests
     private static IHost BuildHost()
     {
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddSingleton<FuelFlowMetrics>();
         services.AddSingleton<MetricsJobFilter>();
         return new ServiceProviderHost(services.BuildServiceProvider());

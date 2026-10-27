@@ -255,6 +255,47 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0] }
 
+      # The per-job counterpart of HangfireJobFailures, which thresholds a rate over ten minutes
+      # and only after ten minutes of it. A daily job that fails once, or a weekly one, produces a
+      # single increment and resolves before that rule may ever fire - the failure is real, the
+      # counter says so, and nobody is told. MetricsJobFilter writes exactly one line per failed
+      # run, carrying the job type, the job name, the duration and the exception, so this rule
+      # fires on the first hit and the notification names the job instead of a bare counter.
+      #
+      # The window is wider than the metric rule's on purpose: it has to cover one evaluation of
+      # the longest recurring interval worth noticing, otherwise the line scrolls out of the query
+      # before Grafana looks. Grouping is by body fields, which is why the query needs `| json`.
+      - uid: fuelflow-job-failed
+        title: JobFailed
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: OK
+        annotations:
+          summary: "Background job {{ $labels.JobType }}.{{ $labels.JobName }} failed"
+          description: "{{ $values.B }} failed run(s) in the last 30 minutes. The exception, stack trace and duration are in the log line - search Grafana > FuelFlow Logs for \"Background job\"."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: fuelflow-loki
+            model:
+              refId: A
+              expr: sum by (JobType, JobName) (count_over_time({level="error"} |= "Background job" | json [30m]))
+              queryType: range
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
       # Catches errors that never reach the HTTP metrics or the app's own Telegram
       # dispatcher - e.g. controllers that catch an exception, log it and return a
       # response themselves. Serilog promotes `level` to a Loki label, so this is a
