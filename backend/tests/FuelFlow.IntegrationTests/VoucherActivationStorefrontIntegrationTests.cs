@@ -276,6 +276,19 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         // supplier cost nor a margin, so the price of a litre cannot be computed at all.
         await SeedFuelAndPackageAsync(BrandIds.Okko, "act-unpriced", 3m);
 
+        // Seeding a package hands the fuel the economics that package was priced from, so the card
+        // is not unpriced yet. Take them back off - the gate reads the fuel's own columns, which is
+        // exactly the difference between "the batch has a price" and "this grade can be sold".
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await context.FuelTypes
+                .Where(f => f.Id == ToUuid("act-unpriced"))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(f => f.SupplierPricePerLiter, (decimal?)null)
+                    .SetProperty(f => f.MarginUahPerLiter, (decimal?)null));
+        }
+
         Guid id;
         using (var scope = _fixture.Services.CreateScope())
         {
