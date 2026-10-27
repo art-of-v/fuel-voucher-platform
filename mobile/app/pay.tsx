@@ -12,7 +12,11 @@ import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { formatMoney } from '../src/core/utils/currency';
 import { Haptics } from '../src/core/utils/haptics';
-import { isFrameLoadableUrl, isOpenableUrl } from '../src/features/payments/linkPolicy';
+import {
+  isFrameLoadableUrl,
+  isMonobankAppLink,
+  isOpenableUrl,
+} from '../src/features/payments/linkPolicy';
 import { isAppDeepLink } from '../src/features/payments/paymentSession';
 
 /**
@@ -42,6 +46,11 @@ import { isAppDeepLink } from '../src/features/payments/paymentSession';
  *     a navigation and a `postMessage`. Both are gated - the frame loads HTTPS only, and a
  *     link the frame asks us to open is opened only if we would have opened it ourselves.
  *     The rules live in `src/features/payments/linkPolicy.ts`.
+ *  5. The way into the Monobank app. A universal link does not leave a WKWebView, so the
+ *     frame renders `mbnk.app`'s web fallback instead - a page that asks the customer to
+ *     install the app they already have, whose own button is a custom scheme the frame
+ *     refuses. Both are handed to the OS here; see `isMonobankAppLink` for the production
+ *     invoice that expired behind that dead end.
  *
  * WHAT IT DELIBERATELY DOES NOT DO
  * It does not decide whether the payment succeeded. The webhook does that, asynchronously,
@@ -219,6 +228,18 @@ export default function PaymentScreen() {
         finish();
         return false;
       }
+
+      // Monobank's way into its own app. Inside a WebView iOS does not resolve a universal
+      // link - it renders the `mbnk.app` web fallback ("open this link in the monobank app"
+      // plus app-store buttons), and that page's own button is a custom scheme the frame will
+      // not load. Either way the customer ends up on a page asking them to install the app
+      // they already have, with no way in. So the link goes to the OS, where Safari resolves
+      // it and the app opens on this invoice.
+      if (isMonobankAppLink(request.url)) {
+        void Linking.openURL(request.url);
+        return false;
+      }
+
       // HTTPS, and nothing else. Plain HTTP, an `intent://` URI, a `tel:` number, a `data:`
       // document - the page in the frame gets to render a payment form, not to drive the
       // customer's phone. 3DS is on HTTPS at the bank's site, so the flow it belongs to

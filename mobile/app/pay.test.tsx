@@ -101,6 +101,25 @@ describe('Payment screen', () => {
     expect(handler({ url: 'https://pay.monobank.ua/3ds/challenge' })).toBe(true);
   });
 
+  it('leaves the frame for the Monobank app instead of rendering its web fallback', () => {
+    // iOS does not resolve a universal link inside a WKWebView: `https://mbnk.app/or/…` loads
+    // as a web page asking the customer to install the app they already have. In production on
+    // 2026-10-27 exactly that happened to an 862 ₴ invoice, which expired an hour later with no
+    // payment attempt - the customer never reached Monobank. The link belongs to the OS.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    const handler = webViewProps?.onShouldStartLoadWithRequest as (r: { url: string }) => boolean;
+
+    expect(handler({ url: 'https://mbnk.app/or/inv-1' })).toBe(false);
+    expect(mockOpenURL).toHaveBeenCalledWith('https://mbnk.app/or/inv-1');
+
+    // And the fallback page's own "Відкрити застосунок" button, which is this custom scheme.
+    expect(handler({ url: 'app://com.ftband.mono/or/inv-1' })).toBe(false);
+    expect(mockOpenURL).toHaveBeenCalledWith('app://com.ftband.mono/or/inv-1');
+  });
+
   it('follows the frame request to open the Monobank app', () => {
     mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
 
