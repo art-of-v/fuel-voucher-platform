@@ -58,17 +58,30 @@ describe("activationErrorMessage", () => {
   it("keeps the server's sentence when the structured part did not arrive", () => {
     // An older backend sends the code and the prose and nothing between them. The prose is true,
     // so it is better than a localised sentence with a hole where the fuel list should be.
-    const noFuels = new ApiError("Cannot activate - the old words", "fuel_not_priced");
-    const noCount = new ApiError("Cannot activate - the old words", "voucher_cost_missing");
+    const noFuels = new ApiError(
+      "Cannot activate - the old words",
+      "fuel_not_priced",
+    );
+    const noCount = new ApiError(
+      "Cannot activate - the old words",
+      "voucher_cost_missing",
+    );
 
-    expect(activationErrorMessage(noFuels, t)).toBe("Cannot activate - the old words");
-    expect(activationErrorMessage(noCount, t)).toBe("Cannot activate - the old words");
+    expect(activationErrorMessage(noFuels, t)).toBe(
+      "Cannot activate - the old words",
+    );
+    expect(activationErrorMessage(noCount, t)).toBe(
+      "Cannot activate - the old words",
+    );
   });
 
   it("does not invent a gap for a token it does not know", () => {
-    const error = new ApiError("Cannot activate", "fuel_not_priced", undefined, [
-      { name: "ДП", gap: "something_new_upstream" },
-    ]);
+    const error = new ApiError(
+      "Cannot activate",
+      "fuel_not_priced",
+      undefined,
+      [{ name: "ДП", gap: "something_new_upstream" }],
+    );
 
     expect(activationErrorMessage(error, t)).toBe(
       "imports.error.notPriced[ДП]",

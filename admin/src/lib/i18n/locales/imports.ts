@@ -36,7 +36,7 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.error.fuelMissing":
       "Cannot activate: a voucher in this selection belongs to a fuel that is no longer in the catalogue. Restore the fuel or remove the voucher.",
     "imports.error.voucherCost":
-      "Cannot activate: {0} voucher(s) in this batch have no cost yet — enter it above, under \"Batch costs\".",
+      'Cannot activate: {0} voucher(s) in this batch have no cost yet — enter it above, under "Batch costs".',
     "imports.parseInvoice": "Upload invoice (.xlsx)",
     "imports.invoiceParsing": "Reading invoice…",
     "imports.invoiceParsed":

@@ -23,10 +23,7 @@ const GAP_KEYS: Record<string, string> = {
   cost_and_margin: "imports.error.gapCostAndMargin",
 };
 
-export function activationErrorMessage(
-  error: unknown,
-  t: Translator,
-): string {
+export function activationErrorMessage(error: unknown, t: Translator): string {
   if (!(error instanceof ApiError) || !error.code) return errorMessage(error);
 
   switch (error.code) {
@@ -48,7 +45,10 @@ export function activationErrorMessage(
 }
 
 /** "ДП (не задано маржу), А-95 (не задано собівартість)" — the names stay as the server wrote them. */
-function describeFuels(fuels: UnpricedFuel[] | undefined, t: Translator): string {
+function describeFuels(
+  fuels: UnpricedFuel[] | undefined,
+  t: Translator,
+): string {
   if (!fuels?.length) return "";
   return fuels
     .map((fuel) => {
