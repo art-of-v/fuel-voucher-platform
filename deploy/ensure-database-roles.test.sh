@@ -73,13 +73,22 @@ check_contains() {
     echo "  FAIL  $what (output did not contain '$needle')"; fail=$((fail + 1))
   fi
 }
+# A statement that must be refused has to be refused BY A PRIVILEGE. A non-zero exit is
+# not the same thing: `UPDATE provider_event_outbox SET payload = ...` also exits non-zero
+# when the table has no `payload` column any more, so the assertion "the application role
+# may not rewrite the audit trail" kept passing on a parse error while production's role
+# was never asked the question (found 2026-10-27 in the deploy's PostgreSQL log). The two
+# wordings below are PostgreSQL's refusals; "does not exist" and "syntax error" mean the
+# probe no longer matches the schema and the test must fail rather than pass.
 check_denied() {
-  local what="$1" out rc="$2"
-  if [[ "$rc" -ne 0 ]]; then
-    echo "  PASS  $what"; pass=$((pass + 1))
-  else
-    echo "  FAIL  $what"; fail=$((fail + 1))
+  local what="$1" out="$2" rc="$3"
+  if [[ "$rc" -eq 0 ]]; then
+    echo "  FAIL  $what"; fail=$((fail + 1)); return
   fi
+  if [[ "$out" != *"permission denied"* && "$out" != *"must be owner"* ]]; then
+    echo "  FAIL  $what (refused for the wrong reason: ${out%%$'\n'*})"; fail=$((fail + 1)); return
+  fi
+  echo "  PASS  $what"; pass=$((pass + 1))
 }
 check_not_contains() {
   local what="$1" needle="$2" haystack="$3"
@@ -296,7 +305,7 @@ else
       CREATE TABLE public.voucher_events(id integer PRIMARY KEY, event_type text);
       CREATE TABLE public.outbox_events(id integer PRIMARY KEY, event_type text, processed boolean NOT NULL DEFAULT false, processed_at_utc timestamptz);
       CREATE TABLE public.webhook_events(id integer PRIMARY KEY, status text, processed_at_utc timestamptz, processing_started_at_utc timestamptz, error text, attempts integer NOT NULL DEFAULT 1, payload text);
-      CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, payload text);
+      CREATE TABLE public.provider_event_outbox(id integer PRIMARY KEY, aggregate_type text, aggregate_id text, event_type text, old_value jsonb, new_value jsonb, changed_by_user_id uuid, changed_by_user_name text, summary text, changed_at_utc timestamptz NOT NULL DEFAULT now(), scope_id text);
       CREATE TABLE public.voucher_redemptions(id integer PRIMARY KEY, status text, confirmed_at_utc timestamptz, confirmed_by_user_id uuid, closed_at_utc timestamptz, closed_by_user_id uuid, resolution_note text, updated_at_utc timestamptz, reported_liters numeric);
       CREATE TABLE public.redemption_statement_rows(id integer PRIMARY KEY, status text, resolved_at_utc timestamptz, resolved_by_user_id uuid, resolution_note text, external_id text);
       CREATE TABLE public.monobank_statement_entries(id integer PRIMARY KEY, amount_kopecks numeric, last_seen_at_utc timestamptz NOT NULL, raw_payload text);
@@ -348,17 +357,17 @@ else
     out="$(as_app "UPDATE public.payments SET amount = amount WHERE false" 2>&1)"; rc=$?
     check "the application role may update a payment" "0" "$rc"
     out="$(as_app "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete a payment" "$rc"
+    check_denied "the application role may NOT delete a payment" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT delete a payment" "$rc"
+    check_denied "the maintenance role may NOT delete a payment" "$out" "$rc"
 
     # voucher_events: SI. The audit trail is written once and never rewritten.
     out="$(as_app "INSERT INTO public.voucher_events(id, event_type) VALUES (1, 'redeemed')" 2>&1)"; rc=$?
     check "the application role may append a voucher event" "0" "$rc"
     out="$(as_app "UPDATE public.voucher_events SET event_type = event_type WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite a voucher event" "$rc"
+    check_denied "the application role may NOT rewrite a voucher event" "$out" "$rc"
     out="$(as_app "DELETE FROM public.voucher_events WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete a voucher event" "$rc"
+    check_denied "the application role may NOT delete a voucher event" "$out" "$rc"
 
     # webhook_events: SI + U(status, processed_at_utc, processing_started_at_utc, error, attempts)
     # for the app - the recorder writes exactly those columns - and the body exactly as received
@@ -368,7 +377,7 @@ else
     out="$(as_app "UPDATE public.webhook_events SET status = 'Processed', processed_at_utc = now() WHERE false" 2>&1)"; rc=$?
     check "the application role may settle a webhook delivery" "0" "$rc"
     out="$(as_app "UPDATE public.webhook_events SET payload = payload WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite a stored webhook delivery" "$rc"
+    check_denied "the application role may NOT rewrite a stored webhook delivery" "$out" "$rc"
 
     # monobank_statement_entries: SI + U(last_seen_at_utc) for the app. The hourly import
     # moves the last-seen column on every re-import of a period it already has, and
@@ -378,15 +387,18 @@ else
     out="$(as_app "UPDATE public.monobank_statement_entries SET last_seen_at_utc = now() WHERE false" 2>&1)"; rc=$?
     check "the application role may move the last-seen column" "0" "$rc"
     out="$(as_app "UPDATE public.monobank_statement_entries SET amount_kopecks = amount_kopecks WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite the acquirer's amount" "$rc"
+    check_denied "the application role may NOT rewrite the acquirer's amount" "$out" "$rc"
     out="$(as_app "DELETE FROM public.monobank_statement_entries WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete a statement row" "$rc"
+    check_denied "the application role may NOT delete a statement row" "$out" "$rc"
 
-    # provider_event_outbox: SI for the app, SD for the maintenance role.
-    out="$(as_app "UPDATE public.provider_event_outbox SET payload = payload WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite the provider event audit trail" "$rc"
+    # provider_event_outbox: SI for the app, SD for the maintenance role. The probed column
+    # is one the table really has: `payload` was retired with the old audit shape, and a
+    # probe naming it is refused by the parser rather than by a privilege - which is exactly
+    # the false pass this test now fails on.
+    out="$(as_app "UPDATE public.provider_event_outbox SET summary = summary WHERE false" 2>&1)"; rc=$?
+    check_denied "the application role may NOT rewrite the provider event audit trail" "$out" "$rc"
     out="$(as_app "DELETE FROM public.provider_event_outbox WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete the provider event audit trail" "$rc"
+    check_denied "the application role may NOT delete the provider event audit trail" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.provider_event_outbox WHERE false" 2>&1)"; rc=$?
     check "the maintenance role may purge the provider event audit trail" "0" "$rc"
 
@@ -398,31 +410,31 @@ else
     out="$(as_app "UPDATE public.voucher_redemptions SET status = 'Confirmed', confirmed_at_utc = now(), confirmed_by_user_id = NULL, closed_at_utc = now(), closed_by_user_id = NULL, resolution_note = 'checked', updated_at_utc = now() WHERE false" 2>&1)"; rc=$?
     check "the application role may close a redemption claim" "0" "$rc"
     out="$(as_app "UPDATE public.voucher_redemptions SET reported_liters = reported_liters WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite the claimed litres" "$rc"
+    check_denied "the application role may NOT rewrite the claimed litres" "$out" "$rc"
     out="$(as_app "DELETE FROM public.voucher_redemptions WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete a redemption claim" "$rc"
+    check_denied "the application role may NOT delete a redemption claim" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.voucher_redemptions WHERE false" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT delete a redemption claim" "$rc"
+    check_denied "the maintenance role may NOT delete a redemption claim" "$out" "$rc"
 
     out="$(as_app "INSERT INTO public.redemption_statement_rows(id, external_id, status) VALUES (1, 'line-1', 'Matched')" 2>&1)"; rc=$?
     check "the application role may import a statement line" "0" "$rc"
     out="$(as_app "UPDATE public.redemption_statement_rows SET status = 'Confirmed', resolved_at_utc = now(), resolved_by_user_id = NULL, resolution_note = 'checked' WHERE false" 2>&1)"; rc=$?
     check "the application role may resolve a statement line" "0" "$rc"
     out="$(as_app "UPDATE public.redemption_statement_rows SET external_id = external_id WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT rewrite the supplier's line id" "$rc"
+    check_denied "the application role may NOT rewrite the supplier's line id" "$out" "$rc"
     out="$(as_app "DELETE FROM public.redemption_statement_rows WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete a statement line" "$rc"
+    check_denied "the application role may NOT delete a statement line" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.redemption_statement_rows WHERE false" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT delete a statement line" "$rc"
+    check_denied "the maintenance role may NOT delete a statement line" "$out" "$rc"
 
     # __EFMigrationsHistory: migration-only, and its name and columns are mixed-case. The
     # app and the maintenance role get nothing; the quoted REVOKE is what makes the row
     # applicable, and the quoted column list is what lets the broad column-level REVOKE
     # touch it without turning MigrationId into migrationid.
     out="$(as_app "SELECT count(*) FROM public.\"__EFMigrationsHistory\"" 2>&1)"; rc=$?
-    check_denied "the application role may NOT read the EF migration history" "$rc"
+    check_denied "the application role may NOT read the EF migration history" "$out" "$rc"
     out="$(as_maint "SELECT count(*) FROM public.\"__EFMigrationsHistory\"" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT read the EF migration history" "$rc"
+    check_denied "the maintenance role may NOT read the EF migration history" "$out" "$rc"
 
     # outbox_events: SIU for the app; SD for maintenance. The app's UPDATE covers the whole
     # row: EF Core's Update(entity) writes every column, so a column-level grant refuses the
@@ -434,49 +446,49 @@ else
     out="$(as_app "UPDATE public.outbox_events SET event_type = event_type WHERE false" 2>&1)"; rc=$?
     check "the application role may update the whole outbox row (EF writes every column)" "0" "$rc"
     out="$(as_app "DELETE FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
-    check_denied "the application role may NOT delete an outbox event" "$rc"
+    check_denied "the application role may NOT delete an outbox event" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
     check "the maintenance role may purge the outbox" "0" "$rc"
     out="$(as_maint "UPDATE public.outbox_events SET processed = true WHERE false" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT update the outbox" "$rc"
+    check_denied "the maintenance role may NOT update the outbox" "$out" "$rc"
     out="$(as_maint "INSERT INTO public.outbox_events SELECT * FROM public.outbox_events WHERE false" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT write the outbox" "$rc"
+    check_denied "the maintenance role may NOT write the outbox" "$out" "$rc"
 
     # The maintenance role's rights end where the matrix says they end.
     out="$(as_maint "SELECT count(*) FROM public.brands" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT read a table the matrix does not give it" "$rc"
+    check_denied "the maintenance role may NOT read a table the matrix does not give it" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.brands WHERE false" 2>&1)"; rc=$?
-    check_denied "the maintenance role may NOT delete from a mutable product table" "$rc"
+    check_denied "the maintenance role may NOT delete from a mutable product table" "$out" "$rc"
 
     # The things the application must not do to the schema.
     out="$(as_app "CREATE TABLE public.app_created(id integer)" 2>&1)"; rc=$?
-    if [[ "$rc" -ne 0 ]]; then
-      echo "  PASS  the application role may not create a table"; pass=$((pass + 1))
-    else
+    if [[ "$rc" -eq 0 ]]; then
       as_super "DROP TABLE IF EXISTS public.app_created" > /dev/null 2>&1
       echo "  FAIL  the application role created a table"; fail=$((fail + 1))
+    else
+      check_denied "the application role may not create a table" "$out" "$rc"
     fi
 
     out="$(as_app "ALTER TABLE public.brands ADD COLUMN extra text" 2>&1)"; rc=$?
-    check_denied "the application role may not alter a table" "$rc"
+    check_denied "the application role may not alter a table" "$out" "$rc"
 
     out="$(as_app "DROP TABLE public.brands" 2>&1)"; rc=$?
-    check_denied "the application role may not drop a table" "$rc"
+    check_denied "the application role may not drop a table" "$out" "$rc"
 
     out="$(as_app "CREATE ROLE probe_role LOGIN" 2>&1)"; rc=$?
-    if [[ "$rc" -ne 0 ]]; then
-      echo "  PASS  the application role may not create a role"; pass=$((pass + 1))
-    else
+    if [[ "$rc" -eq 0 ]]; then
       as_super "DROP ROLE IF EXISTS probe_role" > /dev/null 2>&1
       echo "  FAIL  the application role created a role"; fail=$((fail + 1))
+    else
+      check_denied "the application role may not create a role" "$out" "$rc"
     fi
 
     out="$(as_app "CREATE DATABASE probe_database" 2>&1)"; rc=$?
-    if [[ "$rc" -ne 0 ]]; then
-      echo "  PASS  the application role may not create a database"; pass=$((pass + 1))
-    else
+    if [[ "$rc" -eq 0 ]]; then
       as_super "DROP DATABASE IF EXISTS probe_database" > /dev/null 2>&1
       echo "  FAIL  the application role created a database"; fail=$((fail + 1))
+    else
+      check_denied "the application role may not create a database" "$out" "$rc"
     fi
 
     # The migration role may change the schema.
@@ -511,7 +523,7 @@ else
     check "the read-only role may read" "0" "$rc"
 
     out="$(as_role fuelflow_readonly "$readonly_password" "INSERT INTO public.brands(id) VALUES (2)" 2>&1)"; rc=$?
-    check_denied "the read-only role may not write" "$rc"
+    check_denied "the read-only role may not write" "$out" "$rc"
 
     # --- a privilege granted by hand is revoked by the next run ------------------
     out="$(as_super "GRANT DELETE ON public.payments TO fuelflow_app" 2>&1)"; rc=$?
@@ -528,7 +540,27 @@ else
     check "the run did not create another role" "$before" "$after"
 
     out="$(as_app "DELETE FROM public.payments WHERE false" 2>&1)"; rc=$?
-    check_denied "the next run revoked the hand-granted DELETE" "$rc"
+    check_denied "the next run revoked the hand-granted DELETE" "$out" "$rc"
+
+    # --- a denial probe that cannot fail for the wrong reason -------------------
+    # The defect this guards against, measured in production on 2026-10-27: a probe
+    # naming a column the table no longer has is refused by the parser, the old
+    # `if psql_as ... ; then die` shape read that non-zero exit as "denied", and the run
+    # printed a guarantee it had never tested. Renaming the probed column out from under
+    # the script must stop the run and say why, not let it pass.
+    out="$(as_super "ALTER TABLE public.provider_event_outbox RENAME COLUMN summary TO summary_retired" 2>&1)"; rc=$?
+    check "the probe column is renamed out from under the script" "0" "$rc"
+    out="$(bash "$SCRIPT" 2>&1)"; rc=$?
+    if [[ "$rc" -ne 0 ]]; then
+      echo "  PASS  a probe that cannot be refused by a privilege stops the run"; pass=$((pass + 1))
+    else
+      echo "  FAIL  a probe naming a column the table does not have still reported success"; fail=$((fail + 1))
+    fi
+    check_contains "it says the refusal proves nothing" "refused for a reason that is not a privilege" "$out"
+    out="$(as_super "ALTER TABLE public.provider_event_outbox RENAME COLUMN summary_retired TO summary" 2>&1)"; rc=$?
+    check "the probe column is back" "0" "$rc"
+    out="$(bash "$SCRIPT" 2>&1)"; rc=$?
+    check "the script exits 0 once the probe matches the schema again" "0" "$rc"
 
     # The probe table the script leaves behind is not left behind.
     leftover="$(docker exec "$CONTAINER_NAME" psql -U postgres -d fuelflow -t -A -c "

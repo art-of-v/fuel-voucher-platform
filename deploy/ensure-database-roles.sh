@@ -279,6 +279,24 @@ psql_as() {
     -v ON_ERROR_STOP=1 -X -q "$@"
 }
 
+# A statement that must be refused has to be refused BY A PRIVILEGE. A non-zero exit is
+# not the same thing: an UPDATE naming a column the table no longer has also exits
+# non-zero, and the probe then reports a guarantee it never tested. Measured on
+# 2026-10-27 - `UPDATE provider_event_outbox SET payload = ...` probed a column that had
+# been replaced by old_value/new_value/summary, so every deploy logged
+# `column "payload" does not exist` while the script printed success and the app role was
+# never asked whether it may rewrite the admin audit trail.
+probe_denied() {
+  local role="$1" statement="$2" message="$3" out
+  if out="$(psql_as "$role" -c "$statement" 2>&1)"; then
+    die "$message"
+  fi
+  case "$out" in
+    *"permission denied"* | *"must be owner"*) ;;
+    *) die "a probe was refused for a reason that is not a privilege, so it proves nothing ($role): $statement -> $out" ;;
+  esac
+}
+
 echo "== the database roles =="
 
 # ------------------------------------------------------------------------------
@@ -706,21 +724,18 @@ have_relation() {
 }
 
 if have_relation public.voucher_events; then
-  if psql_as "$APP_ROLE" -c "UPDATE public.voucher_events SET event_type = event_type WHERE false" >/dev/null 2>&1; then
-    die "the application role may UPDATE voucher_events. The voucher audit trail is insert-only for it - database-privileges.tsv says SI."
-  fi
-  if psql_as "$APP_ROLE" -c "DELETE FROM public.voucher_events WHERE false" >/dev/null 2>&1; then
-    die "the application role may DELETE from voucher_events. A redemption nobody can prove happened is a sale nobody has to honour."
-  fi
+  probe_denied "$APP_ROLE" "UPDATE public.voucher_events SET event_type = event_type WHERE false" \
+    "the application role may UPDATE voucher_events. The voucher audit trail is insert-only for it - database-privileges.tsv says SI."
+  probe_denied "$APP_ROLE" "DELETE FROM public.voucher_events WHERE false" \
+    "the application role may DELETE from voucher_events. A redemption nobody can prove happened is a sale nobody has to honour."
   say "the application role may not rewrite or delete voucher_events"
 else
   say "voucher_events does not exist yet - the CI test probes this against a stub table"
 fi
 
 if have_relation public.payments; then
-  if psql_as "$APP_ROLE" -c "DELETE FROM public.payments WHERE false" >/dev/null 2>&1; then
-    die "the application role may DELETE from payments. A payment a bug can erase is a payment the reconciliation cannot trust."
-  fi
+  probe_denied "$APP_ROLE" "DELETE FROM public.payments WHERE false" \
+    "the application role may DELETE from payments. A payment a bug can erase is a payment the reconciliation cannot trust."
   say "the application role may not delete payments"
 else
   say "payments does not exist yet - the CI test probes this against a stub table"
@@ -734,16 +749,14 @@ if have_relation public.outbox_events; then
   if ! psql_as "$APP_ROLE" -c "UPDATE public.outbox_events SET event_type = event_type WHERE false" >/dev/null 2>&1; then
     die "the application role may not UPDATE outbox_events. The dispatcher closes an event by updating the whole row - database-privileges.tsv grants SIU."
   fi
-  if psql_as "$APP_ROLE" -c "DELETE FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
-    die "the application role may DELETE from outbox_events. The purge belongs to the maintenance role."
-  fi
+  probe_denied "$APP_ROLE" "DELETE FROM public.outbox_events WHERE false" \
+    "the application role may DELETE from outbox_events. The purge belongs to the maintenance role."
   say "the application role may close an outbox event and may not delete it"
   if ! psql_as "$MAINTENANCE_ROLE" -c "DELETE FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
     die "the maintenance role may not DELETE from outbox_events. The retention purge would delete nothing, night after night."
   fi
-  if psql_as "$MAINTENANCE_ROLE" -c "INSERT INTO public.outbox_events SELECT * FROM public.outbox_events WHERE false" >/dev/null 2>&1; then
-    die "the maintenance role may INSERT into outbox_events. It holds the destructive half of the lifecycle only - database-privileges.tsv says SD for it."
-  fi
+  probe_denied "$MAINTENANCE_ROLE" "INSERT INTO public.outbox_events SELECT * FROM public.outbox_events WHERE false" \
+    "the maintenance role may INSERT into outbox_events. It holds the destructive half of the lifecycle only - database-privileges.tsv says SD for it."
   say "the maintenance role may purge the outbox and may not write it"
 else
   say "outbox_events does not exist yet - the CI test probes this against a stub table"
@@ -756,9 +769,8 @@ if have_relation public.webhook_events; then
   if ! psql_as "$APP_ROLE" -c "UPDATE public.webhook_events SET status = 'Processed', processed_at_utc = now() WHERE false" >/dev/null 2>&1; then
     die "the application role may not settle a webhook delivery. The recorder closes a delivery exactly this way - database-privileges.tsv grants U(status,processed_at_utc,processing_started_at_utc,error,attempts)."
   fi
-  if psql_as "$APP_ROLE" -c "UPDATE public.webhook_events SET payload = payload WHERE false" >/dev/null 2>&1; then
-    die "the application role may UPDATE webhook_events.payload. The body exactly as received is the evidence the delivery is worth - database-privileges.tsv grants the five outcome columns and nothing else."
-  fi
+  probe_denied "$APP_ROLE" "UPDATE public.webhook_events SET payload = payload WHERE false" \
+    "the application role may UPDATE webhook_events.payload. The body exactly as received is the evidence the delivery is worth - database-privileges.tsv grants the five outcome columns and nothing else."
   say "the application role may settle a webhook delivery and may not rewrite it"
 else
   say "webhook_events does not exist yet - the CI test probes this against a stub table"
@@ -773,24 +785,22 @@ if have_relation public.monobank_statement_entries; then
   if ! psql_as "$APP_ROLE" -c "UPDATE public.monobank_statement_entries SET last_seen_at_utc = last_seen_at_utc WHERE false" >/dev/null 2>&1; then
     die "the application role may not move monobank_statement_entries.last_seen_at_utc. The hourly import touches that column on every re-import - database-privileges.tsv grants SI+U(last_seen_at_utc)."
   fi
-  if psql_as "$APP_ROLE" -c "UPDATE public.monobank_statement_entries SET amount_kopecks = amount_kopecks WHERE false" >/dev/null 2>&1; then
-    die "the application role may UPDATE monobank_statement_entries.amount_kopecks. The acquirer's figure is the evidence the statement is worth - database-privileges.tsv grants the last_seen_at_utc column and nothing else."
-  fi
-  if psql_as "$APP_ROLE" -c "DELETE FROM public.monobank_statement_entries WHERE false" >/dev/null 2>&1; then
-    die "the application role may DELETE from monobank_statement_entries. A statement row nobody can prove the acquirer sent is not evidence."
-  fi
+  probe_denied "$APP_ROLE" "UPDATE public.monobank_statement_entries SET amount_kopecks = amount_kopecks WHERE false" \
+    "the application role may UPDATE monobank_statement_entries.amount_kopecks. The acquirer's figure is the evidence the statement is worth - database-privileges.tsv grants the last_seen_at_utc column and nothing else."
+  probe_denied "$APP_ROLE" "DELETE FROM public.monobank_statement_entries WHERE false" \
+    "the application role may DELETE from monobank_statement_entries. A statement row nobody can prove the acquirer sent is not evidence."
   say "the application role may move the last-seen column and may not rewrite the statement"
 else
   say "monobank_statement_entries does not exist yet - the CI test probes this against a stub table"
 fi
 
 if have_relation public.provider_event_outbox; then
-  if psql_as "$APP_ROLE" -c "UPDATE public.provider_event_outbox SET payload = payload WHERE false" >/dev/null 2>&1; then
-    die "the application role may UPDATE provider_event_outbox. The admin change audit trail is insert-only for it - database-privileges.tsv says SI."
-  fi
-  if psql_as "$APP_ROLE" -c "DELETE FROM public.provider_event_outbox WHERE false" >/dev/null 2>&1; then
-    die "the application role may DELETE from provider_event_outbox. The audit purge belongs to the maintenance role."
-  fi
+  probe_denied "$APP_ROLE" \
+    "UPDATE public.provider_event_outbox SET summary = summary WHERE false" \
+    "the application role may UPDATE provider_event_outbox. The admin change audit trail is insert-only for it - database-privileges.tsv says SI."
+  probe_denied "$APP_ROLE" \
+    "DELETE FROM public.provider_event_outbox WHERE false" \
+    "the application role may DELETE from provider_event_outbox. The audit purge belongs to the maintenance role."
   if ! psql_as "$MAINTENANCE_ROLE" -c "SELECT count(*) FROM public.provider_event_outbox" >/dev/null 2>&1; then
     die "the maintenance role may not SELECT from provider_event_outbox - it cannot age the audit trail without reading it."
   fi
