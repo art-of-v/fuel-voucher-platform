@@ -75,7 +75,7 @@ public sealed class OrderReceiptController : ControllerBase
             CreatedAtUtc = receipt.CreatedAtUtc,
             Status = receipt.Status.ToString(),
             // The order's own Price, not a sum of the lines: a partially refunded order leaves the
-            // two disagreeing, and the receipt has to say what was actually charged for the goods.
+            // two disagreeing, and the receipt has to say what was actually charged for the service.
             Total = receipt.Price,
             AcquirerInvoiceId = receipt.MonobankInvoiceId,
             AcquirerName = receipt.MonobankInvoiceId is null ? null : "Monobank",
@@ -83,8 +83,8 @@ public sealed class OrderReceiptController : ControllerBase
             CompanyName = receipt.CompanyName,
             Lines = receipt.Lines
                 .Select(l => new ReceiptLine(
-                    // The line stores a fuel type ID, which for real fuels is a GUID. The receipt
-                    // prints what the customer bought, so the name comes from the catalog.
+                    // The line stores a fuel type ID, which for real fuels is a GUID. The nominal
+                    // column says what the code is redeemable for, so it prints the catalog name.
                     receipt.FuelNames.TryGetValue(l.FuelTypeId, out var name) ? name : l.FuelTypeId.ToString(),
                     l.Liters, l.Quantity, l.UnitPrice, l.LineTotal))
                 .ToList(),

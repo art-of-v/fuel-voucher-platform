@@ -332,9 +332,6 @@ public sealed class CreateCheckoutCommandHandler
             // and can only print what we declare, and the hryvnia link is switched on in the bank's
             // web cabinet without warning us. Declaring always means activating it is not a
             // launch-day event.
-            var fuelNames = await MonobankBasketBuilder.FuelNamesAsync(
-                _context, order.LineItems.Select(li => li.FuelTypeId), cancellationToken);
-
             var invoiceRequest = new MonobankInvoiceRequest
             {
                 // Monobank is the one place amounts must be kopecks.
@@ -342,9 +339,7 @@ public sealed class CreateCheckoutCommandHandler
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
                 Destination = MonobankClient.DefaultDestination,
                 Items = MonobankBasketBuilder.Build(order.LineItems.Select(li => (
-                    li.Brand, li.FuelTypeId,
-                    fuelNames.GetValueOrDefault(li.FuelTypeId),
-                    li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))),
+                    li.FuelTypeId, li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))),
                 RedirectUrl = _monobankOptions.RedirectUrl,
                 WebhookUrl = _monobankOptions.WebhookUrl
             };
