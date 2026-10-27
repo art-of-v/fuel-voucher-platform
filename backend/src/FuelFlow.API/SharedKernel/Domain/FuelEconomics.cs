@@ -15,7 +15,30 @@ public readonly record struct FuelEconomicsState(bool HasCost, bool HasMargin)
     /// A cost of zero is not a stated cost - see <see cref="FuelEconomics.State"/>.
     /// </remarks>
     public bool IsPriced => HasCost && HasMargin;
+
+    /// <summary>
+    /// What is missing, as a stable machine token, or <c>null</c> when nothing is.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Missing"/> is the English words for a log line; a client cannot build a translated
+    /// sentence out of them, because the words are the thing each locale has its own of. So the gap
+    /// travels as this token and the admin says it in the operator's language.
+    /// </remarks>
+    public string? Gap => (HasCost, HasMargin) switch
+    {
+        (false, false) => "cost_and_margin",
+        (false, true) => "cost",
+        (true, false) => "margin",
+        _ => null
+    };
 }
+
+/// <summary>
+/// A fuel that has no price of its own: its name, and which half of the price is missing.
+/// </summary>
+/// <param name="Name">The fuel's own name, as the operator reads it on the fuel card.</param>
+/// <param name="Gap">What is missing — see <see cref="FuelEconomicsState.Gap"/>.</param>
+public sealed record UnpricedFuel(string Name, string Gap);
 
 /// <summary>
 /// The economics of a fuel: the supplier cost we pay per litre and the margin we add to it.
@@ -51,16 +74,30 @@ public static class FuelEconomics
             HasMargin: marginPerLiter is not null);
 
     /// <summary>
-    /// What is missing, in the words the operator reads.
+    /// What is missing, in the words an English reader of the logs expects.
     /// </summary>
+    /// <remarks>
+    /// Derived from <see cref="FuelEconomicsState.Gap"/>, so the sentence and the token cannot
+    /// disagree about which half of the price is absent.
+    /// </remarks>
     public static string Missing(FuelEconomicsState state)
-        => state switch
+        => state.Gap switch
         {
-            { HasCost: false, HasMargin: false } => "no supplier cost and no margin",
-            { HasCost: false } => "no supplier cost",
-            { HasMargin: false } => "no margin",
+            "cost_and_margin" => "no supplier cost and no margin",
+            "cost" => "no supplier cost",
+            "margin" => "no margin",
             _ => "nothing"
         };
+
+    /// <summary>
+    /// The fuels of these that have no price of their own, as the machine-readable pair the
+    /// refusal is built from: the name and the gap.
+    /// </summary>
+    public static List<UnpricedFuel> Unpriced(
+        IEnumerable<(string Name, FuelEconomicsState State)> fuels)
+        => fuels.Where(f => !f.State.IsPriced)
+            .Select(f => new UnpricedFuel(f.Name, f.State.Gap!))
+            .ToList();
 
     /// <summary>
     /// What is wrong with the numbers an operator sent, or null when they are sound.

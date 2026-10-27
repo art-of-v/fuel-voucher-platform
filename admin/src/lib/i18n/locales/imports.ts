@@ -27,6 +27,16 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.timelineCostMove": "Cost /L",
     "imports.costSaved": "Cost saved — prices updated",
     "imports.costSaveFailed": "Failed to save cost",
+    // An activation the gate refused. The fuel names arrive from the server; the words are ours.
+    "imports.error.notPriced":
+      "Cannot activate: this fuel has no price of its own — {0}. A litre's price is what we pay plus our margin: set the margin on the fuel's card (Brands tab), the cost on the import batch above, then activate.",
+    "imports.error.gapCost": "no supplier cost",
+    "imports.error.gapMargin": "no margin",
+    "imports.error.gapCostAndMargin": "no supplier cost and no margin",
+    "imports.error.fuelMissing":
+      "Cannot activate: a voucher in this selection belongs to a fuel that is no longer in the catalogue. Restore the fuel or remove the voucher.",
+    "imports.error.voucherCost":
+      "Cannot activate: {0} voucher(s) in this batch have no cost yet — enter it above, under \"Batch costs\".",
     "imports.parseInvoice": "Upload invoice (.xlsx)",
     "imports.invoiceParsing": "Reading invoice…",
     "imports.invoiceParsed":
@@ -122,6 +132,15 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.timelineCostMove": "Собівартість /л",
     "imports.costSaved": "Собівартість збережено — ціни оновлено",
     "imports.costSaveFailed": "Не вдалося зберегти собівартість",
+    "imports.error.notPriced":
+      "Не можна активувати: у цього пального ще немає власної ціни — {0}. Ціна літра = собівартість + маржа: маржу задайте на картці пального (вкладка «Бренди»), собівартість партії — вище, у блоці «Собівартість партій».",
+    "imports.error.gapCost": "не задано собівартість",
+    "imports.error.gapMargin": "не задано маржу",
+    "imports.error.gapCostAndMargin": "не задано ані собівартості, ані маржі",
+    "imports.error.fuelMissing":
+      "Не можна активувати: у цьому відборі є талон пального, якого вже немає в каталозі. Поверніть пальне до каталогу або приберіть талон.",
+    "imports.error.voucherCost":
+      "Не можна активувати: для {0} талонів цієї партії ще не внесено собівартість — зробіть це вище, у блоці «Собівартість партій».",
     "imports.parseInvoice": "Завантажити накладну (.xlsx)",
     "imports.invoiceParsing": "Зчитування накладної…",
     "imports.invoiceParsed":
@@ -240,6 +259,15 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.timelineCostMove": "Kosten /L",
     "imports.costSaved": "Kosten gespeichert – Preise aktualisiert",
     "imports.costSaveFailed": "Kosten konnten nicht gespeichert werden",
+    "imports.error.notPriced":
+      "Aktivierung nicht möglich: Dieser Kraftstoff hat noch keinen eigenen Preis — {0}. Der Literpreis ist unser Einkaufspreis plus Marge: Marge auf der Kraftstoffkarte (Tab „Marken“) festlegen, die Chargenkosten oben im Block „Chargenkosten“.",
+    "imports.error.gapCost": "kein Einkaufspreis",
+    "imports.error.gapMargin": "keine Marge",
+    "imports.error.gapCostAndMargin": "kein Einkaufspreis und keine Marge",
+    "imports.error.fuelMissing":
+      "Aktivierung nicht möglich: Ein Gutschein in dieser Auswahl gehört zu einem Kraftstoff, der nicht mehr im Katalog ist. Kraftstoff wiederherstellen oder Gutschein entfernen.",
+    "imports.error.voucherCost":
+      "Aktivierung nicht möglich: Für {0} Gutschein(e) dieser Charge fehlen noch die Kosten — oben im Block „Chargenkosten“ eintragen.",
     "imports.parseInvoice": "Rechnung hochladen (.xlsx)",
     "imports.invoiceParsing": "Rechnung wird gelesen.",
     "imports.invoiceParsed":
@@ -335,6 +363,15 @@ export const imports: Record<Language, Record<string, string>> = {
     "imports.timelineCostMove": "Coste /L",
     "imports.costSaved": "Coste guardado: precios actualizados",
     "imports.costSaveFailed": "No se pudo guardar el coste",
+    "imports.error.notPriced":
+      "No se puede activar: este combustible aún no tiene precio propio — {0}. El precio por litro es lo que pagamos más nuestro margen: defina el margen en la ficha del combustible (pestaña «Marcas») y el coste del lote arriba, en «Coste por lote».",
+    "imports.error.gapCost": "sin coste de proveedor",
+    "imports.error.gapMargin": "sin margen",
+    "imports.error.gapCostAndMargin": "sin coste de proveedor y sin margen",
+    "imports.error.fuelMissing":
+      "No se puede activar: un vale de esta selección pertenece a un combustible que ya no está en el catálogo. Restaure el combustible o elimine el vale.",
+    "imports.error.voucherCost":
+      "No se puede activar: {0} vale(s) de este lote aún no tienen coste — introduzca el coste arriba, en «Coste por lote».",
     "imports.parseInvoice": "Subir factura (.xlsx)",
     "imports.invoiceParsing": "Leyendo la factura.",
     "imports.invoiceParsed":
