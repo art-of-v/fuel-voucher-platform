@@ -314,18 +314,14 @@ public sealed class RefundOrderCommandHandler
             var merchant = order.MonobankMerchant ?? MonobankMerchant.Live;
             var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
-            // The RETURN receipt: the goods going back. Monobank documents `items` on invoice/cancel
+            // The RETURN receipt: the services going back. Monobank documents `items` on invoice/cancel
             // as required when fiscalisation (ПРРО) is active, and it is sent always so that
             // activating the link is not the day refunds start failing. Built from the same
             // breakdown that produced the amount, so the receipt and the money cannot disagree.
             var unfulfilledLines = ComputeUnfulfilledLines(order);
-            var fuelNames = await MonobankBasketBuilder.FuelNamesAsync(
-                _context, unfulfilledLines.Select(l => l.FuelTypeId), cancellationToken);
 
             var returnItems = MonobankBasketBuilder.Build(unfulfilledLines.Select(l => (
-                l.Brand, l.FuelTypeId,
-                fuelNames.GetValueOrDefault(l.FuelTypeId),
-                l.Liters, l.UnfulfilledUnits, l.UnitPrice,
+                l.FuelTypeId, l.Liters, l.UnfulfilledUnits, l.UnitPrice,
                 l.UnfulfilledUnits * l.UnitPrice)));
 
             var response = await monobankClient.CancelInvoiceAsync(

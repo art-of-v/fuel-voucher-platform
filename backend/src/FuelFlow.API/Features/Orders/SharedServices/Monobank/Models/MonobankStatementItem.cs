@@ -77,8 +77,9 @@ public sealed class MonobankStatementItem
     /// reliable key.</summary>
     public string? Reference { get; set; }
 
-    /// <summary>The payment purpose as it appears on the receipt - "Паливо", or whatever the
-    /// checkout asked for. This, not <see cref="Reference"/>, is the human-readable string.</summary>
+    /// <summary>The payment purpose as it appears on the receipt - "Рекламні послуги" on a payment
+    /// made after 2026-10-27, "Паливо" on every earlier one, or whatever the checkout asked for.
+    /// This, not <see cref="Reference"/>, is the human-readable string.</summary>
     public string? Destination { get; set; }
 
     /// <summary>Transaction id in the payment system.</summary>

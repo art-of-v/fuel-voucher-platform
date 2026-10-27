@@ -85,6 +85,27 @@ public sealed class OrderReceiptDocumentBuilderTests
         Encoding.ASCII.GetString(pdf, 0, 5).Should().Be("%PDF-");
     }
 
+    [Fact]
+    public void The_document_sells_the_service_and_names_the_fuel_only_as_the_nominal()
+    {
+        // The QR code is bought under the advertising contract; the fuel is sold by the station. A
+        // receipt whose first column reads as the fuel describes a sale of fuel, which is the claim
+        // this document must not make.
+        OrderReceiptDocumentBuilder.ServiceLabel.Should().Be("Рекламні послуги");
+
+        OrderReceiptDocumentBuilder.NominalOf(new ReceiptLine("А-95", 10m, 1, 862.00m, 862.00m))
+            .Should().Be("А-95 / 10 л");
+    }
+
+    [Theory]
+    [InlineData("ДП ЄВРО", 1f, "ДП ЄВРО / 1 л")]
+    [InlineData("А 95+", 39.5f, "А 95+ / 39.5 л")]
+    public void The_nominal_reads_the_volume_without_inventing_decimals(string fuel, float liters, string expected)
+    {
+        OrderReceiptDocumentBuilder.NominalOf(new ReceiptLine(fuel, (decimal)liters, 1, 0m, 0m))
+            .Should().Be(expected);
+    }
+
     [Theory]
     [InlineData("PT_Sans-Web-Regular.ttf")]
     [InlineData("PT_Sans-Web-Bold.ttf")]

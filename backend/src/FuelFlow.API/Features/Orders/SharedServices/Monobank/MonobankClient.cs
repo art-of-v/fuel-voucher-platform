@@ -11,15 +11,20 @@ public sealed class MonobankClient : IMonobankClient
     private static readonly JsonSerializerOptions StatementJsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// What the receipt says the purchase was for when the caller declares nothing: the fuel.
+    /// What the receipt says the purchase was for when the caller declares nothing: the service.
     /// <para>
     /// It is a literal in Ukrainian because the acquirer prints exactly what we declare it - a
-    /// destination that reads as "Паливо" is what the customer and the tax inspector read. Two
-    /// checkout paths (a voucher renewal and a multi-item basket) declare no destination of their
+    /// destination that reads as "Рекламні послуги" is what the customer and the tax inspector read.
+    /// Two checkout paths (a voucher renewal and a multi-item basket) declare no destination of their
     /// own and land here, so this string is on a fiscal receipt.
     /// </para>
+    /// <para>
+    /// It is not the fuel, and that is the point: the fuel is sold by the station, and what the
+    /// platform sells is the placement of the promotional code. The basket lines and the customer's
+    /// own PDF receipt use the same words.
+    /// </para>
     /// </summary>
-    public const string DefaultDestination = "Паливо";
+    public const string DefaultDestination = "Рекламні послуги";
 
     private readonly MonobankOptions _options;
     private readonly HttpClient _httpClient;

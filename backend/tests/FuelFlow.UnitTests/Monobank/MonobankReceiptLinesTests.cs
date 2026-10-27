@@ -69,20 +69,22 @@ public sealed class MonobankReceiptLinesTests
 
         await client.CreateInvoiceAsync(new MonobankInvoiceRequest
         {
-            Amount = 20000,
+            // The invoice total and the basket total are the same money, so the fixture keeps them
+            // agreeing: 2 × 862.00 + 1 × 276.00.
+            Amount = 200000,
             MerchantPaymentInfo = "FuelFlow Order 7258a522",
-            Destination = "Паливо",
+            Destination = "Рекламні послуги",
             Items =
             [
                 new MonobankBasketItem
                 {
-                    Name = "А-95", Qty = 10m, Sum = 9500, Total = 95000,
-                    Unit = "л", Code = "okko-a95",
+                    Name = "Рекламні послуги", Qty = 2m, Sum = 86200, Total = 172400,
+                    Unit = "послуга", Code = "3808d410-0000-0000-0000-000000000000",
                 },
                 new MonobankBasketItem
                 {
-                    Name = "ДП ЄВРО", Qty = 2m, Sum = 10000, Total = 20000,
-                    Unit = "л", Code = "okko-diesel",
+                    Name = "Рекламні послуги", Qty = 1m, Sum = 27600, Total = 27600,
+                    Unit = "послуга", Code = "4c1f0a11-0000-0000-0000-000000000000",
                 },
             ],
         });
@@ -94,18 +96,18 @@ public sealed class MonobankReceiptLinesTests
 
         // The purchase description used to be a copy of the reference, so the receipt read
         // "FuelFlow Order 7258a522-d402-..." instead of what the customer bought.
-        info.GetProperty("destination").GetString().Should().Be("Паливо");
+        info.GetProperty("destination").GetString().Should().Be("Рекламні послуги");
 
         var basket = info.GetProperty("basketOrder");
         basket.GetArrayLength().Should().Be(2);
 
         var first = basket[0];
-        first.GetProperty("name").GetString().Should().Be("А-95");
-        first.GetProperty("qty").GetDecimal().Should().Be(10m);
-        first.GetProperty("sum").GetInt64().Should().Be(9500, "the price of ONE litre");
-        first.GetProperty("total").GetInt64().Should().Be(95000);
-        first.GetProperty("unit").GetString().Should().Be("л");
-        first.GetProperty("code").GetString().Should().Be("okko-a95");
+        first.GetProperty("name").GetString().Should().Be("Рекламні послуги");
+        first.GetProperty("qty").GetDecimal().Should().Be(2m);
+        first.GetProperty("sum").GetInt64().Should().Be(86200, "the price of ONE code");
+        first.GetProperty("total").GetInt64().Should().Be(172400);
+        first.GetProperty("unit").GetString().Should().Be("послуга");
+        first.GetProperty("code").GetString().Should().Be("3808d410-0000-0000-0000-000000000000");
     }
 
     [Fact]
@@ -125,7 +127,7 @@ public sealed class MonobankReceiptLinesTests
     }
 
     [Fact]
-    public async Task CreateInvoice_FallsBackToTheFuel_WhenTheCallerDeclaresNoDestination()
+    public async Task CreateInvoice_FallsBackToTheService_WhenTheCallerDeclaresNoDestination()
     {
         var (client, handler) = Build();
 
@@ -136,31 +138,35 @@ public sealed class MonobankReceiptLinesTests
         });
 
         // The acquirer prints what we declare it, so the fallback is on a fiscal receipt. It used
-        // to be the CP437 twin of "Паливо" - box-drawing characters in place of the letters - and
-        // two checkout paths reach it: a voucher renewal and a multi-item basket, neither of which
-        // declares a destination of its own. A single checkout declared "Паливо" and hid the
+        // to be the CP437 twin of the fuel purpose - box-drawing characters in place of the letters
+        // - and two checkout paths reach it: a voucher renewal and a multi-item basket, neither of
+        // which declares a destination of its own. A single checkout declared one and hid the
         // damage, which is why the garbled string survived in the source.
+        //
+        // What it says now is the answer to "what did the customer buy", and the answer is the
+        // advertising service the QR code is sold under, not the fuel the station sells.
         MerchantPaymInfo(handler.Body)
             .GetProperty("destination")
             .GetString()
             .Should()
-            .Be("Паливо");
+            .Be(MonobankClient.DefaultDestination)
+            .And.Be("Рекламні послуги");
     }
 
     [Fact]
-    public async Task CancelInvoice_SendsTheReturnedGoods()
+    public async Task CancelInvoice_SendsTheReturnedServices()
     {
         var (client, handler) = Build();
 
         await client.CancelInvoiceAsync(
             "261012BKDuf6zFPD4pME",
-            9500,
+            86200,
             "idem-1",
             [
                 new MonobankBasketItem
                 {
-                    Name = "А-95", Qty = 5m, Sum = 9500, Total = 47500,
-                    Unit = "л", Code = "okko-a95",
+                    Name = "Рекламні послуги", Qty = 1m, Sum = 86200, Total = 86200,
+                    Unit = "послуга", Code = "3808d410-0000-0000-0000-000000000000",
                 },
             ]);
 
@@ -168,12 +174,12 @@ public sealed class MonobankReceiptLinesTests
 
         using var doc = JsonDocument.Parse(handler.Body);
         doc.RootElement.GetProperty("invoiceId").GetString().Should().Be("261012BKDuf6zFPD4pME");
-        doc.RootElement.GetProperty("amount").GetInt64().Should().Be(9500);
+        doc.RootElement.GetProperty("amount").GetInt64().Should().Be(86200);
         doc.RootElement.GetProperty("extRef").GetString().Should().Be("idem-1");
 
         var item = doc.RootElement.GetProperty("items")[0];
-        item.GetProperty("name").GetString().Should().Be("А-95");
-        item.GetProperty("qty").GetDecimal().Should().Be(5m);
+        item.GetProperty("name").GetString().Should().Be("Рекламні послуги");
+        item.GetProperty("qty").GetDecimal().Should().Be(1m);
     }
 
     [Fact]

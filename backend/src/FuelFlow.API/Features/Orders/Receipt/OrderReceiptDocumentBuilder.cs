@@ -8,8 +8,9 @@ namespace FuelFlow.Features.Orders.Receipt;
 
 /// <summary>One line of a receipt, already resolved to what the customer should read.</summary>
 /// <param name="FuelName">
-/// The fuel as the customer reads it - the name from the catalogue the offer came from, never the
-/// id. The id is a uuid, and a receipt that printed one would be unreadable.
+/// The fuel the advertised QR is redeemable for - the name from the catalogue the offer came from,
+/// never the id. The id is a uuid, and a receipt that printed one would be unreadable. It belongs to
+/// the nominal column, not the service column: the fuel is what the code is worth, not what was sold.
 /// </param>
 public sealed record ReceiptLine(string FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
 
@@ -47,6 +48,13 @@ public sealed record RefundReceiptInfo(DateTime RefundedAtUtc, decimal Amount, G
 /// or an accountant asks for: what was bought, what it cost, and what the acquirer recorded.
 /// </para>
 /// <para>
+/// The sale the document describes is the advertising service, not the fuel. The customer buys a QR
+/// code under the advertising contract; the fuel is sold and dispensed by the station, which is why
+/// the service column reads <see cref="ServiceLabel"/> and the fuel appears only as the nominal of
+/// the code. The Monobank basket line says the same thing, so the acquirer's receipt and this one
+/// describe one payment in one vocabulary.
+/// </para>
+/// <para>
 /// Money is formatted through the invariant culture. On a machine whose locale uses a comma as the
 /// decimal separator, <c>ToString("N2")</c> would print 1234.50 as "1 234,50" - and worse, a receipt
 /// whose numbers disagree with the invoice is the exact problem this document exists to solve.
@@ -54,6 +62,12 @@ public sealed record RefundReceiptInfo(DateTime RefundedAtUtc, decimal Amount, G
 /// </remarks>
 public static class OrderReceiptDocumentBuilder
 {
+    /// <summary>
+    /// What every line of this document sells. One constant, because every sale through the platform
+    /// is the same service and the fuel differs only in the nominal.
+    /// </summary>
+    internal const string ServiceLabel = "Рекламні послуги";
+
     public static byte[] Build(OrderReceiptDocument document)
     {
         PdfFonts.EnsureRegistered();
@@ -115,28 +129,33 @@ public static class OrderReceiptDocumentBuilder
             {
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.RelativeColumn(3);   // fuel
-                    columns.RelativeColumn(2);   // litres
+                    columns.RelativeColumn(3);   // service
+                    columns.RelativeColumn(2);   // nominal
                     columns.RelativeColumn(1);   // qty
                     columns.RelativeColumn(2);   // price
                     columns.RelativeColumn(2);   // total
                 });
 
-                table.Cell().Element(HeaderCell).Text("Пальне / номінал");
-                table.Cell().Element(HeaderCell).AlignRight().Text("Літри");
+                table.Cell().Element(HeaderCell).Text("Послуга");
+                table.Cell().Element(HeaderCell).Text("Номінал QR");
                 table.Cell().Element(HeaderCell).AlignRight().Text("К-сть");
                 table.Cell().Element(HeaderCell).AlignRight().Text("Ціна");
                 table.Cell().Element(HeaderCell).AlignRight().Text("Сума");
 
                 foreach (var line in d.Lines)
                 {
-                    table.Cell().PaddingVertical(4).Text(line.FuelName);
-                    table.Cell().PaddingVertical(4).AlignRight().Text(FormatNumber(line.Liters));
+                    table.Cell().PaddingVertical(4).Text(ServiceLabel);
+                    table.Cell().PaddingVertical(4).Text(NominalOf(line));
                     table.Cell().PaddingVertical(4).AlignRight().Text(line.Quantity.ToString(CultureInfo.InvariantCulture));
                     table.Cell().PaddingVertical(4).AlignRight().Text(FormatMoney(line.UnitPrice));
                     table.Cell().PaddingVertical(4).AlignRight().Text(FormatMoney(line.LineTotal));
                 }
             }));
+
+            column.Item().PaddingTop(2).Text(
+                    "Пальне реалізується АЗС. Цей документ підтверджує оплату послуг з розміщення " +
+                    "рекламної інформації (QR-код).")
+                .FontSize(8).FontColor(Colors.Grey.Medium);
 
             column.Item().PaddingTop(10).AlignRight().Text("РАЗОМ")
                 .FontFamily(PdfFonts.Family).Bold().FontSize(12);
@@ -190,6 +209,16 @@ public static class OrderReceiptDocumentBuilder
     private static IContainer HeaderCell(IContainer c)
         => c.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(4)
             .DefaultTextStyle(t => t.FontFamily(PdfFonts.Family).Bold().FontSize(9));
+
+    /// <summary>
+    /// What the QR code is redeemable for, as the nominal column reads it: "А-95 / 10 л".
+    /// </summary>
+    /// <remarks>
+    /// Internal rather than inlined in the table so the test can assert the wording without a PDF
+    /// text extractor - the suite reads the shipped font, not the rendered page.
+    /// </remarks>
+    internal static string NominalOf(ReceiptLine line)
+        => $"{line.FuelName} / {FormatNumber(line.Liters)} л";
 
     /// <summary>
     /// A short, human-quotable order reference. The full GUID would be unusable on a printed receipt
