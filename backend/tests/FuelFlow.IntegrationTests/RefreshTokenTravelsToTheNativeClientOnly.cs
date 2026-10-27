@@ -68,10 +68,40 @@ public sealed class RefreshTokenTravelsToTheNativeClientOnly : IClassFixture<Tes
         rotatedToken.GetString().Should().NotBe(token.GetString(), "a rotation issues a new token");
     }
 
+    [Fact]
+    public async Task The_Shipped_Bundle_That_Sends_No_Header_Still_Gets_The_Refresh_Token()
+    {
+        using var client = _fixture.CreateClient();
+
+        // Build 236 was submitted on 2026-10-14, before the header existed, so a fresh install
+        // sends nothing but its own User-Agent. It has to be recognized anyway: without the token
+        // the app stores no session and the customer is thrown back to the phone screen on the
+        // first /api/auth/user/me (production, 2026-10-27).
+        const string shippedBundle = "FuelFlow/236 CFNetwork/3860.700.2 Darwin/25.6.0";
+
+        var verified = await VerifyAsync(client, "+380995500013", native: false, userAgent: shippedBundle);
+        verified.Body.TryGetProperty("refreshToken", out var token).Should().BeTrue();
+        token.ValueKind.Should().Be(JsonValueKind.String, "the app has no cookie jar to keep it in");
+        token.GetString().Should().NotBeNullOrEmpty();
+
+        // And the rotation keeps working for that build, which is the half that would fail later
+        // even if sign-in looked fine: the app sends the token back and needs the new one.
+        var refreshed = await RefreshAsync(
+            client,
+            body: new { refreshToken = token.GetString() },
+            native: false,
+            cookie: null,
+            userAgent: shippedBundle);
+        refreshed.Body.TryGetProperty("refreshToken", out var rotatedToken).Should().BeTrue();
+        rotatedToken.ValueKind.Should().Be(JsonValueKind.String);
+        rotatedToken.GetString().Should().NotBeNullOrEmpty();
+    }
+
     private async Task<(JsonElement Body, string? SetCookie)> VerifyAsync(
         HttpClient client,
         string phoneNumber,
-        bool native)
+        bool native,
+        string? userAgent = null)
     {
         var sendCode = await client.PostAsJsonAsync("/api/auth/send-code", new { phoneNumber });
         sendCode.EnsureSuccessStatusCode();
@@ -82,6 +112,8 @@ public sealed class RefreshTokenTravelsToTheNativeClientOnly : IClassFixture<Tes
         };
         if (native)
             request.Headers.Add("X-Client-Platform", "mobile");
+        if (userAgent is not null)
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
 
         var verify = await client.SendAsync(request);
         verify.EnsureSuccessStatusCode();
@@ -97,7 +129,8 @@ public sealed class RefreshTokenTravelsToTheNativeClientOnly : IClassFixture<Tes
         HttpClient client,
         object? body,
         bool native,
-        string? cookie)
+        string? cookie,
+        string? userAgent = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
         if (body is not null)
@@ -106,6 +139,8 @@ public sealed class RefreshTokenTravelsToTheNativeClientOnly : IClassFixture<Tes
             request.Headers.Add("X-Client-Platform", "mobile");
         if (cookie is not null)
             request.Headers.Add("Cookie", cookie.Split(';')[0]);
+        if (userAgent is not null)
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
 
         var response = await client.SendAsync(request);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
