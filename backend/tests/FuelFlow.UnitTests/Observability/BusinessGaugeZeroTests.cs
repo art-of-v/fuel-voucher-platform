@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -92,7 +93,7 @@ public sealed class BusinessGaugeZeroTests : IDisposable
             Status = VoucherStatus.Assigned,
             DataKind = DataKinds.Real,
             IsDeleted = false,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherCount = 5
         }));
 
@@ -118,7 +119,7 @@ public sealed class BusinessGaugeZeroTests : IDisposable
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
                 IsDeleted = false,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherCount = 7
             });
             db.StockSummary.Add(new StockSummary
@@ -130,7 +131,7 @@ public sealed class BusinessGaugeZeroTests : IDisposable
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
                 IsDeleted = false,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherCount = 3
             });
         });
@@ -153,8 +154,8 @@ public sealed class BusinessGaugeZeroTests : IDisposable
                 Id = fuelTypeId,
                 Name = "A-95",
                 BrandId = Guid.NewGuid(),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             db.StockSummary.Add(new StockSummary
             {
@@ -165,7 +166,7 @@ public sealed class BusinessGaugeZeroTests : IDisposable
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
                 IsDeleted = false,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherCount = 4
             });
         });
@@ -190,7 +191,7 @@ public sealed class BusinessGaugeZeroTests : IDisposable
             Status = VoucherStatus.Available,
             DataKind = DataKinds.Qa,
             IsDeleted = false,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherCount = 99
         }));
 
@@ -210,8 +211,8 @@ public sealed class BusinessGaugeZeroTests : IDisposable
             Id = orderId,
             UserId = Guid.NewGuid(),
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         }));
 
         var samples = CollectGaugeSamples("fuelflow.orders.by_status");
