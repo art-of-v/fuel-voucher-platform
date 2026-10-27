@@ -1,7 +1,7 @@
 {
   "uid": "fuelflow-logs",
   "title": "FuelFlow / Logs",
-  "description": "Log volume and search across the API and JobsWorker. Logs reach Loki two ways: the in-app Serilog sink (host-run processes) and Alloy's Docker scrape (containers). Only service/environment/level are stream labels - everything else is a structured field, so filter with | json rather than adding labels (see docs/OBSERVABILITY.md (private docs repo)). The Background jobs panel is the job trail: every Hangfire run writes one line at the level of its outcome, so a failure can be read here long after the counter that recorded it has aged out.",
+  "description": "Log volume and search across the API and JobsWorker. Logs reach Loki through the in-app Serilog sink, which ships every line to the authenticated loki-gateway; nothing scrapes container output. Only service/environment/level are stream labels - everything else is a structured field, so filter with | json rather than adding labels (see docs/OBSERVABILITY.md (private docs repo)). The Background jobs panel is the job trail: every Hangfire run writes one line at the level of its outcome, so a failure can be read here long after the counter that recorded it has aged out.",
   "tags": ["fuelflow", "logs"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -77,12 +77,26 @@
     {
       "type": "logs",
       "title": "Errors and warnings",
-      "description": "Filtered to the levels worth reading first. Expand a line to see TraceId/SpanId, which are attached as structured metadata so a log can be tied back to its request without becoming a high-cardinality label.",
+      "description": "Server-side trouble only: error-level lines plus warnings that are not a client's own 4xx. Request-completion lines for 4xx live in the panel below, because a stale app build asking for a route that no longer exists can produce hundreds of them an hour and bury the one line that matters. Expand a line to see TraceId/SpanId, which are attached as structured metadata so a log can be tied back to its request without becoming a high-cardinality label.",
       "gridPos": { "h": 11, "w": 24, "x": 0, "y": 8 },
       "datasource": { "type": "loki", "uid": "fuelflow-loki" },
       "targets": [
         {
-          "expr": "{service=~\"$service\", level=~\"error|warning\"} |~ \"(?i)$search\"",
+          "expr": "{service=~\"$service\", level=~\"error|warning\"} |~ \"(?i)$search\" !~ \"responded 4[0-9][0-9]\"",
+          "refId": "A"
+        }
+      ],
+      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true, "dedupStrategy": "none", "enableLogDetails": true }
+    },
+    {
+      "type": "logs",
+      "title": "Client errors (4xx)",
+      "description": "Requests the API refused or could not match to a route: expired sessions, stale clients, consumers reading a resource that is gone. Kept out of the panel above so they cannot hide a 5xx - but still worth a glance, because a burst that starts at one moment names the client version that broke.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
+      "datasource": { "type": "loki", "uid": "fuelflow-loki" },
+      "targets": [
+        {
+          "expr": "{service=~\"$service\"} |~ \"responded 4[0-9][0-9]\" |~ \"(?i)$search\"",
           "refId": "A"
         }
       ],
@@ -92,7 +106,7 @@
       "type": "logs",
       "title": "Background jobs",
       "description": "Every finished Hangfire run: Information when it completed, Warning when it was cancelled, Error when it failed with the exception attached. JobType, JobName and DurationMs are JSON body fields, so isolate one job with | json | JobName=\"...\". A failure here survives the counter that recorded it - which is the point, because Hangfire's retries clear the failed state in its own dashboard long before the log ages out.",
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 19 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 29 },
       "datasource": { "type": "loki", "uid": "fuelflow-loki" },
       "targets": [
         {
@@ -106,7 +120,7 @@
       "type": "logs",
       "title": "All logs",
       "description": "Unfiltered stream for the selected services. Use the Search variable for a case-insensitive substring match across the raw line.",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 29 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 39 },
       "datasource": { "type": "loki", "uid": "fuelflow-loki" },
       "targets": [
         {
