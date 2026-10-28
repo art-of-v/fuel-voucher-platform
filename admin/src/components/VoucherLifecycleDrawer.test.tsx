@@ -120,11 +120,64 @@ describe("VoucherLifecycleDrawer", () => {
     await waitFor(() =>
       expect(screen.getByText("voucherLifecycle.kind.issued")).toBeTruthy(),
     );
-    expect(screen.getByText("voucherLifecycle.kind.pool")).toBeTruthy();
-    expect(screen.getByText("voucherLifecycle.kind.customer")).toBeTruthy();
     expect(
       screen.getByText("voucherLifecycle.event.StatusChanged"),
     ).toBeTruthy();
+  });
+
+  it("translates the words either side of the arrow through their own source", async () => {
+    // A header status the timeline does not repeat, so each assertion names exactly one element.
+    mockedApiRequest.mockResolvedValue({ ...FULL, status: "Available" });
+    renderDrawer({ voucherId: "v1" });
+
+    // A movement's ends are custody locations, not movement kinds: asking the locales for
+    // `kind.pool` printed the key itself next to a translated neighbour.
+    await waitFor(() =>
+      expect(screen.getByText("voucherLifecycle.location.pool")).toBeTruthy(),
+    );
+    expect(screen.getByText("voucherLifecycle.location.customer")).toBeTruthy();
+
+    // An event's ends are voucher states, so they read from the same keys the status badges use.
+    expect(screen.getAllByText("status.assigned")).toHaveLength(1);
+    expect(screen.getAllByText("status.used")).toHaveLength(1);
+    expect(screen.queryByText("voucherLifecycle.event.Assigned")).toBeNull();
+    expect(screen.queryByText("voucherLifecycle.event.Used")).toBeNull();
+  });
+
+  it("translates the voucher's own status in the header", async () => {
+    // An empty timeline, so the only status on screen is the voucher's own.
+    mockedApiRequest.mockResolvedValue({ ...FULL, entries: [] });
+    renderDrawer({ voucherId: "v1" });
+
+    // The API spells it `Assigned`; the header used to print that English word inside a Ukrainian UI.
+    await waitFor(() =>
+      expect(screen.getByText("status.assigned")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Assigned")).toBeNull();
+  });
+
+  it("keys a renewal's arrow by what the renewal did", async () => {
+    mockedApiRequest.mockResolvedValue({
+      ...FULL,
+      entries: [
+        {
+          ...FULL.entries[0],
+          source: "money",
+          type: "Renewal",
+          from: "replaced",
+          to: null,
+          actorKind: "system",
+          actorUserId: null,
+          actorName: null,
+        },
+      ],
+    });
+    renderDrawer({ voucherId: "v1" });
+
+    await waitFor(() =>
+      expect(screen.getByText("voucherLifecycle.renewal.Renewal")).toBeTruthy(),
+    );
+    expect(screen.getByText("voucherLifecycle.renewal.replaced")).toBeTruthy();
   });
 
   it("shows the resolved author's name and says 'the system' when there is none", async () => {

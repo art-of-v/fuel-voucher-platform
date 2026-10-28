@@ -10,6 +10,7 @@ import {
 
 import { apiRequest } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
+import { voucherStatusKey } from "@/lib/status-keys";
 import { formatDateTime } from "@/lib/utils";
 import {
   Sheet,
@@ -175,7 +176,10 @@ function Header({ data }: { data: LifecycleResponse }) {
       )}
       <Row label={t("vouchers.brand")} value={data.brand} />
       <Row label={t("vouchers.volume")} value={`${data.liters}`} />
-      <Row label={t("vouchers.status")} value={data.status} />
+      <Row
+        label={t("vouchers.status")}
+        value={t(`status.${voucherStatusKey(data.status)}`)}
+      />
       <Row
         label={t("vouchers.supplier")}
         value={data.supplierName ?? t("voucherLifecycle.unknown")}
@@ -232,7 +236,7 @@ function Entry({ entry }: { entry: LifecycleEntry }) {
 
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-sm font-medium">
-          {wordFor(t, entry, entry.type)}
+          {kindWordFor(t, entry, entry.type)}
         </span>
         <span className="text-xs text-muted-foreground">
           {formatDateTime(entry.occurredAtUtc)}
@@ -241,9 +245,9 @@ function Entry({ entry }: { entry: LifecycleEntry }) {
 
       {(entry.from || entry.to) && (
         <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-          {entry.from && <span>{wordFor(t, entry, entry.from)}</span>}
+          {entry.from && <span>{stateWordFor(t, entry, entry.from)}</span>}
           {entry.from && entry.to && <ArrowRight className="h-3 w-3" />}
-          {entry.to && <span>{wordFor(t, entry, entry.to)}</span>}
+          {entry.to && <span>{stateWordFor(t, entry, entry.to)}</span>}
         </p>
       )}
 
@@ -280,7 +284,7 @@ function Entry({ entry }: { entry: LifecycleEntry }) {
  * nothing, and far better than one seeing an invented label for a fact the database asserts.
  * </p>
  */
-function wordFor(
+function kindWordFor(
   t: (key: string, ...params: string[]) => string,
   entry: LifecycleEntry,
   word: string,
@@ -292,6 +296,31 @@ function wordFor(
         ? "voucherLifecycle.event"
         : "voucherLifecycle.renewal";
   return t(`${prefix}.${word}`);
+}
+
+/**
+ * The words either side of the arrow, which are NOT the row's own vocabulary.
+ *
+ * <p>
+ * A movement's ends are custody locations ("supplier", "pool"); an event's ends are voucher states in
+ * the API's PascalCase ("Available", "Deactivated"); a renewal's end is what it did ("replaced",
+ * "extended"). Rendering all three through {@link kindWordFor} asked the locales for
+ * {@code kind.supplier} and {@code event.Available}, which they never carry — so the drawer printed the
+ * key itself next to perfectly translated neighbours.
+ * </p>
+ */
+function stateWordFor(
+  t: (key: string, ...params: string[]) => string,
+  entry: LifecycleEntry,
+  word: string,
+): string {
+  if (entry.source === "movement") {
+    return t(`voucherLifecycle.location.${word}`);
+  }
+  if (entry.source === "event") {
+    return t(`status.${voucherStatusKey(word)}`);
+  }
+  return t(`voucherLifecycle.renewal.${word}`);
 }
 
 function authorFor(
