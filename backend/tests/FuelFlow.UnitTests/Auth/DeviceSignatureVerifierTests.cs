@@ -97,6 +97,8 @@ public sealed class DeviceSignatureVerifierTests
         result.MatchedAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256);
         result.KeyType.Should().Be("RSA");
         result.Attempts.Should().ContainSingle();
+        result.MatchedPayloadVersion.Should().Be(2);
+        result.TriedPayloadVersions.Should().Equal(2);
     }
 
     [Fact]
@@ -109,6 +111,7 @@ public sealed class DeviceSignatureVerifierTests
             RsaPkcs1V1Signature);
 
         result.IsValid.Should().BeTrue();
+        result.MatchedPayloadVersion.Should().Be(1);
     }
 
     [Fact]
@@ -160,6 +163,8 @@ public sealed class DeviceSignatureVerifierTests
 
         result.IsValid.Should().BeFalse();
         result.Failure.Should().BeNull();
+        result.MatchedPayloadVersion.Should().BeNull();
+        result.TriedPayloadVersions.Should().Equal(2, 1);
     }
 
     [Fact]
@@ -175,18 +180,40 @@ public sealed class DeviceSignatureVerifierTests
         result.IsValid.Should().BeFalse();
         result.Attempts.Should().ContainSingle()
             .Which.Algorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPssSha256);
+        result.Attempts.Should().OnlyContain(a => a.Algorithm == AsymmetricSignatureAlgorithm.RsaPssSha256);
     }
 
     [Fact]
-    public void VerifyChallenge_DoesNotAcceptAV2SignatureAsALegacyPayload()
+    public void VerifyChallenge_AcceptsAV2SignatureFromADeviceWhoseRowPinsV1()
     {
+        // The production shape on 2026-10-28: the published bundle signs v2 while all ten enrolled
+        // rows still pinned v1. The signature proves the key either way, so it must be accepted -
+        // and reported, so the row can be re-pinned.
         var result = _verifier.VerifyChallenge(
             Device(DeviceTestKeys.RsaPrimary, AsymmetricSignatureAlgorithm.RsaPkcs1Sha256, 1),
             "device-1",
             Challenge,
             RsaPkcs1V2Signature);
 
-        result.IsValid.Should().BeFalse();
+        result.IsValid.Should().BeTrue();
+        result.MatchedPayloadVersion.Should().Be(2);
+        result.TriedPayloadVersions.Should().Equal(1, 2);
+    }
+
+    [Fact]
+    public void VerifyChallenge_AcceptsAV1SignatureFromADeviceWhoseRowPinsV2()
+    {
+        // The reverse skew: a device that went back to an older bundle signs v1 while its row
+        // pins v2. Same reasoning - the shape changed, the signer did not.
+        var result = _verifier.VerifyChallenge(
+            Device(DeviceTestKeys.RsaPrimary, AsymmetricSignatureAlgorithm.RsaPkcs1Sha256, 2),
+            "device-1",
+            Challenge,
+            RsaPkcs1V1Signature);
+
+        result.IsValid.Should().BeTrue();
+        result.MatchedPayloadVersion.Should().Be(1);
+        result.TriedPayloadVersions.Should().Equal(2, 1);
     }
 
     [Fact]
@@ -224,6 +251,8 @@ public sealed class DeviceSignatureVerifierTests
 
         result.IsValid.Should().BeFalse();
         result.Failure.Should().Be("invalid-base64");
+        // Nothing about the payload can fix an unreadable signature, so the other shape is not built.
+        result.TriedPayloadVersions.Should().Equal(2);
     }
 
     [Fact]
@@ -237,6 +266,7 @@ public sealed class DeviceSignatureVerifierTests
 
         result.IsValid.Should().BeTrue();
         result.MatchedAlgorithm.Should().Be(AsymmetricSignatureAlgorithm.RsaPkcs1Sha256);
+        result.MatchedPayloadVersion.Should().Be(2);
     }
 
     [Fact]
@@ -265,6 +295,7 @@ public sealed class DeviceSignatureVerifierTests
             RequestV2Signature);
 
         result.IsValid.Should().BeFalse();
+        result.MatchedPayloadVersion.Should().BeNull();
     }
 
     [Fact]
