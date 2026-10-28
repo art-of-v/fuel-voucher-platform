@@ -627,7 +627,15 @@ export function VoucherDetailModal({
                 </View>
 
                 <Pressable
-                  onPress={onClose}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onClose();
+                  }}
+                  // 32pt visually; the target reaches 48 so a thumb at the modal's
+                  // corner still closes it on the first tap.
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close')}
                   style={[styles.modalCloseBtn, { borderColor: tokens.colors.borderLight }]}
                 >
                   <X size={18} color={tokens.colors.text.primary} />

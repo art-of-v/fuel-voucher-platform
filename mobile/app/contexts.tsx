@@ -182,7 +182,13 @@ export default function ContextsScreen() {
               {t('context.loadError')}
             </Text>
             <Pressable
-              onPress={() => refetch()}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                refetch();
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
               style={[styles.retryBtn, { borderColor: tokens.colors.error }]}
             >
               <Text
@@ -288,7 +294,13 @@ export default function ContextsScreen() {
                 {t('context.create.title')}
               </Text>
               <Pressable
-                onPress={() => setCreateVisible(false)}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setCreateVisible(false);
+                }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
                 style={{ padding: tokens.spacing.fine6 }}
               >
                 <X size={22} color={tokens.colors.text.muted} />
@@ -344,7 +356,12 @@ export default function ContextsScreen() {
             <Pressable
               testID="confirm-create"
               disabled={!canSubmit || isCreating}
-              onPress={submitCreate}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canSubmit || isCreating }}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                submitCreate();
+              }}
               style={[
                 styles.confirmBtn,
                 { backgroundColor: tokens.colors.primary },
@@ -524,7 +541,12 @@ function ContextRow({
   const styles = useContextsStyles();
   return (
     <Pressable
-      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onPress();
+      }}
       style={[
         styles.row,
         {

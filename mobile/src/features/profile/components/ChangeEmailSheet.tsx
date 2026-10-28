@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { BottomSheet, Button, Text, TextField } from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
+import { Haptics } from '../../../core/utils/haptics';
 import { useChangeEmail } from '../hooks/useChangeEmail';
 
 /**
@@ -114,15 +115,27 @@ export function ChangeEmailSheet({
                 alignItems: 'center',
               }}
             >
-              <Pressable onPress={changeEmail.backToEmail} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  changeEmail.backToEmail();
+                }}
+                // A word is not a target: 12pt of slop around it reaches 44.
+                hitSlop={12}
+                accessibilityRole="button"
+              >
                 <Text role="bodyStrong" tone="muted">
                   {t('profile.changeEmailBack')}
                 </Text>
               </Pressable>
               <Pressable
-                onPress={changeEmail.sendCode}
-                hitSlop={8}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  changeEmail.sendCode();
+                }}
+                hitSlop={12}
                 disabled={changeEmail.isSending}
+                accessibilityRole="button"
               >
                 <Text role="bodyStrong" tone="accent">
                   {t('profile.changeEmailResend')}

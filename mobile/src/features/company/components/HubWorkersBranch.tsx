@@ -18,7 +18,7 @@ import type { OrphanedCompanyFuel, WorkerRosterEntry } from '../lib/stock';
 import type { Voucher } from '../../../core/types/api';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Card, ListItem, SectionHeader } from '../../../core/ui';
+import { Button, Card, ListItem, SectionHeader } from '../../../core/ui';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
 import {
@@ -121,66 +121,42 @@ function VoucherActionRow({
         </Text>
       </View>
       {actions.canUnblock ? (
-        <Pressable
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Unlock />}
+          label={t('company.block.unblockAction')}
           disabled={isUnblocking}
           onPress={() => onUnfreeze(voucher)}
-          style={[
-            styles.smallBtn,
-            { borderColor: tokens.colors.primary },
-            isUnblocking && { opacity: 0.5 },
-          ]}
-        >
-          <Unlock size={14} color={tokens.colors.primary} />
-          <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
-            {t('company.block.unblockAction')}
-          </Text>
-        </Pressable>
+        />
       ) : null}
       {actions.canReturnToPool ? (
-        <Pressable
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<RotateCcw />}
+          label={t('company.recall.action')}
           disabled={isReturningToPool}
           onPress={() => onReturnToPool(voucher)}
-          style={[
-            styles.smallBtn,
-            { borderColor: tokens.colors.primary },
-            isReturningToPool && { opacity: 0.5 },
-          ]}
-        >
-          <RotateCcw size={14} color={tokens.colors.primary} />
-          <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
-            {t('company.recall.action')}
-          </Text>
-        </Pressable>
+        />
       ) : actions.canFreezeOrRecall ? (
         <>
-          <Pressable
+          <Button
+            variant="destructive"
+            size="sm"
+            icon={<Ban />}
+            label={t('company.block.action')}
             disabled={isBlocking}
             onPress={() => onFreeze(voucher)}
-            style={[
-              styles.smallBtn,
-              { borderColor: tokens.colors.error },
-              isBlocking && { opacity: 0.5 },
-            ]}
-          >
-            <Ban size={14} color={tokens.colors.error} />
-            <Text style={[styles.btnLabel, { color: tokens.colors.error }]}>
-              {t('company.block.action')}
-            </Text>
-          </Pressable>
-          <Pressable
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RotateCcw />}
+            label={t('company.recall.action')}
             disabled={isRecalling}
             onPress={() => onRecall(voucher)}
-            style={[
-              styles.smallBtn,
-              { borderColor: tokens.colors.primary },
-              isRecalling && { opacity: 0.5 },
-            ]}
-          >
-            <RotateCcw size={14} color={tokens.colors.primary} />
-            <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
-              {t('company.recall.action')}
-            </Text>
-          </Pressable>
+          />
         </>
       ) : (
         // Keep the row honest about why there is nothing to press.
@@ -276,29 +252,21 @@ function WorkerRosterRow({
       {/* Handing over fuel and letting a worker go are membership actions: the server
           rejects both for someone who is not a member. */}
       <View style={styles.actionRow}>
-        <Pressable
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Ticket />}
+          label={t('company.members.gift')}
           onPress={() => onGift(member)}
-          style={[styles.smallBtn, { borderColor: tokens.colors.primary }]}
-        >
-          <Ticket size={14} color={tokens.colors.primary} />
-          <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
-            {t('company.members.gift')}
-          </Text>
-        </Pressable>
-        <Pressable
+        />
+        <Button
+          variant="destructive"
+          size="sm"
+          icon={<UserMinus />}
+          label={t('company.members.fire')}
           disabled={flags.isFiring}
           onPress={() => onFire(member)}
-          style={[
-            styles.smallBtn,
-            { borderColor: tokens.colors.error },
-            flags.isFiring && { opacity: 0.5 },
-          ]}
-        >
-          <UserMinus size={14} color={tokens.colors.error} />
-          <Text style={[styles.btnLabel, { color: tokens.colors.error }]}>
-            {t('company.members.fire')}
-          </Text>
-        </Pressable>
+        />
       </View>
 
       {expanded && (

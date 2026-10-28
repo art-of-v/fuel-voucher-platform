@@ -14,6 +14,7 @@ import {
 } from '../src/core/ui';
 import { formatMoney } from '../src/core/utils/currency';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
+import { Haptics } from '../src/core/utils/haptics';
 import { useI18n } from '../src/core/i18n';
 
 type PeriodFilter = 'all' | 'month' | '3months' | 'year';
@@ -37,6 +38,11 @@ export default function SavingsScreen() {
         filterChip: {
           paddingHorizontal: tokens.spacing.fine14,
           paddingVertical: tokens.spacing.sm,
+          // 34pt tall: it shares its row with three neighbours, so the extra
+          // reach comes from `hitSlop` at the call site, not from padding here.
+          minHeight: 36,
+          alignItems: 'center',
+          justifyContent: 'center',
           borderRadius: tokens.radius.fine8,
           borderWidth: 1,
         },
@@ -290,7 +296,13 @@ export default function SavingsScreen() {
           {periodFilters.map((pf) => (
             <Pressable
               key={pf.key}
-              onPress={() => setPeriod(pf.key)}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setPeriod(pf.key);
+              }}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityState={{ selected: period === pf.key }}
               style={[
                 styles.filterChip,
                 {

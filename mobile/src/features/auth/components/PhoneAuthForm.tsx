@@ -122,10 +122,7 @@ export function PhoneAuthForm({
             {error ? <InlineFeedback kind="danger" message={error} /> : null}
 
             <PressableScale
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setConsented((v) => !v);
-              }}
+              onPress={() => setConsented((v) => !v)}
               style={styles.consentRow}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: consented }}
@@ -328,6 +325,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
+    // The box is 22pt; the row is the target, so it carries the 44pt minimum.
+    minHeight: 44,
   },
   consentBox: {
     width: 22,

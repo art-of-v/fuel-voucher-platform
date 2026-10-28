@@ -54,6 +54,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
   return (
     <Pressable
       key={voucher.id}
+      accessibilityRole="button"
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onSelect(voucher);

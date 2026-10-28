@@ -9,7 +9,7 @@ import { VoucherCard } from '../../vouchers/components';
 import { brandColorFor } from '../../vouchers/lib/display';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Card, ListItem } from '../../../core/ui';
+import { Button, Card, ListItem } from '../../../core/ui';
 import { Haptics } from '../../../core/utils/haptics';
 import { groupOrdersByBrand, orderBranchEntry } from '../lib/stock';
 import { styles } from './styles';
@@ -171,15 +171,13 @@ function OrderBlock({
               {t('company.hub.undistributedShort')} · {undistributedLabel}
             </Text>
             {issueableIds.length > 0 && (
-              <Pressable
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Ticket />}
+                label={t('company.members.gift')}
                 onPress={() => onIssue(issueableIds)}
-                style={[styles.smallBtn, { borderColor: tokens.colors.primary }]}
-              >
-                <Ticket size={14} color={tokens.colors.primary} />
-                <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
-                  {t('company.members.gift')}
-                </Text>
-              </Pressable>
+              />
             )}
           </View>
           {entry.undistributed.map((v) => (

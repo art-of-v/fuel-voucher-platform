@@ -3,8 +3,8 @@ import { StyleSheet } from 'react-native';
 /**
  * Presentation styles shared by the company screen and its extracted sections.
  *
- * Five of these (`card`, `sectionHeader`, `sectionTitle`, `smallBtn`, `emptyText`)
- * are used by five of the seven components, so they live here rather than being
+ * These (`card`, `sectionHeader`, `sectionTitle`, `emptyText`) are used by several
+ * of the seven components, so they live here rather than being
  * copied into each one — a repeated copy of a style is how two sections end up
  * looking subtly different. The roster ones (`rowHeader`, `drillDown`, `searchField`,
  * ...) came in with the hub's workers branch and are grouped with the rest for the
@@ -15,11 +15,6 @@ export const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: 8,
-  },
-  btnLabel: {
-    fontFamily: 'Inter-Black',
-    fontSize: 11,
-    letterSpacing: 0.8,
   },
   card: {
     padding: 18,
@@ -169,15 +164,6 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
     textTransform: 'uppercase',
-  },
-  smallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
   },
   statCard: {
     flex: 1,

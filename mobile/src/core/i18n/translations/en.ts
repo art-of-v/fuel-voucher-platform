@@ -373,6 +373,8 @@ export const en: Record<string, string> = {
 
   'common.loading': 'LOADING...',
   'common.back': 'Back',
+  'common.decrease': 'Decrease',
+  'common.increase': 'Increase',
   'common.save': 'SAVE',
   'common.saved': 'Changes saved successfully',
   'common.cancel': 'CANCEL',
@@ -445,6 +447,7 @@ export const en: Record<string, string> = {
   'contracts.noContractForBrand': 'No contract for this provider yet',
   'contracts.close': 'CLOSE',
   'contracts.signingTitle': 'CONTRACT SIGNING',
+  'contracts.signAction': 'Sign the contract',
   'contracts.reviewText': 'REVIEW THE TEXT',
   'contracts.readFull': 'READ THE FULL TEXT',
   'contracts.noTextPublished': 'The text for this provider has not been published yet',

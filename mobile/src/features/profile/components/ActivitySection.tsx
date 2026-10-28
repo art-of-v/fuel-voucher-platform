@@ -6,7 +6,6 @@ import { Bell, FileText, Gift, Mail, PiggyBank } from 'lucide-react-native';
 import { Badge, Card, ListItem, SectionHeader } from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Haptics } from '../../../core/utils/haptics';
 
 /**
  * "Activity & Invitations" — notifications, savings, and the invitation row,
@@ -44,7 +43,6 @@ export function ActivitySection({
             ) : undefined
           }
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/notifications');
           }}
           showChevron
@@ -55,7 +53,6 @@ export function ActivitySection({
           leading={<PiggyBank size={20} color={tokens.colors.text.muted} />}
           title={t('profile.savings')}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/savings');
           }}
           showChevron
@@ -69,7 +66,6 @@ export function ActivitySection({
           leading={<Gift size={20} color={tokens.colors.text.muted} />}
           title={t('referral.title')}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/referral');
           }}
           showChevron
@@ -84,7 +80,6 @@ export function ActivitySection({
               <Badge status="primary" emphasis="solid" label={String(pendingInvitationCount)} />
             }
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push('/invitations');
             }}
             showChevron
@@ -98,7 +93,6 @@ export function ActivitySection({
           leading={<FileText size={20} color={tokens.colors.text.muted} />}
           title={t('profile.privacyPolicy')}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             void Linking.openURL('https://palne.shop/privacy/');
           }}
           showChevron

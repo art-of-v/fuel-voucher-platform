@@ -377,6 +377,8 @@ export const uk: Record<string, string> = {
 
   'common.loading': 'ЗАВАНТАЖЕННЯ...',
   'common.back': 'Назад',
+  'common.decrease': 'Зменшити',
+  'common.increase': 'Збільшити',
   'common.save': 'ЗБЕРЕГТИ',
   'common.saved': 'Зміни успішно збережено',
   'common.cancel': 'СКАСУВАТИ',
@@ -449,6 +451,7 @@ export const uk: Record<string, string> = {
   'contracts.noContractForBrand': 'Для цього провайдера ще немає договору',
   'contracts.close': 'ЗАКРИТИ',
   'contracts.signingTitle': 'ПІДПИСАННЯ ДОГОВОРУ',
+  'contracts.signAction': 'Підписати договір',
   'contracts.reviewText': 'ОЗНАЙОМТЕСЯ З ТЕКСТОМ',
   'contracts.readFull': 'ПЕРЕГЛЯНУТИ ПОВНИЙ ТЕКСТ',
   'contracts.noTextPublished': 'Текст для цього провайдера ще не опубліковано',

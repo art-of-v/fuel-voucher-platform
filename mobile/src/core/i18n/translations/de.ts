@@ -385,6 +385,8 @@ export const de: Record<string, string> = {
 
   'common.loading': 'LADE...',
   'common.back': 'Zurück',
+  'common.decrease': 'Verringern',
+  'common.increase': 'Erhöhen',
   'common.save': 'SPEICHERN',
   'common.saved': 'Änderungen erfolgreich gespeichert',
   'common.cancel': 'ABBRECHEN',
@@ -457,6 +459,7 @@ export const de: Record<string, string> = {
   'contracts.noContractForBrand': 'Für diesen Anbieter gibt es noch keinen Vertrag',
   'contracts.close': 'SCHLIESSEN',
   'contracts.signingTitle': 'VERTRAGSUNTERZEICHNUNG',
+  'contracts.signAction': 'Vertrag unterzeichnen',
   'contracts.reviewText': 'TEXT PRÜFEN',
   'contracts.readFull': 'TEXT VOLLSTÄNDIG ANSEHEN',
   'contracts.noTextPublished': 'Der Text für diesen Anbieter wurde noch nicht veröffentlicht',

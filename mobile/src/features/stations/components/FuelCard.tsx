@@ -100,7 +100,7 @@ export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          // `onPressIn` already buzzed; a second impact on release reads as a stutter.
           onPress(station, fuel);
         }}
         style={{ marginBottom: 16 }}

@@ -229,7 +229,12 @@ export default function CompanyScreen() {
               {t('company.loadError')}
             </Text>
             <Pressable
-              onPress={refreshAll}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                refreshAll();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
               style={{
                 paddingHorizontal: tokens.spacing.md,
                 paddingVertical: tokens.spacing.fine6,

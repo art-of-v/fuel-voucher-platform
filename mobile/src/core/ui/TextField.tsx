@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleProp, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
 import { useDesignTokens } from '../hooks/useTheme';
+import { Haptics } from '../utils/haptics';
 import { Text } from './Text';
 
 export interface TextFieldProps extends Omit<
@@ -184,7 +185,16 @@ export function FieldShell({
       ) : null}
 
       <Pressable
-        onPress={disabled ? undefined : onPress}
+        onPress={
+          disabled
+            ? undefined
+            : () => {
+                // A pressable field (a select, a date) is a button: it answers with
+                // the same light touch as every other control that opens something.
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onPress();
+              }
+        }
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}

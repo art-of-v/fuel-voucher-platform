@@ -166,16 +166,30 @@ export const elevation = {
  * Minimum touch target, both platforms: **44×44**. Anything visually smaller
  * must extend its target with `hitSlop` — see `hitSlopFor`.
  *
- * The audit found a 40×40 icon-only contract-signing button, a 32×32 modal
- * close, and a `paddingVertical: 7` "PAY" button around 9px text.
+ * 44 is the floor, not the goal: a control built at exactly 44 has no slack at
+ * all, and the header's back and basket controls were the two most-missed
+ * targets in the product at that size. Every icon-only control is therefore
+ * built to `TOUCH_TARGET_COMFORT`; 44 is what `hitSlop` has to reach.
  */
 export const TOUCH_TARGET_MIN = 44;
+
+/**
+ * Working size for icon-only controls: **48×48**. Material's figure, and the
+ * size that leaves a thumb that lands a few points off its mark still inside
+ * the target. The visible box and the touch target are the same thing — an
+ * invisible `hitSlop` around a 44pt box does not tell the eye where to aim.
+ */
+export const TOUCH_TARGET_COMFORT = 48;
 
 export const control = {
   /** 36 — compact chips and inline controls. Requires `hitSlop`. */
   sm: 36,
-  /** 44 — icon buttons, secondary actions. Meets the minimum exactly. */
-  md: 44,
+  /**
+   * 44 — the minimum. Only for controls that cannot be any larger; icon-only
+   * controls are built to `TOUCH_TARGET_COMFORT`, because at exactly 44 the
+   * header's back and basket were repeatedly missed on the first tap.
+   */
+  md: TOUCH_TARGET_MIN,
   /** 52 — text fields, selects, list rows, default buttons. */
   lg: 52,
   /** 56 — the primary action on a screen. */

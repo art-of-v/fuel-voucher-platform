@@ -467,7 +467,12 @@ export default function MyCodesScreen() {
               {t('codes.failedToLoad')}
             </Text>
             <Pressable
-              onPress={loadData}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                loadData();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
               style={({ pressed }) => [
                 {
                   marginTop: tokens.spacing['2xl'],
@@ -519,7 +524,12 @@ export default function MyCodesScreen() {
                   : t('codes.purchaseFuel')}
             </Text>
             <Pressable
-              onPress={loadData}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                loadData();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
               style={{
                 marginTop: tokens.spacing['2xl'],
                 padding: tokens.spacing.md,
@@ -564,6 +574,7 @@ export default function MyCodesScreen() {
                             (multi-company epic #103). */}
             {!isCompanyContext && renewalConfig?.enabled && renewableCount > 0 && (
               <Pressable
+                accessibilityRole="button"
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push('/renew-select');
@@ -826,7 +837,10 @@ export default function MyCodesScreen() {
         {isCompanyContext && !error && (
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/company')}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/company');
+            }}
             style={{
               marginTop: isEmpty ? tokens.spacing.md : tokens.spacing['2xl'],
               flexDirection: 'row',

@@ -1,10 +1,11 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Clock, X } from 'lucide-react-native';
 import type { useCompany } from '../hooks/useCompany';
 import type { CompanyInvitationDto } from '../types';
 
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
+import { Button } from '../../../core/ui';
 import { styles } from './styles';
 
 function invitationStatusKey(status: string): string {
@@ -71,27 +72,14 @@ export function PendingInvites(props: PendingInvitesProps) {
                   {t(invitationStatusKey(inv.status))}
                 </Text>
               </View>
-              <Pressable
+              <Button
+                variant="destructive"
+                size="sm"
+                icon={<X />}
+                label={t('company.sent.cancel')}
                 disabled={isCancelling}
                 onPress={() => cancelInvite(inv.id)}
-                style={[
-                  styles.smallBtn,
-                  { borderColor: tokens.colors.error },
-                  isCancelling && { opacity: 0.5 },
-                ]}
-              >
-                <X size={14} color={tokens.colors.error} />
-                <Text
-                  style={{
-                    color: tokens.colors.error,
-                    fontFamily: 'Inter-Black',
-                    fontSize: 11,
-                    letterSpacing: 0.8,
-                  }}
-                >
-                  {t('company.sent.cancel')}
-                </Text>
-              </Pressable>
+              />
             </View>
           ))}
         </View>

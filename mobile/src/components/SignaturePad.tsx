@@ -3,6 +3,7 @@ import { View, StyleSheet, LayoutRectangle, Pressable, Text } from 'react-native
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import { useDesignTokens } from '../core/hooks/useTheme';
+import { Haptics } from '../core/utils/haptics';
 import { RotateCcw } from 'lucide-react-native';
 
 interface Props {
@@ -91,7 +92,11 @@ export const SignaturePad: React.FC<Props> = ({ onCapture, height = 250 }) => {
         </GestureDetector>
 
         <Pressable
-          onPress={clear}
+          accessibilityRole="button"
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            clear();
+          }}
           style={[styles.clearBtn, { backgroundColor: `${tokens.colors.primary}22` }]}
         >
           <RotateCcw size={16} color={tokens.colors.primary} />
@@ -119,8 +124,8 @@ const styles = StyleSheet.create({
     right: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
     paddingHorizontal: 12,
-    paddingVertical: 6,
     borderRadius: 20,
     gap: 6,
   },

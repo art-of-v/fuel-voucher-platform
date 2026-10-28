@@ -19,6 +19,7 @@ import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 
 import { formatMoney } from '../src/core/utils/currency';
+import { Haptics } from '../src/core/utils/haptics';
 
 /**
  * What this line costs, per what the customer was quoted on the package card. A line with no term falls
@@ -200,8 +201,12 @@ export default function CheckoutScreen() {
       // Padding, the hairline and the bottom safe-area inset are owned by
       // PageLayout's footer slot — the screen no longer sets paddingBottom: 72.
       <Pressable
-        onPress={handlePaymentEnd}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          handlePaymentEnd();
+        }}
         disabled={isProcessing}
+        accessibilityRole="button"
         style={[
           styles.payButton,
           { backgroundColor: tokens.colors.primary },

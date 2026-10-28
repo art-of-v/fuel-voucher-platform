@@ -378,6 +378,8 @@ export const es: Record<string, string> = {
 
   'common.loading': 'CARGANDO...',
   'common.back': 'Atrás',
+  'common.decrease': 'Reducir',
+  'common.increase': 'Aumentar',
   'common.save': 'GUARDAR',
   'common.saved': 'Cambios guardados exitosamente',
   'common.cancel': 'CANCELAR',
@@ -450,6 +452,7 @@ export const es: Record<string, string> = {
   'contracts.noContractForBrand': 'Todavía no hay contrato para este proveedor',
   'contracts.close': 'CERRAR',
   'contracts.signingTitle': 'FIRMA DE CONTRATO',
+  'contracts.signAction': 'Firmar el contrato',
   'contracts.reviewText': 'REVISE EL TEXTO',
   'contracts.readFull': 'VER EL TEXTO COMPLETO',
   'contracts.noTextPublished': 'Todavía no se ha publicado el texto de este proveedor',
