@@ -71,6 +71,43 @@ beforeEach(() => {
   });
 });
 
+describe("FeedbackTab — the triage states", () => {
+  // The API spells its states for itself ("Handled"); the column printed that word into a
+  // Ukrainian table while its own filter and buttons were translated.
+  const ITEM = {
+    id: "f-1",
+    userId: null,
+    telegramChatId: 1,
+    text: "Паливо не наливають",
+    verdict: "Kept",
+    category: "Bug",
+    severity: null,
+    summary: null,
+    language: "uk",
+    confidence: 0.9,
+    classifierError: null,
+    status: "Handled",
+    staffRepliedAtUtc: null,
+    appVersion: null,
+    platform: null,
+    createdAtUtc: "2026-10-27T10:00:00Z",
+    replyCount: 0,
+  };
+
+  it("translates a state instead of printing the API's word", async () => {
+    useI18n.getState().setLanguage("uk");
+    mockedApiRequest.mockImplementation((_method: string, url: string) => {
+      if (url.includes("/facets")) return Promise.resolve(FACETS);
+      return Promise.resolve({ total: 1, items: [ITEM] });
+    });
+
+    renderTab();
+
+    expect(await screen.findByText("Опрацьовано")).toBeTruthy();
+    expect(screen.queryByText("Handled")).toBeNull();
+  });
+});
+
 describe("FeedbackTab — the triage summary line", () => {
   it("renders the numbers, not the placeholder names", async () => {
     renderTab();

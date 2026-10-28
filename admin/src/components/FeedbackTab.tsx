@@ -265,7 +265,7 @@ export default function FeedbackTab() {
             </SelectItem>
             {(facets?.statuses ?? []).map((s) => (
               <SelectItem key={s} value={s}>
-                {s}
+                {t(`feedback.status.${s}`)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -426,7 +426,7 @@ export default function FeedbackTab() {
                               statusBadge(item.status),
                             )}
                           >
-                            {item.status}
+                            {t(`feedback.status.${item.status}`)}
                           </span>
                           {item.staffRepliedAtUtc && (
                             <p className="mt-1 text-xs text-muted-foreground">
