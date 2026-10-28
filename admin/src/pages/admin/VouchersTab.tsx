@@ -31,6 +31,7 @@ import { useAdminFuelTypes } from "@/lib/admin-lookups";
 import { useI18n } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { voucherStatusKey } from "@/lib/status-keys";
+import { voucherStatusBadgeClass } from "@/lib/voucher-status-style";
 import { useSession } from "@/lib/session-store";
 import { formatDate } from "@/lib/utils";
 import type { AdminVoucherDetail, AdminVoucherList } from "@/lib/api-types";
@@ -595,17 +596,7 @@ export default function VouchersTab() {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${
-                            statusKey === "available"
-                              ? "bg-success/10 text-success border-success/20"
-                              : statusKey === "assigned"
-                                ? "bg-info/10 text-info border-info/20"
-                                : statusKey === "used"
-                                  ? "bg-muted text-muted-foreground border-border"
-                                  : statusKey === "sold"
-                                    ? "bg-warning/10 text-warning border-warning/20"
-                                    : "bg-warning/10 text-warning border-warning/20"
-                          }`}
+                          className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${voucherStatusBadgeClass(statusKey)}`}
                         >
                           {t(`status.${statusKey}`)}
                         </span>

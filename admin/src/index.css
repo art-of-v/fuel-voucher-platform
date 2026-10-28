@@ -34,6 +34,8 @@
   --color-warning: var(--warning);
   --color-success: var(--success);
   --color-info: var(--info);
+  --color-voucher-marked: var(--voucher-marked);
+  --color-voucher-confirmed: var(--voucher-confirmed);
 
   /* Radius + elevation take the same intermediary-var indirection as the
      colours: `inline` substitutes the reference into the utility, so
@@ -84,6 +86,14 @@
   --warning: #fbbf24;
   --success: #34d399;
   --info: #3b82f6;
+
+  /* The spent-voucher axis: fuel that has left the wallet. Its two states are not
+     tuned per theme on purpose - the pair encodes "claimed" vs "confirmed", and a
+     theme that repainted it would erase the difference the badge exists to show.
+     The values are the mobile status palette's, so a voucher reads the same in the
+     app and in the panel. */
+  --voucher-marked: #fbbf24;
+  --voucher-confirmed: #7dd3fc;
 
   /* Chrome tint channels: space-separated RGB, consumed as rgb(var(--x) / a).
      Per-theme overrides retint aurora + glow so no green bleeds on other themes. */
@@ -392,6 +402,10 @@
   --warning: #b45309;
   --success: #047857;
   --info: #1d4ed8;
+  /* Same two meanings on a light canvas, darkened so they stay legible (the
+     mobile light palette's values). */
+  --voucher-marked: #a16207;
+  --voucher-confirmed: #0e7490;
   --destructive: #b91c1c;
   --destructive-foreground: #ffffff;
 }
