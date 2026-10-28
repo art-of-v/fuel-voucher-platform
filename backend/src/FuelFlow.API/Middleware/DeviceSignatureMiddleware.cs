@@ -161,9 +161,10 @@ public sealed class DeviceSignatureMiddleware
         if (!verification.IsValid)
         {
             _logger.LogWarning(
-                "Invalid signature for device {DeviceId} (tried {Algorithms})",
+                "Invalid signature for device {DeviceId} (tried {Algorithms} over payload {PayloadVersions})",
                 deviceId,
-                string.Join(",", verification.Attempts.Select(a => a.Algorithm)));
+                string.Join(",", verification.Attempts.Select(a => a.Algorithm)),
+                string.Join(",", verification.TriedPayloadVersions.Select(v => $"v{v}")));
 
             await ApiErrorResponse.WriteAsync(context, StatusCodes.Status401Unauthorized, "Invalid signature");
             return;
@@ -179,6 +180,23 @@ public sealed class DeviceSignatureMiddleware
                 "Pinned legacy device {DeviceId} to {Algorithm}",
                 deviceId,
                 matched);
+        }
+
+        // The payload version is pinned the same way, but a stale pin is not a failed signature:
+        // a bundle can change the shape it signs while the row keeps the old version, and by then
+        // the sign-in that would refresh the row is already blocked by this very check. Recording
+        // the shape that verified is what closes that loop - it costs nothing here, because the
+        // SaveChanges below was happening anyway.
+        if (verification.MatchedPayloadVersion is { } matchedVersion
+            && matchedVersion != device.SignaturePayloadVersion)
+        {
+            _logger.LogInformation(
+                "Re-pinned device {DeviceId} from payload v{OldVersion} to v{NewVersion}",
+                deviceId,
+                device.SignaturePayloadVersion,
+                matchedVersion);
+
+            device.SignaturePayloadVersion = matchedVersion;
         }
 
         // Nonce TTL must outlast the timestamp tolerance, or a consumed signed

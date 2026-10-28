@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
@@ -381,6 +382,69 @@ public sealed class MiddlewareTests : IDisposable
 
         nextCalled.Should().BeTrue();
         context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldRepinThePayloadVersionTheDeviceActuallySigns()
+    {
+        // Production, 2026-10-28: the published bundle signs v2 while the row still pinned v1. The
+        // signature is genuine, so the request must pass - and the row must catch up, or every
+        // later request pays for the same fallback and a rollback would flip it back again.
+        var userId = Guid.NewGuid();
+        using var rsa = RSA.Create(2048);
+        await SeedDeviceAsync(userId, "dev-sig-v2", rsa.ExportSubjectPublicKeyInfoPem());
+
+        var device = await _context.Devices.SingleAsync(d => d.DeviceId == "dev-sig-v2");
+        device.SignatureAlgorithm = AsymmetricSignatureAlgorithm.RsaPkcs1Sha256;
+        device.SignaturePayloadVersion = DeviceSignatureVerifier.Version1;
+        await _context.SaveChangesAsync();
+
+        const string body = "{\"x\":1}";
+        var timestamp = TestClock.Now.ToUnixTimeMilliseconds().ToString();
+        var payload = DeviceSignatureVerifier.BuildRequestPayload(
+            "dev-sig-v2",
+            HttpMethods.Post,
+            "/api/purchases",
+            body,
+            timestamp,
+            DeviceSignatureVerifier.Version2);
+        var signature = Convert.ToBase64String(
+            rsa.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+
+        var nextCalled = false;
+        var middleware = new DeviceSignatureMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<DeviceSignatureMiddleware>.Instance,
+            new DeviceSignatureVerifier(new AsymmetricSignatureVerifier()));
+        var options = Options.Create(new DeviceAuthOptions
+        {
+            Enabled = true,
+            AllowDevelopmentBypass = false,
+            RequireSignatureForEndpoints = new List<string> { "/api/purchases" }
+        });
+        var context = CreateHttpContext(AuthenticatedPrincipal(userId, "1"));
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/api/purchases";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
+        context.Request.Headers["X-Device-Id"] = "dev-sig-v2";
+        context.Request.Headers["X-Signature"] = signature;
+        context.Request.Headers["X-Timestamp"] = timestamp;
+
+        var cache = new Mock<ICacheService>();
+        cache.Setup(c => c.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await middleware.InvokeAsync(
+            context,
+            _context,
+            cache.Object,
+            options,
+            CreateEnvironment("Production"));
+
+        nextCalled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+
+        var stored = await _context.Devices.AsNoTracking().SingleAsync(d => d.DeviceId == "dev-sig-v2");
+        stored.SignaturePayloadVersion.Should().Be(DeviceSignatureVerifier.Version2);
     }
 
     private async Task SeedUserAsync(Guid userId, bool isActive, int tokenVersion)

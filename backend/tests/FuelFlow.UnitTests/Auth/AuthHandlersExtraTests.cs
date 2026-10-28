@@ -597,6 +597,37 @@ public sealed class AuthHandlersExtraTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyChallenge_RepinsAPayloadVersionTheClientChangedTo()
+    {
+        // A device whose bundle now signs the v2 shape while its row pins v1: the login has to
+        // succeed, because logging in is the only route that refreshes the row.
+        using var rsa = RSA.Create(2048);
+        var device = await SeedActiveDeviceAsync("device-v2-behind", rsa.ExportSubjectPublicKeyInfoPem());
+        device.SignatureAlgorithm = AsymmetricSignatureAlgorithm.RsaPkcs1Sha256;
+        device.SignaturePayloadVersion = DeviceSignatureVerifier.Version1;
+        await _context.SaveChangesAsync();
+
+        var challenge = "challenge-value";
+        var payload = DeviceSignatureVerifier.BuildChallengePayload(device.DeviceId, challenge, 2);
+        var signature = Convert.ToBase64String(
+            rsa.SignData(Encoding.UTF8.GetBytes(payload), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+
+        var cacheServiceMock = new Mock<ICacheService>();
+        cacheServiceMock
+            .Setup(x => x.ExistsAsync($"challenge:{device.DeviceId}:{challenge}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var response = await BuildVerifyChallengeHandler(cacheServiceMock.Object).HandleAsync(
+            new VerifyChallengeCommand { DeviceId = device.DeviceId, Challenge = challenge, Signature = signature },
+            CancellationToken.None);
+
+        response.IsValid.Should().BeTrue();
+        var stored = await _context.Devices.AsNoTracking()
+            .SingleAsync(d => d.DeviceId == device.DeviceId);
+        stored.SignaturePayloadVersion.Should().Be(DeviceSignatureVerifier.Version2);
+    }
+
+    [Fact]
     public async Task VerifyChallenge_RefusesASchemeTheDeviceIsNotPinnedTo()
     {
         using var rsa = RSA.Create(2048);

@@ -124,6 +124,21 @@ public sealed class VerifyChallengeCommandHandler
                 matched);
         }
 
+        // Same for the payload shape: a device whose bundle changed what it signs must be able to
+        // sign in to refresh its row, so the shape that verified is recorded here. Without this the
+        // stale pin would reject every later request while the login that fixes it stays refused.
+        if (verification.MatchedPayloadVersion is { } matchedVersion
+            && matchedVersion != device.SignaturePayloadVersion)
+        {
+            _logger.LogInformation(
+                "Re-pinned device {DeviceId} from payload v{OldVersion} to v{NewVersion}",
+                command.DeviceId,
+                device.SignaturePayloadVersion,
+                matchedVersion);
+
+            device.SignaturePayloadVersion = matchedVersion;
+        }
+
         device.LastSeenAt = SystemClock.UtcNow;
         _context.Devices.Update(device);
         await _context.SaveChangesAsync(cancellationToken);
