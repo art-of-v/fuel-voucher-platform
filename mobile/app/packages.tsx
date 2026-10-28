@@ -191,9 +191,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   badge: {
+    // Inside the button's own box, not hanging off it: a badge that overlaps
+    // empty space reads as part of the control, and a tap on it must count.
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: 0,
+    right: 0,
     minWidth: 20,
     height: 20,
     alignItems: 'center',

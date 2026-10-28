@@ -83,6 +83,7 @@ export function StationCard({ station, index, onPress }: StationCardProps) {
   return (
     <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
       <Pressable
+        accessibilityRole="button"
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={() => onPress(station)}

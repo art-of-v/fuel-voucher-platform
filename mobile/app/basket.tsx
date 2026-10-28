@@ -236,7 +236,16 @@ export default function BasketScreen() {
                 {t('basket.discount')} ({discount}%)
               </Text>
             </View>
-            <Pressable onPress={clearPromocode}>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                clearPromocode();
+              }}
+              // A 20pt glyph: the target reaches 44 without adding a visible box.
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            >
               <X size={20} color={tokens.colors.error} />
             </Pressable>
           </View>
@@ -263,8 +272,13 @@ export default function BasketScreen() {
               ]}
             />
             <Pressable
-              onPress={handleApplyPromo}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleApplyPromo();
+              }}
               disabled={!promoInput}
+              accessibilityRole="button"
+              accessibilityLabel={t('basket.apply')}
               style={[
                 styles.applyButton,
                 {

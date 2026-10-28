@@ -204,11 +204,13 @@ export function OrderCard({
   // Both actions collapse the reveal first, so the alert that follows (delete
   // confirmation) is not left floating above an open card.
   const handleSwipePay = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     swipeableRef.current?.close();
     onPay?.(order);
   };
 
   const handleSwipeDelete = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     swipeableRef.current?.close();
     onDelete?.(order);
   };

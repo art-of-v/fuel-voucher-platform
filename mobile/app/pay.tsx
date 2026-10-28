@@ -286,7 +286,10 @@ export default function PaymentScreen() {
         onBack={() => router.back()}
         actions={
           <Pressable
-            onPress={finish}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              finish();
+            }}
             accessibilityRole="button"
             accessibilityLabel={t('payment.close')}
             hitSlop={12}

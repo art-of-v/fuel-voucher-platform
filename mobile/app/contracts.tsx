@@ -59,6 +59,7 @@ export default function ContractsScreen() {
         },
         tab: {
           flex: 1,
+          minHeight: 44,
           paddingVertical: tokens.spacing.fine10,
           alignItems: 'center',
           justifyContent: 'center',
@@ -93,8 +94,8 @@ export default function ContractsScreen() {
           marginRight: tokens.spacing.lg,
         },
         actionBtn: {
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           borderRadius: tokens.radius.xl,
           alignItems: 'center',
           justifyContent: 'center',
@@ -453,6 +454,9 @@ export default function ContractsScreen() {
                       <CheckCircle2 size={24} color={tokens.colors.primary} />
                     ) : (
                       <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('contracts.signAction')} — ${station.name}`}
+                        hitSlop={4}
                         onPress={() => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                           setSelectedStation(station);
@@ -492,7 +496,10 @@ export default function ContractsScreen() {
               signedContracts?.map((sc) => (
                 <Pressable
                   key={sc.id}
-                  onPress={() => setReadingCard(cardOfSignature(sc))}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setReadingCard(cardOfSignature(sc));
+                  }}
                   style={[
                     styles.providerCard,
                     { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
@@ -544,7 +551,16 @@ export default function ContractsScreen() {
               <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>
                 {readingCard?.title}
               </Text>
-              <Pressable testID="close-reader-x" onPress={() => setReadingCard(null)}>
+              <Pressable
+                testID="close-reader-x"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setReadingCard(null);
+                }}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+              >
                 <X size={24} color={tokens.colors.text.dim} />
               </Pressable>
             </View>
@@ -596,7 +612,10 @@ export default function ContractsScreen() {
             </ScrollView>
             <Pressable
               testID="close-reader-button"
-              onPress={() => setReadingCard(null)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setReadingCard(null);
+              }}
               style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
             >
               <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }}>
@@ -629,10 +648,14 @@ export default function ContractsScreen() {
               <Pressable
                 testID="close-signing-x"
                 onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setSelectedStation(null);
                   setSignature(null);
                   setSigningContract(null);
                 }}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
               >
                 <X size={24} color={tokens.colors.text.dim} />
               </Pressable>
@@ -714,7 +737,10 @@ export default function ContractsScreen() {
                 {t('contracts.reviewText')}
               </Text>
               <Pressable
-                onPress={() => signingContract && setReadingCard(cardOfContract(signingContract))}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (signingContract) setReadingCard(cardOfContract(signingContract));
+                }}
                 disabled={!signingContract}
                 style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
               >
@@ -733,7 +759,10 @@ export default function ContractsScreen() {
 
               <Pressable
                 testID="sign-submit"
-                onPress={handleSign}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  handleSign();
+                }}
                 disabled={signMutation.isPending || !signature || !signingContract}
                 style={[
                   styles.signSubmitBtn,

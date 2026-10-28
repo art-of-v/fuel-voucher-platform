@@ -6,7 +6,6 @@ import { ArrowLeftRight, Building2, FileSignature, Layers, Mail } from 'lucide-r
 import { Card, ListItem, SectionHeader } from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Haptics } from '../../../core/utils/haptics';
 
 /**
  * "What can I manage?" — the account-context switcher, the email row, and the
@@ -62,7 +61,6 @@ export function ManagementSection({
           title={t('context.entryTitle')}
           subtitle={contextLabel}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/contexts');
           }}
           showChevron
@@ -76,7 +74,6 @@ export function ManagementSection({
           title={t('profile.emailRowTitle')}
           subtitle={userEmail || t('profile.emailAddPrompt')}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onOpenChangeEmail();
           }}
           showChevron
@@ -91,7 +88,6 @@ export function ManagementSection({
             title={t('profile.registerCompany')}
             subtitle={t('profile.registerCompanySubtitle')}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onOpenCompanyEdit();
             }}
             showChevron
@@ -106,7 +102,6 @@ export function ManagementSection({
               title={t('profile.companyName')}
               subtitle={companySubtitle}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onOpenCompanyEdit();
               }}
               showChevron
@@ -118,7 +113,6 @@ export function ManagementSection({
               title={t('profile.documentsTitle')}
               subtitle={t('profile.documentsSubtitle')}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/contracts');
               }}
               showChevron
@@ -130,7 +124,6 @@ export function ManagementSection({
               title={t('company.managementTitle')}
               subtitle={t('company.members.section')}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/company');
               }}
               showChevron

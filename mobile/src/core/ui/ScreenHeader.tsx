@@ -83,6 +83,9 @@ export function ScreenHeader({
           accessibilityLabel={t('common.back')}
           variant="plain"
           size="md"
+          // Nothing lives beside the leading edge, so the reach may extend past
+          // the box: the header's back control was the most-missed target.
+          hitSlop={4}
           // Pull the glyph to the container edge; the hit area still extends out.
           style={{ marginLeft: -tokens.spacing.md }}
         />

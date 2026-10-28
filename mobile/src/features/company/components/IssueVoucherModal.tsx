@@ -95,7 +95,16 @@ export function IssueVoucherModal(props: IssueVoucherModalProps) {
                   : t('company.gift.subtitle', giftTarget?.label ?? '')}
               </Text>
             </View>
-            <Pressable onPress={() => setGiftTarget(null)} style={{ padding: 6 }}>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setGiftTarget(null);
+              }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              style={{ padding: 6 }}
+            >
               <X size={22} color={tokens.colors.text.muted} />
             </Pressable>
           </View>
@@ -161,7 +170,10 @@ export function IssueVoucherModal(props: IssueVoucherModalProps) {
             ) : (
               <>
                 <Pressable
-                  onPress={toggleSelectAll}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    toggleSelectAll();
+                  }}
                   style={[
                     styles.voucherPick,
                     {
@@ -196,7 +208,10 @@ export function IssueVoucherModal(props: IssueVoucherModalProps) {
                       return (
                         <Pressable
                           key={v.id}
-                          onPress={() => toggleSelected(v.id)}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            toggleSelected(v.id);
+                          }}
                           style={[
                             styles.voucherPick,
                             {

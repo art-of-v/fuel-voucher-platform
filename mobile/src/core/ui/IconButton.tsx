@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleProp, ViewStyle } from 'react-native';
+import { Insets, Pressable, StyleProp, ViewStyle } from 'react-native';
 import { useDesignTokens } from '../hooks/useTheme';
 import { Haptics } from '../utils/haptics';
 
@@ -21,19 +21,31 @@ export interface IconButtonProps {
   /** Circular instead of the standard `radius.md` square. */
   round?: boolean;
   hapticStyle?: 'light' | 'medium' | 'heavy';
+  /**
+   * Extra reach beyond the box. Only pass it when the space around the control
+   * belongs to nobody else — two adjacent targets with overlapping slop resolve
+   * by z-order, so the nearer one steals the press.
+   */
+  hitSlop?: Insets | number;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
 
-const BOX: Record<IconButtonSize, number> = { sm: 36, md: 44, lg: 52 };
+/**
+ * `md` is 48, not the 44 minimum: at exactly 44 the header's back and basket
+ * controls were missed on the first tap often enough to be reported as broken,
+ * because the eye aims at the 22pt glyph and a few points off its edge is
+ * outside the target. `sm` is 36 visually and borrows 4pt of slop on every edge
+ * to reach 44.
+ */
+const BOX: Record<IconButtonSize, number> = { sm: 36, md: 48, lg: 52 };
 const GLYPH: Record<IconButtonSize, number> = { sm: 18, md: 22, lg: 24 };
 
 /**
  * A single-icon action: back, close, share, expand, overflow.
  *
- * The smallest variant is 36pt visually but receives `hitSlop` up to the 44pt
- * minimum, so no icon action in the product is harder to hit than any other. The
- * audit found 32×32 modal closes and 40×40 primary actions.
+ * No icon action in the product is smaller than the 44pt minimum: `sm` reaches
+ * it through `hitSlop`, the larger variants are 48 and 52 on their own.
  */
 export function IconButton({
   icon,
@@ -44,6 +56,7 @@ export function IconButton({
   disabled = false,
   round = false,
   hapticStyle = 'light',
+  hitSlop,
   style,
   testID,
 }: IconButtonProps) {
@@ -96,7 +109,7 @@ export function IconButton({
         onPress();
       }}
       disabled={disabled}
-      hitSlop={tokens.touchTarget.slopFor(box)}
+      hitSlop={hitSlop ?? tokens.touchTarget.slopFor(box)}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}

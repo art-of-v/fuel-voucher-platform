@@ -2,7 +2,6 @@ import React from 'react';
 import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Haptics } from '../../../core/utils/haptics';
 import { BottomSheet, InlineFeedback, ListItem, LoadingState } from '../../../core/ui';
 import {
   openNavigation,
@@ -52,7 +51,6 @@ export function NavigatorPickerSheet({ target, destinationName, visible, onClose
   }, [visible, target]);
 
   const pick = (option: NavigatorOption) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onClose();
     void openNavigation(option, (url) => Linking.openURL(url));
   };

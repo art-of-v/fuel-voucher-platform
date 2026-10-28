@@ -165,7 +165,12 @@ export default function MapScreen() {
           letterSpacing: 0.5,
         },
         closeBtn: {
-          padding: tokens.spacing.xs,
+          // A 44pt box around a 22–24pt glyph: the chevrons close panels, and at
+          // `padding: 4` they were a 30pt target.
+          width: 44,
+          height: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         divider: {
           height: 1,
@@ -608,8 +613,11 @@ export default function MapScreen() {
             })}
           </MapView>
 
-          {/* Scrim behind the floating search field so it stays legible over tiles. */}
+          {/* Scrim behind the floating search field so it stays legible over tiles.
+              `pointerEvents="none"` is load-bearing: a 100pt band across the top of
+              the map that answers touches would eat every tap on a marker under it. */}
           <View
+            pointerEvents="none"
             style={[
               styles.topGradient,
               { backgroundColor: tokens.colors.background, opacity: 0.3 },
@@ -655,6 +663,11 @@ export default function MapScreen() {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         setSelectedFuel(fuel);
                       }}
+                      // 36pt chip; the slop takes the target to 44 without
+                      // reaching into its neighbour's (8pt) gap.
+                      hitSlop={4}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                       style={[
                         styles.fuelChip,
                         {
@@ -696,6 +709,8 @@ export default function MapScreen() {
                     setSelectedBrand(null);
                     setShowList(true);
                   }}
+                  hitSlop={4}
+                  accessibilityRole="button"
                   style={[styles.nearbyToggle, { backgroundColor: tokens.colors.primary }]}
                 >
                   <TrendingDown size={18} color={tokens.colors.text.onPrimary} />
@@ -705,7 +720,12 @@ export default function MapScreen() {
                 </Pressable>
               )}
               <Pressable
-                onPress={handleLocate}
+                accessibilityRole="button"
+                accessibilityLabel={t('map.locateMe')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleLocate();
+                }}
                 style={[
                   styles.locateFab,
                   {
@@ -714,7 +734,6 @@ export default function MapScreen() {
                       locationStatus === 'granted' ? tokens.colors.primary : tokens.colors.border,
                   },
                 ]}
-                accessibilityLabel={t('map.locateMe')}
               >
                 <Navigation
                   size={22}
@@ -752,7 +771,10 @@ export default function MapScreen() {
                     >
                       {activeBrand && (
                         <Pressable
-                          onPress={() => setSelectedBrand(null)}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setSelectedBrand(null);
+                          }}
                           style={styles.closeBtn}
                           accessibilityLabel={t('map.back')}
                         >
@@ -768,7 +790,15 @@ export default function MapScreen() {
                           : `${t('map.networkRanking')} · ${fuelLabel(selectedFuel)}`}
                       </Text>
                     </View>
-                    <Pressable onPress={() => sheetRef.current?.close()} style={styles.closeBtn}>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        sheetRef.current?.close();
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('common.close')}
+                      style={styles.closeBtn}
+                    >
                       <ChevronDown size={22} color={tokens.colors.text.dim} />
                     </Pressable>
                   </View>
@@ -801,6 +831,7 @@ export default function MapScreen() {
                   return (
                     <Pressable
                       key={b.brandId}
+                      accessibilityRole="button"
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         setSelectedBrand(b.brandId);
@@ -932,7 +963,11 @@ export default function MapScreen() {
                 activeBrand.nodes.slice(0, 30).map((r) => (
                   <Pressable
                     key={r.node.id}
-                    onPress={() => focusStation(r.node)}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      focusStation(r.node);
+                    }}
                     style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
                   >
                     <View style={{ flex: 1 }}>
@@ -1069,7 +1104,15 @@ export default function MapScreen() {
                     </Text>
                   </View>
                 </View>
-                <Pressable onPress={() => setSelectedStation(null)} style={styles.closeBtn}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedStation(null);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.close')}
+                  style={styles.closeBtn}
+                >
                   <ChevronDown size={24} color={tokens.colors.text.dim} />
                 </Pressable>
               </View>
@@ -1147,6 +1190,8 @@ export default function MapScreen() {
                     !routeDestination && { opacity: 0.5 },
                   ]}
                   disabled={!routeDestination}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !routeDestination }}
                   accessibilityLabel={
                     routeDestination ? t('map.buildRoute') : t('map.routeUnavailable')
                   }

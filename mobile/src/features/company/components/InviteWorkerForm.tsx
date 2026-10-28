@@ -58,6 +58,11 @@ export function InviteWorkerForm(props: InviteWorkerFormProps) {
         />
         <Pressable
           disabled={phone.trim().length <= UA_DIAL_PREFIX.length || isInviting}
+          accessibilityRole="button"
+          accessibilityLabel={t('company.invite.section')}
+          accessibilityState={{
+            disabled: phone.trim().length <= UA_DIAL_PREFIX.length || isInviting,
+          }}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             invite(phone.trim());

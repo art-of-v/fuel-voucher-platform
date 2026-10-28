@@ -4,6 +4,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
 import { formatMoney } from '../../../core/utils/currency';
+import { Haptics } from '../../../core/utils/haptics';
 import type { CartItem } from '../types';
 
 interface CartItemCardProps {
@@ -59,7 +60,17 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove, isAvailable }: 
             </Text>
           )}
         </View>
-        <Pressable onPress={() => onRemove(item.id)} style={{ padding: 4 }}>
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onRemove(item.id);
+          }}
+          // A 20pt glyph in a 28pt box: the target reaches 44 without moving the icon.
+          hitSlop={8}
+          style={{ padding: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('basket.remove')}
+        >
           <Trash2 size={20} color={tokens.colors.error} />
         </Pressable>
       </View>
@@ -71,7 +82,14 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove, isAvailable }: 
         <View style={styles.cardFooter}>
           <View style={styles.stepper}>
             <Pressable
-              onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) - 1)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onUpdateQuantity(item.id, (item.quantity ?? 1) - 1);
+              }}
+              // 44pt is the box; the slop only absorbs a thumb landing a few points off.
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.decrease')}
               style={[
                 styles.stepperBtn,
                 {
@@ -87,7 +105,13 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove, isAvailable }: 
               {item.quantity ?? 1}
             </Text>
             <Pressable
-              onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) + 1)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onUpdateQuantity(item.id, (item.quantity ?? 1) + 1);
+              }}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.increase')}
               style={[
                 styles.stepperBtn,
                 {

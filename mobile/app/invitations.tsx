@@ -62,6 +62,7 @@ export default function InvitationsScreen() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: tokens.spacing.sm,
+          minHeight: tokens.touchTarget.min,
           paddingVertical: tokens.spacing.fine14,
           borderRadius: tokens.radius.md,
           borderWidth: 1,
@@ -72,6 +73,7 @@ export default function InvitationsScreen() {
           alignItems: 'center',
           justifyContent: 'center',
           gap: tokens.spacing.sm,
+          minHeight: tokens.touchTarget.min,
           paddingVertical: tokens.spacing.fine14,
           borderRadius: tokens.radius.md,
         },
@@ -230,6 +232,8 @@ export default function InvitationsScreen() {
                   <Pressable
                     testID={`decline-${inv.id}`}
                     disabled={isBusy}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy }}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       declineMutation.mutate(inv.id);
@@ -255,6 +259,8 @@ export default function InvitationsScreen() {
                   <Pressable
                     testID={`accept-${inv.id}`}
                     disabled={isBusy}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isBusy }}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                       acceptMutation.mutate(inv.id);

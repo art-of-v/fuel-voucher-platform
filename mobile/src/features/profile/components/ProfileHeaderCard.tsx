@@ -5,7 +5,6 @@ import { User, Building2, Briefcase, Shield } from 'lucide-react-native';
 import { Badge, Button, Card, Text } from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Haptics } from '../../../core/utils/haptics';
 
 /**
  * The card at the top of the profile: who the user is, which kind of account
@@ -104,15 +103,7 @@ export function ProfileHeaderCard({
             }
           />
 
-          <Button
-            variant="ghost"
-            size="sm"
-            label={t('profile.edit')}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onEdit();
-            }}
-          />
+          <Button variant="ghost" size="sm" label={t('profile.edit')} onPress={onEdit} />
         </View>
       </View>
     </Card>

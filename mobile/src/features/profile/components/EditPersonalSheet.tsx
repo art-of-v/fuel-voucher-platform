@@ -204,7 +204,14 @@ export function EditPersonalSheet({
                   borderBottomColor: tokens.colors.borderSubtle,
                 }}
               >
-                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={12}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setShowDatePicker(false);
+                  }}
+                  hitSlop={14}
+                  accessibilityRole="button"
+                >
                   <Text role="bodyStrong" tone="muted">
                     {t('common.cancel')}
                   </Text>
@@ -215,7 +222,8 @@ export function EditPersonalSheet({
                     setShowDatePicker(false);
                     Haptics.selectionAsync();
                   }}
-                  hitSlop={12}
+                  hitSlop={14}
+                  accessibilityRole="button"
                 >
                   <Text role="bodyStrong" tone="accent">
                     {t('common.done')}

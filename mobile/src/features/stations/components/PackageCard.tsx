@@ -255,6 +255,8 @@ export function PackageCard({
             </Text>
             <View style={styles.stepper}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.decrease')}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   onQuantityChange(Math.max(1, quantity - 1));
@@ -274,6 +276,8 @@ export function PackageCard({
                 {quantity}
               </Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.increase')}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   onQuantityChange(Math.min(99, quantity + 1));
