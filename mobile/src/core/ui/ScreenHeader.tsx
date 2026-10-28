@@ -83,11 +83,13 @@ export function ScreenHeader({
           accessibilityLabel={t('common.back')}
           variant="plain"
           size="md"
-          // Nothing lives beside the leading edge, so the reach may extend past
-          // the box: the header's back control was the most-missed target.
-          hitSlop={4}
-          // Pull the glyph to the container edge; the hit area still extends out.
-          style={{ marginLeft: -tokens.spacing.md }}
+          // The reach goes right, never left: iOS starts its swipe-back gesture in a
+          // strip along the leading edge, and react-native-screens cancels the RN
+          // touch of anything under it the moment the finger drifts horizontally
+          // (`cancelTouchesInParent` in RNSScreenStack.mm — "cancel RN touch events"
+          // for a Touchable "close to an edge"). A control pulled to the edge with a
+          // negative margin, as this one used to be, loses exactly those taps.
+          hitSlop={{ top: 4, bottom: 4, left: 0, right: 8 }}
         />
       )}
 
