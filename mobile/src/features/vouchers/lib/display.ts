@@ -148,6 +148,38 @@ export function countPending(vouchers: { status: string }[]): number {
 }
 
 /**
+ * What a voucher's "used" stamp means, or `null` while it is still spendable.
+ *
+ * The domain is deliberately not renamed: the API keeps reporting `PendingReconciliation` for a
+ * claim the brand has not confirmed and `Used` once an operator settles it, so an installed bundle
+ * that predates this keeps working. The wallet names the two states by tense instead — the fuel is
+ * spent in both, but only `confirmed` is final — and lets the stamp's colour carry the difference.
+ */
+export type VoucherStampTone = 'marked' | 'confirmed';
+
+export function voucherStampTone(voucher: { status?: string | null }): VoucherStampTone | null {
+  const status = (voucher.status ?? '').toLowerCase();
+  if (status === 'pendingreconciliation') return 'marked';
+  if (status === 'used') return 'confirmed';
+  return null;
+}
+
+/**
+ * The stamp an order wears once every voucher in it is spent, or `null` if any can still be used.
+ *
+ * One live voucher means the order is not done, and stamping it would tell the customer their whole
+ * purchase is gone while part of it is still in their hands. A mix of claims and confirmations is
+ * `marked`: the confirmed tone is a promise that nothing about this order can change back, and one
+ * pending claim breaks that promise.
+ */
+export function orderStampTone(vouchers: { status?: string | null }[]): VoucherStampTone | null {
+  if (vouchers.length === 0) return null;
+  const tones = vouchers.map(voucherStampTone);
+  if (tones.some((tone) => tone === null)) return null;
+  return tones.every((tone) => tone === 'confirmed') ? 'confirmed' : 'marked';
+}
+
+/**
  * The colour to paint a voucher card for a given brand string.
  *
  * Lives here, next to `resolveBrand`, because both the wallet screen and the card

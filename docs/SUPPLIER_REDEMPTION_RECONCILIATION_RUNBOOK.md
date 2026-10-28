@@ -21,8 +21,19 @@ Now:
 | The customer withdraws the report | `PendingReconciliation → Assigned` | the drafts are discarded | not recognised |
 | The operator reverses a confirmed sale | `Used → Assigned` | a reversing entry is posted today | undone, not erased |
 
-A pending voucher is **not redeemable**: the mobile app shows "awaiting confirmation", hides the QR
-and refuses to renew it, and the wallet does not count its litres as free stock.
+A pending voucher is **not redeemable**: the mobile app shows "awaiting confirmation" beside a yellow
+"used" stamp, hides the QR and refuses to renew it, and the wallet does not count its litres as free
+stock. Both spent states wear the stamp, so the customer can tell a spent voucher from a live one at a
+glance — and tell the two spent states apart by its colour:
+
+| Stamp colour | Meaning | Can it be undone? |
+|---|---|---|
+| Yellow | the customer reported the use; the brand has not confirmed it | yes — the claim can be withdrawn or rejected |
+| Blue | the brand confirmed the use | no — only an operator reversal, with a note |
+
+An order wears the same stamp in its header once **every** voucher in it is spent: blue only when all
+of them are confirmed, yellow while at least one is still a claim. The stamp is presentation only —
+the API keeps reporting `PendingReconciliation` and `Used`, so an installed app keeps working.
 
 ## Where the queue lives
 

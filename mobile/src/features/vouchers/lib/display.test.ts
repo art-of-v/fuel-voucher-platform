@@ -10,6 +10,8 @@ import {
   splitByIssuanceReceipt,
   isLiveWalletVoucher,
   isPendingReconciliation,
+  voucherStampTone,
+  orderStampTone,
   type WalletCounts,
   type WalletSection,
 } from './display';
@@ -345,5 +347,42 @@ describe('isLiveWalletVoucher', () => {
   it('rejects a missing status rather than treating it as live', () => {
     expect(isLiveWalletVoucher({ status: null })).toBe(false);
     expect(isLiveWalletVoucher({})).toBe(false);
+  });
+});
+
+describe('voucherStampTone', () => {
+  it('reads the API casing both ways', () => {
+    expect(voucherStampTone({ status: 'PendingReconciliation' })).toBe('marked');
+    expect(voucherStampTone({ status: 'pendingreconciliation' })).toBe('marked');
+    expect(voucherStampTone({ status: 'Used' })).toBe('confirmed');
+    expect(voucherStampTone({ status: 'used' })).toBe('confirmed');
+  });
+
+  it('leaves a voucher that can still be spent unstamped', () => {
+    ['Assigned', 'Available', 'active', 'Blocked', 'Expired', 'Deactivated'].forEach((status) =>
+      expect(voucherStampTone({ status })).toBeNull(),
+    );
+    expect(voucherStampTone({ status: null })).toBeNull();
+    expect(voucherStampTone({})).toBeNull();
+  });
+});
+
+describe('orderStampTone', () => {
+  it('stamps an order only once every voucher in it is spent', () => {
+    // One live voucher means the order is not finished, and a stamp would say the whole purchase is
+    // gone while part of it is still in the customer's hands.
+    expect(orderStampTone([{ status: 'used' }, { status: 'Assigned' }])).toBeNull();
+    expect(orderStampTone([])).toBeNull();
+  });
+
+  it('marks the blue tone only when every voucher is confirmed', () => {
+    expect(orderStampTone([{ status: 'Used' }, { status: 'used' }])).toBe('confirmed');
+  });
+
+  it('keeps a claim yellow even beside confirmed vouchers', () => {
+    // A pending claim can still be withdrawn or rejected, so the order must not promise otherwise.
+    expect(orderStampTone([{ status: 'Used' }, { status: 'PendingReconciliation' }])).toBe(
+      'marked',
+    );
   });
 });
