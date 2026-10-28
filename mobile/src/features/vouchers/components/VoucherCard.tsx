@@ -5,7 +5,7 @@
 // `resolveBrand` decides *which* brand a brand string is; the theme supplies the
 // colour. An unknown brand falls back to the action colour rather than
 // guessing a network — a near-miss would paint the wrong brand on the card.
-import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
+import { View, Text, Pressable, Animated } from 'react-native';
 import { AlertTriangle, Ban, Clock, Copy } from 'lucide-react-native';
 import type { Voucher } from '../../../core/types/api';
 import { classifyVoucher } from '../../../core/types/api';
@@ -15,11 +15,12 @@ import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
 import { VoucherBadge } from './VoucherBadge';
+import { VoucherStamp } from './VoucherStamp';
 import {
   brandColorFor,
   daysUntilExpiration,
   isExpiringSoon,
-  isPendingReconciliation,
+  voucherStampTone,
 } from '../lib/display';
 
 type VoucherCardProps = {
@@ -34,8 +35,13 @@ type VoucherCardProps = {
 export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCardProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
-  const isUsed = voucher.status === 'used';
-  const isPending = isPendingReconciliation(voucher);
+  const stamp = voucherStampTone(voucher);
+  const isPending = stamp === 'marked';
+  /**
+   * A claimed voucher is as spent as a confirmed one — the fuel has left the holder's hands and
+   * the card is no longer redeemable — so both get the dead-card treatment and the stamp.
+   */
+  const isSpent = stamp !== null;
   const kind = classifyVoucher(voucher, userId);
   const isBlocked = kind === 'blocked';
   const workerName = [voucher.workerFirstName, voucher.workerLastName]
@@ -59,19 +65,18 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
           borderWidth: 1,
           overflow: 'hidden',
           position: 'relative',
-          backgroundColor: isUsed ? tokens.colors.surfaceSunken : tokens.colors.surface,
-          borderColor: isUsed
+          backgroundColor: isSpent ? tokens.colors.surfaceSunken : tokens.colors.surface,
+          borderColor: isSpent
             ? tokens.colors.borderLight
             : pressed
               ? bColor
               : tokens.colors.borderLight,
-          opacity: isUsed ? 0.5 : 1,
           transform: pressed ? [{ scale: 0.97 }] : [],
         },
       ]}
     >
       <MeshBackground
-        color={isUsed ? tokens.colors.text.dim : bColor}
+        color={isSpent ? tokens.colors.text.dim : bColor}
         intensity={0.07}
         variant="honeycomb"
       />
@@ -82,11 +87,12 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
           top: 0,
           bottom: 0,
           width: 5,
-          backgroundColor: isUsed ? tokens.colors.text.dim : bColor,
+          backgroundColor: isSpent ? tokens.colors.text.dim : bColor,
         }}
       />
 
-      <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14 }}>
+      {/* The content dims; the stamp over it stays at full strength, so a dead card still says why. */}
+      <View style={{ padding: 22, paddingLeft: 22 + 5 + 16, gap: 14, opacity: isSpent ? 0.55 : 1 }}>
         <View
           style={{
             flexDirection: 'row',
@@ -102,7 +108,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
                 fontFamily: 'Rajdhani-Bold',
                 letterSpacing: 1.5,
                 textTransform: 'uppercase',
-                color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
+                color: isSpent ? tokens.colors.text.dim : tokens.colors.text.primary,
               }}
               numberOfLines={1}
             >
@@ -115,7 +121,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
                 fontFamily: 'Inter-Bold',
                 letterSpacing: 1.5,
                 textTransform: 'uppercase',
-                color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
+                color: isSpent ? tokens.colors.text.dim : tokens.colors.text.muted,
               }}
               numberOfLines={1}
             >
@@ -186,7 +192,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
                 {t('codes.pendingReconciliation')}
               </Text>
             </View>
-          ) : !isUsed ? (
+          ) : !isSpent ? (
             <View
               style={{
                 flexDirection: 'row',
@@ -254,7 +260,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
               fontFamily: 'Rajdhani-Bold',
               letterSpacing: -1,
               lineHeight: 38,
-              color: isUsed ? tokens.colors.text.dim : tokens.colors.text.primary,
+              color: isSpent ? tokens.colors.text.dim : tokens.colors.text.primary,
             }}
           >
             {voucher.amount}
@@ -264,7 +270,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
                 fontSize: 18,
                 fontFamily: 'Rajdhani-SemiBold',
                 letterSpacing: 0,
-                color: isUsed ? tokens.colors.text.dim : tokens.colors.text.muted,
+                color: isSpent ? tokens.colors.text.dim : tokens.colors.text.muted,
               }}
             >
               {' '}
@@ -282,12 +288,12 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
                   fontSize: 12,
                   fontFamily: 'Inter',
                   letterSpacing: 0.5,
-                  color: expiringSoon && !isUsed ? tokens.colors.error : tokens.colors.text.dim,
+                  color: expiringSoon && !isSpent ? tokens.colors.error : tokens.colors.text.dim,
                 }}
               >
                 {t('codes.expires')}: {formatExpirationDate(voucher.expirationDate)}
               </Text>
-              {expiringSoon && !isUsed && <AlertTriangle size={12} color={tokens.colors.error} />}
+              {expiringSoon && !isSpent && <AlertTriangle size={12} color={tokens.colors.error} />}
             </View>
           )}
           {voucher.externalId && (
@@ -311,64 +317,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
         </View>
       </View>
 
-      {isUsed && (
-        <View style={styles.diagonalStampContainer}>
-          {/*
-                        The "USED" watermark. Its three colours were raw translucent
-                        whites plus a black plaque, so on the light themes it was a
-                        dark box with near-invisible text. "Used" is precisely what
-                        the neutral status role is for.
-                      */}
-          <View
-            style={[styles.diagonalStamp, { borderColor: tokens.colors.status.neutral.border }]}
-          >
-            <View
-              style={[
-                styles.diagonalStampInner,
-                {
-                  borderColor: tokens.colors.status.neutral.border,
-                  backgroundColor: tokens.colors.status.neutral.subtle,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.diagonalStampText, { color: tokens.colors.status.neutral.base }]}
-              >
-                {t('codes.used')}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
+      {stamp && <VoucherStamp tone={stamp} />}
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  diagonalStampContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  diagonalStamp: {
-    borderWidth: 1,
-    padding: 2,
-    transform: [{ rotate: '-12deg' }],
-  },
-  diagonalStampInner: {
-    borderWidth: 2,
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-  },
-  diagonalStampText: {
-    fontSize: 22,
-    fontFamily: 'Rajdhani-Bold',
-    letterSpacing: 6,
-    textTransform: 'uppercase',
-  },
-});

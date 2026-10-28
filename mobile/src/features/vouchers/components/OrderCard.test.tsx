@@ -292,3 +292,50 @@ describe('OrderCard receipt action (#119)', () => {
     expect(screen.getByTestId('receipt-order-1')).toBeTruthy();
   });
 });
+
+describe('OrderCard - the stamp on spent fuel', () => {
+  /**
+   * Two states look alike on paper — the customer reported the use, the brand confirmed it — but
+   * only one of them can be undone. The stamp is the whole difference, and the colour is the only
+   * thing that carries it: yellow can still roll back, blue cannot.
+   */
+  it('stamps a voucher the customer reported in the reversible tone', () => {
+    renderCard([mkVoucher({ status: 'pendingreconciliation' })]);
+
+    expect(screen.getByTestId('voucher-stamp-marked')).toBeTruthy();
+    expect(screen.queryByTestId('voucher-stamp-confirmed')).toBeNull();
+  });
+
+  it('stamps a voucher the brand confirmed in the final tone', () => {
+    renderCard([mkVoucher({ status: 'used' })]);
+
+    expect(screen.getByTestId('voucher-stamp-confirmed')).toBeTruthy();
+    expect(screen.queryByTestId('voucher-stamp-marked')).toBeNull();
+  });
+
+  it('stamps the order once every voucher in it is spent', () => {
+    renderCard([mkVoucher({ id: 'v1', status: 'used' }), mkVoucher({ id: 'v2', status: 'used' })]);
+
+    expect(screen.getByTestId('order-stamp-confirmed')).toBeTruthy();
+  });
+
+  it('keeps the order stamp reversible while any voucher is only claimed', () => {
+    renderCard([
+      mkVoucher({ id: 'v1', status: 'used' }),
+      mkVoucher({ id: 'v2', status: 'pendingreconciliation' }),
+    ]);
+
+    expect(screen.getByTestId('order-stamp-marked')).toBeTruthy();
+    expect(screen.queryByTestId('order-stamp-confirmed')).toBeNull();
+  });
+
+  it('does not stamp an order that still holds spendable fuel', () => {
+    renderCard([
+      mkVoucher({ id: 'v1', status: 'used' }),
+      mkVoucher({ id: 'v2', status: 'active' }),
+    ]);
+
+    expect(screen.queryByTestId('order-stamp-marked')).toBeNull();
+    expect(screen.queryByTestId('order-stamp-confirmed')).toBeNull();
+  });
+});

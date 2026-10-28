@@ -15,10 +15,12 @@ import {
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import type { Order, Voucher } from '../../../core/types/api';
 import { VoucherCard } from './VoucherCard';
+import { VoucherStamp } from './VoucherStamp';
 import { useI18n } from '../../../core/i18n';
 import { Price, Button } from '../../../core/ui';
 import { Haptics } from '../../../core/utils/haptics';
 import { formatExpirationDate } from '../../../core/utils/formatters';
+import { orderStampTone } from '../lib/display';
 import Svg, { Rect, Defs, Pattern, Path, RadialGradient, Stop } from 'react-native-svg';
 
 /**
@@ -135,6 +137,12 @@ export function OrderCard({
   const accentColor = statusRole.base;
   const orderVouchers = order.vouchers || [];
   const voucherCount = orderVouchers.length;
+  /**
+   * The order wears the same stamp as its vouchers once every one of them is spent, so a dead
+   * purchase is recognisable without expanding it. It stays `marked` while any voucher is still a
+   * claim: the blue tone is reserved for an order nothing can roll back.
+   */
+  const stamp = orderStampTone(orderVouchers);
 
   // What the customer actually paid, from the order's own amount rather than a package's shown
   // price: the two differ by the kopecks, and the order total is the figure on their bank
@@ -425,6 +433,8 @@ export function OrderCard({
               )}
             </View>
           </View>
+
+          {stamp && <VoucherStamp tone={stamp} testID={`order-stamp-${stamp}`} />}
         </Pressable>
 
         <Animated.View
