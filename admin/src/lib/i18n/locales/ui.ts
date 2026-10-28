@@ -77,6 +77,8 @@ export const ui: Record<Language, Record<string, string>> = {
     "status.failed": "Failed",
     "status.started": "Started",
     "status.decodeIntegrityWarning": "QR decode warning",
+    "status.blocked": "Blocked",
+    "status.pendingReconciliation": "Reported, awaiting confirmation",
   },
   uk: {
     "status.deactivated": "Деактивовано",
@@ -154,6 +156,8 @@ export const ui: Record<Language, Record<string, string>> = {
     "status.failed": "Помилка",
     "status.started": "Розпочато",
     "status.decodeIntegrityWarning": "Попередження QR-декодування",
+    "status.blocked": "Заблоковано",
+    "status.pendingReconciliation": "Позначено, очікує підтвердження",
   },
   de: {
     "table.nominals": "Nennwerte",
@@ -230,6 +234,8 @@ export const ui: Record<Language, Record<string, string>> = {
     "status.failed": "Fehlgeschlagen",
     "status.started": "Gestartet",
     "status.decodeIntegrityWarning": "QR-Dekodierung mit Warnung",
+    "status.blocked": "Gesperrt",
+    "status.pendingReconciliation": "Gemeldet, wartet auf Bestätigung",
     "status.deactivated": "Deaktiviert",
   },
   es: {
@@ -307,6 +313,8 @@ export const ui: Record<Language, Record<string, string>> = {
     "status.failed": "Fallido",
     "status.started": "Iniciado",
     "status.decodeIntegrityWarning": "Aviso de decodificación QR",
+    "status.blocked": "Bloqueado",
+    "status.pendingReconciliation": "Marcado, espera confirmación",
     "status.deactivated": "Desactivado",
   },
 };

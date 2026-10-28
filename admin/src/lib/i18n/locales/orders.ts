@@ -85,6 +85,7 @@ export const orders: Record<Language, Record<string, string>> = {
       "The voucher's supplier validity cannot absorb this term. Pick a shorter one.",
     "customerRenewal.error.notFound": "Voucher not found.",
     "purchases.total": "Total",
+    "purchases.acquirer": "Acquirer",
     "purchases.refund": "Refund",
     "purchases.refundTitle": "Confirm refund",
     "purchases.refundConfirm":
@@ -193,6 +194,7 @@ export const orders: Record<Language, Record<string, string>> = {
       "Провайдерський строк талона не вміщує цей термін. Оберіть коротший.",
     "customerRenewal.error.notFound": "Талон не знайдено.",
     "purchases.total": "Всього",
+    "purchases.acquirer": "Еквайр",
     "purchases.refund": "Повернення",
     "purchases.refundTitle": "Підтвердити повернення",
     "purchases.refundConfirm":
@@ -302,6 +304,7 @@ export const orders: Record<Language, Record<string, string>> = {
       "Die Gültigkeit beim Lieferanten reicht für diese Laufzeit nicht. Wählen Sie eine kürzere.",
     "customerRenewal.error.notFound": "Gutschein nicht gefunden.",
     "purchases.total": "Gesamt",
+    "purchases.acquirer": "Acquirer",
     "purchases.refund": "Erstattung",
     "purchases.refundTitle": "Erstattung bestätigen",
     "purchases.refundConfirm":
@@ -411,6 +414,7 @@ export const orders: Record<Language, Record<string, string>> = {
     "customerRenewal.error.notFound": "Vale no encontrado.",
     "purchases.total": "Total",
     "purchases.refund": "Reembolso",
+    "purchases.acquirer": "Adquirente",
     "purchases.refundTitle": "Confirmar reembolso",
     "purchases.refundConfirm":
       "¿Reembolsar este pedido? El valor no cumplido de {0} UAH se devolverá al cliente.",
