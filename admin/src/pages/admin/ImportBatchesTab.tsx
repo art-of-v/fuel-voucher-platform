@@ -8,6 +8,10 @@ import { activationErrorMessage } from "@/lib/activation-error";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/session-store";
 import { formatDateTime } from "@/lib/utils";
+import {
+  VOUCHER_CONFIRMED_BADGE,
+  VOUCHER_MARKED_BADGE,
+} from "@/lib/voucher-status-style";
 import type {
   ImportBatch,
   ImportBatchCost,
@@ -303,7 +307,8 @@ export default function ImportBatchesTab() {
                     DecodeIntegrityFailed:
                       "bg-destructive/10 text-destructive border-destructive/20",
                     Assigned: "bg-info/10 text-info border-info/20",
-                    Used: "bg-muted text-muted-foreground border-border",
+                    Used: VOUCHER_CONFIRMED_BADGE,
+                    PendingReconciliation: VOUCHER_MARKED_BADGE,
                     Expired:
                       "bg-destructive/10 text-destructive border-destructive/20",
                     Deactivated: "bg-muted text-muted-foreground border-border",
