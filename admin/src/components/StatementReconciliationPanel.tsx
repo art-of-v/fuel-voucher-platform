@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { apiRequest, apiBlob } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
+import { orderStatusKey } from "@/lib/status-keys";
 import {
   defaultStatementPeriod,
   statementPeriodLabel,
@@ -421,7 +422,9 @@ export function StatementReconciliationPanel() {
                         <td className="p-3 whitespace-nowrap">
                           {row.amount} ₴
                         </td>
-                        <td className="p-3">{row.status}</td>
+                        <td className="p-3">
+                          {t(`order.status.${orderStatusKey(row.status)}`)}
+                        </td>
                         <td className="p-3">{row.createdAtUtc.slice(0, 10)}</td>
                       </tr>
                     ))}

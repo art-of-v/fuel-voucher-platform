@@ -197,4 +197,28 @@ describe("StatementReconciliationPanel", () => {
 
     expect(await screen.findByText("statementAct.loadFailed")).toBeDefined();
   });
+
+  it("translates the state of an invoice the acquirer never reported", async () => {
+    mockedApiRequest.mockResolvedValue({
+      ...ACT,
+      missingFromStatement: [
+        {
+          orderId: "o-9",
+          invoiceId: "inv-9",
+          amount: 862,
+          status: "PendingPayment",
+          createdAtUtc: "2026-09-28T07:59:55Z",
+        },
+      ],
+    });
+    renderPanel();
+
+    await userEvent.click(screen.getByText("statementAct.build"));
+
+    // The API speaks PascalCase and the table printed it as-is inside a Ukrainian UI.
+    expect(
+      await screen.findByText("order.status.pendingPayment"),
+    ).toBeDefined();
+    expect(screen.queryByText("PendingPayment")).toBeNull();
+  });
 });
