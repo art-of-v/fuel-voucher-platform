@@ -23,9 +23,10 @@ public partial class FulfillmentService
 
     public async Task ProcessOrderCreatedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
-        var payload = System.Text.Json.JsonSerializer.Deserialize<OrderCreatedPayload>(outboxEvent.Payload);
+        var payload = System.Text.Json.JsonSerializer.Deserialize<OrderCreatedPayload>(
+            outboxEvent.Payload, OutboxPayloadJson.Options);
 
-        if (payload?.OrderId == null)
+        if (payload?.OrderId is not { } orderId)
         {
             _logger.LogWarning("Invalid ORDER_CREATED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
@@ -37,11 +38,11 @@ public partial class FulfillmentService
 
         var order = await _context.Orders
             .Include(o => o.LineItems)
-            .FirstOrDefaultAsync(o => o.Id == payload.OrderId, cancellationToken);
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
         if (order == null)
         {
-            _logger.LogWarning("Order {OrderId} not found for event {EventId}", payload.OrderId, outboxEvent.Id);
+            _logger.LogWarning("Order {OrderId} not found for event {EventId}", orderId, outboxEvent.Id);
             outboxEvent.Processed = true;
             outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
