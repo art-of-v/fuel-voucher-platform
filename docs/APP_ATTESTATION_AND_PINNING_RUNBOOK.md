@@ -232,7 +232,22 @@ This is the one-time bootstrap that must exist before an Android proof can be `V
 | `GOOGLE_TEST_RESPONSE` | Play marked the response as a test response | Do not set `GoogleAllowTestingResponses=true` in production; install from a normal Play track and re-test. |
 | `GOOGLE_HASH_MISMATCH` | Proxy or interceptor changed the body/path after the proof | Compute the hash from the exact bytes sent; check retries that rewrite the body. |
 | Pinning error / no network | Certificate changed, pin set wrong, or a proxy | Compare the live SPKI hashes (below); ship a corrected pin; if impossible, wait for the expiry dead-man switch. |
-| `native module unavailable` in pinning logs | Expo Go, web, a build without the native module, or an old binary running a newer bundle | Expected in all four; a current production build logging this is broken. |
+| `native module unavailable` in pinning logs | Expo Go, web, or a binary without the module | Expected in all three, including an older binary running a newer bundle; a current production build logging this is broken. |
+
+### A missing native module cannot be caught - it has to be checked for first
+
+Metro loads a module through `guardedLoadModule`, and when the module factory throws it calls
+`global.ErrorUtils.reportFatalError` instead of rethrowing (metro-runtime,
+`src/polyfills/require.js`). React Native treats that report as fatal, so a `try/catch` around
+`require` never sees the error - the app is already going down. That is how build 236 died on
+2026-10-29: the OTA bundle required `expo-crypto` lazily, the `try/catch` was there, and the first
+request to a protected endpoint still aborted the app.
+
+Every optional native module is therefore probed in the runtime registry before it is required:
+`hasExpoNativeModule` in `src/core/security/optionalNativeModule.ts` for Expo modules, and the
+TurboModule registry for the pinning module. `loadOptionalNativeModule` keeps its `try/catch` as a
+second line of defence - it catches a throw under Jest and in a non-Metro runtime, not in a real
+bundle.
 
 The server sends `X-Attestation-Error` on attestation refusals. The client uses that header to avoid
 treating the 401 as an expired access token: it must not refresh or clear the session for an

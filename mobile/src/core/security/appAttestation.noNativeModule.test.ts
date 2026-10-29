@@ -1,3 +1,4 @@
+import { stubExpoNativeModules } from '../../test-utils/nativeModules';
 import { getAttestationHeaders } from './appAttestation';
 
 jest.mock('expo-crypto', () => {
@@ -25,13 +26,19 @@ jest.mock('../api/securityService', () => ({
  */
 describe('appAttestation without the app-integrity native module', () => {
   it('sends nothing instead of crashing the app', async () => {
+    // This binary has the crypto module (so the request hash exists) but not app-integrity, which
+    // is the module under test here.
+    const restoreRuntime = stubExpoNativeModules({ ExpoCrypto: {} });
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await expect(getAttestationHeaders('POST', '/api/auth/verify', '{}')).resolves.toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    warn.mockRestore();
+    try {
+      await expect(getAttestationHeaders('POST', '/api/auth/verify', '{}')).resolves.toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      restoreRuntime();
+      warn.mockRestore();
+    }
   });
 });
