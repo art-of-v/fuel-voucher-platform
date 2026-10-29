@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
@@ -9,11 +10,18 @@ using Microsoft.Extensions.Options;
 namespace FuelFlow.API.BackgroundJobs;
 
 /// <summary>
-/// Watches the available voucher pool and raises an alert when a brand/fuel-type
+/// Watches the available voucher pool and raises an alert when a brand / fuel type / pack size
 /// combination drops to or below the configured threshold, or reaches zero.
 /// <para>
 /// This complements the Prometheus <c>VoucherPoolLow</c> rule: the metric drives the
 /// dashboards, this job drives the immediate chat message with the concrete numbers.
+/// </para>
+/// <para>
+/// The combination is the one a sale is matched on — <c>FulfillmentService.FindMatchingVouchersAsync</c>
+/// compares brand, fuel type, litres and data kind — so a 10-litre line can never be satisfied by a
+/// 20-litre voucher. Counting the sizes together, or counting rehearsal stock, reports a pool the
+/// customer cannot buy from: planning #781 was filed on a paid 10 × 10 L order that had no voucher
+/// while the alert read healthy.
 /// </para>
 /// <para>
 /// Lives in the API (not FuelFlow.JobsWorker) because production deploys only the API and
@@ -62,13 +70,17 @@ public sealed class VoucherStockMonitor
         // them for renewal. A combination qualifies if *either* number is worth reporting.
         var horizon = DateOnly.FromDateTime(SystemClock.UtcNow).AddDays(config.ExpiringWithinDays);
 
+        // Real stock only: a QA voucher is rehearsal data, never fuel a customer can be given, so
+        // counting it makes the pool look stocked to the one alert that is supposed to see the
+        // shortage (DataKinds.ForPool - the fulfilment path makes the same split).
         var counts = await _context.FuelVouchers
-            .Where(v => !v.IsDeleted)
-            .GroupBy(v => new { v.Brand, v.FuelTypeId })
+            .Where(v => !v.IsDeleted && v.DataKind == DataKinds.Real)
+            .GroupBy(v => new { v.Brand, v.FuelTypeId, v.Liters })
             .Select(g => new
             {
                 g.Key.Brand,
                 g.Key.FuelTypeId,
+                g.Key.Liters,
                 Available = g.Count(v => v.AssignedToUserId == null && v.Status == VoucherStatus.Available),
                 ExpiringSoon = g.Count(v => v.AssignedToUserId == null
                                             && v.Status == VoucherStatus.Available
@@ -102,13 +114,14 @@ public sealed class VoucherStockMonitor
             if (combination.ExpiringSoon > 0)
             {
                 _logger.LogWarning(
-                    "Voucher pool expiring for {Brand}/{FuelType} ({FuelTypeId}): {Expiring} of {Available} available expire within {Days} days",
-                    combination.Brand, fuelTypeLabel, combination.FuelTypeId,
+                    "Voucher pool expiring for {Brand}/{FuelType}/{Liters}L ({FuelTypeId}): {Expiring} of {Available} available expire within {Days} days",
+                    combination.Brand, fuelTypeLabel, combination.Liters, combination.FuelTypeId,
                     combination.ExpiringSoon, combination.Available, config.ExpiringWithinDays);
 
                 await _notifications.VoucherStockExpiringAsync(
                     combination.Brand,
                     fuelTypeLabel,
+                    combination.Liters,
                     combination.ExpiringSoon,
                     combination.Available,
                     config.ExpiringWithinDays,
@@ -118,12 +131,14 @@ public sealed class VoucherStockMonitor
             if (combination.Available <= threshold)
             {
                 _logger.LogWarning(
-                    "Voucher pool low for {Brand}/{FuelType} ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
-                    combination.Brand, fuelTypeLabel, combination.FuelTypeId, combination.Available, threshold);
+                    "Voucher pool low for {Brand}/{FuelType}/{Liters}L ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
+                    combination.Brand, fuelTypeLabel, combination.Liters, combination.FuelTypeId,
+                    combination.Available, threshold);
 
                 await _notifications.VoucherStockLowAsync(
                     combination.Brand,
                     fuelTypeLabel,
+                    combination.Liters,
                     combination.Available,
                     threshold,
                     cancellationToken);

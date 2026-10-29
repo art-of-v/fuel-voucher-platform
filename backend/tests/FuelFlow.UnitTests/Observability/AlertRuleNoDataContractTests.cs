@@ -121,6 +121,19 @@ public class AlertRuleNoDataContractTests
         RuleBlocks().Should().ContainKey("fuelflow-voucher-pool-metric-absent");
     }
 
+    [Fact]
+    public void ThePoolRule_NamesThePackSizeItIsAbout()
+    {
+        // Fulfilment matches a line on brand, fuel type and litres, so a brand/fuel total that
+        // reads healthy can still have nothing for the size an order asks for - the shape planning
+        // #781 was filed on. One instance per size without the size in the message is the same
+        // sentence twice for two different things to buy.
+        var rule = WithoutComments(RuleBlocks()["fuelflow-voucher-pool-low"]);
+
+        rule.Should().Contain("$labels.liters",
+            "the pack size is half of what makes a pool a pool, and the operator has to know which one to top up");
+    }
+
     [Theory]
     [InlineData("fuelflow-log-error-burst")]
     [InlineData("fuelflow-log-fatal")]

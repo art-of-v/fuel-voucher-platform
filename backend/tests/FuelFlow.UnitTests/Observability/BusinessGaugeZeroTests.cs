@@ -105,8 +105,11 @@ public sealed class BusinessGaugeZeroTests : IDisposable
     }
 
     [Fact]
-    public void AvailableStock_IsReportedForItsOwnCombination()
+    public void EachPackSize_IsAPoolOfItsOwn()
     {
+        // Fulfilment matches a line on brand, fuel type AND litres, so the sizes are not
+        // interchangeable: a 10 L order cannot be filled from 20 L vouchers. Counting them
+        // together is what let "34 available" mean "nothing this order can use" (planning #781).
         var fuelTypeId = Guid.NewGuid();
         Seed(db =>
         {
@@ -138,9 +141,50 @@ public sealed class BusinessGaugeZeroTests : IDisposable
 
         var samples = CollectGaugeSamples("fuelflow.vouchers.pool_available");
 
-        samples.Should().ContainSingle()
-            .Which.Value.Should().Be(10,
-                "the pool counts vouchers, not the litre sizes they come in");
+        samples.Should().HaveCount(2, "a 10 L pack and a 20 L pack are two pools to the sale");
+        samples.Should().ContainSingle(s => LitersLabel(s) == "10").Which.Value.Should().Be(7);
+        samples.Should().ContainSingle(s => LitersLabel(s) == "20").Which.Value.Should().Be(3);
+    }
+
+    [Fact]
+    public void ASoldOutPackSize_ReportsZero_WhileAnotherSizeStaysStocked()
+    {
+        var fuelTypeId = Guid.NewGuid();
+        Seed(db =>
+        {
+            // Carried, all in customers' hands: no Available 10 L voucher left.
+            db.StockSummary.Add(new StockSummary
+            {
+                Id = Guid.NewGuid(),
+                Brand = "OKKO",
+                FuelTypeId = fuelTypeId,
+                Liters = 10,
+                Status = VoucherStatus.Assigned,
+                DataKind = DataKinds.Real,
+                IsDeleted = false,
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                VoucherCount = 20
+            });
+            db.StockSummary.Add(new StockSummary
+            {
+                Id = Guid.NewGuid(),
+                Brand = "OKKO",
+                FuelTypeId = fuelTypeId,
+                Liters = 20,
+                Status = VoucherStatus.Available,
+                DataKind = DataKinds.Real,
+                IsDeleted = false,
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                VoucherCount = 30
+            });
+        });
+
+        var samples = CollectGaugeSamples("fuelflow.vouchers.pool_available");
+
+        samples.Should().ContainSingle(s => LitersLabel(s) == "10").Which.Value.Should().Be(0,
+            "the brand/fuel total reads 30, but the size the customer orders is gone - " +
+            "that is the state VoucherPoolLow has to be able to fire on");
+        samples.Should().ContainSingle(s => LitersLabel(s) == "20").Which.Value.Should().Be(30);
     }
 
     [Fact]
@@ -176,6 +220,8 @@ public sealed class BusinessGaugeZeroTests : IDisposable
         sample.Tags.Should().Contain(new KeyValuePair<string, object?>("brand", "OKKO"));
         sample.Tags.Should().Contain(new KeyValuePair<string, object?>("fuel_type", "A-95"),
             "the legend of the pool panel is read by an operator, and a uuid says nothing");
+        sample.Tags.Should().Contain(new KeyValuePair<string, object?>("liters", "10"),
+            "the alert names the size to top up, and 10 and 10.00 must not split into two series");
     }
 
     [Fact]
@@ -263,6 +309,12 @@ public sealed class BusinessGaugeZeroTests : IDisposable
 
         return samples;
     }
+
+    private static string? LitersLabel(GaugeSample sample)
+        => sample.Tags
+            .Where(t => t.Key == "liters")
+            .Select(t => t.Value?.ToString())
+            .SingleOrDefault();
 
     private sealed record GaugeSample(int Value, KeyValuePair<string, object?>[] Tags);
 

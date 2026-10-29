@@ -389,11 +389,13 @@ groups:
         execErrState: OK
         annotations:
           summary: "Voucher pool is running low"
-          # The gauge reports one series per brand and fuel type, so this rule has one instance per
-          # combination - and without the labels in the message, three exhausted combinations would
-          # arrive as three identical lines. An untagged series means the pool carries no inventory
-          # at all: the gauge emits a single zero in that case, so the sentence stays as it was.
-          description: "Only {{ $values.B }} unassigned vouchers remain{{ if $labels.brand }} for {{ $labels.brand }} {{ $labels.fuel_type }}{{ end }}."
+          # The gauge reports one series per brand, fuel type and pack size - the grain a sale is
+          # matched on - so this rule has one instance per combination, and without the labels in
+          # the message several exhausted combinations would arrive as identical lines. The size is
+          # part of the sentence for the same reason: a 10 L shortage and a 20 L shortage are two
+          # different things to buy. An untagged series means the pool carries no inventory at all:
+          # the gauge emits a single zero in that case, so the sentence stays as it was.
+          description: "Only {{ $values.B }} unassigned vouchers remain{{ if $labels.brand }} for {{ $labels.brand }} {{ $labels.fuel_type }}{{ if $labels.liters }} {{ $labels.liters }} L{{ end }}{{ end }}."
         labels:
           severity: warning
         data:

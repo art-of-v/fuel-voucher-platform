@@ -61,14 +61,20 @@ public sealed class VoucherStockMonitorTests : IDisposable
     /// </summary>
     private readonly string _provider = $"OKKO-{Guid.NewGuid().ToString()[..6]}";
 
-    private void Voucher(int daysUntilExpiry, VoucherStatus status = VoucherStatus.Available, string? brand = null)
+    private void Voucher(
+        int daysUntilExpiry,
+        VoucherStatus status = VoucherStatus.Available,
+        string? brand = null,
+        decimal liters = 10,
+        string dataKind = DataKinds.Real)
         => _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
             BrandId = BrandIds.ForSlug(brand ?? _provider),
             Brand = brand ?? _provider,
             FuelTypeId = ToUuid("test-expiring-dp"),
-            Liters = 10,
+            Liters = liters,
+            DataKind = dataKind,
             SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(daysUntilExpiry)),
             CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(daysUntilExpiry)),
             VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
@@ -186,6 +192,57 @@ public sealed class VoucherStockMonitorTests : IDisposable
 
         _alerts.Sent.Should().Contain(a => a.Title == "Талони добігають терміну");
         _alerts.Sent.Should().Contain(a => a.Title == "Малий залишок талонів");
+    }
+
+    [Fact]
+    public async Task QaStockIsNotCountedAsASellablePool()
+    {
+        // Rehearsal vouchers are not fuel a customer can be handed, so they must not prop up the
+        // count the operator is asked to top up: five real vouchers is a pool of five (planning #781).
+        for (var i = 0; i < 5; i++) Voucher(daysUntilExpiry: 90);
+        for (var i = 0; i < 99; i++) Voucher(daysUntilExpiry: 90, dataKind: DataKinds.Qa);
+        await _context.SaveChangesAsync();
+
+        await RunAsync(v => v.NotifyOnLowStock = true);
+
+        var alert = _alerts.Sent.Should().ContainSingle(a => a.Title == "Малий залишок талонів").Which;
+        alert.Context!["Доступно"].Should().Be("5",
+            "ninety-nine emulated vouchers are not stock the customer at the counter can buy");
+    }
+
+    [Fact]
+    public async Task APackSizeIsItsOwnPool()
+    {
+        // A deep 20 L pool does not cover a 10 L line: fulfilment matches the size too, so the
+        // shortage has to be reported for the size that is short (planning #781).
+        for (var i = 0; i < 50; i++) Voucher(daysUntilExpiry: 90, liters: 20);
+        Voucher(daysUntilExpiry: 90, liters: 10);
+        await _context.SaveChangesAsync();
+
+        await RunAsync(v => v.NotifyOnLowStock = true);
+
+        var alert = _alerts.Sent.Should().ContainSingle(a => a.Title == "Малий залишок талонів").Which;
+        alert.Context!["Фасування"].Should().Be("10 л");
+        alert.Context["Доступно"].Should().Be("1");
+    }
+
+    [Fact]
+    public async Task TheThresholdIsPerCombination_NotForTheirTotal()
+    {
+        // Fifteen of each size totals thirty, well above the threshold - and still two shortages,
+        // because neither size can serve the other's order.
+        for (var i = 0; i < 15; i++) Voucher(daysUntilExpiry: 90, liters: 10);
+        for (var i = 0; i < 15; i++) Voucher(daysUntilExpiry: 90, liters: 20);
+        await _context.SaveChangesAsync();
+
+        await RunAsync(v =>
+        {
+            v.NotifyOnLowStock = true;
+            v.LowLevelThreshold = 20;
+        });
+
+        _alerts.Sent.Where(a => a.Title == "Малий залишок талонів").Should().HaveCount(2,
+            "a healthy total must not hide a size that is running out");
     }
 
     [Fact]
