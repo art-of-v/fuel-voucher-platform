@@ -70,9 +70,9 @@ public sealed class VoucherStockMonitor
         // them for renewal. A combination qualifies if *either* number is worth reporting.
         var horizon = DateOnly.FromDateTime(SystemClock.UtcNow).AddDays(config.ExpiringWithinDays);
 
-        // Real stock only: a QA voucher is rehearsal data, never fuel a customer can be given, so
-        // counting it makes the pool look stocked to the one alert that is supposed to see the
-        // shortage (DataKinds.ForPool - the fulfilment path makes the same split).
+        // Real stock only: a QA voucher is rehearsal data that only a test account can ever be
+        // given (the fulfilment path picks the kind with DataKinds.ForPool), so counting it makes
+        // the pool look stocked to the one alert that is supposed to see the shortage.
         var counts = await _context.FuelVouchers
             .Where(v => !v.IsDeleted && v.DataKind == DataKinds.Real)
             .GroupBy(v => new { v.Brand, v.FuelTypeId, v.Liters })
