@@ -96,6 +96,46 @@ public sealed class UpgWogPricePageTests
             "a page that cannot be read must leave the catalogue alone rather than write half of one");
     }
 
+    /// <summary>
+    /// WOG's real state, as the site served it, read through the shipping parser.
+    /// </summary>
+    /// <remarks>
+    /// The inline sample above is small enough to read; this one is the fixture
+    /// <c>scripts/fetch-upg-wog-prices.test.mjs</c> also reads, so the backend reader and the
+    /// operator's script are held to the same bytes. Every grade, its joined code and its price in
+    /// hryvnia are pinned: a page that grows a grade or moves a decimal fails here, and the alarm on
+    /// the last-sync age is what covers the page changing shape in production.
+    /// </remarks>
+    [Fact]
+    public void The_real_WOG_state_carries_all_seven_grades_at_kopeck_prices()
+    {
+        var state = File.ReadAllText(WogFixturePath());
+        var page = $"""<html><body><script id="__NEXT_DATA__" type="application/json">{state}</script></body></html>""";
+
+        var prices = UpgWogPricePage.Parse(page);
+
+        prices.Select(p => p.FuelCode).Should().Equal(
+            "ДП Євро5", "ДП Mustang+", "95 Євро5-Е10", "95 Mustang Євро5-Е10",
+            "100 Mustang Євро5-Е0", "ГАЗ", "AdBlue");
+        prices.Select(p => p.PricePerLiter).Should().Equal(
+            103.50m, 106.50m, 92.90m, 95.90m, 102.90m, 51.50m, 61.90m);
+    }
+
+    /// <summary>The Next.js state WOG published, shared with the node script's test.</summary>
+    private static string WogFixturePath()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null &&
+               !Directory.Exists(Path.Combine(dir.FullName, ".git")) &&
+               !File.Exists(Path.Combine(dir.FullName, ".git")))
+        {
+            dir = dir.Parent;
+        }
+
+        dir.Should().NotBeNull("the tests must run from inside the repository");
+        return Path.Combine(dir!.FullName, "scripts", "fixtures", "wog-next-page-state.json");
+    }
+
     [Fact]
     public void A_page_whose_shape_carries_no_price_is_refused()
     {

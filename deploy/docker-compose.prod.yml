@@ -348,7 +348,7 @@ services:
       # weekly, so a new grade appears on the week, not the quarter.
       UpgWogPrice__Enabled: ${UPGWOG_PRICE_ENABLED:-false}
       UpgWogPrice__UpgEndpointUrl: ${UPGWOG_PRICE_UPG_ENDPOINT:-https://upg.ua/}
-      UpgWogPrice__WogEndpointUrl: ${UPGWOG_PRICE_WOG_ENDPOINT:-https://www.wog.ua/ua/fuels/}
+      UpgWogPrice__WogEndpointUrl: ${UPGWOG_PRICE_WOG_ENDPOINT:-https://wog.ua/ua/fuels/}
       UpgWogPrice__TimeoutSeconds: ${UPGWOG_PRICE_TIMEOUT_SECONDS:-30}
 
       # KLO publishes no prices of its own - its products page lists the grades and nothing else -
