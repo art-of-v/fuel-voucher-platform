@@ -1,6 +1,6 @@
 {
   "level": "high",
-  "reviewedOn": "2026-10-24",
+  "reviewedOn": "2026-10-29",
   "note": "The advisories the JavaScript dependency gate accepts, each with the reason it is accepted. The gate (scripts/npm-audit-gate.mjs) fails the build on any advisory at or above the level above that is NOT listed here; the advisories below the level are listed as well, so the whole set of known advisories is on the record instead of a number. Every entry names the path the advisory reaches this repository through, the fix - or says there is none - and the reason the risk is accepted.",
   "advisories": {
     "GHSA-5p2g-fcmc-qvqq": {
@@ -42,6 +42,14 @@
       "path": "decode-uri-component 0.2.2 <- query-string <- expo-router",
       "fix": "0.5.0, but that release is ESM-only (`\"type\": \"module\"`) and query-string is CommonJS, so the bump breaks the router's dependency chain; there is no 0.4.3 to move to.",
       "reason": "The decoded string is a deep link's query string. The exponential decoding needs thousands of nested percent escapes in one query parameter."
+    },
+    "GHSA-qr28-fpjm-wq7f": {
+      "package": "decode-uri-component",
+      "severity": "high",
+      "apps": ["mobile"],
+      "path": "decode-uri-component 0.2.2 <- query-string <- expo-router",
+      "fix": "0.5.1, but it is ESM-only (`\"type\": \"module\"`) exactly like 0.5.0, and query-string is CommonJS: the require would hand back a namespace object instead of the callable the router invokes, so the bump breaks the router's dependency chain.",
+      "reason": "Same package, same path and the same code path as GHSA-vcc3-ghjq-m6fr above: the fallback decoder that only runs when the native decodeURIComponent throws. The input is a deep link's query string and the work happens on the device, in the app's JavaScript runtime, so the twenty-second stall is local to the person who opened a malformed ~224 KB link - it is not reachable from this service, and no server-side endpoint parses URLs through this package."
     },
     "GHSA-w5hq-g745-h8pq": {
       "package": "uuid",
