@@ -285,6 +285,17 @@ describe('useLogin', () => {
       expect(result.current.step).toBe('two_factor');
     }
 
+    it('hands the second factor an idle screen, not the first factor’s spinner', async () => {
+      const { result } = renderLogin();
+      await reachTwoFactorStep(result);
+
+      // The step is only worth showing if it can be used: a field disabled by a leftover
+      // `loading` and a spinner where Verify should be would be a screen nobody can type
+      // into, and nothing would ever reach /two-factor/verify. The request that carried the
+      // person here has finished by now, so its spinner must be gone with it.
+      expect(result.current.loading).toBe(false);
+    });
+
     it('says the authenticator code is wrong instead of blaming the device', async () => {
       verifyTwoFactorMock.mockRejectedValue(
         Object.assign(new Error('Invalid or expired verification code'), { status: 401 }),
