@@ -11,6 +11,8 @@ import {
   EmptyState,
   ErrorState,
   GridPageLayout,
+  HEADER_ACTION_FRAME,
+  HEADER_TRAILING_HIT_SLOP,
   IconButton,
   LoadingState,
   ScreenHeader,
@@ -81,13 +83,16 @@ export default function PackagesScreen() {
       subtitle={t('packages.selectCards')}
       actions={
         canPurchase ? (
-          <View>
+          <View style={HEADER_ACTION_FRAME}>
             <IconButton
               icon={<ShoppingCart />}
               onPress={() => router.push('/basket')}
               accessibilityLabel={t('basket.title')}
               variant="outlined"
               hapticStyle="medium"
+              // The basket is one of the two controls people miss on the first tap,
+              // and the header's corner is empty space nobody else needs.
+              hitSlop={HEADER_TRAILING_HIT_SLOP}
             />
             {cartItemCount > 0 && (
               <View

@@ -14,7 +14,12 @@
 export { PageLayout, useContentInsets } from './PageLayout';
 export type { ContentInsets, PageLayoutProps } from './PageLayout';
 export { GridPageLayout } from './GridPageLayout';
-export { ScreenHeader } from './ScreenHeader';
+export {
+  ScreenHeader,
+  HEADER_ACTION_FRAME,
+  HEADER_LEADING_HIT_SLOP,
+  HEADER_TRAILING_HIT_SLOP,
+} from './ScreenHeader';
 export type { ScreenHeaderProps } from './ScreenHeader';
 export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderProps } from './SectionHeader';
