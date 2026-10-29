@@ -252,7 +252,8 @@ export function PhoneAuthForm({
               keyboardType="number-pad"
               maxLength={6}
               codeStyle
-              autoFocus
+              // No autoFocus on purpose: this screen mounts while the previous keyboard is
+              // still animating away, which is what the 2026-10-29 sign-in crashes point at.
               disabled={loading}
               error={error ?? undefined}
             />
