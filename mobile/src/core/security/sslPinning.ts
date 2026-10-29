@@ -1,3 +1,4 @@
+import { NativeModules, TurboModuleRegistry } from 'react-native';
 import type { PinningOptions } from 'react-native-ssl-public-key-pinning';
 import { loadOptionalNativeModule } from './optionalNativeModule';
 
@@ -35,14 +36,27 @@ let initializationFailed = false;
 let sslPinningModule: SslPinningModule | null | undefined;
 
 /**
- * The pinning module is native code. A binary built before it existed cannot resolve it, so it is
- * resolved on demand - that is what lets an OTA bundle run on an older binary instead of dying on
- * the import.
+ * The pinning module is native code, and requiring it on a binary built before it existed is
+ * fatal inside Metro and cannot be caught (see optionalNativeModule). It is a TurboModule on the
+ * new architecture and a plain native module on the old one, so both registries are asked - `get`
+ * answers null instead of throwing.
+ */
+function hasSslPinningModule(): boolean {
+  return (
+    TurboModuleRegistry.get('SslPublicKeyPinning') != null ||
+    NativeModules.SslPublicKeyPinning != null
+  );
+}
+
+/**
+ * Resolved on demand and only when the binary really has it - that is what lets an OTA bundle run
+ * on an older binary instead of dying on the import.
  */
 function loadSslPinning(): SslPinningModule | null {
   if (sslPinningModule === undefined) {
     sslPinningModule = loadOptionalNativeModule(
       'react-native-ssl-public-key-pinning',
+      hasSslPinningModule,
       () => require('react-native-ssl-public-key-pinning') as SslPinningModule,
     );
   }

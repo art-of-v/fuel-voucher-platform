@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import { BASE_URL, CLIENT_PLATFORM_HEADER, NATIVE_CLIENT_PLATFORM } from '../api/apiConfig';
 import { SecurityService } from '../api/securityService';
 import { computeProofRequestHash, computeRequestHash } from './attestationProtocol';
-import { loadOptionalNativeModule } from './optionalNativeModule';
+import { hasExpoNativeModule, loadOptionalNativeModule } from './optionalNativeModule';
 import { ensureSslPinningInitialized } from './sslPinning';
 
 export { isAttestationProtected } from './attestationProtocol';
@@ -31,15 +31,16 @@ let googleProviderPromise: Promise<boolean> | null = null;
 let appIntegrityModule: AppIntegrityModule | null | undefined;
 
 /**
- * `@expo/app-integrity` resolves its native side while it is being imported, so a binary built
- * before it existed throws there - and a throw during import takes the whole bundle down.
- * Resolving it on demand is what keeps an OTA bundle runnable on an older binary: there is no
- * attestation there, so the request goes out without a proof instead of crashing the app.
+ * `@expo/app-integrity` resolves its native side while it is being imported, and a binary built
+ * before it existed cannot do that - the failure is fatal inside Metro and cannot be caught (see
+ * optionalNativeModule). The registry is therefore checked first: there is no attestation on an
+ * older binary, so the request goes out without a proof instead of crashing the app.
  */
 function loadAppIntegrity(): AppIntegrityModule | null {
   if (appIntegrityModule === undefined) {
     appIntegrityModule = loadOptionalNativeModule(
       '@expo/app-integrity',
+      () => hasExpoNativeModule('ExpoAppIntegrity'),
       () => require('@expo/app-integrity') as AppIntegrityModule,
     );
   }

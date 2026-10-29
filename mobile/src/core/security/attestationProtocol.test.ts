@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { stubExpoNativeModules } from '../../test-utils/nativeModules';
 import {
   computeProofRequestHash,
   computeRequestHash,
@@ -26,6 +27,18 @@ function base64Url(value: string): string {
 }
 
 describe('attestationProtocol', () => {
+  let restoreRuntime: () => void;
+
+  beforeEach(() => {
+    // The binary this suite pretends to run on has the crypto module; without the registry entry
+    // the loader would (correctly) skip the require and every hash would be null.
+    restoreRuntime = stubExpoNativeModules({ ExpoCrypto: {} });
+  });
+
+  afterEach(() => {
+    restoreRuntime();
+  });
+
   it('hashes method, exact path and body with newlines', async () => {
     await expect(computeRequestHash('POST', '/api/purchases', '{"amount":1}')).resolves.toBe(
       base64Url('POST\n/api/purchases\n{"amount":1}'),

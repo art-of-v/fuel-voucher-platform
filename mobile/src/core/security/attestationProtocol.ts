@@ -1,19 +1,20 @@
-import { loadOptionalNativeModule } from './optionalNativeModule';
+import { hasExpoNativeModule, loadOptionalNativeModule } from './optionalNativeModule';
 
 type CryptoModule = typeof import('expo-crypto');
 
 let cryptoModule: CryptoModule | null | undefined;
 
 /**
- * `expo-crypto` is a native module: a binary built before it existed cannot resolve it, and the
- * import throws while the bundle is being evaluated. Resolving it on demand is what lets an OTA
- * bundle run on an older binary - the hash is simply unavailable there, so the request goes out
- * without a proof instead of taking the app down.
+ * `expo-crypto` resolves its native side while it is being imported, and build 236 has no
+ * `ExpoCrypto` at all - requiring it there is fatal inside Metro and cannot be caught (see
+ * optionalNativeModule). The registry is therefore checked first: on an older binary the hash is
+ * simply unavailable, so the request goes out without a proof instead of taking the app down.
  */
 function loadCrypto(): CryptoModule | null {
   if (cryptoModule === undefined) {
     cryptoModule = loadOptionalNativeModule(
       'expo-crypto',
+      () => hasExpoNativeModule('ExpoCrypto'),
       () => require('expo-crypto') as CryptoModule,
     );
   }
