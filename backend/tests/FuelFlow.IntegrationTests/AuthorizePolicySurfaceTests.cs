@@ -86,6 +86,11 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         // #622, S-13).
         ["GET /api/admin/legal-entity/contracts/signed-contracts"] = AuthPolicies.SignaturePayload,
         ["GET /api/admin/legal-entity/contracts/signed-contracts/{id:guid}"] = AuthPolicies.SignaturePayload,
+        // The close check is a read: it reports what is posted, what is a draft and whether 311
+        // agrees with the bank, and it changes nothing (#780). Booking the receipts it reports does
+        // change the books, and that one is in the money section below.
+        ["GET /api/admin/ledger/trial-balance"] = AuthPolicies.Staff,
+        ["GET /api/admin/ledger/trial-balance/csv"] = AuthPolicies.Staff,
         ["GET /api/admin/orders"] = AuthPolicies.Staff,
         ["GET /api/admin/orders/{id}"] = AuthPolicies.Staff,
         ["GET /api/admin/orders/{id:guid}/receipt"] = AuthPolicies.Staff,
@@ -165,6 +170,9 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
 
         // ---- the money ---------------------------------------------------------------
         ["DELETE /api/admin/orders/{id}"] = AuthPolicies.MoneyMovement,
+        // Writes money into the books: Dr 311 / Cr 681 for a received capture no order accounts
+        // for. It is the operator standing behind the posting, and the journal records them (#780).
+        ["POST /api/admin/ledger/unapplied-receipts"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/orders/{id}/refund"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/payments/{id:guid}/attach"] = AuthPolicies.MoneyMovement,
         ["POST /api/purchases/simulate"] = AuthPolicies.MoneyMovement,

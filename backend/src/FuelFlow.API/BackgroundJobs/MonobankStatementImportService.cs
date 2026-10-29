@@ -1,6 +1,7 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Acquiring;
+using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
@@ -210,6 +211,26 @@ public class MonobankStatementImportService
 
         await SettlePaymentsFromStatementAsync(merchant, nameable, now, cancellationToken);
 
+        // Money the acquirer took that no payment row of ours holds (#780). Nothing is booked here:
+        // an unexplained receipt becomes a liability under a named operator, and that is the
+        // close-time command's job. Saying it in the log every pass is what keeps it from being
+        // discovered at month end instead.
+        if (merchant == MonobankMerchant.Live)
+        {
+            var unbooked = await UnappliedReceipts.FindAsync(_context, merchant, fromUtc, toUtc, cancellationToken);
+
+            if (unbooked.Count > 0)
+            {
+                _logger.LogWarning(
+                    "{Count} received {Merchant} capture(s) totalling {Total} UAH have no payment row and are not in the books: {Invoices}. " +
+                        "Book them before the period closes (POST /api/admin/ledger/unapplied-receipts).",
+                    unbooked.Count,
+                    merchant,
+                    unbooked.Sum(c => c.AmountUah),
+                    string.Join(", ", unbooked.Select(c => c.InvoiceId)));
+            }
+        }
+
         _logger.LogInformation(
             "Imported the {Merchant} statement for [{From} - {To}): {Inserted} new, {Updated} already known",
             merchant, fromUtc, toUtc, inserted, updated);
@@ -321,15 +342,9 @@ public class MonobankStatementImportService
     }
 
     /// <summary>
-    /// The acquirer's own vocabulary, matched loosely on purpose.
+    /// The acquirer's own vocabulary, matched loosely on purpose - see
+    /// <see cref="MonobankStatementEntry.IsReceivedStatus"/>, which is the single definition.
     /// </summary>
-    /// <remarks>
-    /// The status column is explicitly not mapped onto our enums - the statement speaks in its own
-    /// words and the whole point of the table is to keep them. So this is a substring test, not an
-    /// equality test against a closed set: "success" and "hold"/"success_hold" both mean received,
-    /// and a vocabulary we have not seen should fail closed here rather than be guessed at.
-    /// </remarks>
     private static bool IsReceived(string? acquirerStatus)
-        => !string.IsNullOrWhiteSpace(acquirerStatus)
-           && acquirerStatus.Contains("success", StringComparison.OrdinalIgnoreCase);
+        => MonobankStatementEntry.IsReceivedStatus(acquirerStatus);
 }

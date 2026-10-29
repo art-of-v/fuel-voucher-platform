@@ -32,7 +32,7 @@ public static class TestJournal
 
         var cash = NewAccount(context, "311", "Рахунки в банках", "Asset", "Debit");
         var advance = NewAccount(context, "681", "Рахунки за авансами одержаними", "Liability", "Credit");
-        var contra = NewAccount(context, "703", "Вирахування з доходу", "Revenue", "Debit");
+        var contra = NewAccount(context, "704", "Вирахування з доходу", "Revenue", "Debit");
         var vat = NewAccount(context, "643", "Податкові зобов'язання", "Liability", "Credit");
 
         context.LedgerMappingRules.AddRange(

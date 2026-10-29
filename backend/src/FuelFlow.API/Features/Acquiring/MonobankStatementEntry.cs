@@ -112,4 +112,22 @@ public class MonobankStatementEntry
     /// <summary>When we last saw it in a fetch. A row that keeps being re-reported is one the
     /// acquirer is still revising, which is different from one that is settled and closed.</summary>
     public DateTime LastSeenAtUtc { get; set; }
+
+    /// <summary>
+    /// Whether the acquirer's status means money was received, matched loosely on purpose.
+    /// </summary>
+    /// <remarks>
+    /// The status column is explicitly not mapped onto our enums - the statement speaks in its own
+    /// words and the whole point of the table is to keep them. So this is a substring test, not an
+    /// equality test against a closed set: "success" and "hold"/"success_hold" both mean received,
+    /// and a vocabulary we have not seen fails closed here rather than being guessed at.
+    /// <para>
+    /// One definition, used by the import's settlement, the unapplied-receipt booking and the close
+    /// check: three callers that must agree on what "money arrived" means, or one of them reports a
+    /// difference the other two do not have.
+    /// </para>
+    /// </remarks>
+    public static bool IsReceivedStatus(string? acquirerStatus)
+        => !string.IsNullOrWhiteSpace(acquirerStatus)
+           && acquirerStatus.Contains("success", StringComparison.OrdinalIgnoreCase);
 }

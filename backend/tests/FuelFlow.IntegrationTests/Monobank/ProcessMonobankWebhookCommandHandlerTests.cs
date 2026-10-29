@@ -456,7 +456,7 @@ LineItems =
 
         var vat = entries.Single(e => e.SourceEvent == "payment.received.vat");
         vat.Lines.Sum(l => l.DebitUah).Should().Be(416.67m);
-        vat.Lines.Single(l => l.DebitUah > 0).Account!.Code.Should().Be("703");
+        vat.Lines.Single(l => l.DebitUah > 0).Account!.Code.Should().Be("704");
         vat.Lines.Single(l => l.CreditUah > 0).Account!.Code.Should().Be("643");
     }
 

@@ -191,18 +191,20 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
 
         var posted = await PostAsync(userId, voucherId);
 
-        posted.Should().HaveCount(3, "revenue, VAT and cost of sales are three separate facts");
+        posted.Should().HaveCount(2, "revenue and cost of sales are two facts; the VAT was booked with the receipt");
 
-        // 2500 gross at 20% carries 416.67 of VAT and 2083.33 net.
-        posted["voucher.redeemed.revenue"].Should().Be(("681", "702", 2083.33m));
-        posted["voucher.redeemed.vat"].Should().Be(("643", "703", 416.67m));
+        // The advance is released whole: 2500.00, VAT inside it. The VAT was already carved out when
+        // the money arrived (payment.received.vat), so a redemption that split it again released the
+        // liability and left the earned advance's VAT on 681 (planning #780).
+        posted["voucher.redeemed.revenue"].Should().Be(("681", "702", 2500m));
 
         // 50 liters at 45.00 is what we actually paid, not today's offer price.
         posted["voucher.redeemed.cogs"].Should().Be(("808", "281", 2250m));
 
-        // The margin, computed from what was actually posted rather than asserted separately.
+        // Gross revenue against gross cost. 250.00 is the sale's margin before VAT: the 416.67 of VAT
+        // inside the 2500.00 is owed to the budget, not earned, and is on 643/704, not here.
         var margin = posted["voucher.redeemed.revenue"].Amount - posted["voucher.redeemed.cogs"].Amount;
-        margin.Should().Be(-166.67m, "revenue is net of VAT and cost is gross of it, so this is not the margin");
+        margin.Should().Be(250m);
     }
 
     [Fact]
@@ -222,17 +224,13 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             posted.Add(await PostAsync(userId, voucherId));
         }
 
-        // 862 gross carries 143.67 of VAT and 718.33 net - one voucher's share.
-        posted.Should().OnlyContain(p => p["voucher.redeemed.revenue"].Amount == 718.33m);
-        posted.Should().OnlyContain(p => p["voucher.redeemed.vat"].Amount == 143.67m);
-        posted.Sum(p => p["voucher.redeemed.revenue"].Amount).Should().Be(7183.30m);
-        posted.Sum(p => p["voucher.redeemed.vat"].Amount).Should().Be(1436.70m);
+        // 862 is one voucher's share of the 8620.00 line, gross - the VAT was carved out of the
+        // advance, so nothing is split here.
+        posted.Should().OnlyContain(p => p["voucher.redeemed.revenue"].Amount == 862m);
+        posted.Should().OnlyContain(p => !p.ContainsKey("voucher.redeemed.vat"));
 
-        // The ten entries carry exactly what the customer paid for the line. The net and VAT add up
-        // to 0.03 more than splitting 8620 as a whole does - that is the per-entry kopeck rounding
-        // (10 x 143.67 = 1436.70 against 8620's 1436.67), not a share left unallocated.
-        posted.Sum(p => p["voucher.redeemed.revenue"].Amount + p["voucher.redeemed.vat"].Amount)
-            .Should().Be(8620m);
+        // The ten entries carry exactly what the customer paid for the line, with nothing left on 681.
+        posted.Sum(p => p["voucher.redeemed.revenue"].Amount).Should().Be(8620m);
     }
 
     [Fact]
@@ -271,7 +269,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             var entries = await verify.JournalEntries
                 .Where(e => e.SourceId == voucherId)
                 .ToListAsync();
-            entries.Should().HaveCount(3);
+            entries.Should().HaveCount(2);
             entries.Should().OnlyContain(e => e.Status == JournalEntryStatus.Draft);
         }
 
@@ -330,7 +328,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
 
         await using var verify = CreateContext();
         var count = await verify.JournalEntries.CountAsync(e => e.SourceId == voucherId);
-        count.Should().Be(3);
+        count.Should().Be(2);
     }
 
 [Fact]
