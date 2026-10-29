@@ -90,14 +90,14 @@ public sealed class RedemptionJournalPoster
             return;
         }
 
-        var lineTotal = await (
+        var orderLine = await (
             from movement in _context.VoucherMovements.AsNoTracking()
             join line in _context.OrderLineItems.AsNoTracking() on movement.LineItemId equals line.Id
             where movement.VoucherId == id
-            select (decimal?)line.LineTotal)
+            select new { line.LineTotal, line.Quantity })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (lineTotal is null or <= 0m)
+        if (orderLine is null || orderLine.LineTotal <= 0m)
         {
             _logger.LogWarning(
                 "PAYMENTS: voucher {VoucherId} was reported but its order line carried no amount, so "
@@ -106,7 +106,12 @@ public sealed class RedemptionJournalPoster
             return;
         }
 
-        var (netUah, vatUah) = VatCalculator.Split(lineTotal.Value, VatRate);
+        // One voucher is one unit of the line, so it carries one unit's revenue. Booking the whole
+        // line gave every voucher on a multi-unit line the full amount - a 10-pack recognised ten
+        // times its sale (planning #779). quantity is the divisor the database guarantees positive
+        // (ck_order_line_positive_quantity).
+        var share = orderLine.LineTotal / orderLine.Quantity;
+        var (netUah, vatUah) = VatCalculator.Split(share, VatRate);
 
         await _journal.PostProvisionalAsync(
             new PostJournalEntryRequest

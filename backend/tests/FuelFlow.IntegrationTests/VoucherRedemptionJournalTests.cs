@@ -49,15 +49,30 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
     /// <summary>A voucher sold at 2500 gross with 50 liters bought at 45.00 - a 250 margin.</summary>
     private async Task<(Guid UserId, Guid VoucherId)> SeedSaleAsync(ApplicationDbContext context, decimal costPerLiter)
     {
+        var (userId, voucherIds) = await SeedPackSaleAsync(
+            context, quantity: 1, unitPrice: 2500m, liters: 50m, costPerLiter);
+        return (userId, voucherIds.Single());
+    }
+
+    /// <summary>
+    /// A paid order of <paramref name="quantity"/> vouchers on one line - the shape a multi-pack has.
+    /// </summary>
+    private async Task<(Guid UserId, IReadOnlyList<Guid> VoucherIds)> SeedPackSaleAsync(
+        ApplicationDbContext context,
+        int quantity,
+        decimal unitPrice,
+        decimal liters,
+        decimal costPerLiter)
+    {
         var userId = Guid.NewGuid();
-        var voucherId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var now = TestClock.UtcNow;
+        var voucherIds = Enumerable.Range(0, quantity).Select(_ => Guid.NewGuid()).ToList();
 
         context.Users.Add(new User
         {
             Id = userId,
-            PhoneNumber = $"+38{voucherId:N}"[..20],
+            PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
@@ -67,7 +82,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         {
             Id = orderId,
             UserId = userId,
-            Price = 2500m,
+            Price = unitPrice * quantity,
             Status = OrderStatus.Fulfilled,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
@@ -87,49 +102,52 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
-            Liters = 50m,
-            Quantity = 1,
-            UnitPrice = 2500m,
-            LineTotal = 2500m,
+            Liters = liters,
+            Quantity = quantity,
+            UnitPrice = unitPrice,
+            LineTotal = unitPrice * quantity,
         });
 
-        context.FuelVouchers.Add(new FuelVoucher
+        foreach (var voucherId in voucherIds)
         {
-            Id = voucherId,
-            BrandId = BrandIds.ForSlug("okko"),
-            Brand = "okko",
-            FuelTypeId = ToUuid("okko-95"),
-            Liters = 50m,
-            CostPerLiter = costPerLiter,
-            SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
-            VoucherNumber = $"OKKO-{voucherId:N}"[..20],
-            QrPayload = $"payload-{voucherId:N}",
-            Status = VoucherStatus.Assigned,
-            AssignedToUserId = userId,
-            OrderId = orderId,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
+            context.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = voucherId,
+                BrandId = BrandIds.ForSlug("okko"),
+                Brand = "okko",
+                FuelTypeId = ToUuid("okko-95"),
+                Liters = liters,
+                CostPerLiter = costPerLiter,
+                SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+                CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+                VoucherNumber = $"OKKO-{voucherId:N}"[..20],
+                QrPayload = $"payload-{voucherId:N}",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = userId,
+                OrderId = orderId,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            });
 
-        // The handover: pool -> customer, naming both the voucher and the line it was issued
-        // against. This is what lets the posting find the price without guessing from fuel type.
-        context.VoucherMovements.Add(new VoucherMovement
-        {
-            Id = Guid.CreateVersion7(),
-            Kind = VoucherMovementKinds.Issued,
-            VoucherId = voucherId,
-            FromLocation = VoucherLocations.Pool,
-            ToLocation = VoucherLocations.Customer,
-            OrderId = orderId,
-            LineItemId = lineId,
-            ActorKind = VoucherActorKinds.User,
-            ActorUserId = userId,
-            OccurredAtUtc = now,
-        });
+            // The handover: pool -> customer, naming both the voucher and the line it was issued
+            // against. This is what lets the posting find the price without guessing from fuel type.
+            context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.Issued,
+                VoucherId = voucherId,
+                FromLocation = VoucherLocations.Pool,
+                ToLocation = VoucherLocations.Customer,
+                OrderId = orderId,
+                LineItemId = lineId,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = userId,
+                OccurredAtUtc = now,
+            });
+        }
 
         await context.SaveChangesAsync();
-        return (userId, voucherId);
+        return (userId, voucherIds);
     }
 
     private async Task<Dictionary<string, (string Debit, string Credit, decimal Amount)>> PostAsync(
@@ -185,6 +203,36 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         // The margin, computed from what was actually posted rather than asserted separately.
         var margin = posted["voucher.redeemed.revenue"].Amount - posted["voucher.redeemed.cogs"].Amount;
         margin.Should().Be(-166.67m, "revenue is net of VAT and cost is gross of it, so this is not the margin");
+    }
+
+    [Fact]
+    public async Task A_Voucher_On_A_Ten_Unit_Line_Books_One_Units_Revenue_Not_The_Whole_Line()
+    {
+        await using var setup = CreateContext();
+        await ResetAsync(setup);
+
+        // The 2026-10-29 production case: ten vouchers on one line at 862.00 each, 8620.00 paid.
+        // Before #779 every one of them recognised the whole line - ten times the sale.
+        var (userId, voucherIds) = await SeedPackSaleAsync(
+            setup, quantity: 10, unitPrice: 862m, liters: 50m, costPerLiter: 45m);
+
+        var posted = new List<Dictionary<string, (string Debit, string Credit, decimal Amount)>>();
+        foreach (var voucherId in voucherIds)
+        {
+            posted.Add(await PostAsync(userId, voucherId));
+        }
+
+        // 862 gross carries 143.67 of VAT and 718.33 net - one voucher's share.
+        posted.Should().OnlyContain(p => p["voucher.redeemed.revenue"].Amount == 718.33m);
+        posted.Should().OnlyContain(p => p["voucher.redeemed.vat"].Amount == 143.67m);
+        posted.Sum(p => p["voucher.redeemed.revenue"].Amount).Should().Be(7183.30m);
+        posted.Sum(p => p["voucher.redeemed.vat"].Amount).Should().Be(1436.70m);
+
+        // The ten entries carry exactly what the customer paid for the line. The net and VAT add up
+        // to 0.03 more than splitting 8620 as a whole does - that is the per-entry kopeck rounding
+        // (10 x 143.67 = 1436.70 against 8620's 1436.67), not a share left unallocated.
+        posted.Sum(p => p["voucher.redeemed.revenue"].Amount + p["voucher.redeemed.vat"].Amount)
+            .Should().Be(8620m);
     }
 
     [Fact]
