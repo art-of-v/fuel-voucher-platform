@@ -202,6 +202,8 @@ running app rather than the platform's design:
 
 - `docs/SUPPLIER_REDEMPTION_RECONCILIATION_RUNBOOK.md` — the daily supplier statement import and the
   redemption exception queue.
+- `docs/PAID_ORDER_NO_VOUCHER_RUNBOOK.md` — a paid order with no voucher: the match predicate, the
+  triage queries, top-up and refund, and the deferred manual release.
 - `docs/APP_ATTESTATION_AND_PINNING_RUNBOOK.md` — attestation and certificate pinning.
 - `docs/DEVICE_SIGNATURE.md` — the device signature contract.
 
