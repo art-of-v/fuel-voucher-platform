@@ -17,9 +17,16 @@ namespace FuelFlow.UnitTests.Observability;
 /// an exporter that stopped reporting.
 /// </para>
 /// <para>
-/// The fix is per datasource: PromQL rules carry <c>or vector(0)</c>, because 0 is the answer the
+/// The fix is per datasource: PromQL rules carry a fallback to 0, because 0 is the answer the
 /// healthy system should have given; Loki rules carry <c>noDataState: OK</c>, because "no error
 /// lines" is the healthy state itself. These tests keep a later edit from quietly dropping either.
+/// </para>
+/// <para>
+/// The PromQL fallback is <c>or vector(0)</c> only where the label set matches: a query that
+/// aggregates its labels away (<c>sum(...)</c>, <c>absent(...)</c>). Added to a labelled series it
+/// is a second, untagged instance - and under a <c>lt</c> threshold it is a permanent firing alert
+/// with no labels (planning #778). Such a rule gets a second rule for the missing-metric case
+/// instead; <c>AnUntaggedZeroFallback_IsNeverThresholdedFromBelow</c> is what holds that line.
 /// </para>
 /// </summary>
 public class AlertRuleNoDataContractTests
@@ -55,9 +62,17 @@ public class AlertRuleNoDataContractTests
             block => block);
     }
 
+    /// <summary>
+    /// The block without its YAML comments. A block runs up to the next rule, so the comment that
+    /// introduces that rule lands in the previous block - and a comment explaining why a construct
+    /// is absent must not read as the construct being present.
+    /// </summary>
+    private static string WithoutComments(string block) =>
+        string.Join('\n', block.Split('\n').Where(line => !line.TrimStart().StartsWith('#')));
+
     [Theory]
     [InlineData("fuelflow-high-error-rate")]
-    [InlineData("fuelflow-voucher-pool-low")]
+    [InlineData("fuelflow-voucher-pool-metric-absent")]
     [InlineData("fuelflow-fulfillment-failures")]
     [InlineData("fuelflow-job-failures")]
     [InlineData("fuelflow-payments-stuck")]
@@ -70,6 +85,40 @@ public class AlertRuleNoDataContractTests
             $"'{uid}' thresholds a value whose healthy state is 0, and PromQL returns no series for a " +
             "counter or label combination that has never been observed - so without the fallback the " +
             "rule can never be Normal, only NoData");
+    }
+
+    [Fact]
+    public void AnUntaggedZeroFallback_IsNeverThresholdedFromBelow()
+    {
+        // `or` matches by label set. `vector(0)` is the series `{}`, and every series of a labelled
+        // query carries its own labels, so the fallback is added as a separate instance whose value
+        // is 0 - below any `lt` threshold. That instance fires for ever, with no brand and no fuel
+        // type, next to the real stock-out the rule is supposed to report (planning #778).
+        var offenders = RuleBlocks()
+            .Where(rule => WithoutComments(rule.Value).Contains("or vector(0)"))
+            .Where(rule => WithoutComments(rule.Value).Contains("type: lt"))
+            .Select(rule => rule.Key)
+            .ToList();
+
+        offenders.Should().BeEmpty(
+            "an untagged zero is a real series, not an absence; under a lower-than threshold it is a " +
+            "permanent firing instance with empty labels. Report a missing metric with its own " +
+            "absent() rule instead");
+    }
+
+    [Fact]
+    public void ThePoolRule_LeavesAbsenceToItsOwnAlert()
+    {
+        var rule = WithoutComments(RuleBlocks()["fuelflow-voucher-pool-low"]);
+
+        rule.Should().Contain("expr: fuelflow_vouchers_pool_available_vouchers");
+        rule.Should().NotContain("or vector(0)",
+            "the gauge is labelled per brand and fuel type, so an untagged fallback would be a " +
+            "permanent firing instance (planning #778)");
+        rule.Should().Contain("noDataState: OK",
+            "a missing gauge is reported by fuelflow-voucher-pool-metric-absent; leaving NoData here " +
+            "would notify twice for one missing metric");
+        RuleBlocks().Should().ContainKey("fuelflow-voucher-pool-metric-absent");
     }
 
     [Theory]
