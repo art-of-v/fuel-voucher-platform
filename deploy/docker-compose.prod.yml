@@ -346,6 +346,10 @@ services:
       # backend itself - the same job, the same cadence, and the same failure policy: a page that
       # cannot be read leaves the last known prices alone. The catalogue half of these jobs runs
       # weekly, so a new grade appears on the week, not the quarter.
+      #
+      # WOG answers the production address with 204 and an empty body (2026-10-29), so WOG's
+      # endpoint may point at the relay in deploy/cloudflare/wog-relay instead of wog.ua. Both
+      # serve the same page; only the address the request leaves from differs.
       UpgWogPrice__Enabled: ${UPGWOG_PRICE_ENABLED:-false}
       UpgWogPrice__UpgEndpointUrl: ${UPGWOG_PRICE_UPG_ENDPOINT:-https://upg.ua/}
       UpgWogPrice__WogEndpointUrl: ${UPGWOG_PRICE_WOG_ENDPOINT:-https://wog.ua/ua/fuels/}
