@@ -40,8 +40,80 @@ public static class BusinessGaugeSetup
         metrics.RegisterVoucherPoolGauge(() => ReadVoucherPool(scopeFactory));
         metrics.RegisterOrderStatusGauge(() => ReadOrderStatuses(scopeFactory));
         metrics.RegisterStuckPaymentGauge(() => ReadStuckPayments(scopeFactory));
+        metrics.RegisterPriceFreshnessGauge(() => ReadPriceFreshness(scopeFactory));
 
         return host;
+    }
+
+    /// <summary>
+    /// The brands a job keeps priced: OKKO, UPG and WOG from their own pages, KLO from Minfin.
+    /// </summary>
+    /// <remarks>
+    /// Named rather than discovered, because "every brand in the catalogue" would page on every
+    /// brand an operator creates and prices by hand - and a rule that fires on a healthy setup is a
+    /// rule nobody reads. A brand added with its own feed belongs in this list, next to the job that
+    /// serves it.
+    /// </remarks>
+    private static readonly string[] AutomaticallyPricedBrands = ["okko", "upg", "wog", "klo"];
+
+    /// <summary>
+    /// Seconds since each brand's pump price was last written, one series per brand.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Read from <c>price_updated_at</c> rather than from a counter of successful fetches, because
+    /// the stamp is the one thing every write path already maintains: the pump importers stamp every
+    /// fuel the source still lists on every successful run, changed or not (see
+    /// <see cref="FuelFlow.Features.Pricing.PriceHistoryRecorder"/>), and an operator's edit stamps
+    /// too. So an old stamp means nothing has priced this brand for that long - which is the
+    /// question the alarm asks.
+    /// </para>
+    /// <para>
+    /// A fuel that has never been stamped reports its age from <see cref="DateTime.MinValue"/>: it is
+    /// unboundedly stale, not absent, and disappearing from the metric would be the "exhausted
+    /// combination" mistake the pool gauge already made once.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<Measurement<double>> ReadPriceFreshness(IServiceScopeFactory scopeFactory)
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var now = SystemClock.UtcNow;
+
+            var brands = db.Brands
+                .Where(b => AutomaticallyPricedBrands.Contains(b.Slug))
+                .Select(b => new
+                {
+                    b.Slug,
+                    LiveFuels = db.FuelTypes.Count(f => f.BrandId == b.Id),
+                    LastPriced = db.FuelTypes
+                        .Where(f => f.BrandId == b.Id)
+                        .Max(f => (DateTime?)f.PriceUpdatedAt)
+                })
+                .ToList();
+
+            // A brand with no live fuel has no price that can be stale: nothing to sell, nothing to
+            // watch. Every other brand reports, including one whose fuels have never been priced.
+            var measurements = brands
+                .Where(b => b.LiveFuels > 0)
+                .Select(b => new Measurement<double>(
+                    Math.Max(0d, (now - (b.LastPriced ?? DateTime.MinValue)).TotalSeconds),
+                    new KeyValuePair<string, object?>("brand", b.Slug)))
+                .ToList();
+
+            // An empty catalogue is a real, finite answer ("nothing to watch"), so it is reported as
+            // a zero and the rule stays Normal. A read that FAILS returns nothing from the catch
+            // below, which the rule reads as NoData - and for a staleness alarm that is a state to
+            // act on, not a state to hide.
+            return measurements.Count > 0 ? measurements : [new Measurement<double>(0d)];
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Price freshness gauge could not be read");
+            return [];
+        }
     }
 
     /// <summary>

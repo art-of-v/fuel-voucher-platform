@@ -517,6 +517,49 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0] }
 
+      # A feed that stops is not an error anywhere else in the stack. Every pump-price sync keeps the
+      # last known prices when its fetch fails - deliberately, so an outage cannot blank the
+      # catalogue - and the job returns normally, so nothing reaches Hangfire's failed state and
+      # LogErrorBurst (more than 5 error lines a minute) never trips on one line every quarter hour.
+      # Measured on 2026-10-29: WOG's seven grades had not moved for nineteen hours and the only
+      # evidence was a Loki error line nobody was watching.
+      #
+      # Healthy here is a NUMBER, not an empty result: the gauge reports the age in seconds for every
+      # brand that has live fuels, so the usual `or vector(0)` would turn "the gauge could not be
+      # read" into a healthy zero - the one case this alarm must not swallow. That is why it is the
+      # only Prometheus rule whose noDataState alerts.
+      - uid: fuelflow-price-sync-stale
+        title: PriceSyncStale
+        condition: C
+        for: 10m
+        noDataState: Alerting
+        execErrState: Alerting
+        annotations:
+          summary: "{{ $labels.brand }} pump prices are more than an hour old"
+          description: "The {{ $labels.brand }} price feed has not written a pump price for {{ $values.B }} seconds (threshold 3600). The last known prices are still being served and the customer's saving is measured against them, so the app may be advertising a saving against a price the station no longer charges. The vendor's page may have changed shape, be down, or refuse our requests - search Grafana > FuelFlow Logs for the sync's error line."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: fuelflow_fuel_prices_last_sync_age_seconds
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [3600] }
+
   - orgId: 1
     name: fuelflow-security
     folder: FuelFlow

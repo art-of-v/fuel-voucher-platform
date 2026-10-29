@@ -232,6 +232,25 @@ public sealed class FuelFlowMetrics : IDisposable
             description: "Awaiting-payment orders older than the reconciliation grace window, by merchant.");
     }
 
+    /// <summary>
+    /// Registers an observable gauge reporting how long ago each brand's pump price was last written.
+    /// </summary>
+    /// <remarks>
+    /// The freshness of the price feed, not the health of the fetch. Every pump-price job keeps its
+    /// last known prices on a failed fetch - that is deliberate and correct - so a source that has
+    /// stopped for a week leaves a catalogue that looks entirely healthy: the API serves prices, the
+    /// jobs "succeed" by returning, and nothing enters Hangfire's failed state. Measured on
+    /// 2026-10-29: WOG's seven grades had not moved for nineteen hours and nothing said so.
+    /// </remarks>
+    public void RegisterPriceFreshnessGauge(Func<IEnumerable<Measurement<double>>> observe)
+    {
+        _meter.CreateObservableGauge(
+            "fuelflow.fuel_prices.last_sync_age",
+            observe,
+            "s",
+            "Seconds since a brand's pump price was last written by one of its sync jobs or an operator. Alerting target.");
+    }
+
     public void VoucherAssigned(string brand, Guid fuelTypeId, bool isCompany) =>
         _vouchersAssigned.Add(1,
             new KeyValuePair<string, object?>("brand", brand),
