@@ -199,4 +199,76 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await act.Should().ThrowAsync<InvalidOperationException>(
             "an empty sheet is a page that failed to load, not a network that stopped selling fuel");
     }
+
+    /// <summary>
+    /// A reprice leaves the evidence the column exists for: the fuel's own stamp and one history row.
+    /// </summary>
+    /// <remarks>
+    /// Until 2026-10-29 the importer saved first and recorded after, and the recorder deliberately
+    /// does not save - its callers own the transaction - so every stamp and every row this import
+    /// wrote died with the request scope. Production showed a KLO diesel that had moved 104.40 to
+    /// 105.40 in the log while `price_updated_at` still carried the seed date and
+    /// `fuel_price_history` held one row per fuel, also from the seed. A second run over an unchanged
+    /// sheet must not append a second row: the import runs every fifteen minutes.
+    /// </remarks>
+    [Fact]
+    public async Task A_reprice_stamps_the_fuel_and_appends_one_history_row()
+    {
+        await SeedBrandAsync();
+        await SeedOperatorFuelsAsync("А 95+", "А 95", "А 92", "ДП", "Газ");
+        await SetPumpPricesAsync(("ДП", 104.40m));
+
+        await Handler().HandleAsync(
+            new ImportKloPricesCommand(Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        var diesel = await _context.FuelTypes.SingleAsync(f => f.Name == "ДП");
+        diesel.PumpPricePerLiter.Should().Be(101.90m, "the column's price is written to the fuel");
+        diesel.PriceUpdatedAt.Should().Be(TestClock.UtcNow,
+            "a reprice stamps the fuel, and the stamp is what the freshness alarm reads");
+
+        var history = await _context.FuelPriceHistory.Where(h => h.FuelTypeId == diesel.Id).ToListAsync();
+        history.Should().ContainSingle("one reprice is one history row, and the row survives the save");
+        history[0].Reason.Should().Be(PriceHistoryReasons.PumpImport);
+        history[0].PumpPricePerLiter.Should().Be(101.90m);
+        history[0].EffectiveFromUtc.Should().Be(TestClock.UtcNow);
+
+        (await _context.FuelPriceHistory.CountAsync()).Should().Be(5,
+            "no fuel had a row to compare against, so the first run lays down one baseline per matched grade");
+
+        // The next tick, over the same sheet. Nothing moved, so nothing is appended - but the run
+        // still stamps, because "the source still lists this fuel" is a fact worth keeping.
+        await Handler().HandleAsync(
+            new ImportKloPricesCommand(Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        (await _context.FuelPriceHistory.CountAsync()).Should().Be(5,
+            "an unchanged sheet must not bury the history in a row per fuel per quarter hour");
+    }
+
+    [Fact]
+    public async Task A_dry_run_writes_neither_a_stamp_nor_a_history_row()
+    {
+        await SeedBrandAsync();
+        await SeedOperatorFuelsAsync("А 95+", "А 95", "А 92", "ДП", "Газ");
+
+        await Handler().HandleAsync(
+            new ImportKloPricesCommand(Sheet, DryRun: true, CreateMissing: false), Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        (await _context.FuelPriceHistory.CountAsync()).Should().Be(0);
+        (await _context.FuelTypes.Where(f => f.PriceUpdatedAt != null).CountAsync()).Should().Be(0);
+    }
+
+    private async Task SetPumpPricesAsync(params (string Name, decimal Price)[] prices)
+    {
+        foreach (var (name, price) in prices)
+        {
+            var fuel = await _context.FuelTypes.SingleAsync(f => f.Name == name);
+            fuel.PumpPricePerLiter = price;
+        }
+
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+    }
 }

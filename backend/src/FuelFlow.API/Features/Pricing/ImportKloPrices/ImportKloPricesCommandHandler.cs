@@ -181,12 +181,18 @@ public sealed class ImportKloPricesCommandHandler
 
         if (!command.DryRun)
         {
-            await _context.SaveChangesAsync(ct);
+            // Recorded BEFORE the save, and through the range form so the newest history row of
+            // every fuel is one query rather than one per fuel. The recorder deliberately does not
+            // save - its callers own the transaction - so a call made after the only SaveChanges is
+            // a stamp and a history row that die with the request scope. That is exactly what this
+            // importer did until 2026-10-29: the pump price moved, the log said it moved, and
+            // `price_updated_at` still carried the seed date. The other two pump importers had the
+            // order right all along, which is why only KLO's history had a hole.
+            var matchedIds = repriced.Select(r => r.FuelTypeId).ToHashSet();
+            var touched = ours.Where(f => matchedIds.Contains(f.Id)).ToList();
+            await _priceRecorder.RecordRangeAsync(touched, PriceHistoryReasons.PumpImport, actor, now, ct);
 
-            foreach (var fuel in ours.Where(f => repriced.Any(r => r.FuelTypeId == f.Id)))
-            {
-                await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.PumpImport, actor, now, ct);
-            }
+            await _context.SaveChangesAsync(ct);
         }
 
         return new KloPriceImportResult(created, repriced, notSold, command.DryRun);
@@ -238,7 +244,7 @@ public sealed class ImportKloPricesCommandHandler
             await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.PumpImport, actor, now, ct);
         }
 
-            return new KloPriceFuelCreated(Guid.Empty, row.Grade, row.PricePerLiter);
+        return new KloPriceFuelCreated(Guid.Empty, row.Grade, row.PricePerLiter);
     }
 
     /// <summary>
