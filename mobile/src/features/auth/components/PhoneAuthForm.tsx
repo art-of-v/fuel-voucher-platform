@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Linking } from 'react-native';
+import { View, StyleSheet, Linking, TextInput } from 'react-native';
 import { Phone, ArrowRight, Lock, Check } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
@@ -64,6 +64,18 @@ export function PhoneAuthForm({
   // code verification registers the user). The send button stays disabled
   // until it is checked, so no OTP can even be requested without it.
   const [consented, setConsented] = React.useState(false);
+
+  // The code field is focused when a code step appears rather than by `autoFocus` at
+  // mount: the two code steps share one field, so the mount happens once and the focus
+  // has to follow the step. Doing it in an effect runs it after the commit - by which
+  // time the previous keyboard has been dismissed - instead of inside the commit, which
+  // is where the swap used to collide.
+  const codeInputRef = React.useRef<TextInput>(null);
+  React.useEffect(() => {
+    if (step === 'code' || step === 'two_factor') {
+      codeInputRef.current?.focus();
+    }
+  }, [step]);
 
   const iconBox = (icon: React.ReactNode, { filled = false }: { filled?: boolean } = {}) => (
     <View
@@ -181,100 +193,81 @@ export function PhoneAuthForm({
         </View>
       )}
 
-      {step === 'code' && (
+      {/*
+        Both code steps are ONE tree, not two. The SMS code and the authenticator code are
+        the same interaction - six digits in the same place - and rendering them as two
+        separate screens threw the mounted field away at the exact moment the sign-in
+        needed it: the swap unmounted a focused input and mounted another one that took
+        focus during the same frame, which is the shape of the 2026-10-29 crash reports
+        (a native exception on the screen change, then expo-updates error recovery
+        re-raising it). Here the field is never replaced, so there is nothing to tear
+        down: it clears, re-labels, and takes the keyboard again.
+      */}
+      {(step === 'code' || step === 'two_factor') && (
         <View style={styles.content}>
           {heading(
-            t('phoneAuth.enterCodeTitle'),
-            `${t('phoneAuth.enterCode')} ${phone}`,
+            step === 'code' ? t('phoneAuth.enterCodeTitle') : t('phoneAuth.twoFactorTitle'),
+            step === 'code' ? `${t('phoneAuth.enterCode')} ${phone}` : t('phoneAuth.twoFactorHint'),
             iconBox(<Lock size={32} color={tokens.colors.primary} />),
           )}
 
           <View style={[styles.form, { gap: tokens.spacing.xl }]}>
+            {/*
+              Always rendered, so the input below keeps its position in the tree and is
+              never remounted when the enrolment card appears.
+            */}
+            <View
+              style={
+                twoFactor?.needsEnrollment && twoFactor.enrollmentSecret
+                  ? undefined
+                  : styles.hiddenSlot
+              }
+            >
+              {twoFactor?.needsEnrollment && twoFactor.enrollmentSecret ? (
+                <TwoFactorSecretField secret={twoFactor.enrollmentSecret} />
+              ) : null}
+            </View>
+
             <TextField
-              label={t('phoneAuth.codeLabel')}
-              value={code}
-              onChangeText={setCode}
+              ref={codeInputRef}
+              testID="auth-code-field"
+              label={step === 'code' ? t('phoneAuth.codeLabel') : t('phoneAuth.twoFactorCodeLabel')}
+              value={step === 'code' ? code : twoFactorCode}
+              onChangeText={step === 'code' ? setCode : setTwoFactorCode}
               placeholder="000000"
               keyboardType="number-pad"
               maxLength={6}
               codeStyle
-              autoFocus
-              // Lets both platforms offer the code from the SMS itself, which is
-              // the difference between a two-tap and an eight-tap sign-in.
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
+              // Lets both platforms offer the SMS code from the message itself, which is
+              // the difference between a two-tap and an eight-tap sign-in. The
+              // authenticator code comes from another app, not from a message.
+              textContentType={step === 'code' ? 'oneTimeCode' : undefined}
+              autoComplete={step === 'code' ? 'sms-otp' : undefined}
               disabled={loading}
-              // An invalid code *is* a problem with this field's value, so the
-              // message is attached to the field.
+              // An invalid code *is* a problem with this field's value, so the message is
+              // attached to the field on both steps.
               error={error ?? undefined}
             />
 
             <Button
               label={t('phoneAuth.verify')}
-              onPress={handleVerifyCode}
+              onPress={step === 'code' ? handleVerifyCode : handleVerifyTwoFactor}
               loading={loading}
-              disabled={code.length !== 6}
+              disabled={(step === 'code' ? code : twoFactorCode).length !== 6}
               icon={<ArrowRight />}
             />
 
             <Button
-              label={t('phoneAuth.changePhone')}
+              // On the code step this changes the number; on the second factor it takes
+              // the person back to the start of the sign-in, because a challenge that was
+              // spent or expired cannot be redeemed with any code. Same action either
+              // way - the label is what says which one it is.
+              label={step === 'code' ? t('phoneAuth.changePhone') : t('phoneAuth.startOver')}
               variant="ghost"
               size="md"
               hapticStyle="light"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                resetToPhone();
-              }}
-            />
-          </View>
-        </View>
-      )}
-
-      {step === 'two_factor' && (
-        <View style={styles.content}>
-          {heading(
-            t('phoneAuth.twoFactorTitle'),
-            t('phoneAuth.twoFactorHint'),
-            iconBox(<Lock size={32} color={tokens.colors.primary} />),
-          )}
-
-          <View style={[styles.form, { gap: tokens.spacing.xl }]}>
-            {twoFactor?.needsEnrollment && twoFactor.enrollmentSecret && (
-              <TwoFactorSecretField secret={twoFactor.enrollmentSecret} />
-            )}
-
-            <TextField
-              label={t('phoneAuth.twoFactorCodeLabel')}
-              value={twoFactorCode}
-              onChangeText={setTwoFactorCode}
-              placeholder="000000"
-              keyboardType="number-pad"
-              maxLength={6}
-              codeStyle
-              autoFocus
-              disabled={loading}
-              error={error ?? undefined}
-            />
-
-            <Button
-              label={t('phoneAuth.verify')}
-              onPress={handleVerifyTwoFactor}
-              loading={loading}
-              disabled={twoFactorCode.length !== 6}
-              icon={<ArrowRight />}
-            />
-
-            <Button
-              // On this step the ghost button does not change the number - it takes the
-              // person back to the start of the sign-in. A challenge that was spent or
-              // expired cannot be redeemed with any code, so "start over" is the only
-              // way forward, and "change phone number" would not say that.
-              label={t('phoneAuth.startOver')}
-              variant="ghost"
-              size="md"
-              hapticStyle="light"
-              onPress={() => {
                 resetToPhone();
               }}
             />
@@ -320,6 +313,12 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  // An empty slot in a `gap` column still consumes a gap, and the enrollment block only
+  // exists on the authenticator step. Hiding the empty slot keeps the layout identical
+  // while leaving the field at a stable child index - which is what keeps it mounted.
+  hiddenSlot: {
+    display: 'none',
   },
   consentRow: {
     flexDirection: 'row',

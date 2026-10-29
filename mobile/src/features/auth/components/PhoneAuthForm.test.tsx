@@ -1,4 +1,5 @@
 import React from 'react';
+import { TextInput } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
 
 import { PhoneAuthForm } from './PhoneAuthForm';
@@ -84,5 +85,58 @@ describe('PhoneAuthForm - the second factor', () => {
     // button does not change the number either.
     expect(screen.getByText('phoneAuth.startOver')).toBeTruthy();
     expect(screen.queryByText('phoneAuth.changePhone')).toBeNull();
+  });
+});
+
+describe('PhoneAuthForm - the code field', () => {
+  beforeEach(() => {
+    mockUseLogin.mockReset();
+  });
+
+  it('is the same field after the sign-in moves from the SMS code to the second factor', () => {
+    // Two steps, two copies of the same six-digit field. They were two separate text
+    // inputs, so moving on from the SMS code tore one down and mounted the next - with
+    // `autoFocus` asking iOS for the keyboard inside that same commit, which is where
+    // the app died. One shared field means there is nothing to tear down.
+    mockLoginAt('code');
+    const view = render(<PhoneAuthForm onSuccess={jest.fn()} />);
+    const field = screen.getByTestId('auth-code-field');
+
+    mockLoginAt('two_factor');
+    view.rerender(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.getByTestId('auth-code-field')).toBe(field);
+    // ...and it is now asking for the code from the authenticator app, not from the SMS.
+    expect(screen.getByText('phoneAuth.twoFactorCodeLabel')).toBeTruthy();
+    expect(screen.queryByText('phoneAuth.codeLabel')).toBeNull();
+  });
+
+  it('takes focus back when the second factor step appears', () => {
+    // The field is mounted once, so `autoFocus` can no longer be what opens the keyboard
+    // on the later step. Without this the person would land on the authenticator screen
+    // with a closed keyboard and have to tap a field that had already been focused once.
+    const focus = jest.spyOn(TextInput.prototype as any, 'focus');
+
+    mockLoginAt('code');
+    const view = render(<PhoneAuthForm onSuccess={jest.fn()} />);
+    focus.mockClear();
+
+    mockLoginAt('two_factor');
+    view.rerender(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(focus).toHaveBeenCalled();
+
+    focus.mockRestore();
+  });
+
+  it('still names the SMS code on the SMS step', () => {
+    mockLoginAt('code');
+
+    render(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.getByText('phoneAuth.codeLabel')).toBeTruthy();
+    expect(screen.queryByText('phoneAuth.twoFactorCodeLabel')).toBeNull();
+    expect(screen.getByText('phoneAuth.changePhone')).toBeTruthy();
+    expect(screen.queryByText('phoneAuth.startOver')).toBeNull();
   });
 });
