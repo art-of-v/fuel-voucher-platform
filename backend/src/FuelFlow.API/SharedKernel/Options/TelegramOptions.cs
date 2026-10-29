@@ -131,8 +131,14 @@ public sealed class TelegramOptions
         public bool NotifyOnOrderUnfulfillable { get; set; } = false;
 
         /// <summary>
-        /// Evaluated per brand/fuel-type combination rather than on the total, so an
-        /// exhausted single combination is not hidden by a healthy overall count.
+        /// Evaluated per brand / fuel-type / pack-size combination of <b>real</b> stock, not on the
+        /// total, so an exhausted single combination is not hidden by a healthy overall count.
+        /// <para>
+        /// The pack size is part of the combination because it is part of the sale: fulfilment
+        /// matches a line on brand, fuel, litres and data kind, so a 10-litre order cannot be
+        /// filled from 20-litre vouchers. Counting the sizes together and counting rehearsal
+        /// stock both reported a pool the customer could not buy from (planning #781).
+        /// </para>
         /// </summary>
         public int LowLevelThreshold { get; set; } = 20;
 

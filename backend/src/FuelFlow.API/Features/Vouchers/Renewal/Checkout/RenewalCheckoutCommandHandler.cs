@@ -218,7 +218,8 @@ public sealed class RenewalCheckoutCommandHandler
             if (candidate is null)
             {
                 var fuelName = await ResolveFuelNameAsync(line.Source, cancellationToken);
-                await _notifications.VoucherStockLowAsync(line.Source.Brand, fuelName, 0, 1, cancellationToken);
+                await _notifications.VoucherStockLowAsync(
+                    line.Source.Brand, fuelName, line.Source.Liters, 0, 1, cancellationToken);
                 throw new VoucherRenewalException("no_stock", $"No replacement voucher is currently in stock for {fuelName}.");
             }
 

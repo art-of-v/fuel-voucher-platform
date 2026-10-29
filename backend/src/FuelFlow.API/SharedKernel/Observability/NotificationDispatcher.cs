@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Logging;
@@ -146,6 +147,7 @@ public sealed class NotificationDispatcher
     public Task VoucherStockLowAsync(
         string brand,
         string fuelType,
+        decimal liters,
         int available,
         int threshold,
         CancellationToken ct = default)
@@ -153,22 +155,27 @@ public sealed class NotificationDispatcher
         var vouchers = _config.Vouchers;
         var isZero = available == 0;
         var enabled = isZero ? vouchers.NotifyOnZeroStock : vouchers.NotifyOnLowStock;
+        var size = $"{liters.ToString("0.##", CultureInfo.InvariantCulture)} л";
 
+        // The size is part of the throttle key as well as the message: a 10-litre shortage and a
+        // 20-litre shortage are two things to top up, and one of them must not silence the other
+        // for the reminder interval.
         return SendAsync(
             enabled,
             isZero ? AlertSeverity.Critical : AlertSeverity.Warning,
             isZero ? "Талонів не залишилось" : "Малий залишок талонів",
             isZero
-                ? $"Для {brand} талонів більше немає."
-                : $"Для {brand} залишилось лише {available} талон(ів).",
+                ? $"Для {brand} {fuelType} {size} талонів більше немає."
+                : $"Для {brand} {fuelType} {size} залишилось лише {available} талон(ів).",
             new Dictionary<string, string>
             {
                 ["Мережа"] = brand,
                 ["Пальне"] = fuelType,
+                ["Фасування"] = size,
                 ["Доступно"] = available.ToString(),
                 ["Порог"] = threshold.ToString()
             },
-            throttleKey: $"stock|{brand}|{fuelType}|{isZero}",
+            throttleKey: $"stock|{brand}|{fuelType}|{size}|{isZero}",
             ct,
             throttleMinutes: vouchers.ReminderIntervalMinutes);
     }
@@ -181,23 +188,26 @@ public sealed class NotificationDispatcher
     public Task VoucherStockExpiringAsync(
         string brand,
         string fuelType,
+        decimal liters,
         int expiring,
         int available,
         int withinDays,
         CancellationToken ct = default)
     {
         var vouchers = _config.Vouchers;
+        var size = $"{liters.ToString("0.##", CultureInfo.InvariantCulture)} л";
 
         return SendAsync(
             vouchers.NotifyOnExpiringStock,
             AlertSeverity.Warning,
             "Талони добігають терміну",
-            $"Для {brand} {expiring} талон(ів) із {available} доступних втрачають силу менш ніж за {withinDays} дн. "
+            $"Для {brand} {fuelType} {size} {expiring} талон(ів) із {available} доступних втрачають силу менш ніж за {withinDays} дн. "
             + "Їх треба або продати, або залишити на платне продовження.",
             new Dictionary<string, string>
             {
                 ["Мережа"] = brand,
                 ["Пальне"] = fuelType,
+                ["Фасування"] = size,
                 ["Добігають терміну"] = expiring.ToString(),
                 ["Доступно"] = available.ToString(),
                 ["Горизонт, дн"] = withinDays.ToString()
@@ -205,7 +215,7 @@ public sealed class NotificationDispatcher
             // Distinct throttle key from the low-count alert: the same combination can be both
             // comfortably stocked and quietly running out of life, and the two deserve a message
             // each rather than one swallowing the other.
-            throttleKey: $"expiring|{brand}|{fuelType}",
+            throttleKey: $"expiring|{brand}|{fuelType}|{size}",
             ct,
             throttleMinutes: vouchers.ReminderIntervalMinutes);
     }

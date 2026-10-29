@@ -35,12 +35,12 @@
     },
     {
       "type": "timeseries",
-      "title": "Available pool by brand / fuel type",
-      "description": "The alert evaluates each series separately, so a healthy total can still hide an exhausted individual combination. A combination that sold out reports 0 rather than disappearing - the gauge is driven by the inventory we carry, not by the part of it that happens to be available.",
+      "title": "Available pool by brand / fuel type / pack size",
+      "description": "The alert evaluates each series separately, so a healthy total can still hide an exhausted individual combination. A combination that sold out reports 0 rather than disappearing - the gauge is driven by the inventory we carry, not by the part of it that happens to be available. The pack size is a series of its own because fulfilment matches a line on it: a 10 L order cannot be filled from 20 L vouchers.",
       "gridPos": { "h": 9, "w": 12, "x": 6, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
       "targets": [
-        { "expr": "fuelflow_vouchers_pool_available_vouchers", "legendFormat": "{{brand}} / {{fuel_type}}", "refId": "A" }
+        { "expr": "fuelflow_vouchers_pool_available_vouchers", "legendFormat": "{{brand}} / {{fuel_type}} / {{liters}} L", "refId": "A" }
       ],
       "fieldConfig": {
         "defaults": {

@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -117,7 +118,7 @@ public static class BusinessGaugeSetup
     }
 
     /// <summary>
-    /// The sellable pool, one series per brand and fuel type.
+    /// The sellable pool, one series per brand, fuel type and pack size.
     /// <para>
     /// The series set is the inventory we CARRY, not the inventory we happen to have available: a
     /// combination whose stock sold out still has rows (status Assigned, Used, Expired), so it still
@@ -125,6 +126,15 @@ public static class BusinessGaugeSetup
     /// disappear, and a combination that is gone is exactly the one the operator has to be told
     /// about: VoucherPoolLow could not fire on a stock-out, because the series it thresholds had
     /// ceased to exist.
+    /// </para>
+    /// <para>
+    /// <b>The size is a dimension, because it is a dimension of the sale.</b>
+    /// <c>FulfillmentService.FindMatchingVouchersAsync</c> matches a line on brand, fuel type,
+    /// litres and data kind, so a 10-litre order cannot take a 20-litre voucher. Counting the sizes
+    /// together let "34 available" mean "nothing this order can use", which is precisely the state
+    /// planning #781 was filed on: a paid 10 × 10 L order with no free voucher while the brand/fuel
+    /// total read healthy. The pool is counted at the grain the customer buys at, so a size that
+    /// ran out has its own series and its own zero.
     /// </para>
     /// <para>
     /// The counts come from <c>stock_summary</c> rather than from <c>fuel_vouchers</c> itself. The
@@ -144,7 +154,7 @@ public static class BusinessGaugeSetup
 
             var carried = db.StockSummary
                 .Where(s => s.DataKind == DataKinds.Real && !s.IsDeleted)
-                .Select(s => new { s.Brand, s.FuelTypeId })
+                .Select(s => new { s.Brand, s.FuelTypeId, s.Liters })
                 .Distinct()
                 .ToList();
 
@@ -158,10 +168,10 @@ public static class BusinessGaugeSetup
                          && !s.IsDeleted
                          && s.Status == VoucherStatus.Available
                          && (!expiryEnabled || s.SupplierExpirationDate >= today))
-                .GroupBy(s => new { s.Brand, s.FuelTypeId })
-                .Select(g => new { g.Key.Brand, g.Key.FuelTypeId, Count = g.Sum(s => s.VoucherCount) })
+                .GroupBy(s => new { s.Brand, s.FuelTypeId, s.Liters })
+                .Select(g => new { g.Key.Brand, g.Key.FuelTypeId, g.Key.Liters, Count = g.Sum(s => s.VoucherCount) })
                 .ToList()
-                .ToDictionary(x => (x.Brand, x.FuelTypeId), x => x.Count);
+                .ToDictionary(x => (x.Brand, x.FuelTypeId, x.Liters), x => x.Count);
 
             // The name, not the id: the legend of the pool panel is read by an operator, and a uuid
             // says nothing. The catalogue query filter drops archived fuels, so an archived fuel
@@ -172,10 +182,15 @@ public static class BusinessGaugeSetup
                 .ToDictionary(f => f.Id, f => f.Name);
 
             return carried.Select(c => new Measurement<int>(
-                available.GetValueOrDefault((c.Brand, c.FuelTypeId)),
+                available.GetValueOrDefault((c.Brand, c.FuelTypeId, c.Liters)),
                 new KeyValuePair<string, object?>("brand", c.Brand),
                 new KeyValuePair<string, object?>("fuel_type",
-                    fuelNames.GetValueOrDefault(c.FuelTypeId, c.FuelTypeId.ToString()))))
+                    fuelNames.GetValueOrDefault(c.FuelTypeId, c.FuelTypeId.ToString())),
+                // Invariant and trailing-zero-free, so 10 and 10.00 cannot become two series for
+                // one pack size. The alert message prints it with a unit; a dashboard legend can
+                // put nothing after it and still read as a size.
+                new KeyValuePair<string, object?>("liters",
+                    c.Liters.ToString("0.##", CultureInfo.InvariantCulture))))
                 .ToList();
         }
         catch (Exception ex)
