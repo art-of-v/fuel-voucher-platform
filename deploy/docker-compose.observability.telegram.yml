@@ -35,11 +35,10 @@
 # Check it before you apply it: deploy/check-alerting-provisioning.sh loads the
 # provisioning in a throwaway Grafana and fails if it does not load.
 #
-# Alert rules provisioned by this overlay: ServiceDown, HighErrorRate,
-# HighRequestLatency, HighCpuUsage, HighMemoryUsage, LogErrorBurst, LogFatal,
-# VoucherPoolLow, FulfillmentFailures, HangfireJobFailures. Grafana sends BOTH
-# firing and resolved notifications, so "app is down" and "app is back up" arrive
-# in the same group.
+# Alert rules provisioned by this overlay: whatever alert-rules.yml beside the contact point
+# holds. The list is deliberately not repeated here - it used to be, and it drifted behind the
+# file within two releases. Grafana sends BOTH firing and resolved notifications, so "app is
+# down" and "app is back up" arrive in the same group.
 
 services:
   grafana:
