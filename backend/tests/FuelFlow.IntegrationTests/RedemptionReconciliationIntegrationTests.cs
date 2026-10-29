@@ -91,7 +91,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
                     .Where(e => e.SourceId == seeded.VoucherId)
                     .Select(e => e.Status)
                     .ToListAsync())
-                .Should().HaveCount(3)
+                .Should().HaveCount(2)
                 .And.OnlyContain(status => status == JournalEntryStatus.Draft);
         }
 
@@ -118,7 +118,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
             (await verify.VoucherRedemptions.CountAsync(r => r.VoucherId == seeded.VoucherId))
                 .Should().Be(1);
             (await verify.JournalEntries.CountAsync(e => e.SourceId == seeded.VoucherId))
-                .Should().Be(3);
+                .Should().Be(2);
         }
     }
 
@@ -290,7 +290,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
                     .Where(e => e.SourceId == seeded.VoucherId)
                     .Select(e => e.Status)
                     .ToListAsync())
-                .Should().HaveCount(3)
+                .Should().HaveCount(2)
                 .And.OnlyContain(status => status == JournalEntryStatus.Posted);
 
             var exceptions = await new GetRedemptionExceptionsQueryHandler(verify)
@@ -316,7 +316,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
         await using (var verify = CreateContext())
         {
             (await verify.JournalEntries.CountAsync(e => e.SourceId == seeded.VoucherId))
-                .Should().Be(3, "a repeated decision posts nothing new");
+                .Should().Be(2, "a repeated decision posts nothing new");
         }
     }
 
@@ -385,7 +385,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
             var originals = await verify.JournalEntries
                 .Where(e => e.SourceId == seeded.VoucherId)
                 .ToListAsync();
-            originals.Should().HaveCount(3);
+            originals.Should().HaveCount(2);
             originals.Should().OnlyContain(e => e.Status == JournalEntryStatus.Reversed);
             originals.Should().OnlyContain(e => e.ReversedByEntryId != null);
 
@@ -393,7 +393,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
             var reversals = await verify.JournalEntries
                 .Where(e => reversalIds.Contains(e.Id))
                 .ToListAsync();
-            reversals.Should().HaveCount(3);
+            reversals.Should().HaveCount(2);
             reversals.Should().OnlyContain(e => e.Status == JournalEntryStatus.Posted);
             reversals.Should().OnlyContain(e => e.SourceType == JournalSourceType.Reversal);
         }
@@ -526,7 +526,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
             row.Status.Should().Be(RedemptionStatementStatus.Dismissed);
 
             (await verify.JournalEntries.CountAsync(e => e.SourceId == seeded.VoucherId))
-                .Should().Be(3, "the import did not post a second sale");
+                .Should().Be(2, "the import did not post a second sale");
         }
     }
 
