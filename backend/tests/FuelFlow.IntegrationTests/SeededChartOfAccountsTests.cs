@@ -82,7 +82,7 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
 
         var accounts = await context.ChartOfAccounts.AsNoTracking().ToListAsync();
 
-        accounts.Should().HaveCount(25, "11 headers plus 14 subaccounts, and only what this business uses");
+        accounts.Should().HaveCount(26, "11 headers plus 15 subaccounts, and only what this business uses");
 
         // Spot-checks against the plan rather than an exhaustive list: these are the codes whose
         // meaning the earlier fabricated table got wrong.
@@ -95,7 +95,10 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
         (await CodeOf("401")).Should().Be("Статутний капітал");
         (await CodeOf("643")).Should().Be("Податкові зобов'язання");
         (await CodeOf("702")).Should().Be("Дохід від реалізації товарів");
-        (await CodeOf("703")).Should().Be("Вирахування з доходу");
+        // 703 is service revenue by the plan; the deduction account is 704. The seed had the two
+        // swapped in name, which made a VAT pass-through read as a revenue account carrying a debit.
+        (await CodeOf("703")).Should().Be("Дохід від реалізації робіт і послуг");
+        (await CodeOf("704")).Should().Be("Вирахування з доходу");
         (await CodeOf("808")).Should().Be("Витрати товарів");
         // The write-off of expired unsold stock: lost goods, not the cost of a sale. It has to be
         // its own element, because "how much did we lose to expired stock" is a question the
@@ -153,24 +156,25 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
     }
 
     [Fact]
-    public async Task The_Vat_Contra_Account_Takes_Both_Sides()
+    public async Task The_Vat_Is_Carved_Out_Of_The_Advance_And_Not_Again_At_Redemption()
     {
-        // 703 is debited when VAT is carved out of an advance and credited when it is carved out of
-        // a sale. An engine that derived the side from the account's normal balance would produce a
-        // 703 credit with no matching debit.
         await using (var context = CreateContext())
         {
             var entry = await CreateService(context).PostAsync(Req("payment.received.vat", JournalSourceType.Payment, 200m));
             var codes = await CodesForAsync(entry.Id);
-            codes["debit"].Should().StartWith("703");
-            codes["credit"].Should().StartWith("643");
+            codes["debit"].Should().StartWith("704", "the VAT is a deduction from the income it was charged on");
+            codes["credit"].Should().StartWith("643", "and a liability to the budget from the moment the money arrived");
         }
 
+        // The redemption releases the advance gross (see RedemptionJournalPoster): carving the same
+        // VAT out a second time released the liability and stranded the VAT on 681 (planning #780).
+        // The event has no mapping, so a caller that reintroduces it fails loudly instead of posting
+        // a pair that nets the VAT away.
         await using var second = CreateContext();
-        var redemption = await CreateService(second).PostAsync(Req("voucher.redeemed.vat", JournalSourceType.Fulfillment, 160m));
-        var redemptionCodes = await CodesForAsync(redemption.Id);
-        redemptionCodes["debit"].Should().StartWith("643");
-        redemptionCodes["credit"].Should().StartWith("703");
+        var act = () => CreateService(second).PostAsync(
+            Req("voucher.redeemed.vat", JournalSourceType.Fulfillment, 160m));
+
+        await act.Should().ThrowAsync<LedgerUnmappedEventException>();
     }
 
     [Fact]
