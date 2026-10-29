@@ -46,7 +46,7 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         await using (var verify = CreateContext())
         {
             (await verify.JournalEntries.CountAsync(e => e.SourceId == voucherId))
-                .Should().Be(3, "the report composed cost, revenue and VAT drafts");
+                .Should().Be(2, "the report composed cost and revenue drafts; the VAT was carved out at the receipt");
             (await verify.JournalEntries
                     .Where(e => e.SourceId == voucherId)
                     .Select(e => e.Status)
