@@ -48,7 +48,27 @@ public sealed class UpgWogPriceClient : IUpgWogPriceClient
                 $"GET {url} -> HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
         }
 
+        // A 2xx with no body is not a page: on 2026-10-29 the WOG host answered 204 after a
+        // redirect and the parse failed with "the page carried neither shape", which reads like the
+        // vendor changed the markup. Say what actually arrived instead.
         var html = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(html))
+        {
+            throw new UpgWogPriceScrapeException(
+                $"GET {url} -> HTTP {(int)response.StatusCode} with an empty body");
+        }
+
+        // The page is followed through redirects by the handler, so the URL the prices came from is
+        // not necessarily the one configured. Said out loud when it differs: a vendor that moves the
+        // page is the beginning of the next outage, and this line is the one that names it.
+        var finalUrl = response.RequestMessage?.RequestUri?.ToString();
+        if (!string.IsNullOrEmpty(finalUrl) && !string.Equals(finalUrl, url, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "{Brand} price page moved: {ConfiguredUrl} answered {FinalUrl}. Update UpgWogPrice:{OptionName}.",
+                brand, url, finalUrl, brand == "wog" ? "WogEndpointUrl" : "UpgEndpointUrl");
+        }
+
         var prices = UpgWogPricePage.Parse(html);
 
         _logger.LogInformation(

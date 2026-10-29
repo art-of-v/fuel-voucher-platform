@@ -63,7 +63,10 @@ import { collapse, writePriceCsv } from "./lib/upg-wog-price-csv.mjs";
 
 const SOURCES = {
   upg: "https://upg.ua/",
-  wog: "https://www.wog.ua/ua/fuels/",
+  // The canonical host, not `www`: `www.wog.ua` only 301s here, and on 2026-10-29 that redirect is
+  // where the backend's fetch died (301 -> 204, empty body, production host only). The backend's
+  // UpgWogPriceOptions default names the same URL.
+  wog: "https://wog.ua/ua/fuels/",
 };
 
 const DEFAULT_OUT = "upg-wog-prices.csv";

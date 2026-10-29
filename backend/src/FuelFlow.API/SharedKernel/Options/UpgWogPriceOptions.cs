@@ -26,8 +26,17 @@ public sealed class UpgWogPriceOptions
     /// <summary>UPG's price page.</summary>
     public string UpgEndpointUrl { get; set; } = "https://upg.ua/";
 
-    /// <summary>WOG's price page.</summary>
-    public string WogEndpointUrl { get; set; } = "https://www.wog.ua/ua/fuels/";
+    /// <summary>
+    /// WOG's price page, on the host the site calls canonical.
+    /// </summary>
+    /// <remarks>
+    /// Not <c>www.wog.ua</c>: that host only answers <c>301</c> to the apex, so every fetch paid for
+    /// a redirect before it could read anything - and on 2026-10-29 that hop was where the sync
+    /// stopped, with the redirect target answering <c>204</c> and an empty body to the production
+    /// host while the same page answered <c>200</c> everywhere else. The canonical URL is the one
+    /// the site itself publishes, so it is the one that is least likely to change next.
+    /// </remarks>
+    public string WogEndpointUrl { get; set; } = "https://wog.ua/ua/fuels/";
 
     /// <summary>Abort the fetch after this long so a hung connection cannot occupy the job slot.</summary>
     public const int DefaultTimeoutSeconds = 30;
