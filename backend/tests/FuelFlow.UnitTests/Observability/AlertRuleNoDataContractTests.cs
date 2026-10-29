@@ -98,4 +98,25 @@ public class AlertRuleNoDataContractTests
             "a Loki rule returning no lines is reporting a healthy log, not a missing datasource; " +
             "NoData there is a notification every repeat_interval for doing nothing wrong");
     }
+
+    /// <summary>
+    /// The stale-price rule has to name the brand it is about, because the brand is the only thing
+    /// the operator can act on - four feeds share the pipeline, and "prices are stale" without a name
+    /// sends them to read four jobs' logs.
+    /// </summary>
+    [Fact]
+    public void TheStalePriceRule_NamesTheBrandAndDoesNotTreatNoDataAsHealthy()
+    {
+        RuleBlocks().Should().ContainKey("fuelflow-price-sync-stale");
+
+        var rule = RuleBlocks()["fuelflow-price-sync-stale"];
+
+        rule.Should().Contain("$labels.brand",
+            "the gauge carries one series per brand, and the notification has to say which one stopped");
+        rule.Should().Contain("noDataState: Alerting",
+            "for a freshness check, no data means the age cannot be proven - which is not a healthy " +
+            "state, and is exactly the nineteen hours of silence issue #777 exists to end");
+        rule.Should().NotContain("or vector(0)",
+            "a zero fallback would report 'fresh' whenever the gauge could not be read");
+    }
 }

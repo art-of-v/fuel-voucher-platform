@@ -136,6 +136,7 @@ public class MetricNameContractTests
         metrics.RegisterVoucherPoolGauge(() => []);
         metrics.RegisterOrderStatusGauge(() => []);
         metrics.RegisterStuckPaymentGauge(() => []);
+        metrics.RegisterPriceFreshnessGauge(() => []);
 
         return names;
     }
@@ -349,6 +350,7 @@ public class MetricNameContractTests
     [InlineData("fuelflow_vouchers_pool_available_vouchers")]
     [InlineData("fuelflow_auth_refresh_events_total")]
     [InlineData("fuelflow_payments_stuck_pending_payment")]
+    [InlineData("fuelflow_fuel_prices_last_sync_age_seconds")]
     public void AlertTargetedMetrics_KeepTheirExportedNames(string expectedName)
     {
         GetExportedMetricNames().Should().Contain(expectedName);
