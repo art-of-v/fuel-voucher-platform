@@ -45,20 +45,23 @@ export interface TextFieldProps extends Omit<
  * SMS code the app had just triggered. That prop is now passed through; use
  * `textContentType="oneTimeCode"` and `autoComplete="sms-otp"` for OTP entry.
  */
-export function TextField({
-  label,
-  helper,
-  error,
-  disabled = false,
-  required = false,
-  leading,
-  trailing,
-  codeStyle = false,
-  containerStyle,
-  onFocus,
-  onBlur,
-  ...inputProps
-}: TextFieldProps) {
+export const TextField = React.forwardRef<TextInput, TextFieldProps>(function TextField(
+  {
+    label,
+    helper,
+    error,
+    disabled = false,
+    required = false,
+    leading,
+    trailing,
+    codeStyle = false,
+    containerStyle,
+    onFocus,
+    onBlur,
+    ...inputProps
+  },
+  ref,
+) {
   const tokens = useDesignTokens();
   const c = tokens.colors;
   const [focused, setFocused] = useState(false);
@@ -96,6 +99,7 @@ export function TextField({
           : null}
 
         <TextInput
+          ref={ref}
           editable={!disabled}
           placeholderTextColor={c.text.disabled}
           onFocus={(e) => {
@@ -146,7 +150,7 @@ export function TextField({
       ) : null}
     </View>
   );
-}
+});
 
 /**
  * A field-shaped control that opens something instead of accepting typing.
