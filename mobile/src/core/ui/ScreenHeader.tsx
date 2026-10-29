@@ -7,6 +7,42 @@ import { useI18n } from '../i18n';
 import { IconButton } from './IconButton';
 import { Text } from './Text';
 
+/**
+ * How far a header control reaches past the box it draws.
+ *
+ * The header is the one row where each end has an empty corner, so a thumb that
+ * lands beside the 22pt glyph should still count: 48pt of box plus this reach is
+ * 72pt across and taller than the row, which is close to twice the area of the box
+ * alone. The reach cannot come from `hitSlop` on its own — React Native never
+ * delivers a touch past an ancestor's frame — so the slots carry it as a
+ * transparent border and take the space back with a matching negative margin: the
+ * layout does not move, only the frame a touch may land in.
+ *
+ * `left: 0` on the leading control is deliberate: iOS starts its swipe-back
+ * gesture in a strip along the leading edge and react-native-screens cancels the
+ * touch of anything under it, so the leading reach may only go inwards.
+ */
+export const HEADER_REACH = 12;
+export const HEADER_LEADING_HIT_SLOP = {
+  top: HEADER_REACH,
+  bottom: 16,
+  left: 0,
+  right: 24,
+};
+export const HEADER_TRAILING_HIT_SLOP = {
+  top: HEADER_REACH,
+  bottom: 16,
+  left: HEADER_REACH,
+  right: HEADER_REACH,
+};
+
+/** The frame a header action's touch may land in, as a style a slot must carry. */
+export const HEADER_ACTION_FRAME = {
+  borderWidth: HEADER_REACH,
+  borderColor: 'transparent',
+  margin: -HEADER_REACH,
+} as const;
+
 export interface ScreenHeaderProps {
   /** The screen's name. Sentence case — this is a title, not a label. */
   title: string;
@@ -89,11 +125,16 @@ export function ScreenHeader({
           // (`cancelTouchesInParent` in RNSScreenStack.mm — "cancel RN touch events"
           // for a Touchable "close to an edge"). A control pulled to the edge with a
           // negative margin, as this one used to be, loses exactly those taps.
-          hitSlop={{ top: 4, bottom: 4, left: 0, right: 8 }}
+          hitSlop={HEADER_LEADING_HIT_SLOP}
         />
       )}
 
-      <View style={{ flex: 1, gap: 2 }}>
+      {/*
+        Inert, and deliberately transparent to touches: the back control's reach
+        extends 24pt inwards over this block, and a plain View in front of it would
+        swallow that half of the target.
+      */}
+      <View testID="header-title" style={{ flex: 1, gap: 2 }} pointerEvents="none">
         <Text role={compact ? 'heading' : 'title'} accessibilityRole="header" numberOfLines={2}>
           {title}
         </Text>
@@ -105,7 +146,15 @@ export function ScreenHeader({
       </View>
 
       {actions ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
+        <View
+          testID="header-actions"
+          style={[
+            { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm },
+            // Grows the frame an action's `hitSlop` can reach into, without moving
+            // the action: the border pads, the margin takes the same space back.
+            HEADER_ACTION_FRAME,
+          ]}
+        >
           {actions}
         </View>
       ) : null}
