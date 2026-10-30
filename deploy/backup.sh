@@ -81,7 +81,12 @@ WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 # archive_timeout, so 4.6 GiB a day - a 14-day on-box window would be 63 GiB on a disk
 # with 21 GiB free. The size cap below is the hard guarantee; this is the policy.
 WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-3}"
-WAL_REMOTE_RETENTION_DAYS="${WAL_REMOTE_RETENTION_DAYS:-30}"
+# The OFF-BOX WAL copy is kept longer than the on-box archive, because it is the copy that
+# survives the host. It covers both shapes this script and the shipper write: the nightly
+# `fuelflow_wal_*.tar.gz.age` blob and the per-segment objects under wal/. 31 days is the
+# number docs/DEPLOYMENT.md quotes; the per-segment shipper used to carry this default
+# itself and now leaves every prune to this script (see the segment prune near the end).
+WAL_REMOTE_RETENTION_DAYS="${WAL_REMOTE_RETENTION_DAYS:-31}"
 
 # The trim's bounds, defined here so this script and deploy/prune-wal-archive.sh
 # cannot disagree about them - the same values, the same defaults, and the same
@@ -177,6 +182,8 @@ echo "[$(date -Is)] Backing up '${POSTGRES_DB}' -> ${OUT}"
 #
 # shellcheck source=pitr-common.sh
 source "$SCRIPT_DIR/pitr-common.sh"
+# shellcheck source=wal-offbox.sh
+source "$SCRIPT_DIR/wal-offbox.sh"
 
   ARCHIVER_OK=0
   WAL_SHIP_FAILED=0
@@ -383,6 +390,21 @@ if [[ -n "${BACKUP_REMOTE:-}" ]] && command -v rclone >/dev/null 2>&1 && [[ -d "
     else
       echo "WARNING: remote WAL prune failed (the copy above still succeeded)." >&2
     fi
+  fi
+
+  # The per-segment copy under wal/ is pruned HERE, once a night, and never by the
+  # per-minute shipper. That is not tidiness: a prune is a full scan of the prefix and
+  # costs about a tenth of a second per object - measured on the production box on
+  # 2026-10-29, 60-105 s for 707 objects to delete NOTHING, and several minutes when a
+  # connection stalled. The shipper's unit has a 600 s timeout, so doing it every minute
+  # failed shipments that had already reached the bucket (30+ alerts in one day). This
+  # unit has 30 minutes. It runs whatever the packaging above did, because the retention
+  # of what is already off-box does not depend on tonight's blob.
+  if wal_prune_remote "$(wal_remote_wal_dir "$BACKUP_REMOTE")" "$WAL_REMOTE_RETENTION_DAYS"; then
+    echo "[$(date -Is)] Remote segment prune done."
+  else
+    echo "WARNING: remote segment prune failed (the copies above still succeeded). Old" >&2
+    echo "         segments may accumulate until the next successful run." >&2
   fi
   rm -rf "$WAL_TMP"
 else

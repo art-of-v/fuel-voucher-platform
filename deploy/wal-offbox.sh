@@ -36,6 +36,16 @@ wal_object_is_segment() {
 # constant in the code.
 WAL_SEGMENT_SIZE="${WAL_SEGMENT_SIZE:-16777216}"
 
+# rclone waits five minutes on an idle connection by default. The shipper runs under a
+# 600-second unit timeout and a one-minute timer, so one stalled socket could burn the
+# whole budget and fail a run that a second attempt would have completed - which is
+# exactly what happened on 2026-10-29 (two runs died at 600 s with 5 s of CPU). These
+# bounds make one attempt fail in about a minute and let the next tick retry.
+#
+# They are deliberately NOT used by the restore helpers (wal_fetch_base, wal_fetch_offbox):
+# a restore has no deadline, and a slow link is not a failure there.
+WAL_RCLONE_TIMEOUT=(--contimeout 10s --timeout 60s)
+
 # Is this file a COMPLETE WAL segment?
 #
 # The archive directory is not a place where files appear atomically. PostgreSQL's
@@ -185,12 +195,27 @@ wal_ship_segment() {
     rm -f "$enc"
     return 1
   fi
-  if ! "${RCLONE:-rclone}" copyto "$enc" "$remote_dir/$name.age"; then
+  if ! "${RCLONE:-rclone}" copyto "$enc" "$remote_dir/$name.age" "${WAL_RCLONE_TIMEOUT[@]}"; then
     echo "ERROR: could not upload $name.age." >&2
     rm -f "$enc"
     return 1
   fi
   rm -f "$enc"
+}
+
+# Delete segment objects older than <days> from the remote wal/ prefix.
+#
+# This is a FULL SCAN of the prefix, and its cost is per object, not per deletion: on the
+# production box on 2026-10-29 it took 60-105 s to walk 707 objects and delete nothing
+# (the oldest segment was six days old), and several minutes when a connection stalled.
+# Running it from the per-minute shipper therefore failed runs whose shipment had already
+# succeeded - one OnFailure alert every ten minutes. At the 31 days of retention the
+# bucket is sized for (~3600 objects at the measured ~118 a day) the same scan extrapolates
+# to five minutes or more, over the shipper's 600 s budget on its own. It is a nightly job
+# (deploy/backup.sh, 30-minute unit budget), never part of the shipping path.
+wal_prune_remote() {
+  local remote_dir="$1" days="$2"
+  "${RCLONE:-rclone}" delete --min-age "${days}d" --include '*.age' "$remote_dir"
 }
 
 # The sizes of the objects in a remote directory, one "<name> <size>" pair per line.
@@ -205,7 +230,8 @@ wal_ship_segment() {
 # "the object is missing" or "the object is short".
 wal_remote_object_sizes() {
   local remote_dir="$1"
-  "${RCLONE:-rclone}" lsf "$remote_dir" --files-only --format "ps" 2>/dev/null \
+  "${RCLONE:-rclone}" lsf "$remote_dir" --files-only --format "ps" \
+    "${WAL_RCLONE_TIMEOUT[@]}" 2>/dev/null \
     | awk '{
         n = split($0, a, /[;,\t ]+/)
         if (n < 2) next

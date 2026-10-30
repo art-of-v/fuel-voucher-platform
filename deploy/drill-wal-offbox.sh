@@ -243,7 +243,7 @@ docker exec "$SRC" chmod -R a+r /var/lib/postgresql/wal
 echo "[$(date -Is)] Shipping the archive off-box ..."
 SHIP_START="$(date +%s)"
 BACKUP_REMOTE="$REMOTE" WAL_ARCHIVE_DIR="$TMP/archive" \
-  WAL_SHIP_STATE_DIR="$TMP/state" WAL_REMOTE_RETENTION_DAYS=999 ENV_FILE="$TMP/env" \
+  WAL_SHIP_STATE_DIR="$TMP/state" ENV_FILE="$TMP/env" \
   bash "$SCRIPT_DIR/ship-wal-offbox.sh"
 SHIPPED_AT="$(date +%s)"
 
