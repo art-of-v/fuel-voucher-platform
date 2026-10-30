@@ -213,6 +213,7 @@ export const uk: Record<string, string> = {
   'codes.hide': 'СХОВАТИ',
   'codes.noVouchersYet': 'Талонів ще немає',
   'codes.used': 'ВИКОРИСТАНО',
+  'codes.spentFilter': 'ВИКОРИСТАНІ',
   'codes.redeemed': 'ВИКОРИСТАНО',
   'codes.pendingReconciliation': 'ОЧІКУЄ ПІДТВЕРДЖЕННЯ',
   'codes.withdrawReport': 'Відкликати позначку',

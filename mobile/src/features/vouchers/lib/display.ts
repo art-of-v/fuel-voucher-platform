@@ -202,7 +202,9 @@ export function brandColorFor(
  * `active` is not a `VoucherStatus` the backend can store (its enum has no such value), but it is
  * kept in the set because client fixtures and older payloads used it, and reading it costs nothing.
  * What matters is the contrast: `used`, `expired`, `blocked` and `deactivated` fuel is spent, so an
- * order left holding only those has nothing to show and leaves the wallet (planning #176).
+ * order left holding only those has nothing live to show. The wallet hides it by default and
+ * reveals it - together with the spent vouchers inside every other order - when the customer
+ * switches the "used" filter on.
  *
  * A pending redemption stays on the card: the holder reported it and is waiting for the supplier's
  * evidence, so hiding it would leave them with a voucher that silently vanished from the wallet.

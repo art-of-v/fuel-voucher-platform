@@ -218,6 +218,7 @@ export const de: Record<string, string> = {
   'codes.hide': 'AUSBLENDEN',
   'codes.noVouchersYet': 'Noch keine Gutscheine',
   'codes.used': 'VERWENDET',
+  'codes.spentFilter': 'VERBRAUCHT',
   'codes.redeemed': 'EINGELÖST',
   'codes.pendingReconciliation': 'AUSSTEHEND',
   'codes.withdrawReport': 'Meldung zurückziehen',

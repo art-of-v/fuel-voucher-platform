@@ -34,7 +34,16 @@ import { useRefreshOnFocus } from '../../../core/hooks/useRefreshOnFocus';
  * selected-voucher preservation on refresh, order deletion), so folding it into
  * that hook would change behaviour. This is a faithful extraction of the screen.
  */
-export function useMyCodes() {
+export interface UseMyCodesOptions {
+  /**
+   * Show spent fuel too: standing orders whose every voucher is spent, and the spent vouchers
+   * inside every other order. Off by default - the wallet opens on what the customer can still
+   * use - and driven by the screen's filter chip.
+   */
+  includeSpent?: boolean;
+}
+
+export function useMyCodes({ includeSpent = false }: UseMyCodesOptions = {}) {
   const { t } = useI18n();
   const { isAuthenticated: hookAuth, isLoading: authLoading, user } = useAuth();
   const storeAuth = useStore((state) => state.isAuthenticated);
@@ -187,7 +196,10 @@ export function useMyCodes() {
     (o) => o.status === 'PENDING_FULFILLMENT' || o.status === 'PENDING_PAYMENT',
   );
 
-  // Live vouchers the customer currently holds, grouped under the purchase order they belong to.
+  // Every voucher the customer's orders nest, grouped under the purchase order it belongs to —
+  // spent fuel included, because the wallet's "show used" filter reads the same source. Both
+  // levels of that filter (whole orders, and vouchers inside a card) have to agree on what an
+  // order contains, so there is one map and two views of it rather than two maps that can drift.
   //
   // Built from the vouchers the sync response NESTS in each order, not from /api/vouchers/my: only
   // the nested VoucherDto carries `history` and `originOrderId`, and the wallet's whole point is the
@@ -198,8 +210,7 @@ export function useMyCodes() {
   // fuel stays one asset. That is why EVERY order is scanned, renewal orders included: a replace
   // delivers its stock voucher under the RENEWAL order's fulfillment, so scanning only purchase
   // orders would file it nowhere and the renewed fuel would vanish from the wallet (planning #180).
-  // A retired/replaced original is Expired, so it drops out of the live filter below.
-  const liveVouchersByOrder = useMemo(() => {
+  const vouchersByOrder = useMemo(() => {
     const map = new Map<string, Voucher[]>();
     // One tank of fuel is one card, so a voucher may appear once at most. An EXTEND keeps the same
     // voucher and adds a fulfillment row against the RENEWAL order, so the sync response nests it
@@ -209,7 +220,7 @@ export function useMyCodes() {
     const seen = new Set<string>();
     scopedOrders.forEach((order) => {
       (order.vouchers || []).forEach((voucher) => {
-        if (seen.has(voucher.id) || !isLiveWalletVoucher(voucher)) return;
+        if (seen.has(voucher.id)) return;
         seen.add(voucher.id);
         const key = voucher.originOrderId ?? order.id;
         const list = map.get(key);
@@ -220,15 +231,41 @@ export function useMyCodes() {
     return map;
   }, [scopedOrders]);
 
-  // Fulfilled purchase orders, each carrying its re-parented live vouchers. An order with no live
-  // voucher left (everything used up and expired) is dropped from the wallet.
+  // The purchase orders the wallet renders as receipts. Shared by the list and the filter's
+  // count, so the chip can never promise an order the list would not show.
+  const fulfilledPurchaseOrders = useMemo(
+    () =>
+      purchaseOrders.filter((o) => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED'),
+    [purchaseOrders],
+  );
+
+  // How many receipts are fully spent — every voucher in them is used, lapsed, blocked or
+  // deactivated. They are hidden by default; this is what the filter chip counts. An order that
+  // nests no voucher at all is not "spent", it is simply not a wallet card.
+  const spentOrderCount = useMemo(
+    () =>
+      fulfilledPurchaseOrders.filter((order) => {
+        const all = vouchersByOrder.get(order.id) ?? [];
+        return all.length > 0 && !all.some(isLiveWalletVoucher);
+      }).length,
+    [fulfilledPurchaseOrders, vouchersByOrder],
+  );
+
+  // Fulfilled purchase orders, each carrying the vouchers the wallet shows for it: only the live
+  // ones, or — when the spent filter is on — all of them, live first so the fuel still in hand
+  // stays on top of a mixed card. An order left with nothing to show is dropped from the list.
   const fulfilledOrders = useMemo(
     () =>
-      purchaseOrders
-        .filter((o) => o.status === 'FULFILLED' || o.status === 'PARTIALLY_REFUNDED')
-        .map((o) => ({ ...o, vouchers: liveVouchersByOrder.get(o.id) ?? [] }))
-        .filter((o) => o.vouchers.length > 0),
-    [purchaseOrders, liveVouchersByOrder],
+      fulfilledPurchaseOrders
+        .map((order) => {
+          const all = vouchersByOrder.get(order.id) ?? [];
+          const vouchers = includeSpent
+            ? [...all.filter(isLiveWalletVoucher), ...all.filter((v) => !isLiveWalletVoucher(v))]
+            : all.filter(isLiveWalletVoucher);
+          return { ...order, vouchers };
+        })
+        .filter((order) => order.vouchers.length > 0),
+    [fulfilledPurchaseOrders, vouchersByOrder, includeSpent],
   );
 
   // Fuel the company handed over, split into the receipts it arrived in plus anything that
@@ -271,6 +308,7 @@ export function useMyCodes() {
     // derived: orders containing vouchers (renewals are folded into voucher History)
     pendingOrders,
     fulfilledOrders,
+    spentOrderCount,
     issuanceOrders: receipts,
     issuanceVouchers: vouchersInReceipts,
     looseIssuanceVouchers: loose,
