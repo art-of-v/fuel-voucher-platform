@@ -214,6 +214,8 @@ export const uk: Record<string, string> = {
   'codes.noVouchersYet': 'Талонів ще немає',
   'codes.used': 'ВИКОРИСТАНО',
   'codes.spentFilter': 'ВИКОРИСТАНІ',
+  'codes.emptySpentTitle': 'УСІ ТАЛОНИ ВИКОРИСТАНІ',
+  'codes.emptySpentSubtitle': 'Увімкніть «ВИКОРИСТАНІ», щоб побачити історію замовлень',
   'codes.redeemed': 'ВИКОРИСТАНО',
   'codes.pendingReconciliation': 'ОЧІКУЄ ПІДТВЕРДЖЕННЯ',
   'codes.withdrawReport': 'Відкликати позначку',

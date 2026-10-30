@@ -1,23 +1,24 @@
 import { View, Text } from 'react-native';
-import type { Order } from '../../../core/types/api';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
 
 type WalletSummaryBarProps = {
-  orders: Order[];
-  fulfilledOrders: Order[];
-  pendingOrders: Order[];
+  /** Every order in this context, filtered or not: the customer counts their purchases here. */
+  ordersCount: number;
+  /** Fulfilled receipts, counted before the spent filter hides the fully spent ones. */
+  fulfilledCount: number;
+  pendingCount: number;
 };
 
 /**
  * The three counts across the top of the wallet: all orders, fulfilled, pending.
- * Purely presentational — it takes the lists because that is what the screen already
- * has, and reads only their lengths.
+ * Purely presentational - it takes numbers rather than the lists, because the screen has to
+ * count before it filters and the bar must not disagree with the account.
  */
 export function WalletSummaryBar({
-  orders,
-  fulfilledOrders,
-  pendingOrders,
+  ordersCount,
+  fulfilledCount,
+  pendingCount,
 }: WalletSummaryBarProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
@@ -42,7 +43,7 @@ export function WalletSummaryBar({
             textAlign: 'center',
           }}
         >
-          {orders.length}
+          {ordersCount}
         </Text>
         <Text
           allowFontScaling={false}
@@ -75,7 +76,7 @@ export function WalletSummaryBar({
             textAlign: 'center',
           }}
         >
-          {fulfilledOrders.length}
+          {fulfilledCount}
         </Text>
         <Text
           allowFontScaling={false}
@@ -103,7 +104,7 @@ export function WalletSummaryBar({
             textAlign: 'center',
           }}
         >
-          {pendingOrders.length}
+          {pendingCount}
         </Text>
         <Text
           allowFontScaling={false}

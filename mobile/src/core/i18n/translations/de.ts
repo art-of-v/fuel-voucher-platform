@@ -219,6 +219,8 @@ export const de: Record<string, string> = {
   'codes.noVouchersYet': 'Noch keine Gutscheine',
   'codes.used': 'VERWENDET',
   'codes.spentFilter': 'VERBRAUCHT',
+  'codes.emptySpentTitle': 'ALLE CODES SIND VERBRAUCHT',
+  'codes.emptySpentSubtitle': 'Aktivieren Sie „VERBRAUCHT“, um den Verlauf zu sehen',
   'codes.redeemed': 'EINGELÖST',
   'codes.pendingReconciliation': 'AUSSTEHEND',
   'codes.withdrawReport': 'Meldung zurückziehen',

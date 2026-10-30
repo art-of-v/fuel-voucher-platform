@@ -159,11 +159,27 @@ jest.mock('../src/features/vouchers/components/OrderCard', () => {
   };
 });
 
-jest.mock('../src/features/vouchers/components', () => ({
-  VoucherCard: () => null,
-  WalletSummaryBar: () => null,
-  VoucherListControlsBar: () => null,
-}));
+// The bar is presentational, but WHICH numbers the screen hands it is the screen's decision:
+// the counts must survive the spent filter, so they are rendered here as text to assert on.
+jest.mock('../src/features/vouchers/components', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Text } = require('react-native');
+  return {
+    VoucherCard: () => null,
+    WalletSummaryBar: (props: {
+      ordersCount: number;
+      fulfilledCount: number;
+      pendingCount: number;
+    }) => (
+      <>
+        <Text testID="summary-orders">{String(props.ordersCount)}</Text>
+        <Text testID="summary-fulfilled">{String(props.fulfilledCount)}</Text>
+        <Text testID="summary-pending">{String(props.pendingCount)}</Text>
+      </>
+    ),
+    VoucherListControlsBar: () => null,
+  };
+});
 
 jest.mock('../src/features/company/components', () => ({
   WorkerFuelHeader: () => null,
@@ -508,6 +524,37 @@ describe('MyCodesScreen', () => {
       renderScreen({ fulfilledOrders: [], spentOrderCount: 2 });
 
       expect(screen.getByTestId('spent-orders-toggle')).toBeTruthy();
+    });
+
+    it('does not call a wallet whose receipts are all spent empty', () => {
+      // The orders and their vouchers exist; the default view hides them. Saying "no codes found"
+      // reads as "you never bought fuel", and the customer has no way to tell otherwise.
+      renderScreen({
+        orders: [order('spent-1', 'FULFILLED'), order('spent-2', 'FULFILLED')],
+        fulfilledOrders: [],
+        spentOrderCount: 2,
+      });
+
+      expect(screen.getByText('codes.emptySpentSubtitle')).toBeTruthy();
+      expect(screen.queryByText('codes.purchaseFuel')).toBeNull();
+      // The counts are the proof that the wallet is filtered rather than empty.
+      expect(screen.getByTestId('summary-orders')).toHaveTextContent('2');
+      expect(screen.getByTestId('summary-fulfilled')).toHaveTextContent('2');
+    });
+
+    it('keeps the ordinary empty state when nothing has been spent', () => {
+      renderScreen({ orders: [], fulfilledOrders: [], spentOrderCount: 0 });
+
+      expect(screen.getByText('codes.purchaseFuel')).toBeTruthy();
+      expect(screen.queryByTestId('summary-orders')).toBeNull();
+    });
+
+    it('counts a fully spent receipt in the summary while the list hides it', () => {
+      // Filtering the list must not shrink the account: two fulfilled receipts, one live and one
+      // spent, are still two - otherwise the bar contradicts the customer's own history.
+      renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')], spentOrderCount: 1 });
+
+      expect(screen.getByTestId('summary-fulfilled')).toHaveTextContent('2');
     });
   });
 
