@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Logging;
@@ -21,24 +22,33 @@ namespace FuelFlow.SharedKernel.Observability;
 public sealed class NotificationDispatcher
 {
     /// <summary>
-    /// Last send time per throttle key. Static and process-local: a restart
-    /// intentionally re-arms everything, and losing the history is harmless because
-    /// the worst case is one extra message.
+    /// The throttle keys' namespace in the shared cache, kept apart from the auth challenges that
+    /// live in the same store.
+    /// </summary>
+    private const string ThrottleKeyPrefix = "alert-throttle:";
+
+    /// <summary>
+    /// Fallback when the shared store is unreachable, absent (JobsWorker, tests) or failing.
+    /// Process-local, so it starts empty on every start - which is exactly why it is no longer the
+    /// only throttle: with nothing else, every redeploy repeated every alert that was still open.
     /// </summary>
     private static readonly ConcurrentDictionary<string, DateTime> LastSentUtc = new();
 
     private readonly IAlertNotifier _alerts;
     private readonly TelegramOptions.NotificationOptions _config;
     private readonly ILogger<NotificationDispatcher> _logger;
+    private readonly ICacheService? _throttles;
 
     public NotificationDispatcher(
         IAlertNotifier alerts,
         IOptions<TelegramOptions> telegram,
-        ILogger<NotificationDispatcher> logger)
+        ILogger<NotificationDispatcher> logger,
+        ICacheService? throttles = null)
     {
         _alerts = alerts;
         _config = telegram.Value.Notifications;
         _logger = logger;
+        _throttles = throttles;
     }
 
     /// <summary>
@@ -412,7 +422,8 @@ public sealed class NotificationDispatcher
             return;
         }
 
-        if (throttleKey is not null && throttleMinutes > 0 && !TryClaimSlot(throttleKey, throttleMinutes))
+        if (throttleKey is not null && throttleMinutes > 0
+            && !await TryClaimSlotAsync(throttleKey, throttleMinutes, ct))
         {
             return;
         }
@@ -430,10 +441,34 @@ public sealed class NotificationDispatcher
         }
     }
 
-    private static bool TryClaimSlot(string key, int throttleMinutes)
+    /// <summary>
+    /// Claims the key for the interval, shared across every process and every restart when the
+    /// cache is available. When it is not, the claim falls back to the in-process dictionary: an
+    /// unreachable cache must cost a repeated alert at worst, never a missed one.
+    /// </summary>
+    private async Task<bool> TryClaimSlotAsync(string key, int throttleMinutes, CancellationToken ct)
+    {
+        var interval = TimeSpan.FromMinutes(throttleMinutes);
+
+        if (_throttles is not null)
+        {
+            try
+            {
+                return await _throttles.TrySetIfAbsentAsync(
+                    ThrottleKeyPrefix + key, "1", interval, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Alert throttle store unavailable; using the in-process throttle");
+            }
+        }
+
+        return TryClaimSlotInMemory(key, interval);
+    }
+
+    private static bool TryClaimSlotInMemory(string key, TimeSpan interval)
     {
         var now = SystemClock.UtcNow;
-        var interval = TimeSpan.FromMinutes(throttleMinutes);
         var claimed = false;
 
         // Whether the slot was claimed is decided by the branch that writes, NOT by comparing the

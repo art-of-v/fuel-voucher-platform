@@ -54,4 +54,29 @@ public sealed class RedisCacheService : ICacheService
         await _cache.RemoveAsync(key, ct);
         return value;
     }
+
+    public async Task<bool> TrySetIfAbsentAsync(
+        string key,
+        string value,
+        TimeSpan expiry,
+        CancellationToken ct = default)
+    {
+        if (_redis is not null)
+        {
+            // SET ... EX ttl NX is one command, so two callers cannot both claim the slot.
+            return await _redis.GetDatabase().StringSetAsync(key, value, expiry, When.NotExists);
+        }
+
+        // Without the multiplexer the claim is best-effort - the same trade GetAndDeleteAsync makes
+        // above rather than throwing a NullReference from a throttle.
+        if (await _cache.GetStringAsync(key, ct) is not null)
+            return false;
+
+        await _cache.SetStringAsync(key, value, new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = expiry
+        }, ct);
+
+        return true;
+    }
 }
