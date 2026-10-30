@@ -297,6 +297,92 @@ check_placeholder_secrets() {
 }
 
 # ------------------------------------------------------------------------------
+# A guardrail switch on the box must be the one the repository ships.
+#
+# A git deploy does not touch the droplet's env file: it is gitignored and lives only
+# on the box, so nothing ever compared it with the checked-in example. That is #746:
+# ATTESTATION_ENABLED was false in production while the template, the compose file and
+# the docs all said true. The API measured nothing for days, no test failed, and the
+# only way anybody found out was a campaign that expected a log line and did not get
+# one. Any live-only switch can drift that way - the failure is silent by construction.
+#
+# The keys below are the ones where a different value on the box is a decision rather
+# than a configuration: the guardrails. Secrets and host-specific values (passwords,
+# URLs, the QR cipher key) are deliberately NOT here - they are meant to differ, and a
+# check that fires on them is a check the operator learns to ignore.
+#
+# A deliberate divergence is allowed, but it has to be written down in the file it is
+# about: ENV_DRIFT_ACKNOWLEDGED="KEY1 KEY2" in the live file turns those keys'
+# mismatches into a warning that names them on every restart. The acknowledgement and
+# the diverging value are then one edit, and both are in the same diff.
+#
+# A key that is ABSENT from the box file is not a divergence: the compose file defaults
+# every one of these (${ATTESTATION_ENABLED:-true}), and the defaults equal the example,
+# so the container runs what the repository ships. Failing on absence would block a box
+# whose runtime is correct, which is how a check earns the right to be ignored. It warns
+# instead - the file no longer records what the container runs with.
+#
+# Compared with <file>.example - which is exactly what the checked-in templates are
+# named (.env.production.example sits beside .env.production), so the same rule covers
+# the two box files and an extra --env-file a CI run stands in with.
+# ------------------------------------------------------------------------------
+GUARDED_SWITCHES=(
+  ATTESTATION_ENABLED
+  ATTESTATION_MODE
+  ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION
+  VOUCHER_EXPIRATION_ENABLED
+)
+
+# shellcheck disable=SC2317 # every call is from the env section below
+check_switches_match_example() {
+  local file="$1" example="$1.example"
+  local key expected actual acknowledged compared=0 problems=()
+
+  [[ -f "$file" ]] || return 0
+  if [[ ! -f "$example" ]]; then
+    warn "$file: no $example beside it, so the guardrail switches were not compared with the repository"
+    return 0
+  fi
+
+  acknowledged=" $(grep -E '^ENV_DRIFT_ACKNOWLEDGED=' "$file" | head -1 | cut -d= -f2- | tr -d '\r"' || true) "
+
+  for key in "${GUARDED_SWITCHES[@]}"; do
+    expected="$(grep -E "^${key}=" "$example" | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+    # A tier's example does not have to ship every switch - staging has no attestation -
+    # and a blank value in the example is an empty slot, not an expectation.
+    if [[ -z "$expected" ]]; then
+      continue
+    fi
+
+    if ! grep -qE "^${key}=" "$file"; then
+      warn "$file: $key is not set at all, so the container takes the compose default (the example ships '$expected'). Add the line so the box records what it runs with."
+      continue
+    fi
+
+    actual="$(grep -E "^${key}=" "$file" | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+    compared=$((compared + 1))
+    if [[ "$actual" == "$expected" ]]; then
+      continue
+    fi
+
+    if [[ "$acknowledged" == *" $key "* ]]; then
+      warn "$file: $key is '$actual' here and '$expected' in $example - acknowledged by ENV_DRIFT_ACKNOWLEDGED"
+    else
+      problems+=("$key is '$actual' here and '$expected' in $example")
+    fi
+  done
+
+  if [[ ${#problems[@]} -gt 0 ]]; then
+    fail "$file disagrees with $example on a guardrail switch:
+$(printf '    - %s\n' "${problems[@]}")  A git deploy never updates this file, so the box keeps the old value until somebody sets it - and whatever the switch guards stays off while the repository, the compose file and the docs all say on. Set the key(s) in $file to the example's value, or record the difference as ENV_DRIFT_ACKNOWLEDGED=\"KEY\" in the same file if it is deliberate. Nothing has been restarted."
+  fi
+
+  if [[ "$compared" -gt 0 ]]; then
+    echo "  $file: the guardrail switches match $example ($compared compared)"
+  fi
+}
+
+# ------------------------------------------------------------------------------
 # The two environments must not share the voucher QR cipher key.
 #
 # The key encrypts the redeemable QR payload of every voucher at rest, and it is
@@ -456,10 +542,14 @@ if [[ "$NO_DEFAULTS" -eq 0 ]]; then
   # The four secrets the templates ship must not have survived into the deployed files.
   check_placeholder_secrets .env.production .env.production.example .env.staging.example
   check_placeholder_secrets .env.staging .env.production.example .env.staging.example
+  # The guardrail switches must be the ones the repository ships (#746, #753).
+  check_switches_match_example .env.production
+  check_switches_match_example .env.staging
 fi
 for extra in ${EXTRA_ENV_FILES+"${EXTRA_ENV_FILES[@]}"}; do
   check_env_file "$extra" optional
   check_placeholder_secrets "$extra" .env.production.example .env.staging.example
+  check_switches_match_example "$extra"
 done
 
 # One credential check, on the one file caddy actually reads it from. The check
