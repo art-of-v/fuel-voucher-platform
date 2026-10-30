@@ -83,8 +83,15 @@ public class MetricsJobFilterTests
                     listener.EnableMeasurementEvents(instrument);
             };
 
+            // The meter name is process-wide, so a listener that records every instrument also hears
+            // the business counters other test classes emit while this one runs in parallel - which
+            // is how a "jobs.failed" assertion once saw an order metric. This test is about the job
+            // counters, so it captures only those.
             _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
-                _measurements.Add((instrument.Name, value, tags.ToArray())));
+            {
+                if (instrument.Name.StartsWith("fuelflow.jobs.", StringComparison.Ordinal))
+                    _measurements.Add((instrument.Name, value, tags.ToArray()));
+            });
 
             _listener.Start();
         }
