@@ -362,31 +362,35 @@ try
             service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
             "5 3 * * 1");
 
-        // The same cadence for UPG and WOG, which publish a page rather than an API. Their importer
-        // creates a grade it has not seen before - with its sizes - and records the price, so a fuel
-        // we did not carry appears on the shelf at the vendor's price, marked unavailable until an
-        // operator costs it. A failed fetch writes nothing: the last known prices stand.
-        schedule.Add<UpgWogPriceSyncService>(
-            "sync-upgwog-pump-prices",
+        // The same cadence for UPG, which publishes a page rather than an API. Its importer creates
+        // a grade it has not seen before - with its sizes - and records the price, so a fuel we did
+        // not carry appears on the shelf at the vendor's price, marked unavailable until an operator
+        // costs it. A failed fetch writes nothing: the last known prices stand.
+        //
+        // WOG is not here: wog.ua answers this host with an empty 204 since 2026-10-29, so WOG is
+        // priced from Minfin's table below, beside KLO.
+        schedule.Add<UpgPriceSyncService>(
+            "sync-upg-pump-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
 
-        // The same split for the two vendors that publish a page: prices every fifteen minutes, the
-        // question "do they sell something we do not" once a week.
-        schedule.Add<UpgWogPriceSyncService>(
-            "sync-upgwog-catalogue",
+        // The same split for the vendor that publishes a page: prices every fifteen minutes, the
+        // question "does it sell something we do not" once a week.
+        schedule.Add<UpgPriceSyncService>(
+            "sync-upg-catalogue",
             service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
             "11 3 * * 1");
 
-        // KLO publishes no prices of its own, so Minfin's table is the source: what the network
-        // charges, every fifteen minutes, and the grades we do not carry, once a week.
-        schedule.Add<KloPriceSyncService>(
-            "sync-klo-prices",
+        // KLO publishes no prices of its own and WOG's page is unreadable from here, so Minfin's
+        // table is the source for both: what each network charges, every fifteen minutes, and the
+        // grades we do not carry, once a week.
+        schedule.Add<MinfinPriceSyncService>(
+            "sync-minfin-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
 
-        schedule.Add<KloPriceSyncService>(
-            "sync-klo-catalogue",
+        schedule.Add<MinfinPriceSyncService>(
+            "sync-minfin-catalogue",
             service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
             "23 3 * * 1");
 

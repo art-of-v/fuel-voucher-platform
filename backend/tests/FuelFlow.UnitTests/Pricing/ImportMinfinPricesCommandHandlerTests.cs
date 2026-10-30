@@ -1,6 +1,6 @@
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing;
-using FuelFlow.Features.Pricing.ImportKloPrices;
+using FuelFlow.Features.Pricing.ImportMinfinPrices;
 using FuelFlow.Features.Pricing.ScrapeMinfinPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -13,13 +13,22 @@ using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Pricing;
 
 /// <summary>
-/// The KLO price import: Minfin's table, matched against a catalogue an operator built by hand.
+/// The Minfin price import: the table's row for a network, matched against our catalogue of it.
 /// </summary>
-public sealed class ImportKloPricesCommandHandlerTests : IDisposable
+/// <remarks>
+/// Two networks, two matching rules. KLO's catalogue is named after the columns, so an operator's
+/// fuel and Minfin's column are compared by the grade they speak of. WOG names a grade in its own
+/// words, so the correspondence is written out in <see cref="ScrapeMinfinPrices.MinfinNetwork"/> and
+/// the tests below pin it against the names production actually holds.
+/// </remarks>
+public sealed class ImportMinfinPricesCommandHandlerTests : IDisposable
 {
+    private const string Klo = "klo";
+    private const string Wog = "wog";
+
     private readonly ApplicationDbContext _context;
 
-    public ImportKloPricesCommandHandlerTests()
+    public ImportMinfinPricesCommandHandlerTests()
     {
         _context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -33,7 +42,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         _context.Dispose();
     }
 
-    private ImportKloPricesCommandHandler Handler()
+    private ImportMinfinPricesCommandHandler Handler()
         => new(_context, new PriceHistoryRecorder(_context), new BrandSlugResolver(_context));
 
     /// <summary>The sheet, as Minfin publishes it for KLO on 2026-10-19.</summary>
@@ -46,14 +55,41 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         new("Газ", 50.90m),
     ];
 
+    /// <summary>The WOG row, as Minfin published it on 2026-10-30: five columns, A-92 empty.</summary>
+    private static readonly MinfinFuelPrice[] WogSheet =
+    [
+        new("А 95+", 95.90m),
+        new("А 95", 92.90m),
+        new("ДП", 106.90m),
+        new("Газ", 58.90m),
+    ];
+
+    /// <summary>
+    /// WOG's catalogue as production holds it, with the prices its own page last wrote and the codes
+    /// that page gave it.
+    /// </summary>
+    private static readonly (string Name, decimal Price)[] WogCatalogue =
+    [
+        ("95 Євро5-Е10", 92.90m),
+        ("95 Mustang Євро5-Е10", 95.90m),
+        ("100 Mustang Євро5-Е0", 102.90m),
+        ("ДП Євро5", 106.90m),
+        ("ДП Mustang+", 109.90m),
+        ("ГАЗ", 58.90m),
+        ("AdBlue", 61.90m),
+    ];
+
     private async Task SeedBrandAsync()
+        => await SeedBrandAsync(BrandIds.Klo, Klo);
+
+    private async Task SeedBrandAsync(Guid brandId, string slug)
     {
         _context.Brands.Add(new Brand
         {
-            Id = BrandIds.Klo,
-            Slug = "klo",
-            Name = "klo",
-            LogoText = "klo",
+            Id = brandId,
+            Slug = slug,
+            Name = slug,
+            LogoText = slug,
             Color = "#000",
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
@@ -92,7 +128,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedOperatorFuelsAsync("А95", "Газ");
 
         var result = await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         var a95 = await _context.FuelTypes.SingleAsync(f => f.Name == "А95");
@@ -118,7 +154,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedOperatorFuelsAsync("А-95", "ДП", "Газ");
 
         await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         var a95 = await _context.FuelTypes.SingleAsync(f => f.Name == "А-95");
@@ -136,7 +172,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedOperatorFuelsAsync("А95");
 
         var result = await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         result.Created.Should().HaveCount(4);
@@ -154,7 +190,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedOperatorFuelsAsync("А95");
 
         await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         (await _context.FuelTypes.CountAsync()).Should().Be(1);
@@ -178,7 +214,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         _context.ChangeTracker.Clear();
 
         await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         // Minfin knows what the driver pays and nothing about what we pay.
@@ -194,7 +230,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedOperatorFuelsAsync("А95");
 
         var act = async () => await Handler().HandleAsync(
-            new ImportKloPricesCommand([], DryRun: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, [], DryRun: false), Guid.Empty, "test");
 
         await act.Should().ThrowAsync<InvalidOperationException>(
             "an empty sheet is a page that failed to load, not a network that stopped selling fuel");
@@ -219,7 +255,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SetPumpPricesAsync(("ДП", 104.40m));
 
         await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         var diesel = await _context.FuelTypes.SingleAsync(f => f.Name == "ДП");
@@ -239,7 +275,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         // The next tick, over the same sheet. Nothing moved, so nothing is appended - but the run
         // still stamps, because "the source still lists this fuel" is a fact worth keeping.
         await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: false, CreateMissing: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         (await _context.FuelPriceHistory.CountAsync()).Should().Be(5,
@@ -253,11 +289,119 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedOperatorFuelsAsync("А 95+", "А 95", "А 92", "ДП", "Газ");
 
         await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: true, CreateMissing: false), Guid.Empty, "test");
+            new ImportMinfinPricesCommand(Klo, Sheet, DryRun: true, CreateMissing: false), Guid.Empty, "test");
         _context.ChangeTracker.Clear();
 
         (await _context.FuelPriceHistory.CountAsync()).Should().Be(0);
         (await _context.FuelTypes.Where(f => f.PriceUpdatedAt != null).CountAsync()).Should().Be(0);
+    }
+
+    /// <summary>
+    /// WOG's catalogue as production holds it, with the prices its own page last wrote and the codes
+    /// that page gave it.
+    /// </summary>
+    private async Task SeedWogCatalogueAsync()
+    {
+        foreach (var (name, price) in WogCatalogue)
+        {
+            _context.FuelTypes.Add(new FuelTypeEntity
+            {
+                Id = Guid.CreateVersion7(),
+                BrandId = BrandIds.Wog,
+                Name = name,
+                BrandFuelCode = name,
+                PumpPricePerLiter = price,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            });
+        }
+
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+    }
+
+    /// <summary>
+    /// WOG is matched through its own vocabulary: the column says "А 95+" and the shelf says
+    /// "95 Mustang Євро5-Е10", and the correspondence is written out rather than folded.
+    /// </summary>
+    [Fact]
+    public async Task Wog_grades_are_matched_through_the_brands_own_words()
+    {
+        await SeedBrandAsync(BrandIds.Wog, Wog);
+        await SeedWogCatalogueAsync();
+        await SetPumpPricesAsync(("ДП Євро5", 105.00m));
+
+        var result = await Handler().HandleAsync(
+            new ImportMinfinPricesCommand(Wog, WogSheet, DryRun: false, CreateMissing: false),
+            Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        var fuels = await _context.FuelTypes.Where(f => f.BrandId == BrandIds.Wog).ToListAsync();
+        fuels.Single(f => f.Name == "95 Mustang Євро5-Е10").PumpPricePerLiter.Should().Be(95.90m,
+            "Minfin's 'А 95+' is WOG's premium 95, and the two agreed on the figure on 2026-10-30");
+        fuels.Single(f => f.Name == "95 Євро5-Е10").PumpPricePerLiter.Should().Be(92.90m);
+        fuels.Single(f => f.Name == "ДП Євро5").PumpPricePerLiter.Should().Be(106.90m);
+        fuels.Single(f => f.Name == "ГАЗ").PumpPricePerLiter.Should().Be(58.90m);
+
+        // No column for these three, so nothing to write: they keep what WOG's page last said, and
+        // the import says which they are instead of leaving the freeze unsaid.
+        fuels.Single(f => f.Name == "100 Mustang Євро5-Е0").PumpPricePerLiter.Should().Be(102.90m);
+        fuels.Single(f => f.Name == "ДП Mustang+").PumpPricePerLiter.Should().Be(109.90m);
+        fuels.Single(f => f.Name == "AdBlue").PumpPricePerLiter.Should().Be(61.90m);
+        result.GradesNotListed.Should().BeEquivalentTo(
+            ["100 Mustang Євро5-Е0", "ДП Mustang+", "AdBlue"]);
+
+        result.Repriced.Single(r => r.Name == "ДП Євро5").Changed.Should().BeTrue();
+        fuels.Should().HaveCount(7, "Minfin prices the shelf; it does not add a row to it");
+        fuels.Single(f => f.Name == "95 Євро5-Е10").BrandFuelCode.Should().Be("95 Євро5-Е10",
+            "the column is not WOG's code for the grade, so it must not become one");
+    }
+
+    [Fact]
+    public async Task A_wog_column_with_no_counterpart_is_reported_rather_than_written()
+    {
+        await SeedBrandAsync(BrandIds.Wog, Wog);
+        await SeedWogCatalogueAsync();
+
+        var result = await Handler().HandleAsync(
+            new ImportMinfinPricesCommand(
+                Wog, [.. WogSheet, new MinfinFuelPrice("А 92", 86.50m)], DryRun: false, CreateMissing: false),
+            Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        // WOG does not sell A-92 today, and the cell is empty; should the column fill in one day, a
+        // fuel named after it would be a shelf row invented by a table.
+        result.GradesNotMapped.Should().BeEquivalentTo(["А 92"]);
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Wog)).Should().Be(7);
+        (await _context.FuelTypes.AnyAsync(f => f.PumpPricePerLiter == 86.50m)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_wog_grade_is_never_created_from_a_column_name()
+    {
+        await SeedBrandAsync(BrandIds.Wog, Wog);
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = Guid.CreateVersion7(),
+            BrandId = BrandIds.Wog,
+            Name = "95 Євро5-Е10",
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
+        });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        var result = await Handler().HandleAsync(
+            new ImportMinfinPricesCommand(Wog, WogSheet, DryRun: false, CreateMissing: true),
+            Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        // Even on the pass that is allowed to grow a catalogue: "А 95+" is Minfin's word, and a WOG
+        // fuel created under it would be a grade the brand does not sell under that name.
+        result.Created.Should().BeEmpty();
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Wog)).Should().Be(1);
+        (await _context.FuelTypes.SingleAsync()).BrandFuelCode.Should().BeNull(
+            "a fuel with no code keeps none: WOG's codes carry the brand's wording, not the column's");
     }
 
     private async Task SetPumpPricesAsync(params (string Name, decimal Price)[] prices)

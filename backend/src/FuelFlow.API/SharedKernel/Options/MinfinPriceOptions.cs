@@ -5,10 +5,13 @@ namespace FuelFlow.SharedKernel.Options;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Minfin publishes the average retail price of every fuel network, and it is the only price source
-/// for KLO - a network that publishes none of its own. The grades it lists are the generic ones
-/// ("А 95", "ДП", "Газ"), which is how an operator names a KLO fuel too, so a grade read from here
-/// matches a fuel in the catalogue without a second table of correspondences.
+/// Minfin publishes the average retail price of every fuel network. It is the price source for two
+/// of ours: KLO, which publishes none of its own, and WOG, whose page answers this host with an
+/// empty <c>204</c> (2026-10-29). The grades it lists are the generic ones ("А 95+", "А 95", "А 92",
+/// "ДП", "Газ"), which is how an operator names a KLO fuel too, so a KLO grade read from here
+/// matches a fuel in the catalogue without a second table of correspondences. WOG names its grades
+/// its own way, and <c>MinfinNetwork</c> is where those five columns are written down against the
+/// fuels they price.
 /// </para>
 /// <para>
 /// Off by default, like the other fetches: a fresh deployment must not start writing prices before

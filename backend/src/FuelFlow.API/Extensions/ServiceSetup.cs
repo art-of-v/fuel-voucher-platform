@@ -7,7 +7,7 @@ using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Features.Pricing.ScrapeUpgWogPrices;
 using FuelFlow.Features.Pricing.ScrapeMinfinPrices;
-using FuelFlow.Features.Pricing.ImportKloPrices;
+using FuelFlow.Features.Pricing.ImportMinfinPrices;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminLogin;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUserOptions;
@@ -575,11 +575,12 @@ var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
         services.AddScoped<HangfireHistoryCleanupService>();
         services.AddScoped<RuntimeSettingsService>();
         services.AddScoped<OkkoPriceSyncService>();
-        // The same job for the two vendors that publish a page rather than an API.
-        services.AddScoped<UpgWogPriceSyncService>();
-        // The vendor that publishes no prices: this one learns which grades exist.
-        services.AddScoped<KloPriceSyncService>();
-        services.AddScoped<ImportKloPricesCommandHandler>();
+        // The same job for the vendor that publishes a page rather than an API.
+        services.AddScoped<UpgPriceSyncService>();
+        // The networks whose prices are read from Minfin's table: KLO publishes none, and WOG's own
+        // page cannot be read from this host.
+        services.AddScoped<MinfinPriceSyncService>();
+        services.AddScoped<ImportMinfinPricesCommandHandler>();
         // The catalogue half of the same fetch: creates the fuels OKKO sells that we do not carry yet,
         // and nothing else. Registered beside the sync because it is only ever called by it.
         services.AddScoped<ImportOkkoCatalogueCommandHandler>();

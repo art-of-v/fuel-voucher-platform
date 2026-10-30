@@ -39,6 +39,6 @@ public sealed class AdminSyncCatalogueControllerTests
             .ToList();
 
         enqueued.Should().BeEquivalentTo(
-            [typeof(OkkoPriceSyncService), typeof(UpgWogPriceSyncService), typeof(KloPriceSyncService)]);
+            [typeof(OkkoPriceSyncService), typeof(UpgPriceSyncService), typeof(MinfinPriceSyncService)]);
     }
 }

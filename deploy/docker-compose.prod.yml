@@ -342,14 +342,15 @@ services:
       OkkoPrice__EndpointUrl: ${OKKO_PRICE_ENDPOINT:-https://www.okko.ua/api/uk/fuels}
       OkkoPrice__TimeoutSeconds: ${OKKO_PRICE_TIMEOUT_SECONDS:-30}
 
-      # UPG and WOG publish their price list as a page, not an API, so the sheet is read by the
-      # backend itself - the same job, the same cadence, and the same failure policy: a page that
-      # cannot be read leaves the last known prices alone. The catalogue half of these jobs runs
-      # weekly, so a new grade appears on the week, not the quarter.
+      # UPG publishes its price list as a page, not an API, so the sheet is read by the backend
+      # itself - the same failure policy as the other vendors: a page that cannot be read leaves the
+      # last known prices alone. The catalogue half of the job runs weekly, so a new grade appears on
+      # the week, not the quarter.
       #
-      # WOG answers the production address with 204 and an empty body (2026-10-29), so WOG's
-      # endpoint may point at the relay in deploy/cloudflare/wog-relay instead of wog.ua. Both
-      # serve the same page; only the address the request leaves from differs.
+      # WOG is NOT read here since 2026-10-30: wog.ua answers this host with 204 and an empty body
+      # whatever the path or the client (measured 2026-10-29), and a relay on a foreign address is
+      # refused too. WOG is priced from Minfin's table instead - see MinfinPrice below. The WOG
+      # endpoint stays for the manual import and for the day the block is lifted.
       UpgWogPrice__Enabled: ${UPGWOG_PRICE_ENABLED:-false}
       UpgWogPrice__UpgEndpointUrl: ${UPGWOG_PRICE_UPG_ENDPOINT:-https://upg.ua/}
       UpgWogPrice__WogEndpointUrl: ${UPGWOG_PRICE_WOG_ENDPOINT:-https://wog.ua/ua/fuels/}
@@ -359,6 +360,11 @@ services:
       # so Minfin's table is the source: the average retail price of every network, KLO included.
       # Its five grades are the five our KLO catalogue holds, so a grade read from here matches a
       # fuel without a second table of correspondences.
+      #
+      # WOG is here for the same reason, with one difference: WOG names a grade in its own words
+      # ("95 Mustang Євро5-Е10"), so the five columns are mapped onto the seven fuels the catalogue
+      # holds rather than matched by name. Three WOG grades Minfin does not average keep the price
+      # their own page last wrote; the weekly catalogue pass names them in the log.
       MinfinPrice__Enabled: ${MINFIN_PRICE_ENABLED:-false}
       MinfinPrice__EndpointUrl: ${MINFIN_PRICE_ENDPOINT:-https://index.minfin.com.ua/ua/markets/fuel/tm/}
       MinfinPrice__TimeoutSeconds: ${MINFIN_PRICE_TIMEOUT_SECONDS:-30}

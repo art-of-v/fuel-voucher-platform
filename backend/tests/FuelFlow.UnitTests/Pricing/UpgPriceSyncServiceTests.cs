@@ -17,16 +17,19 @@ using Xunit;
 namespace FuelFlow.UnitTests.Pricing;
 
 /// <summary>
-/// The scheduled UPG/WOG refresh. What matters here is not the arithmetic - the importer has its
-/// own tests - but the unattended failure modes: a fetch that fails must not move a price, a
-/// disabled switch must not reach the network at all, and one vendor being down must not stop the
-/// other.
+/// The scheduled UPG refresh. What matters here is not the arithmetic - the importer has its own
+/// tests - but the unattended failure modes: a fetch that fails must not move a price, and a
+/// disabled switch must not reach the network at all.
 /// </summary>
-public sealed class UpgWogPriceSyncServiceTests : IDisposable
+/// <remarks>
+/// WOG is not one of these: its page answers production with an empty 204 since 2026-10-29, and it
+/// is priced from Minfin's table instead. The test below pins that this job does not ask for it.
+/// </remarks>
+public sealed class UpgPriceSyncServiceTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
 
-    public UpgWogPriceSyncServiceTests()
+    public UpgPriceSyncServiceTests()
     {
         _context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -55,13 +58,13 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
         }
     }
 
-    private UpgWogPriceSyncService Service(StubClient client, bool enabled, ILogger<UpgWogPriceSyncService>? logger = null)
+    private UpgPriceSyncService Service(StubClient client, bool enabled, ILogger<UpgPriceSyncService>? logger = null)
         => new(
             client,
             new ImportUpgWogPricesCommandHandler(_context, new PriceHistoryRecorder(_context), new BrandSlugResolver(_context)),
             _context,
             Options.Create(new UpgWogPriceOptions { Enabled = enabled }),
-            logger ?? NullLogger<UpgWogPriceSyncService>.Instance);
+            logger ?? NullLogger<UpgPriceSyncService>.Instance);
 
     private async Task SeedBrandAsync(Guid brandId, string slug)
     {
@@ -91,7 +94,7 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Sync_ShouldAskEachVendorItServes()
+    public async Task Sync_ShouldAskOnlyTheVendorWhosePageStillAnswers()
     {
         await SeedBrandAsync(BrandIds.Upg, "upg");
         await SeedBrandAsync(BrandIds.Wog, "wog");
@@ -99,7 +102,10 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
 
         await Service(client, enabled: true).SyncPricesAsync();
 
-        client.Asked.Should().BeEquivalentTo(["upg", "wog"]);
+        // WOG's page answers this host with an empty 204 (2026-10-29), so asking it every quarter
+        // hour is a fetch that can only fail - and a second source writing the same fuels would
+        // fight Minfin's table, which is where WOG is priced from now.
+        client.Asked.Should().BeEquivalentTo(["upg"]);
     }
 
     [Fact]
@@ -115,24 +121,6 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
         // catalogue either - and it wrote nothing at all.
         (await _context.FuelTypes.CountAsync()).Should().Be(0);
         (await _context.FuelPriceHistory.CountAsync()).Should().Be(0);
-    }
-
-    [Fact]
-    public async Task Sync_ShouldStillImportTheOtherVendor_WhenOneIsDown()
-    {
-        await SeedBrandAsync(BrandIds.Upg, "upg");
-        await SeedBrandAsync(BrandIds.Wog, "wog");
-        var client = new StubClient(brand => brand == "upg"
-            ? throw new UpgWogPriceScrapeException("HTTP 503")
-            : [new UpgWogPrice("wog95", 95.90m)]);
-
-        await Service(client, enabled: true).SyncCatalogueAndPricesAsync();
-        _context.ChangeTracker.Clear();
-
-        // UPG and WOG are separate sites: one of them being down says nothing about the other.
-        var created = await _context.FuelTypes.SingleAsync(f => f.BrandId == BrandIds.Wog);
-        created.Name.Should().Be("wog95", "the vendor's own word for the grade is the name");
-        created.PumpPricePerLiter.Should().Be(95.90m);
     }
 
     [Fact]

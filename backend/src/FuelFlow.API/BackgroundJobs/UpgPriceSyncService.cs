@@ -8,14 +8,21 @@ using Microsoft.Extensions.Options;
 namespace FuelFlow.BackgroundJobs;
 
 /// <summary>
-/// Keeps UPG's and WOG's pump prices in step with what they charge, every fifteen minutes.
+/// Keeps UPG's pump prices in step with what it charges, every fifteen minutes.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The counterpart of <see cref="OkkoPriceSyncService"/>, for the two vendors that publish a page
+/// The counterpart of <see cref="OkkoPriceSyncService"/>, for the vendor that publishes a page
 /// rather than an API. The shape of the work is the same: fetch the sheet, hand it to the importer
 /// that already exists, and let the importer create the grades it has never seen - with their
 /// sizes - and record the price in the history.
+/// </para>
+/// <para>
+/// <b>WOG is not here.</b> Since 2026-10-29 <c>wog.ua</c> answers this host with an empty
+/// <c>204</c> - whatever the path, the client or the user agent - so the page cannot be read from
+/// where the product runs. WOG is priced from Minfin's table instead
+/// (<see cref="MinfinPriceSyncService"/>), which carries WOG's own retail figures. The page path is
+/// left in place for the vendor that still serves it, and for the day WOG serves it again.
 /// </para>
 /// <para>
 /// <b>A failed fetch changes nothing.</b> A vendor page that is down, or that has changed shape,
@@ -24,32 +31,27 @@ namespace FuelFlow.BackgroundJobs;
 /// side - but the guard is still the first thing it does, because the importer refuses an
 /// unreadable sheet rather than writing half of one.
 /// </para>
-/// <para>
-/// <b>One brand failing does not stop the other.</b> Each is fetched, written and reported on its
-/// own, because UPG and WOG are separate sites and one of them being down says nothing about the
-/// other.
-/// </para>
 /// </remarks>
-public sealed class UpgWogPriceSyncService
+public sealed class UpgPriceSyncService
 {
     /// <summary>Actor recorded on audit rows written by the scheduler — there is no person behind them.</summary>
-    private const string SyncActorName = "upg-wog-price-sync";
+    private const string SyncActorName = "upg-price-sync";
 
     /// <summary>The brands this job serves, and the only ones its pages may name.</summary>
-    public static readonly string[] SupportedBrands = ["upg", "wog"];
+    public static readonly string[] SupportedBrands = ["upg"];
 
     private readonly IUpgWogPriceClient _client;
     private readonly ImportUpgWogPricesCommandHandler _import;
     private readonly ApplicationDbContext _context;
     private readonly UpgWogPriceOptions _options;
-    private readonly ILogger<UpgWogPriceSyncService> _logger;
+    private readonly ILogger<UpgPriceSyncService> _logger;
 
-    public UpgWogPriceSyncService(
+    public UpgPriceSyncService(
         IUpgWogPriceClient client,
         ImportUpgWogPricesCommandHandler import,
         ApplicationDbContext context,
         IOptions<UpgWogPriceOptions> options,
-        ILogger<UpgWogPriceSyncService> logger)
+        ILogger<UpgPriceSyncService> logger)
     {
         _client = client;
         _import = import;
@@ -59,14 +61,14 @@ public sealed class UpgWogPriceSyncService
     }
 
     /// <summary>
-    /// The fifteen-minute refresh: what the vendors charge, for the grades we already carry.
+    /// The fifteen-minute refresh: what the vendor charges, for the grades we already carry.
     /// </summary>
     public async Task SyncPricesAsync(CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
         {
             _logger.LogDebug(
-                "UPG/WOG price sync skipped (UpgWogPrice:Enabled=false); the catalogue keeps its current pump prices");
+                "UPG price sync skipped (UpgWogPrice:Enabled=false); the catalogue keeps its current pump prices");
             return;
         }
 
@@ -77,7 +79,7 @@ public sealed class UpgWogPriceSyncService
     }
 
     /// <summary>
-    /// The weekly check: whether the vendors sell a grade we do not carry.
+    /// The weekly check: whether the vendor sells a grade we do not carry.
     /// </summary>
     /// <remarks>
     /// A new grade is news on a scale of weeks, and creating one is a decision - it puts a row in the
@@ -90,7 +92,7 @@ public sealed class UpgWogPriceSyncService
         if (!_options.Enabled)
         {
             _logger.LogDebug(
-                "UPG/WOG catalogue sync skipped (UpgWogPrice:Enabled=false); the catalogue keeps the grades it has");
+                "UPG catalogue sync skipped (UpgWogPrice:Enabled=false); the catalogue keeps the grades it has");
             return;
         }
 

@@ -6,33 +6,41 @@ using FuelFlow.SharedKernel.Time;
 using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Pricing.ImportKloPrices;
+namespace FuelFlow.Features.Pricing.ImportMinfinPrices;
 
+/// <param name="BrandSlug">The network whose row of Minfin's table this sheet is: <c>klo</c>, <c>wog</c>.</param>
 /// <param name="CreateMissing">
 /// Whether a grade the catalogue lacks becomes a row. True for the weekly catalogue check, false
 /// for the fifteen-minute price refresh: a new grade is news that arrives on a scale of weeks, and
 /// a price refresh that created rows would add a fuel to the catalogue every time the table grew -
 /// which is a decision, and it belongs to a job that runs weekly.
 /// </param>
-public sealed record ImportKloPricesCommand(
+public sealed record ImportMinfinPricesCommand(
+    string BrandSlug,
     IReadOnlyList<MinfinFuelPrice> Sheet,
     bool DryRun,
     bool CreateMissing = true);
 
 /// <summary>A grade the catalogue did not have and now has, or would have in a dry run.</summary>
-public sealed record KloPriceFuelCreated(Guid FuelTypeId, string Name, decimal PumpPricePerLiter);
+public sealed record MinfinPriceFuelCreated(Guid FuelTypeId, string Name, decimal PumpPricePerLiter);
 
 /// <summary>A grade that was repriced: what it cost before, and what it costs now.</summary>
-public sealed record KloPriceFuelRepriced(Guid FuelTypeId, string Name, string Grade, decimal PumpPricePerLiter, decimal? PreviousPumpPricePerLiter, bool Changed);
+public sealed record MinfinPriceFuelRepriced(Guid FuelTypeId, string Name, string Grade, decimal PumpPricePerLiter, decimal? PreviousPumpPricePerLiter, bool Changed);
 
-public sealed record KloPriceImportResult(
-    IReadOnlyList<KloPriceFuelCreated> Created,
-    IReadOnlyList<KloPriceFuelRepriced> Repriced,
-    IReadOnlyList<string> GradesNotSold,
+/// <param name="GradesNotListed">Grades our catalogue of that network sells that Minfin does not list.</param>
+/// <param name="GradesNotMapped">
+/// Grades Minfin lists for that network that have no counterpart in our catalogue of it - a grade
+/// the network sells under a vocabulary nobody has written out yet.
+/// </param>
+public sealed record MinfinPriceImportResult(
+    IReadOnlyList<MinfinPriceFuelCreated> Created,
+    IReadOnlyList<MinfinPriceFuelRepriced> Repriced,
+    IReadOnlyList<string> GradesNotListed,
+    IReadOnlyList<string> GradesNotMapped,
     bool DryRun);
 
 /// <summary>
-/// Brings the KLO catalogue up to Minfin's prices for KLO.
+/// Brings one network's catalogue up to Minfin's prices for it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -43,13 +51,22 @@ public sealed record KloPriceImportResult(
 /// how the catalogue got those names in the first place.
 /// </para>
 /// <para>
+/// <b>WOG comes here for a different reason.</b> WOG publishes its own page, and since 2026-10-29
+/// that page answers this host with an empty <c>204</c> whatever the path or the client - a block on
+/// the address we ask from, not on the request. Minfin's WOG row carries the same figures, read off
+/// WOG's own retail prices, so it is the source that keeps the shelf priced while that stands. WOG's
+/// grades are written in WOG's vocabulary, which is what <see cref="MinfinNetwork"/> exists for.
+/// </para>
+/// <para>
 /// <b>Matched by name, not by code.</b> The KLO fuels carry no brand code, and Minfin publishes a
 /// grade name rather than a code, so name is what there is to match on. The comparison folds the
 /// name onto one spelling - our fuel is "А95" and the column is "А 95", and they are the same
 /// grade - which is the same rule the database's <c>ux_fuel_types_brand_grade_key</c> enforces, so
 /// the import cannot write the second spelling of a grade the catalogue already holds.
-/// A match that finds a fuel with no code GIVES it one - the column's name - because a code is what
-/// makes a fuel resolve exactly, and this is the only source that can say which grade it is.
+/// Where a network names a grade its own way the correspondence is written out instead of guessed
+/// at (<see cref="MinfinNetwork.Wog"/>), and a column with no counterpart is reported, not matched.
+/// A name match that finds a KLO fuel with no code GIVES it one - the column's name - because a code
+/// is what makes a fuel resolve exactly, and this is the only source that can say which grade it is.
 /// </para>
 /// <para>
 /// <b>What it writes.</b> The pump price, which is what the vendor charges. The cost, the margin and
@@ -63,11 +80,8 @@ public sealed record KloPriceImportResult(
 /// discount - is compared against our cost.
 /// </para>
 /// </remarks>
-public sealed class ImportKloPricesCommandHandler
+public sealed class ImportMinfinPricesCommandHandler
 {
-    /// <summary>The brand this importer serves.</summary>
-    public const string KloSlug = "klo";
-
     /// <summary>
     /// The sizes a new grade is sold in: the same three the UPG/WOG importer gives a grade it
     /// creates, so a KLO fuel and a WOG one behave alike on the shelf.
@@ -78,7 +92,7 @@ public sealed class ImportKloPricesCommandHandler
     private readonly PriceHistoryRecorder _priceRecorder;
     private readonly BrandSlugResolver _brands;
 
-    public ImportKloPricesCommandHandler(
+    public ImportMinfinPricesCommandHandler(
         ApplicationDbContext context,
         PriceHistoryRecorder priceRecorder,
         BrandSlugResolver brands)
@@ -88,52 +102,62 @@ public sealed class ImportKloPricesCommandHandler
         _brands = brands;
     }
 
-    public async Task<KloPriceImportResult> HandleAsync(
-        ImportKloPricesCommand command,
+    public async Task<MinfinPriceImportResult> HandleAsync(
+        ImportMinfinPricesCommand command,
         Guid actingUserId,
         string? actingUserName,
         CancellationToken ct = default)
     {
-        var brandId = await _brands.ResolveAsync(KloSlug, ct);
+        var network = MinfinNetwork.For(command.BrandSlug)
+            ?? throw new InvalidOperationException(
+                $"Minfin's table is not read for '{command.BrandSlug}': it prices {string.Join(" and ", MinfinNetwork.All.Select(n => n.Slug))}.");
+
+        var brandId = await _brands.ResolveAsync(network.Slug, ct);
         if (brandId is null)
         {
             throw new InvalidOperationException(
-                $"No live brand carries the slug '{KloSlug}', so the KLO prices cannot be imported.");
+                $"No live brand carries the slug '{network.Slug}', so its Minfin prices cannot be imported.");
         }
 
         if (command.Sheet.Count == 0)
         {
             throw new InvalidOperationException(
-                "The KLO price sheet carried no rows. Refusing to apply it: an empty sheet is a page "
+                "The Minfin price sheet carried no rows. Refusing to apply it: an empty sheet is a page "
                 + "that failed to load, not a network that stopped selling fuel.");
         }
 
-        var klo = brandId.Value;
+        var brand = brandId.Value;
         var now = SystemClock.UtcNow;
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
 
         var ours = await _context.FuelTypes
             .AsTracking()
-            .Where(f => f.BrandId == klo && !f.IsDeleted)
+            .Where(f => f.BrandId == brand && !f.IsDeleted)
             .ToListAsync(ct);
 
-        // One key for both sides: the grade's key - the name folded onto one spelling, so that
-        // "А95", "А 95" and "A-95" are one grade. Minfin writes "А 95" and an operator wrote
-        // "А95", and they are the same grade.
         var byName = new Dictionary<string, FuelTypeEntity>(StringComparer.Ordinal);
         foreach (var fuel in ours)
         {
-            byName[MatchKey(fuel.Name)] = fuel;
+            byName[MinfinNetwork.Key(fuel.Name)] = fuel;
         }
 
-        var created = new List<KloPriceFuelCreated>();
-        var repriced = new List<KloPriceFuelRepriced>();
-        var notSold = new List<string>();
+        var created = new List<MinfinPriceFuelCreated>();
+        var repriced = new List<MinfinPriceFuelRepriced>();
+        var notListed = new List<string>();
+        var notMapped = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var row in command.Sheet)
         {
-            var key = MatchKey(row.Grade);
+            var key = network.OurGradeKey(row.Grade);
+            if (key is null)
+            {
+                // Minfin lists a grade this network's vocabulary does not name. Writing it anywhere
+                // would be a guess about which shelf row it belongs on.
+                notMapped.Add(row.Grade);
+                continue;
+            }
+
             seen.Add(key);
 
             if (!byName.TryGetValue(key, out var fuel))
@@ -145,7 +169,14 @@ public sealed class ImportKloPricesCommandHandler
                     continue;
                 }
 
-                var made = await CreateAsync(klo, row, actor, now, command.DryRun, ct);
+                if (!network.OwnsTheColumnNames)
+                {
+                    // The column is not the name this brand uses for the grade, so a row created
+                    // from it would be a fuel named after somebody else's vocabulary.
+                    continue;
+                }
+
+                var made = await CreateAsync(brand, row, actor, now, command.DryRun, ct);
                 created.Add(made);
                 continue;
             }
@@ -158,8 +189,8 @@ public sealed class ImportKloPricesCommandHandler
                 fuel.PumpPricePerLiter = row.PricePerLiter;
                 // A fuel with no code cannot resolve by code, and this is the only source that can
                 // say which grade it is. The code is the column's name, which is the same string the
-                // operator would have typed.
-                if (string.IsNullOrWhiteSpace(fuel.BrandFuelCode))
+                // operator would have typed - true only where the column IS the catalogue's word.
+                if (network.OwnsTheColumnNames && string.IsNullOrWhiteSpace(fuel.BrandFuelCode))
                 {
                     fuel.BrandFuelCode = row.Grade;
                 }
@@ -167,16 +198,17 @@ public sealed class ImportKloPricesCommandHandler
                 fuel.UpdatedAtUtc = now;
             }
 
-            repriced.Add(new KloPriceFuelRepriced(
+            repriced.Add(new MinfinPriceFuelRepriced(
                 fuel.Id, fuel.Name, row.Grade, row.PricePerLiter, previousPump, changed));
         }
 
-        // The grades our catalogue holds that Minfin does not list for KLO. Reported, not archived:
-        // a network's own grade can be one Minfin does not average, and archiving a fuel over a
-        // third party's table would be a decision this importer has no standing to make.
-        foreach (var fuel in ours.Where(f => !seen.Contains(MatchKey(f.Name))))
+        // The grades our catalogue holds that Minfin does not list for this network. Reported, not
+        // archived: a network's own grade can be one Minfin does not average - WOG's "ДП Mustang+"
+        // and "AdBlue" are exactly that - and archiving a fuel over a third party's table would be a
+        // decision this importer has no standing to make.
+        foreach (var fuel in ours.Where(f => !seen.Contains(MinfinNetwork.Key(f.Name))))
         {
-            notSold.Add(fuel.Name);
+            notListed.Add(fuel.Name);
         }
 
         if (!command.DryRun)
@@ -195,13 +227,13 @@ public sealed class ImportKloPricesCommandHandler
             await _context.SaveChangesAsync(ct);
         }
 
-        return new KloPriceImportResult(created, repriced, notSold, command.DryRun);
+        return new MinfinPriceImportResult(created, repriced, notListed, notMapped, command.DryRun);
     }
 
     /// <summary>
     /// Creates one grade the catalogue lacks, with the price Minfin lists it at.
     /// </summary>
-    private async Task<KloPriceFuelCreated> CreateAsync(
+    private async Task<MinfinPriceFuelCreated> CreateAsync(
         Guid brandId,
         MinfinFuelPrice row,
         Guid? actor,
@@ -244,15 +276,6 @@ public sealed class ImportKloPricesCommandHandler
             await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.PumpImport, actor, now, ct);
         }
 
-        return new KloPriceFuelCreated(Guid.Empty, row.Grade, row.PricePerLiter);
+        return new MinfinPriceFuelCreated(Guid.Empty, row.Grade, row.PricePerLiter);
     }
-
-    /// <summary>
-    /// The key a grade is matched by: the name folded onto one spelling, so that "А95", "А 95" and
-    /// "A-95" are one grade - the same rule the database's ux_fuel_types_brand_grade_key enforces.
-    /// A name that says no grade at all is matched by itself, because two rows with no grade are
-    /// still two rows.
-    /// </summary>
-    private static string MatchKey(string name)
-        => FuelGrade.Key(name) ?? name.Trim().ToUpperInvariant();
 }
