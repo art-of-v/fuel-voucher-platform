@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Features.Vouchers.Events;
 
 /// <summary>
@@ -39,7 +41,7 @@ namespace FuelFlow.Features.Vouchers.Events;
 /// an event is written once and never updated. A correction is another event.
 /// </para>
 /// </remarks>
-public sealed class VoucherEvent
+public sealed class VoucherEvent : IAppendOnlyEntity
 {
     public Guid Id { get; set; }
 

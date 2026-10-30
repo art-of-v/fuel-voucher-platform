@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Features.Vouchers.Redemptions;
 
 /// <summary>
@@ -27,6 +29,7 @@ public sealed class VoucherRedemption
     public FuelVoucher? Voucher { get; set; }
 
     /// <summary>Where the claim stands. See <see cref="VoucherRedemptionStatuses"/>.</summary>
+    [MutableAfterInsert]
     public VoucherRedemptionStatus Status { get; set; }
 
     /// <summary>
@@ -50,17 +53,23 @@ public sealed class VoucherRedemption
     /// <summary>The supplier's line reference, when the claim came from a statement.</summary>
     public string? SupplierReference { get; set; }
 
+    [MutableAfterInsert]
     public DateTime? ConfirmedAtUtc { get; set; }
+    [MutableAfterInsert]
     public Guid? ConfirmedByUserId { get; set; }
 
     /// <summary>When the claim was withdrawn, rejected or reversed.</summary>
+    [MutableAfterInsert]
     public DateTime? ClosedAtUtc { get; set; }
+    [MutableAfterInsert]
     public Guid? ClosedByUserId { get; set; }
 
     /// <summary>Why the operator closed it, in their own words.</summary>
+    [MutableAfterInsert]
     public string? ResolutionNote { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
+    [MutableAfterInsert]
     public DateTime UpdatedAtUtc { get; set; }
 }
 

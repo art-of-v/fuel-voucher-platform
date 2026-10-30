@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 
 namespace FuelFlow.Features.Acquiring;
@@ -111,6 +112,7 @@ public class MonobankStatementEntry
 
     /// <summary>When we last saw it in a fetch. A row that keeps being re-reported is one the
     /// acquirer is still revising, which is different from one that is settled and closed.</summary>
+    [MutableAfterInsert]
     public DateTime LastSeenAtUtc { get; set; }
 
     /// <summary>

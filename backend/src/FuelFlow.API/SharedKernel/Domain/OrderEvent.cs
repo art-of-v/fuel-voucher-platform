@@ -32,7 +32,7 @@ namespace FuelFlow.SharedKernel.Domain;
 /// which is the point of keeping it.
 /// </para>
 /// </remarks>
-public sealed class OrderEvent
+public sealed class OrderEvent : IAppendOnlyEntity
 {
     public Guid Id { get; set; }
 
