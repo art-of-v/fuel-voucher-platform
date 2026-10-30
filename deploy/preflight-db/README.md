@@ -185,7 +185,7 @@ So strict mode is available and is enabled.
 
 **Where `PREFLIGHT_DB_STRICT` has to be set, which is the part that is easy to get wrong.** It is
 read from the environment of the `preflight.sh` **process**. The script passes `--env-file` to
-`docker compose` and never sources anything into its own shell, so writing it into `deploy/.env` has
+`docker compose` and never sources anything into its own shell, so writing it into `deploy/.env.production` has
 no effect — the line would still read the `:-0` default. The CI job that runs the preflight sets it
 from the repository variable `PREFLIGHT_DB_STRICT`, so flipping it is a settings change rather than
 an edit to a file on the box. It stays a separate decision from adding the check: a warning that

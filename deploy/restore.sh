@@ -47,7 +47,7 @@ if [[ ! -f "$SCRIPT_DIR/.env.production" ]]; then
   exit 1
 fi
 
-# Parse .env rather than source it — see load-env.sh (a spaced/quoted secret must not
+# Parse .env.production rather than source it — see load-env.sh (a spaced/quoted secret must not
 # break restore any more than it breaks backup).
 # shellcheck source=load-env.sh
 source "$SCRIPT_DIR/load-env.sh"

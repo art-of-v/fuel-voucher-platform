@@ -63,7 +63,7 @@ command -v rclone >/dev/null 2>&1 || fail \
 command -v age >/dev/null 2>&1 || fail \
   "age is not installed. The shipper refuses to upload a plaintext WAL segment."
 
-# The shipper reads the same .env the stack uses. Parse, don't source (see load-env.sh).
+# The shipper reads the same .env.production the stack uses. Parse, don't source (see load-env.sh).
 [[ -f "$SCRIPT_DIR/.env.production" ]] || fail \
   "$SCRIPT_DIR/.env.production is missing. Copy .env.production.example to .env.production and fill it in first."
 # shellcheck source=load-env.sh

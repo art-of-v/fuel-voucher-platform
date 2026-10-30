@@ -42,7 +42,7 @@
 #
 # WHY IT DOES NOT USE `docker compose config --services`
 #
-# That list is the canonical one, and it is also the one that needs a complete .env -
+# That list is the canonical one, and it is also the one that needs a complete env file -
 # every required variable has to be set before Compose will render the file. A gate that
 # cannot run in CI is a gate that only runs on the box, on the day somebody renames a
 # service, which is the day it is too late to be useful. The service keys are read out of
