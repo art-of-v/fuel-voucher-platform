@@ -1,7 +1,10 @@
+using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Resilience;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
@@ -119,7 +122,7 @@ public static class ObservabilitySetup
         if (!telegram.IsConfigured)
         {
             services.AddSingleton<IAlertNotifier, NullAlertNotifier>();
-            services.AddTransient<NotificationDispatcher>();
+            services.AddTransient(AddNotificationDispatcher);
             return services;
         }
 
@@ -131,10 +134,22 @@ public static class ObservabilitySetup
             OutboundCallKind.Write,
             client => client.BaseAddress = new Uri(telegram.BaseUrl));
 
-        services.AddTransient<NotificationDispatcher>();
+        services.AddTransient(AddNotificationDispatcher);
 
         return services;
     }
+
+    /// <summary>
+    /// The cache is what makes the throttle outlive a process, so it is resolved when the host has
+    /// one and left null when it does not - the JobsWorker registers no cache, and a throttle that
+    /// cannot reach one must degrade to the in-process claim rather than fail to construct.
+    /// </summary>
+    private static NotificationDispatcher AddNotificationDispatcher(IServiceProvider services)
+        => new(
+            services.GetRequiredService<IAlertNotifier>(),
+            services.GetRequiredService<IOptions<TelegramOptions>>(),
+            services.GetRequiredService<ILogger<NotificationDispatcher>>(),
+            services.GetService<ICacheService>());
 
     private static void ConfigureOtlp(
         OtlpExporterOptions exporter,

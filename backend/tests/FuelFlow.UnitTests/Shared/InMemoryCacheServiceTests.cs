@@ -88,6 +88,32 @@ public class InMemoryCacheServiceTests
     }
 
     [Fact]
+    public async Task TrySetIfAbsent_ShouldRefuseASecondClaimUntilTheFirstExpires()
+    {
+        const string key = "throttle-key";
+
+        (await _service.TrySetIfAbsentAsync(key, "1", TimeSpan.FromMinutes(5))).Should().BeTrue();
+        (await _service.TrySetIfAbsentAsync(key, "1", TimeSpan.FromMinutes(5)))
+            .Should().BeFalse("the slot is held for the whole interval");
+
+        _clock.Advance(TimeSpan.FromMinutes(6));
+
+        (await _service.TrySetIfAbsentAsync(key, "1", TimeSpan.FromMinutes(5)))
+            .Should().BeTrue("the interval has passed, so the next alert is a new one");
+    }
+
+    [Fact]
+    public async Task TrySetIfAbsent_ShouldLetExactlyOneRacerWin()
+    {
+        const string key = "raced-key";
+
+        var claims = await Task.WhenAll(Enumerable.Range(0, 32)
+            .Select(_ => Task.Run(() => _service.TrySetIfAbsentAsync(key, "1", TimeSpan.FromMinutes(5)))));
+
+        claims.Count(claimed => claimed).Should().Be(1);
+    }
+
+    [Fact]
     public async Task SetAsync_ShouldEvictSoonestExpiringEntry_WhenOverflow()
     {
         for (int i = 0; i < 10_000; i++)

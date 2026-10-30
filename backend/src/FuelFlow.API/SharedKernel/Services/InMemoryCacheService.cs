@@ -88,6 +88,37 @@ namespace FuelFlow.SharedKernel.Services
             return Task.FromResult<string?>(null);
         }
 
+        public Task<bool> TrySetIfAbsentAsync(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
+        {
+            var entry = new CacheEntry(value, _clock.GetUtcNow().UtcDateTime.Add(expiry));
+
+            // TryAdd and TryUpdate are each atomic, so two callers racing for one key cannot both
+            // see it absent. An expired entry is replaced through TryUpdate against the exact
+            // entry that was read, so a claim another caller just made is never overwritten.
+            while (true)
+            {
+                if (_cache.TryAdd(key, entry))
+                {
+                    if (_cache.Count > MaxEntries)
+                        TrimOverflow();
+
+                    return Task.FromResult(true);
+                }
+
+                if (!_cache.TryGetValue(key, out var existing))
+                    continue;
+
+                if (existing.ExpiresAt > _clock.GetUtcNow().UtcDateTime)
+                    return Task.FromResult(false);
+
+                if (_cache.TryUpdate(key, entry, existing))
+                {
+                    _logger.LogDebug("Replaced expired cache key {Key} with a fresh claim", key);
+                    return Task.FromResult(true);
+                }
+            }
+        }
+
         private void TrimOverflow()
         {
             int excess = _cache.Count - MaxEntries;

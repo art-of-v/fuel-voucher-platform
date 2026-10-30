@@ -55,9 +55,11 @@ public sealed class VoucherStockMonitorTests : IDisposable
     }
 
     /// <summary>
-    /// The dispatcher's throttle is a process-static dictionary keyed on brand+fuel, so two
-    /// tests that alert on the same combination would silently suppress each other within the
-    /// reminder interval. Each test therefore gets its own brand.
+    /// These dispatchers are built without a cache, so the throttle falls back to the
+    /// process-static dictionary keyed on brand+fuel, and two tests that alert on the same
+    /// combination would silently suppress each other within the reminder interval. Each test
+    /// therefore gets its own brand. (The cache-backed throttle is covered by
+    /// <c>NotificationThrottleTests</c>.)
     /// </summary>
     private readonly string _provider = $"OKKO-{Guid.NewGuid().ToString()[..6]}";
 
