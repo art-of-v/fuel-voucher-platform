@@ -32,6 +32,7 @@ import { useI18n } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { voucherStatusKey } from "@/lib/status-keys";
 import { voucherStatusBadgeClass } from "@/lib/voucher-status-style";
+import { voucherRefusalMessage } from "@/lib/voucher-refusal-error";
 import { useSession } from "@/lib/session-store";
 import { formatDate } from "@/lib/utils";
 import type { AdminVoucherDetail, AdminVoucherList } from "@/lib/api-types";
@@ -153,7 +154,7 @@ export default function VouchersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(voucherRefusalMessage(e, t)),
   });
 
   const deleteSelectedMutation = useMutation({
@@ -168,7 +169,7 @@ export default function VouchersTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       setSelectedVoucherIds(new Set());
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(voucherRefusalMessage(e, t)),
   });
 
   // The undo for the delete above. Deletes are soft (#217), so an archived voucher is still listed
@@ -184,7 +185,7 @@ export default function VouchersTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
       toast.success(t("vouchers.unarchive") + " ✓");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(voucherRefusalMessage(e, t)),
   });
 
   const toggleSort = (column: string) => {

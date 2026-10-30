@@ -106,7 +106,7 @@ public sealed class ImportBatchBulkActionQueryHandler
                     $"Cannot activate - enter the cost first for {uncosted.Count} voucher(s): " +
                     string.Join(", ", uncosted.Take(10).Select(v => v.VoucherNumber)),
                     0,
-                    ActivationCodes.VoucherCostMissing,
+                    VoucherRefusalCodes.VoucherCostMissing,
                     UncostedVoucherCount: uncosted.Count);
             }
 
@@ -165,7 +165,7 @@ public sealed class ImportBatchBulkActionQueryHandler
 /// What a batch action did, and what stopped it if it did not.
 /// </summary>
 /// <param name="Code">
-/// The stable machine code of the refusal, when there was one — see <see cref="ActivationCodes"/>.
+/// The stable machine code of the refusal, when there was one — see <see cref="VoucherRefusalCodes"/>.
 /// The admin renders its own sentence from this and shows <paramref name="Error"/> only for a code
 /// it has not learnt.
 /// </param>

@@ -109,7 +109,7 @@ public sealed class AdminVoucherImportController : ControllerBase
 
         if (!result.Success)
         {
-            return ActivationError.BadRequest(
+            return VoucherRefusalError.BadRequest(
                 result.Error,
                 result.Code,
                 result.UnpricedFuels,

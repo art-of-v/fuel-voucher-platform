@@ -98,17 +98,25 @@ export class ApiError extends Error {
    * `data` and travel under their own key of the problem document instead.
    */
   readonly unpricedFuels?: UnpricedFuel[];
+  /**
+   * Every other member the problem document carries under a name of its own — the `voucherNumber`
+   * and `gap` of a refused deletion, say. Untyped by nature: the reader for a given code knows what
+   * that code put there. `unpricedFuels` is not repeated here, because it is already typed above.
+   */
+  readonly extra?: Record<string, unknown>;
   constructor(
     message: string,
     code?: string,
     data?: Record<string, number>,
     unpricedFuels?: UnpricedFuel[],
+    extra?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.data = data;
     this.unpricedFuels = unpricedFuels;
+    this.extra = extra;
   }
 }
 
@@ -131,11 +139,30 @@ async function readErrorMessage(response: Response): Promise<string> {
   return (await readError(response)).message;
 }
 
+/**
+ * The members of the problem document that this client reads into a field of its own. Everything
+ * else the document carries is collected into `extra`, so a new key the API attaches reaches the
+ * screen without a client change.
+ */
+const RESERVED_PROBLEM_KEYS = new Set([
+  "type",
+  "title",
+  "status",
+  "detail",
+  "instance",
+  "traceId",
+  "code",
+  "data",
+  "errors",
+  "unpricedFuels",
+]);
+
 async function readError(response: Response): Promise<{
   message: string;
   code?: string;
   data?: Record<string, number>;
   unpricedFuels?: UnpricedFuel[];
+  extra?: Record<string, unknown>;
 }> {
   const errorText = await response.text();
   let extracted: string | undefined;
@@ -144,6 +171,7 @@ async function readError(response: Response): Promise<{
   let code: string | undefined;
   let data: Record<string, number> | undefined;
   let unpricedFuels: UnpricedFuel[] | undefined;
+  let extra: Record<string, unknown> | undefined;
 
   try {
     const errorData = JSON.parse(errorText);
@@ -177,6 +205,20 @@ async function readError(response: Response): Promise<{
       );
       if (named.length > 0) unpricedFuels = named;
     }
+    // Everything under a name of its own, so a refusal that needs to say more than a sentence and a
+    // code does not need a matching field added here first.
+    if (errorData && typeof errorData === "object") {
+      const rest: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(errorData)) {
+        if (
+          !RESERVED_PROBLEM_KEYS.has(key) &&
+          value !== null &&
+          value !== undefined
+        )
+          rest[key] = value;
+      }
+      if (Object.keys(rest).length > 0) extra = rest;
+    }
   } catch {
     // The body was not JSON - a proxy's HTML error page, say. There is no code and no data to
     // read out of it, so the raw text below is the best reason the operator can be given.
@@ -191,7 +233,13 @@ async function readError(response: Response): Promise<{
         (response.status >= 500 && extracted === title);
 
   if (!opaqueServerFault)
-    return { message: extracted ?? errorText, code, data, unpricedFuels };
+    return {
+      message: extracted ?? errorText,
+      code,
+      data,
+      unpricedFuels,
+      extra,
+    };
 
   return {
     message: traceId
@@ -286,8 +334,9 @@ export const apiRequest = async <T, R = unknown>(
   }
 
   if (!response.ok) {
-    const { message, code, data, unpricedFuels } = await readError(response);
-    throw new ApiError(message, code, data, unpricedFuels);
+    const { message, code, data, unpricedFuels, extra } =
+      await readError(response);
+    throw new ApiError(message, code, data, unpricedFuels, extra);
   }
 
   return parseJsonBody<R>(response);
@@ -355,8 +404,9 @@ export const apiBlob = async (
       code,
       data: errorData,
       unpricedFuels,
+      extra,
     } = await readError(response);
-    throw new ApiError(message, code, errorData, unpricedFuels);
+    throw new ApiError(message, code, errorData, unpricedFuels, extra);
   }
 
   return toBlob(response, fileName);
@@ -368,8 +418,9 @@ async function toBlob(
   fallbackFileName: string,
 ): Promise<{ blob: Blob; fileName: string }> {
   if (!response.ok) {
-    const { message, code, data, unpricedFuels } = await readError(response);
-    throw new ApiError(message, code, data, unpricedFuels);
+    const { message, code, data, unpricedFuels, extra } =
+      await readError(response);
+    throw new ApiError(message, code, data, unpricedFuels, extra);
   }
 
   // The server sends the real name (receipt-<id>.pdf); the fallback only covers a response

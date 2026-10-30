@@ -33,6 +33,21 @@ export const vouchers: Record<Language, Record<string, string>> = {
       "Are you sure you want to archive all {0} vouchers? They stop being sellable immediately, and each one can be restored from this list.",
     "vouchers.deleteAllAction": "Delete All",
     "vouchers.cancel": "Cancel",
+    "vouchers.error.notDeletable":
+      "Nothing was deleted: {0} of {1} vouchers cannot be archived. Voucher {2} — {3}. A paid voucher is never deleted; it is the record of what the customer bought. Use “Restore” if it was archived by mistake.",
+    "vouchers.error.archivePartial":
+      "Archived {0} vouchers and kept {1}. A paid voucher is never deleted, so the kept ones are still in the list.",
+    "vouchers.error.assignDisabled":
+      "Vouchers are not assigned by hand any more — they are assigned when an order is fulfilled.",
+    "vouchers.error.gapAssigned": "it has been handed to its holder",
+    "vouchers.error.gapPendingReconciliation":
+      "it is awaiting supplier reconciliation",
+    "vouchers.error.gapUsed": "it has already been used",
+    "vouchers.error.gapExpired": "it has already expired",
+    "vouchers.error.gapBlocked": "it is blocked",
+    "vouchers.error.gapDeactivated": "it is deactivated",
+    "vouchers.error.gapWorker": "it is with a worker",
+    "vouchers.error.gapOrder": "it is part of an order",
     "voucherLifecycle.title": "Voucher lifecycle",
     "voucherLifecycle.open": "History",
     "voucherLifecycle.loading": "Loading lifecycle...",
@@ -105,6 +120,21 @@ export const vouchers: Record<Language, Record<string, string>> = {
       "Ви впевнені, що хочете архівувати всі {0} талонів? Вони одразу перестануть продаватися, і кожен можна повернути з цього списку.",
     "vouchers.deleteAllAction": "Видалити всі",
     "vouchers.cancel": "Скасувати",
+    "vouchers.error.notDeletable":
+      "Нічого не видалено: {0} з {1} талонів не можна архівувати. Талон {2} — {3}. Сплачений талон не видаляють; це запис про те, що купив клієнт. Скористайтеся «Повернути», якщо його заархівували помилково.",
+    "vouchers.error.archivePartial":
+      "Заархівовано {0} талонів, залишено {1}. Сплачений талон не видаляють, тому залишені досі у списку.",
+    "vouchers.error.assignDisabled":
+      "Талонів вручну більше не призначають — вони призначаються під час виконання замовлення.",
+    "vouchers.error.gapAssigned": "його вже передано власнику",
+    "vouchers.error.gapPendingReconciliation":
+      "він очікує звірки з постачальником",
+    "vouchers.error.gapUsed": "його вже використано",
+    "vouchers.error.gapExpired": "у нього вже минув термін",
+    "vouchers.error.gapBlocked": "він заблокований",
+    "vouchers.error.gapDeactivated": "його деактивовано",
+    "vouchers.error.gapWorker": "він у працівника",
+    "vouchers.error.gapOrder": "він є частиною замовлення",
     "voucherLifecycle.title": "Історія талона",
     "voucherLifecycle.open": "Історія",
     "voucherLifecycle.loading": "Завантаження історії...",
@@ -177,6 +207,21 @@ export const vouchers: Record<Language, Record<string, string>> = {
       "Möchten Sie wirklich alle {0} Gutscheine archivieren? Sie sind sofort nicht mehr verkäuflich und lassen sich einzeln aus dieser Liste zurückholen.",
     "vouchers.deleteAllAction": "Alle löschen",
     "vouchers.cancel": "Abbrechen",
+    "vouchers.error.notDeletable":
+      "Es wurde nichts gelöscht: {0} von {1} Gutscheinen lassen sich nicht archivieren. Gutschein {2} — {3}. Ein bezahlter Gutschein wird nie gelöscht; er ist der Nachweis, was der Kunde gekauft hat. Nutzen Sie „Zurückholen“, wenn er versehentlich archiviert wurde.",
+    "vouchers.error.archivePartial":
+      "Archiviert: {0} Gutscheine, behalten: {1}. Ein bezahlter Gutschein wird nie gelöscht, deshalb stehen die behaltenen noch in der Liste.",
+    "vouchers.error.assignDisabled":
+      "Gutscheine werden nicht mehr von Hand zugewiesen — sie werden bei der Auftragserfüllung zugewiesen.",
+    "vouchers.error.gapAssigned": "er wurde seinem Inhaber übergeben",
+    "vouchers.error.gapPendingReconciliation":
+      "er wartet auf den Abgleich mit dem Lieferanten",
+    "vouchers.error.gapUsed": "er wurde bereits eingelöst",
+    "vouchers.error.gapExpired": "seine Laufzeit ist abgelaufen",
+    "vouchers.error.gapBlocked": "er ist gesperrt",
+    "vouchers.error.gapDeactivated": "er ist deaktiviert",
+    "vouchers.error.gapWorker": "er ist bei einem Mitarbeiter",
+    "vouchers.error.gapOrder": "er gehört zu einem Auftrag",
     "voucherLifecycle.title": "Gutschein-Lebenszyklus",
     "voucherLifecycle.open": "Verlauf",
     "voucherLifecycle.loading": "Lebenszyklus wird geladen...",
@@ -250,6 +295,21 @@ export const vouchers: Record<Language, Record<string, string>> = {
       "¿Seguro que desea archivar todos los {0} vales? Dejan de venderse de inmediato y cada uno se puede recuperar desde esta lista.",
     "vouchers.deleteAllAction": "Eliminar todos",
     "vouchers.cancel": "Cancelar",
+    "vouchers.error.notDeletable":
+      "No se eliminó nada: {0} de {1} vales no se pueden archivar. El vale {2} — {3}. Un vale pagado nunca se elimina; es el registro de lo que compró el cliente. Use «Recuperar» si se archivó por error.",
+    "vouchers.error.archivePartial":
+      "Se archivaron {0} vales y se conservaron {1}. Un vale pagado nunca se elimina, así que los conservados siguen en la lista.",
+    "vouchers.error.assignDisabled":
+      "Los vales ya no se asignan a mano: se asignan al completar un pedido.",
+    "vouchers.error.gapAssigned": "ya se entregó a su titular",
+    "vouchers.error.gapPendingReconciliation":
+      "espera la conciliación con el proveedor",
+    "vouchers.error.gapUsed": "ya se ha usado",
+    "vouchers.error.gapExpired": "ya ha caducado",
+    "vouchers.error.gapBlocked": "está bloqueado",
+    "vouchers.error.gapDeactivated": "está desactivado",
+    "vouchers.error.gapWorker": "está con un trabajador",
+    "vouchers.error.gapOrder": "es parte de un pedido",
     "voucherLifecycle.title": "Ciclo de vida del vale",
     "voucherLifecycle.open": "Historial",
     "voucherLifecycle.loading": "Cargando el historial...",

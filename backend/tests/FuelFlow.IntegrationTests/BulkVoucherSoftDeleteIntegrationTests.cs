@@ -139,12 +139,14 @@ public sealed class BulkVoucherSoftDeleteIntegrationTests : IClassFixture<TestDa
 // so both delete paths went on archiving paid vouchers silently.
 
 [Theory]
-[InlineData(VoucherStatus.Assigned)]
-[InlineData(VoucherStatus.Used)]
-[InlineData(VoucherStatus.Expired)]
-[InlineData(VoucherStatus.Blocked)]
-[InlineData(VoucherStatus.Deactivated)]
-public async Task Bulk_Delete_Refuses_A_Voucher_That_Is_Not_Just_Stock(VoucherStatus status)
+[InlineData(VoucherStatus.Assigned, "assigned")]
+[InlineData(VoucherStatus.Used, "used")]
+[InlineData(VoucherStatus.Expired, "expired")]
+[InlineData(VoucherStatus.Blocked, "blocked")]
+[InlineData(VoucherStatus.Deactivated, "deactivated")]
+public async Task Bulk_Delete_Refuses_A_Voucher_That_Is_Not_Just_Stock(
+    VoucherStatus status,
+    string gap)
 {
     await SeedAsync();
     var context = CreateContext();
@@ -168,6 +170,17 @@ public async Task Bulk_Delete_Refuses_A_Voucher_That_Is_Not_Just_Stock(VoucherSt
     result.Success.Should().BeFalse();
     result.Error.Should().NotBeNullOrWhiteSpace("the admin has to be told why, not just refused");
     (await acting.FuelVouchers.IgnoreQueryFilters().Where(v => v.IsDeleted).ToListAsync()).Should().BeEmpty();
+
+    // The refusal has to reach a Ukrainian panel as Ukrainian, so it travels as a code plus the
+    // numbers and the one voucher that stopped it - the sentence is built in the admin, and the
+    // gap token is the key it looks its clause up under.
+    result.Code.Should().Be(VoucherRefusalCodes.VouchersNotDeletable);
+    result.Data.Should().NotBeNull();
+    result.Data!["refusedCount"].Should().Be(1);
+    result.Data!["totalCount"].Should().Be(1);
+    result.Extra.Should().NotBeNull();
+    result.Extra!["voucherNumber"].Should().Be(voucher.VoucherNumber);
+    result.Extra!["gap"].Should().Be(gap);
 }
 
 [Fact]
@@ -259,6 +272,11 @@ public async Task Delete_All_Archives_Stock_And_Names_What_It_Kept()
     // has to be told which is which rather than left to infer it.
     result.Success.Should().BeFalse();
     result.Error.Should().Contain("kept 1");
+    // Not a refusal but a half-done action, and still a sentence the operator has to read: the
+    // counts travel with a code so the admin can say which went and which stayed.
+    result.Code.Should().Be(VoucherRefusalCodes.VoucherArchivePartial);
+    result.Data!["archivedCount"].Should().Be(1);
+    result.Data!["keptCount"].Should().Be(1);
 
     var stillThere = await acting.FuelVouchers.IgnoreQueryFilters().Where(v => !v.IsDeleted).ToListAsync();
     stillThere.Should().ContainSingle("the paid voucher is the record of what the customer bought");

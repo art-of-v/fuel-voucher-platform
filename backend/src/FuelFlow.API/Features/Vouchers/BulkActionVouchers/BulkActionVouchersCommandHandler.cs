@@ -162,6 +162,12 @@ public sealed class BulkActionVouchersCommandHandler
                 {
                     Success = false,
                     Count = removedCount,
+                    Code = VoucherRefusalCodes.VoucherArchivePartial,
+                    Data = new Dictionary<string, object?>
+                    {
+                        ["archivedCount"] = removedCount,
+                        ["keptCount"] = keptCount
+                    },
                     Error = $"Archived {removedCount} voucher(s), kept {keptCount}. A paid voucher is never " +
                             "deleted - the kept ones are still in the list. Delete them in batches if " +
                             "some of them are stock you meant to archive."
@@ -195,7 +201,7 @@ public sealed class BulkActionVouchersCommandHandler
                     return new BulkActionResult
                     {
                         Success = false,
-                        Code = ActivationCodes.VoucherCostMissing,
+                        Code = VoucherRefusalCodes.VoucherCostMissing,
                         UncostedVoucherCount = uncosted.Count,
                         Error = $"Cannot activate — enter the cost (собівартість) first for {uncosted.Count} voucher(s): {string.Join(", ", uncosted.Take(10).Select(e => e.VoucherNumber))}"
                     };
@@ -232,6 +238,7 @@ public sealed class BulkActionVouchersCommandHandler
                 return new BulkActionResult
                 {
                     Success = false,
+                    Code = VoucherRefusalCodes.ManualAssignDisabled,
                     Error = "Manual assign is disabled — vouchers are assigned by fulfilling an order"
                 };
             case "delete":
@@ -255,6 +262,21 @@ public sealed class BulkActionVouchersCommandHandler
                     return new BulkActionResult
                     {
                         Success = false,
+                        Code = VoucherRefusalCodes.VouchersNotDeletable,
+                        // The counts are numbers and travel in `data`; the voucher's number and the
+                        // signal are not, and travel in `extra` under their own names. Without them the
+                        // admin can only repeat "cannot be deleted" in Ukrainian and leave the operator
+                        // to find the one voucher in the selection that stopped the action.
+                        Data = new Dictionary<string, object?>
+                        {
+                            ["refusedCount"] = refused.Count,
+                            ["totalCount"] = entities.Count
+                        },
+                        Extra = new Dictionary<string, object?>
+                        {
+                            ["voucherNumber"] = refused[0].VoucherNumber,
+                            ["gap"] = VoucherDeletionGuard.Gap(refused[0])
+                        },
                         Error = refused.Count == entities.Count
                             ? $"None of the {refused.Count} voucher(s) can be deleted. " +
                               VoucherDeletionGuard.Reason(refused[0])
@@ -399,7 +421,7 @@ public sealed class BulkActionResult
     public string? Error { get; set; }
 
     /// <summary>
-    /// The stable machine code of the refusal, when there was one — see <see cref="ActivationCodes"/>.
+    /// The stable machine code of the refusal, when there was one — see <see cref="VoucherRefusalCodes"/>.
     /// The admin renders its own sentence from this and shows <see cref="Error"/> only for a code it
     /// has not learnt.
     /// </summary>
@@ -410,4 +432,13 @@ public sealed class BulkActionResult
 
     /// <summary>How many vouchers of this selection still carry no supplier cost.</summary>
     public int? UncostedVoucherCount { get; set; }
+
+    /// <summary>The numbers a coded refusal carries, beside the two above.</summary>
+    public IReadOnlyDictionary<string, object?>? Data { get; set; }
+
+    /// <summary>
+    /// What a coded refusal names and cannot say in a number - the voucher a deletion stopped on,
+    /// the half of its price a fuel lacks. One document field per key, as <c>unpricedFuels</c> is.
+    /// </summary>
+    public IReadOnlyDictionary<string, object?>? Extra { get; set; }
 }
