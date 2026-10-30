@@ -82,7 +82,7 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
 
         var accounts = await context.ChartOfAccounts.AsNoTracking().ToListAsync();
 
-        accounts.Should().HaveCount(26, "11 headers plus 15 subaccounts, and only what this business uses");
+        accounts.Should().HaveCount(27, "11 headers plus 16 subaccounts, and only what this business uses");
 
         // Spot-checks against the plan rather than an exhaustive list: these are the codes whose
         // meaning the earlier fabricated table got wrong.
@@ -99,6 +99,9 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
         // swapped in name, which made a VAT pass-through read as a revenue account carrying a debit.
         (await CodeOf("703")).Should().Be("Дохід від реалізації робіт і послуг");
         (await CodeOf("704")).Should().Be("Вирахування з доходу");
+        // The account a filed VAT return settles 643 into (planning #787). Without it the liability
+        // accumulates and nothing in the books can show what was declared.
+        (await CodeOf("641")).Should().Be("Розрахунки за податками");
         (await CodeOf("808")).Should().Be("Витрати товарів");
         // The write-off of expired unsold stock: lost goods, not the cost of a sale. It has to be
         // its own element, because "how much did we lose to expired stock" is a question the
