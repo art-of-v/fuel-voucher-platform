@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Features.ErrorLogs.Logging;
@@ -165,7 +166,11 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
         if (ErrorLogNoiseFilter.IsNoise(logLevel, exception))
             return;
 
-        string message = ComposeMessage(formatter(state, exception), exception);
+        // This provider is fed the rendered message, not the Serilog event, so the enricher that
+        // masks a bot token in request URIs (planning #793) never sees it. Redact here, and before
+        // truncation so a cut cannot leave half a token behind.
+        string message = SensitiveDataRedactor.RedactTelegramBotToken(
+            ComposeMessage(formatter(state, exception), exception));
 
         string? requestPath = null;
         string? requestMethod = null;
@@ -189,8 +194,8 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
             logLevel.ToString(),
             Truncate(message, MaxMessageLength),
             exception?.GetType().FullName,
-            Truncate(exception?.Message, MaxExceptionMessageLength),
-            Truncate(exception?.ToString(), MaxStackTraceLength),
+            Truncate(Redact(exception?.Message), MaxExceptionMessageLength),
+            Truncate(Redact(exception?.ToString()), MaxStackTraceLength),
             _categoryName,
             requestPath,
             requestMethod,
@@ -248,6 +253,9 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
 
         return collapsed.Length <= maxLength ? collapsed : collapsed[..maxLength];
     }
+
+    private static string? Redact(string? value) =>
+        value is null ? null : SensitiveDataRedactor.RedactTelegramBotToken(value);
 
     private static string Truncate(string? value, int maxLength)
     {

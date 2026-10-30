@@ -25,6 +25,9 @@ public static class LoggingSetup
     {
         configuration
             .Enrich.FromLogContext()
+            // Before the sinks, so a bot token in a logged request URI never reaches the console,
+            // Loki or a forwarded provider (planning #793).
+            .Enrich.With(new TelegramTokenRedactingEnricher())
             .Enrich.WithProperty("service", observability.ServiceName)
             .Enrich.WithProperty("environment", observability.Environment)
             .Enrich.WithProperty("host", Environment.MachineName);
