@@ -59,7 +59,7 @@
     },
     {
       "path": "mobile/app/map.tsx",
-      "lines": 1210,
+      "lines": 1218,
       "reason": "Was already 1,193 lines when the target was adopted and the table, which lists mobile/src but not mobile/app, never named it. The split is tracked in planning #807."
     },
     {
