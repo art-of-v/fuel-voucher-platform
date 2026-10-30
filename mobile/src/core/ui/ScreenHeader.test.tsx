@@ -2,17 +2,27 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
-import { HEADER_BOTTOM_HIT, HEADER_DROP, HEADER_LIFT, ScreenHeader } from './ScreenHeader';
+import {
+  HEADER_BOTTOM_HIT,
+  HEADER_CORNER_INWARD,
+  HEADER_DROP,
+  HEADER_REACH,
+  ScreenHeader,
+  useHeaderCornerFrames,
+} from './ScreenHeader';
 import { Haptics } from '../utils/haptics';
 
 /**
- * Why the leading edge is asserted at all: iOS starts its swipe-back gesture in a
- * strip along the leading edge, and react-native-screens cancels the RN touch of
- * anything under that strip the moment the finger drifts horizontally
- * (`cancelTouchesInParent` in `RNSScreenStack.mm`). The header's back control used
- * to be pulled to the edge with a negative margin, so part of its target sat in that
- * strip and a tap that moved a few points was cancelled. The control must clear the
- * strip and spend any extra reach inwards.
+ * The corner contract, asserted on the pressable itself.
+ *
+ * A header corner is pressed without looking — a hand arriving at the top-left
+ * lands as often 20-40pt below the glyph as on it, and as often above it, in the
+ * safe-area strip, when it comes down from the status bar. So the corner is not a
+ * button with a ring of slop: the whole region is the button, and its frame is the
+ * region. `hitSlop` cannot express that — React Native clips it to every ancestor's
+ * frame and resolves overlapping slops by z-order — so these tests pin the frame:
+ * transparent borders that grow the target, negative margins that give the layout
+ * back, and `0` on the leading edge, which iOS reserves for its swipe-back gesture.
  */
 
 beforeEach(() => {
@@ -21,49 +31,62 @@ beforeEach(() => {
 
 const back = () => screen.getByRole('button');
 
-it('keeps the back control clear of the leading edge', () => {
+const backStyle = () => StyleSheet.flatten(back().props.style);
+
+it('is the whole corner, not a slop around a control', () => {
   render(<ScreenHeader title="OKKO" />);
 
-  const style = StyleSheet.flatten(back().props.style);
-
-  expect(style.marginLeft ?? 0).toBe(0);
-  expect(style.width).toBe(52);
+  // A frame and a slop would describe two different targets, one of them clipped.
+  expect(back().props.hitSlop).toBeUndefined();
+  // `lg` is the drawn control: 52pt box, 24pt glyph.
+  expect(backStyle().width).toBe(52);
+  expect(backStyle().height).toBe(52);
 });
 
-it('spends the extra reach inwards, never towards the edge', () => {
+it('reaches inwards and down, and takes the layout back', () => {
   render(<ScreenHeader title="OKKO" />);
 
-  expect(back().props.hitSlop).toMatchObject({ left: 0 });
-  expect(back().props.hitSlop.right).toBeGreaterThan(0);
+  const style = backStyle();
+
+  expect(style.borderRightWidth).toBe(HEADER_CORNER_INWARD);
+  expect(style.marginRight).toBe(-HEADER_CORNER_INWARD);
+  expect(style.borderBottomWidth).toBe(HEADER_BOTTOM_HIT);
+  expect(style.marginBottom).toBe(-HEADER_BOTTOM_HIT);
 });
 
-it('makes the back target the whole header corner', () => {
+it('never spends a pixel on the leading edge', () => {
   render(<ScreenHeader title="OKKO" />);
 
-  const style = StyleSheet.flatten(back().props.style);
-  const slop = back().props.hitSlop;
+  // iOS starts its swipe-back gesture in a strip along the leading edge, and
+  // react-native-screens cancels the RN touch of anything under it the moment the
+  // finger drifts horizontally (`cancelTouchesInParent` in RNSScreenStack.mm).
+  const style = backStyle();
 
-  // 48pt of box plus the reach on both axes. The height is the one that matters:
-  // a thumb reaching for the top-left corner lands 20-40pt below the glyph when it
-  // comes from the content and above it when it comes down from the status bar, so
-  // the target has to run past both edges of the row.
-  expect(style.width + slop.left + slop.right).toBeGreaterThanOrEqual(80);
-  expect(style.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(120);
+  expect(style.borderLeftWidth).toBe(0);
+  expect(style.marginLeft).toBe(0);
 });
 
-it('lets the corner answer above and below the row without eating the content', () => {
+it('reaches up into the band the row reserves, by the row’s own number', () => {
   render(<ScreenHeader title="OKKO" testID="header" />);
 
-  // `hitSlop` is clipped by every ancestor's frame, so the row itself has to own
-  // the extra bands — and `box-none` keeps them from swallowing content taps
-  // outside the corner targets.
+  const style = backStyle();
+  const row = StyleSheet.flatten(screen.getByTestId('header').props.style);
+
+  // Both frames have to start where the safe-area band starts, or the part of the
+  // region above the row is clipped by the row and never sees the touch.
+  expect(style.borderTopWidth).toBeGreaterThan(0);
+  expect(style.borderTopWidth).toBe(row.borderTopWidth);
+  expect(style.marginTop).toBe(-style.borderTopWidth);
+});
+
+it('lets the row own the same bands without eating the content', () => {
+  render(<ScreenHeader title="OKKO" testID="header" />);
+
   const row = screen.getByTestId('header');
   const style = StyleSheet.flatten(row.props.style);
 
   expect(style.borderBottomWidth).toBe(HEADER_DROP);
   expect(style.marginBottom).toBe(-HEADER_DROP);
-  // Above the row the band is the safe area `PageLayout` reserves: the border must
-  // be as deep as the margin is negative, or the row slides off its own line.
   expect(style.borderTopWidth).toBeGreaterThan(0);
   expect(style.marginTop).toBe(-style.borderTopWidth);
   expect(row.props.pointerEvents).toBe('box-none');
@@ -72,25 +95,49 @@ it('lets the corner answer above and below the row without eating the content', 
 it('keeps the title from swallowing half of the back target', () => {
   render(<ScreenHeader title="OKKO" />);
 
-  // The reach crosses the 16pt gap and 8pt of the title block; a plain View in
+  // The frame crosses the 12pt gap and 20pt of the title block; a plain View in
   // front of the control would take those taps and do nothing with them.
   expect(screen.getByTestId('header-title').props.pointerEvents).toBe('none');
 });
 
-it('gives a trailing action a frame its hitSlop can reach into', () => {
+it('gives the trailing corner the same frame its action answers in', () => {
   render(<ScreenHeader title="OKKO" actions={<View testID="action" />} />);
 
-  // React Native never delivers a touch past an ancestor's frame, so a trailing
-  // action's reach only exists if its slot carries one — upwards, sideways, and
-  // the same drop below the row that the leading control gets.
+  // React Native never delivers a touch past an ancestor's frame, so the action's
+  // own frame only exists if its slot carries one — and the slot is a plain View,
+  // so it has to stay out of the hit test itself.
   const slot = screen.getByTestId('header-actions');
   const style = StyleSheet.flatten(slot.props.style);
 
-  expect(style.borderTopWidth).toBe(HEADER_LIFT);
+  expect(style.borderLeftWidth).toBe(HEADER_CORNER_INWARD);
+  expect(style.marginLeft).toBe(-HEADER_CORNER_INWARD);
+  expect(style.borderRightWidth).toBe(HEADER_REACH);
+  expect(style.marginRight).toBe(-HEADER_REACH);
   expect(style.borderBottomWidth).toBe(HEADER_BOTTOM_HIT);
-  expect(style.marginTop).toBe(-HEADER_LIFT);
   expect(style.marginBottom).toBe(-HEADER_BOTTOM_HIT);
+  expect(style.borderTopWidth).toBeGreaterThan(0);
+  expect(style.marginTop).toBe(-style.borderTopWidth);
   expect(slot.props.pointerEvents).toBe('box-none');
+});
+
+it('splits the row between the two corners without a shared pixel', () => {
+  // The screen decides what the trailing corner is — the basket on the catalog —
+  // so it asks for the same frames the header uses rather than guessing numbers.
+  let frames: ReturnType<typeof useHeaderCornerFrames> | undefined;
+  const Probe = () => {
+    frames = useHeaderCornerFrames();
+    return null;
+  };
+  render(<Probe />);
+
+  const { leading, trailing } = frames!;
+
+  expect(leading.right).toBe(trailing.left);
+  expect(leading.left).toBe(0);
+  expect(trailing.right).toBe(HEADER_REACH);
+  expect(leading.top).toBe(trailing.top);
+  expect(leading.bottom).toBe(trailing.bottom);
+  expect(leading.bottom).toBe(HEADER_BOTTOM_HIT);
 });
 
 it('renders no back control when the screen is a root', () => {
