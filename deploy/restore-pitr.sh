@@ -95,13 +95,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# The role and the database come from the deployment's own .env when it is available,
+# The role and the database come from the deployment's own env file when it is available,
 # because the role is NOT "postgres" - it is whatever the deployment was created with
 # (fuelflow). Connecting as the wrong role fails with "role does not exist", which is a
 # confusing way to learn that.
 #
 # The restore usually happens somewhere ELSE - on the laptop that holds the age key - so
-# the .env may not be there at all. In that case the flags are the way to say it.
+# the env file may not be there at all. In that case the flags are the way to say it.
 if [[ -n "$ENV_FILE" && -f "$ENV_FILE" ]]; then
   # shellcheck source=load-env.sh
   source "$SCRIPT_DIR/load-env.sh"

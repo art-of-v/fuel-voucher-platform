@@ -108,7 +108,7 @@ fi
 # --- Throwaway container ------------------------------------------------------------
 # The name is derived from $$ so two drills can never collide, and it is asserted
 # against the live container below. Nothing in this script reads the production
-# .env, stops the API, or names fuelflow-postgres.
+# .env.production, stops the API, or names fuelflow-postgres.
 DRILL_CONTAINER="fuelflow-drill-$$"
 cleanup() {
   echo

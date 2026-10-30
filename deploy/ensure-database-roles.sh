@@ -156,7 +156,7 @@ esac
 #
 # They are generated when they are missing and written to the env file, because the
 # alternative is a deploy that stops at the preflight with "set POSTGRES_APP_PASSWORD
-# in .env" the moment this reaches production - and the operator who merges the change
+# in .env.production" the moment this reaches production - and the operator who merges the change
 # is not necessarily the operator with access to the box. The generated values are
 # printed once, so they can be put in a password manager.
 #
@@ -229,7 +229,7 @@ container_is_running() {
 if ! container_is_running; then
   if [[ "$CONTAINER" == "$DEFAULT_CONTAINER" && -f "$SCRIPT_DIR/docker-compose.prod.yml" ]]; then
     echo "the database is not running yet - starting it"
-    # The env file is `.env` and not the variable: the production stack reads its key
+    # The env file is named and not taken from a variable: the production stack reads its key
     # from `.env.production`, and the wiring test (StagingQrCipherKeySeparationTests) reads this
     # line the same way - a variable here would hide which file the stack was started
     # with, which is the whole point of that guard.
