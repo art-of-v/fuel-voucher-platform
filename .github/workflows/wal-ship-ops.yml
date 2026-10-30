@@ -23,6 +23,7 @@
 #   W4 lag          how old the newest off-box segment is (the host-loss recovery point)
 #   W5 alert-drill  a broken remote produces an alert, and the next run recovers
 #   W6 drill        the real-R2 host-loss drill: source stopped, restore from the bucket
+#   prune           the nightly retention prune, run by hand (deploy/backup.sh --prune-only)
 #
 # The transcript of the run is the evidence, and it is kept in the job log and in
 # /var/lib/fuelflow/wal-ship-ops-<timestamp>.txt on the box.
@@ -42,6 +43,7 @@ on:
           - install
           - ship-once
           - lag
+          - prune
           - verify
           - alert-drill
           - drill

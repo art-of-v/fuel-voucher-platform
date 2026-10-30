@@ -8,6 +8,9 @@
 # One-off run:
 #     cd ~/FuelFlow/deploy && ./backup.sh
 #
+# Retention only - the two remote prunes below and nothing else, no dump and no upload:
+#     cd ~/FuelFlow/deploy && ./backup.sh --prune-only
+#
 # Nightly at 03:20 (run `crontab -e` and add this line):
 #     20 3 * * * cd /root/FuelFlow/deploy && ./backup.sh >> /var/log/fuelflow-backup.log 2>&1
 #
@@ -41,6 +44,21 @@
 #     age -d -i fuelflow-backup.key fuelflow_2026-08-21_032001.dump.age > restore.dump
 # ------------------------------------------------------------------------------
 set -euo pipefail
+
+# --prune-only exists because retention moved here from the per-minute shipper
+# (2026-10-30) and there was then no way to prove the prune works except by waiting for
+# 03:20 and reading a journal - a retention rule nobody has ever watched run is a belief.
+# It runs the same two functions the nightly run does, in the same order.
+PRUNE_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prune-only) PRUNE_ONLY=1; shift ;;
+    -h|--help)
+      sed -n '2,/^set -euo pipefail$/{/^set -euo pipefail$/d;p}' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    *) echo "unknown argument: $1 (the only flag is --prune-only)" >&2; exit 2 ;;
+  esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-/root/fuelflow-backups}"
@@ -117,6 +135,59 @@ export STAGING_WAL_ARCHIVE_DIR STAGING_WAL_MAX_BYTES
 source "$SCRIPT_DIR/load-env.sh"
 load_env "$SCRIPT_DIR/.env.production"
 
+# shellcheck source=pitr-common.sh
+source "$SCRIPT_DIR/pitr-common.sh"
+# shellcheck source=wal-offbox.sh
+source "$SCRIPT_DIR/wal-offbox.sh"
+
+# The two remote deletes, each in one place, so `--prune-only` and the nightly run cannot
+# drift apart - that is the whole reason the flag exists rather than a second copy of the
+# calls. Both are called at the end of a normal run and by `--prune-only`.
+#
+# The blob prune, or the bucket grows by one every night forever. The --include scopes the
+# delete to our own files, so a shared bucket is never touched.
+prune_remote_wal_blobs() {
+  if rclone delete --min-age "${WAL_REMOTE_RETENTION_DAYS}d" \
+       --include 'fuelflow_wal_*.tar.gz.age' "$BACKUP_REMOTE"; then
+    echo "[$(date -Is)] Remote WAL prune done."
+  else
+    echo "WARNING: remote WAL prune failed (the copy above still succeeded)." >&2
+  fi
+}
+
+# The per-segment copy under wal/ is pruned HERE, once a night, and never by the
+# per-minute shipper. That is not tidiness: a prune is a full scan of the prefix and
+# costs about a tenth of a second per object - measured on the production box on
+# 2026-10-29, 60-105 s for 707 objects to delete NOTHING, and several minutes when a
+# connection stalled. The shipper's unit has a 600 s timeout, so doing it every minute
+# failed shipments that had already reached the bucket (30+ alerts in one day). This
+# unit has 30 minutes. It runs whatever the packaging did, because the retention of what
+# is already off-box does not depend on tonight's blob.
+prune_remote_segments() {
+  if wal_prune_remote "$(wal_remote_wal_dir "$BACKUP_REMOTE")" "$WAL_REMOTE_RETENTION_DAYS"; then
+    echo "[$(date -Is)] Remote segment prune done."
+  else
+    echo "WARNING: remote segment prune failed (the copies above still succeeded). Old" >&2
+    echo "         segments may accumulate until the next successful run." >&2
+  fi
+}
+
+# --- --prune-only: the retention half, and nothing else -------------------------------
+if [[ "$PRUNE_ONLY" -eq 1 ]]; then
+  if [[ -z "${BACKUP_REMOTE:-}" ]]; then
+    echo "ERROR: BACKUP_REMOTE is not set, so there is no remote prefix to prune." >&2
+    exit 1
+  fi
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "ERROR: rclone is not installed, so the remote cannot be pruned." >&2
+    exit 1
+  fi
+  echo "[$(date -Is)] Prune-only run: no dump, no base backup, no upload."
+  prune_remote_wal_blobs
+  prune_remote_segments
+  exit 0
+fi
+
 # --- Refuse to write a plaintext dump ----------------------------------------------
 # This check is deliberately fatal. A backup script that quietly degrades to plaintext
 # when a tool is missing is worse than no backup, because the operator believes the
@@ -180,10 +251,6 @@ echo "[$(date -Is)] Backing up '${POSTGRES_DB}' -> ${OUT}"
 # whether the directory has grown: a segment the archiver has not archived is a hole in
 # the history, and a quiet database is not.
 #
-# shellcheck source=pitr-common.sh
-source "$SCRIPT_DIR/pitr-common.sh"
-# shellcheck source=wal-offbox.sh
-source "$SCRIPT_DIR/wal-offbox.sh"
 
   ARCHIVER_OK=0
   WAL_SHIP_FAILED=0
@@ -382,30 +449,10 @@ if [[ -n "${BACKUP_REMOTE:-}" ]] && command -v rclone >/dev/null 2>&1 && [[ -d "
     rclone copy "$WAL_BLOB" "$BACKUP_REMOTE"
     echo "[$(date -Is)] WAL archive shipped: $(du -h "$WAL_BLOB" | cut -f1) as $(basename "$WAL_BLOB")."
 
-    # Prune the remote blobs, or the bucket grows by one every night forever. The
-    # --include scopes the delete to our own files, so a shared bucket is never touched.
-    if rclone delete --min-age "${WAL_REMOTE_RETENTION_DAYS}d" \
-         --include 'fuelflow_wal_*.tar.gz.age' "$BACKUP_REMOTE"; then
-      echo "[$(date -Is)] Remote WAL prune done."
-    else
-      echo "WARNING: remote WAL prune failed (the copy above still succeeded)." >&2
-    fi
+    prune_remote_wal_blobs
   fi
 
-  # The per-segment copy under wal/ is pruned HERE, once a night, and never by the
-  # per-minute shipper. That is not tidiness: a prune is a full scan of the prefix and
-  # costs about a tenth of a second per object - measured on the production box on
-  # 2026-10-29, 60-105 s for 707 objects to delete NOTHING, and several minutes when a
-  # connection stalled. The shipper's unit has a 600 s timeout, so doing it every minute
-  # failed shipments that had already reached the bucket (30+ alerts in one day). This
-  # unit has 30 minutes. It runs whatever the packaging above did, because the retention
-  # of what is already off-box does not depend on tonight's blob.
-  if wal_prune_remote "$(wal_remote_wal_dir "$BACKUP_REMOTE")" "$WAL_REMOTE_RETENTION_DAYS"; then
-    echo "[$(date -Is)] Remote segment prune done."
-  else
-    echo "WARNING: remote segment prune failed (the copies above still succeeded). Old" >&2
-    echo "         segments may accumulate until the next successful run." >&2
-  fi
+  prune_remote_segments
   rm -rf "$WAL_TMP"
 else
   echo "WARNING: the WAL archive was NOT shipped off-box (remote=${BACKUP_REMOTE:-unset}," >&2
