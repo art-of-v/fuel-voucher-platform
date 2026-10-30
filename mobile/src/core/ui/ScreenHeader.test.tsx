@@ -27,7 +27,7 @@ it('keeps the back control clear of the leading edge', () => {
   const style = StyleSheet.flatten(back().props.style);
 
   expect(style.marginLeft ?? 0).toBe(0);
-  expect(style.width).toBe(48);
+  expect(style.width).toBe(52);
 });
 
 it('spends the extra reach inwards, never towards the edge', () => {

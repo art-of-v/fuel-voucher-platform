@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleProp, View, ViewStyle } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { chrome } from '../design/layout';
+import { chrome, spacing } from '../design/layout';
 import { useDesignTokens } from '../hooks/useTheme';
 import { useI18n } from '../i18n';
 import { IconButton } from './IconButton';
@@ -12,11 +12,11 @@ import { Text } from './Text';
 /**
  * How far a header control reaches past the box it draws.
  *
- * The header is the one row where each end has an empty corner, so a thumb that
- * lands beside the 22pt glyph should still count. On a device the miss was almost
- * always off the control's own band — under it when the hand comes from below, and
- * over it into the safe-area strip when the hand reaches from above — so a corner
- * owns a slice of both, not only a ring around the box.
+ * The header is the one row where each end has an empty corner, and the one row
+ * people press without looking — a hand arriving at the top-left corner lands as
+ * often 20-40pt under the control as on it, and as often over it, in the safe-area
+ * strip, when it comes down from the status bar. The drawn control is `lg` (52pt
+ * box, 24pt glyph) for that reason, and the corner around it answers as well.
  *
  * The reach cannot come from `hitSlop` on its own — React Native never delivers a
  * touch past an ancestor's frame — so the row carries it as a transparent border
@@ -35,8 +35,12 @@ export const HEADER_REACH = 12;
 export const HEADER_DROP = chrome.headerCornerDrop;
 /** How far above the row a corner target reaches into the safe-area band. */
 export const HEADER_LIFT = chrome.headerCornerLift;
-/** The row's own padding below the controls — reach past it is `HEADER_DROP` more. */
-const HEADER_ROW_PAD = 16;
+/**
+ * The row's own padding below the controls — reach past it is `HEADER_DROP` more.
+ * It is the token, not a copy of it: the `lg` box fills a 64pt row with this much
+ * left under it, so a change here silently moves the corner's whole geometry.
+ */
+const HEADER_ROW_PAD = spacing.md;
 /** Total reach below a control's bottom edge, so the corner ends level on both ends. */
 export const HEADER_BOTTOM_HIT = HEADER_ROW_PAD + HEADER_DROP;
 export const HEADER_LEADING_HIT_SLOP = {
@@ -134,7 +138,7 @@ export function ScreenHeader({
           gap: tokens.spacing.md,
           minHeight: tokens.chrome.headerHeight,
           paddingHorizontal: tokens.spacing.containerPadding,
-          paddingBottom: tokens.spacing.lg,
+          paddingBottom: spacing.md,
           // The bands a corner keeps answering in, above and below the row. The
           // borders grow the frame, the margins take the same space back, so the
           // layout does not move. `box-none` keeps the bands from swallowing
@@ -154,7 +158,10 @@ export function ScreenHeader({
           onPress={handleBack}
           accessibilityLabel={t('common.back')}
           variant="plain"
-          size="md"
+          // `lg` in the header only: 52pt box, 24pt glyph. Every other icon button
+          // sits in a row the eye leads to; this one is reached blind, at the far
+          // corner, so it gets the largest box the 64pt row holds without moving.
+          size="lg"
           // The reach goes right, never left: iOS starts its swipe-back gesture in a
           // strip along the leading edge, and react-native-screens cancels the RN
           // touch of anything under it the moment the finger drifts horizontally
