@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Features.Vouchers.Redemptions;
 
 /// <summary>
@@ -39,6 +41,7 @@ public sealed class RedemptionStatementRow
     public VoucherRedemption? VoucherRedemption { get; set; }
 
     /// <summary>Where this line stands. See <see cref="RedemptionStatementStatuses"/>.</summary>
+    [MutableAfterInsert]
     public RedemptionStatementStatus Status { get; set; }
 
     /// <summary>The line as the supplier sent it, kept verbatim for the operator.</summary>
@@ -47,8 +50,11 @@ public sealed class RedemptionStatementRow
     public DateTime ImportedAtUtc { get; set; }
     public Guid ImportedByUserId { get; set; }
 
+    [MutableAfterInsert]
     public DateTime? ResolvedAtUtc { get; set; }
+    [MutableAfterInsert]
     public Guid? ResolvedByUserId { get; set; }
+    [MutableAfterInsert]
     public string? ResolutionNote { get; set; }
 }
 

@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Features.Vouchers.Movements;
 
 /// <summary>
@@ -40,7 +42,7 @@ namespace FuelFlow.Features.Vouchers.Movements;
 /// and never updated. The first thing that updates one should first decide it needs a token.
 /// </para>
 /// </remarks>
-public sealed class VoucherMovement
+public sealed class VoucherMovement : IAppendOnlyEntity
 {
     public Guid Id { get; set; }
 

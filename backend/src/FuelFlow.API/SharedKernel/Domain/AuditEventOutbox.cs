@@ -1,6 +1,6 @@
 namespace FuelFlow.SharedKernel.Domain;
 
-public sealed class AuditEventOutbox
+public sealed class AuditEventOutbox : IAppendOnlyEntity
 {
     public Guid Id { get; set; }
     public string AggregateType { get; set; } = null!;

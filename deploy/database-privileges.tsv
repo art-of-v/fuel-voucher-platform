@@ -25,6 +25,12 @@
 #   migration-only -    - the EF migration history: the migrator owns it, the
 #                 application never reads it
 #
+# PrivilegeMatrixCoversTheModelTests (unit suite) holds this file to those classes in both
+# directions: every table the EF model maps is listed here, an IAppendOnlyEntity grants no
+# U and no D, a column-level U names exactly the columns marked [MutableAfterInsert], and
+# every other entity grants table-level U. Adding a write path without updating this file
+# is a red CI run, not a 42501 in production (planning #725, #732).
+#
 # WARNING: the blank maintenance column means the maintenance role has NO grants on the
 # table - it is not "inherit from app". The roles do not inherit from each other.
 

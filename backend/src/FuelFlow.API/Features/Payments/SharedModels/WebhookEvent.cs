@@ -1,3 +1,5 @@
+using FuelFlow.SharedKernel.Domain;
+
 namespace FuelFlow.Payments.SharedModels;
 
 /// <summary>
@@ -78,12 +80,14 @@ public sealed class WebhookEvent
 
     public string? KeyId { get; set; }
 
+    [MutableAfterInsert]
     public WebhookReceiptStatus Status { get; set; } = WebhookReceiptStatus.Received;
 
     /// <summary>When we received it. Our clock, and the one thing here we are the authority on.</summary>
     public DateTime ReceivedAtUtc { get; set; }
 
     /// <summary>When processing finished. Null while a delivery is still outstanding.</summary>
+    [MutableAfterInsert]
     public DateTime? ProcessedAtUtc { get; set; }
 
     /// <summary>
@@ -96,12 +100,15 @@ public sealed class WebhookEvent
     /// rolled back could never be tried again. The lease answers both without a new status - a
     /// fresh claim is in flight, a stale one is abandoned and may be retried.
     /// </remarks>
+    [MutableAfterInsert]
     public DateTime? ProcessingStartedAtUtc { get; set; }
 
     /// <summary>Deliveries seen for this event. Above 1 means the acquirer retried us.</summary>
+    [MutableAfterInsert]
     public int Attempts { get; set; } = 1;
 
     /// <summary>Why processing failed, when it did.</summary>
+    [MutableAfterInsert]
     public string? Error { get; set; }
 }
 
