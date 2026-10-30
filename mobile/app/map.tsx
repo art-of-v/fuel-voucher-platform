@@ -29,6 +29,7 @@ import {
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
+import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
 import { pointsInRegion, type MapRegion } from '../src/features/stations/lib/viewport';
 import { useTabBarOverride } from '../src/core/navigation/tabBarOverride';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
@@ -397,6 +398,9 @@ export default function MapScreen() {
   const [selectedBrand, setSelectedBrand] = React.useState<string | null>(null);
   const { data: packages } = useAllPackages();
   const { location, status: locationStatus, request: requestLocation } = useUserLocation();
+  // The tap that opens a station also reaches the map's press handler on iOS - see
+  // isMarkerPressEcho.
+  const lastMarkerPressAt = React.useRef<number | null>(null);
   const mapRef = React.useRef<MapView | null>(null);
   // The leaderboard sheet is drawn inside this scene while the tab bar is a sibling
   // of the scene, so the bar paints over it whatever z-index the sheet carries.
@@ -569,7 +573,10 @@ export default function MapScreen() {
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={KYIV_REGION}
-            onPress={() => setSelectedStation(null)}
+            onPress={() => {
+              if (isMarkerPressEcho(lastMarkerPressAt.current, Date.now())) return;
+              setSelectedStation(null);
+            }}
             onRegionChangeComplete={(region) => setViewport(region)}
             userInterfaceStyle={tokens.colors.isDark ? 'dark' : 'light'}
             showsUserLocation={locationStatus === 'granted'}
@@ -605,6 +612,7 @@ export default function MapScreen() {
                   tokens={tokens}
                   t={t}
                   onPress={() => {
+                    lastMarkerPressAt.current = Date.now();
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     setSelectedStation(point);
                   }}
