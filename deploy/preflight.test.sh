@@ -181,6 +181,21 @@ grep -hoE '\$\{[A-Za-z0-9_]+' "$FIXTURE"/docker-compose.*.yml \
 for envfile in "$FIXTURE/.env.production" "$FIXTURE/.env.staging"; do
   awk -F= '!seen[$1]++' "$envfile" > "$envfile.tmp" && mv "$envfile.tmp" "$envfile"
 done
+# The guardrail switches the preflight compares with the example (#746, #753) have to be in the
+# fixture as well, or every assertion below would trip the drift check instead of testing the
+# thing it was written for. The values are the examples' own, so an example that changes a
+# default cannot leave this fixture silently disagreeing with it.
+for key in ATTESTATION_ENABLED ATTESTATION_MODE ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION VOUCHER_EXPIRATION_ENABLED; do
+  for pair in "$FIXTURE/.env.production:.env.production.example" "$FIXTURE/.env.staging:.env.staging.example"; do
+    value="$(grep -E "^${key}=" "$SCRIPT_DIR/${pair#*:}" | head -1 | cut -d= -f2-)"
+    if [[ -n "$value" ]]; then
+      # The compose `:?` list names attestation too, so the dummy above is already there; the
+      # first occurrence wins in check_env_file's scan, so replace rather than append.
+      sed -i "/^${key}=/d" "${pair%%:*}"
+      printf '%s=%s\n' "$key" "$value" >> "${pair%%:*}"
+    fi
+  done
+done
 GOOD_ENV="$TMP/env-complete"
 GOOD_ENV_STAGING="$TMP/env-staging-complete"
 cp "$FIXTURE/.env.production" "$GOOD_ENV"
@@ -373,6 +388,90 @@ check "a misindented compose file fails the preflight" 1 "$rc"
 # Restore it, or the remaining assertions below inherit a broken file.
 cp "$SCRIPT_DIR/docker-compose.prod.yml" "$GOOD_COMPOSE"
 fi
+
+# ------------------------------------------------------------------------------
+# A guardrail switch on the box must be the one the repository ships (#746, #753).
+#
+# A git deploy does not touch the droplet's env file, so ATTESTATION_ENABLED was false in
+# production while the template, the compose file and the docs all said true. The API measured
+# nothing for days and no test failed; the drift was found by a campaign that expected a log
+# line and did not get one. The check has to fire on exactly that - and it must not fire on the
+# values that are MEANT to differ (secrets, the QR key, host-specific URLs), or the operator
+# learns to ignore it.
+# ------------------------------------------------------------------------------
+drift_live() { # key=value ...
+  cp "$GOOD_ENV" "$FIXTURE/.env.production"
+  local line key
+  for line in "$@"; do
+    key="${line%%=*}"
+    sed -i "/^${key}=/d" "$FIXTURE/.env.production"
+    printf '%s\n' "$line" >> "$FIXTURE/.env.production"
+  done
+}
+
+drift_live "ATTESTATION_ENABLED=true" "ATTESTATION_MODE=ReportOnly" \
+  "ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true" "VOUCHER_EXPIRATION_ENABLED=true"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "switches that match the example pass" 0 "$rc"
+[[ "$out" == *"the guardrail switches match"* ]] \
+  && { echo "  PASS  it says the switches were compared"; pass=$((pass+1)); } \
+  || { echo "  FAIL  it does not say the switches were compared: $out"; fail=$((fail+1)); }
+
+# The real defect: the box says off, the repository says on.
+drift_live "ATTESTATION_ENABLED=false" "ATTESTATION_MODE=ReportOnly" \
+  "ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true" "VOUCHER_EXPIRATION_ENABLED=true"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a switch switched off on the box fails the preflight" 1 "$rc"
+[[ "$out" == *"ATTESTATION_ENABLED is 'false'"* && "$out" == *"'true' in .env.production.example"* ]] \
+  && { echo "  PASS  it names the key, both values and the file the value should come from"; pass=$((pass+1)); } \
+  || { echo "  FAIL  it does not name key, values and example: $out"; fail=$((fail+1)); }
+[[ "$out" == *"git deploy never updates this file"* ]] \
+  && { echo "  PASS  it says why the box drifted and the repository did not"; pass=$((pass+1)); } \
+  || { echo "  FAIL  it does not explain the drift: $out"; fail=$((fail+1)); }
+
+# A deliberate divergence is allowed, but only when it is recorded in the file it is about.
+drift_live "ATTESTATION_ENABLED=false" "ATTESTATION_MODE=ReportOnly" \
+  "ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true" "VOUCHER_EXPIRATION_ENABLED=true" \
+  "ENV_DRIFT_ACKNOWLEDGED=ATTESTATION_ENABLED"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "an acknowledged divergence passes with a warning" 0 "$rc"
+[[ "$out" == *"acknowledged by ENV_DRIFT_ACKNOWLEDGED"* && "$out" == *"ATTESTATION_ENABLED"* ]] \
+  && { echo "  PASS  the warning names the acknowledged key on every run"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the acknowledgement is silent or unnamed: $out"; fail=$((fail+1)); }
+
+# Absent is not drift: the compose file defaults every guarded switch to the example's value
+# (${ATTESTATION_MODE:-ReportOnly}), so the container still runs what the repository ships.
+# It warns - a hard failure here would block a box that is running correctly.
+drift_live "ATTESTATION_ENABLED=true" "ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true" \
+  "VOUCHER_EXPIRATION_ENABLED=true"
+sed -i '/^ATTESTATION_MODE=/d' "$FIXTURE/.env.production"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a guarded switch missing from the box does not block the restart" 0 "$rc"
+[[ "$out" == *"ATTESTATION_MODE is not set at all"* && "$out" == *"compose default"* ]] \
+  && { echo "  PASS  the missing key is named, with the reason it still runs"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the missing key is not named as such: $out"; fail=$((fail+1)); }
+
+# Each tier is held to its OWN example. Staging ships VOUCHER_EXPIRATION_ENABLED=false on
+# purpose, so a check that measured staging against the production template would fire on every
+# staging run - and one that skipped staging would miss the drift on the box that tests it.
+cp "$GOOD_ENV_STAGING" "$FIXTURE/.env.staging"
+sed -i '/^VOUCHER_EXPIRATION_ENABLED=/d' "$FIXTURE/.env.staging"
+printf 'VOUCHER_EXPIRATION_ENABLED=true\n' >> "$FIXTURE/.env.staging"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a staged gate switch that drifts fails against the staging example" 1 "$rc"
+[[ "$out" == *".env.staging disagrees with .env.staging.example"* ]] \
+  && { echo "  PASS  staging is compared with the staging example, not production's"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the staging file was not compared with its own example: $out"; fail=$((fail+1)); }
+cp "$GOOD_ENV_STAGING" "$FIXTURE/.env.staging"
+
+# The check must stay off the values that are meant to differ. A switch that is not guarded
+# (and every secret) may hold whatever the box needs.
+drift_live "ATTESTATION_ENABLED=true" "ATTESTATION_MODE=ReportOnly" \
+  "ATTESTATION_ACKNOWLEDGE_DISABLED_IN_PRODUCTION=true" "VOUCHER_EXPIRATION_ENABLED=true" \
+  "TELEGRAM_FEEDBACK_ENABLED=true"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "an unguarded switch may differ" 0 "$rc"
+cp "$GOOD_ENV" "$FIXTURE/.env.production"
 
 echo
 echo "  $pass passed, $fail failed"
