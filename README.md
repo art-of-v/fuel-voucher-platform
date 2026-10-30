@@ -167,6 +167,12 @@ the path the advisory reaches this repository through, the fix (or the statement
 none), and the reason the risk is accepted. Adding an advisory to that list is a decision: write
 the reason, or the next reader has a number instead of a decision.
 
+When the gate blocks, its output is the decision's starting point: the advisory, the version the
+lockfile resolves, the affected range, the patched version with the one command that installs it,
+and — when the lockfile marks the package dev-only — the fact that it is build-time (the toolchain,
+not the app the customer installs). That means the common case, a published advisory on a direct
+dependency, is a one-line bump read off the failure rather than a trip to the advisory page.
+
 The `overrides` blocks in `admin/package.json` and `mobile/package.json` pin the transitive
 dependencies whose advisory has a fix, so a lockfile refresh cannot quietly bring one back.
 
