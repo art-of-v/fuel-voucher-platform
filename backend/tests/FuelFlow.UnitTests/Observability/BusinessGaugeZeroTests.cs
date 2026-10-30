@@ -34,6 +34,7 @@ namespace FuelFlow.UnitTests.Observability;
 /// precisely what VoucherPoolLow has to be able to fire on.
 /// </para>
 /// </summary>
+[Collection(BusinessGaugeCollection.Name)]
 public sealed class BusinessGaugeZeroTests : IDisposable
 {
     private readonly ServiceProvider _provider;

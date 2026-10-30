@@ -23,6 +23,7 @@ namespace FuelFlow.UnitTests.Observability;
 /// healthy. These pin what the gauge reports: every automatically priced brand that has fuel, the
 /// brand as its label, and an unbounded age for a fuel that has never been priced.
 /// </remarks>
+[Collection(BusinessGaugeCollection.Name)]
 public sealed class PriceFreshnessGaugeTests : IDisposable
 {
     private readonly ServiceProvider _provider;
