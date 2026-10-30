@@ -47,7 +47,7 @@ public static class BusinessGaugeSetup
     }
 
     /// <summary>
-    /// The brands a job keeps priced: OKKO, UPG and WOG from their own pages, KLO from Minfin.
+    /// The brands a job keeps priced: OKKO and UPG from their own pages, KLO and WOG from Minfin.
     /// </summary>
     /// <remarks>
     /// Named rather than discovered, because "every brand in the catalogue" would page on every
