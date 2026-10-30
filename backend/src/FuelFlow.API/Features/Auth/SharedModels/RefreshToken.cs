@@ -30,6 +30,13 @@ public sealed class RefreshToken
     /// </summary>
     public string? RoleNameAtIssue { get; set; }
 
+    /// <summary>
+    /// Whether this token IS the session or is the throwaway a native sign-in discards once the
+    /// device-bound one is minted. Completing the signed challenge revokes the second kind for the
+    /// account it signs in, so one sign-in leaves one live token per device instead of two.
+    /// </summary>
+    public RefreshTokenPurpose Purpose { get; set; } = RefreshTokenPurpose.Session;
+
     public string Token { get; set; } = string.Empty;
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }

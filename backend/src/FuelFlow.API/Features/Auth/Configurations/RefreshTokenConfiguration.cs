@@ -39,6 +39,16 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .HasComment(                "The role the account had WHEN the token was issued. The role is copied rather than read" +
                     "at use time, so that a role change does not silently change what an old token can do.");
 
+        builder.Property(e => e.Purpose)
+            .HasColumnName("purpose")
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired()
+            .HasDefaultValue(RefreshTokenPurpose.Session)
+            .HasComment(                "What the token is for. Session = the client keeps and rotates it. DeviceBinding = " +
+                    "the throwaway a native sign-in discards once the signed challenge mints the device-bound token; " +
+                    "completing that challenge revokes it, and it never outlives the binding window.");
+
         builder.Property(e => e.Token)
             .HasColumnName("token")
             .HasMaxLength(200)

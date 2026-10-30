@@ -64,9 +64,18 @@ public static class ClientPlatform
     /// in the response body.
     /// </summary>
     public static bool IsNative(IHeaderDictionary headers)
-        => DeclaresItself(headers) || LooksLikeTheApp(headers);
+        => SaysItIsMobile(headers) || LooksLikeTheApp(headers);
 
-    private static bool DeclaresItself(IHeaderDictionary headers)
+    /// <summary>
+    /// Whether the caller DECLARES itself the mobile app, without the User-Agent fallback.
+    /// <para>
+    /// Only builds that send the header complete the signed device challenge; build 236 sends
+    /// nothing and keeps the token it gets at /verify as its session, which is why the fallback
+    /// above exists. So this - not <see cref="IsNative"/> - is what decides whether that token is
+    /// a throwaway to be replaced by a device-bound one.
+    /// </para>
+    /// </summary>
+    public static bool SaysItIsMobile(IHeaderDictionary headers)
         => headers.TryGetValue(HeaderName, out var value)
            && string.Equals(value.ToString(), NativeMobile, StringComparison.OrdinalIgnoreCase);
 

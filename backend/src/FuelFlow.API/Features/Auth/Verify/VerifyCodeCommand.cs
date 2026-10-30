@@ -113,7 +113,13 @@ public sealed class VerifyCodeCommandHandler
     /// missing row here means a race (deleted mid-flow) and must fail closed. The mobile path
     /// leaves this true - self-registration is its intended behaviour.
     /// </param>
-    public async Task<VerifyCodeResponse> HandleAsync(VerifyCodeCommand command, CancellationToken cancellationToken, bool allowRegistration = true)
+    /// <param name="deviceBindingPending">
+    /// True when the caller declared itself the mobile app, which replaces this session with the
+    /// device-bound one the signed challenge mints. The refresh token minted here is then a
+    /// throwaway: it is revoked by that challenge and never outlives the binding window. A
+    /// browser - and build 236, which sends no platform header - keeps a real session here.
+    /// </param>
+    public async Task<VerifyCodeResponse> HandleAsync(VerifyCodeCommand command, CancellationToken cancellationToken, bool allowRegistration = true, bool deviceBindingPending = false)
     {
         var phoneNumber = _phoneNumberService.Normalize(command.PhoneNumber);
         var code = command.Code.Trim();
@@ -296,7 +302,7 @@ public sealed class VerifyCodeCommandHandler
                     challenge.ProvisioningUri));
         }
 
-        return await IssueSessionAsync(user, isNewUser, cancellationToken);
+        return await IssueSessionAsync(user, isNewUser, cancellationToken, deviceBindingPending);
     }
 
     /// <summary>
@@ -352,7 +358,8 @@ public sealed class VerifyCodeCommandHandler
     public async Task<VerifyCodeResponse> IssueSessionAsync(
         User user,
         bool isNewUser,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool deviceBindingPending = false)
     {
         // OTP verification registers/logs in the user but does NOT activate them.
         // is_active=false users can use all features EXCEPT payments.
@@ -375,6 +382,12 @@ public sealed class VerifyCodeCommandHandler
         var accessToken = _tokenService.GenerateAccessToken(user.Id, user.PhoneNumber, user.Role?.Name, user.FirstName, user.LastName, user.TokenVersion);
         var refreshTokenValue = _tokenService.GenerateRefreshToken();
 
+        var purpose = deviceBindingPending ? RefreshTokenPurpose.DeviceBinding : RefreshTokenPurpose.Session;
+        var issuedAt = SystemClock.UtcNow;
+        var expiresAt = purpose == RefreshTokenPurpose.DeviceBinding
+            ? issuedAt.Add(RefreshTokenPurposePolicy.DeviceBindingWindow)
+            : issuedAt.AddDays(_jwtOptions.RefreshTokenExpirationDays);
+
         var refreshToken = new RefreshToken
         {
             Id = Guid.CreateVersion7(),
@@ -385,9 +398,10 @@ public sealed class VerifyCodeCommandHandler
         FamilyId = Guid.NewGuid(),
             DeviceId = null, // Device will be linked during challenge verification
             RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
+            Purpose = purpose,
             Token = SecretsHasher.Hash(refreshTokenValue),
-            ExpiresAtUtc = SystemClock.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
-            CreatedAtUtc = SystemClock.UtcNow,
+            ExpiresAtUtc = expiresAt,
+            CreatedAtUtc = issuedAt,
             IsRevoked = false
         };
 

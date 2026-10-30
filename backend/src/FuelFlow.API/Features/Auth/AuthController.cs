@@ -103,6 +103,15 @@ public sealed class AuthController : ControllerBase
     /// </summary>
     private bool IsNativeClient => ClientPlatform.IsNative(Request.Headers);
 
+    /// <summary>
+    /// Whether the session minted by this sign-in is replaced before it is used: the mobile app
+    /// registers its device and signs a challenge with the access token, and keeps only the
+    /// device-bound tokens that answers with. The header, not <see cref="ClientPlatform.IsNative"/>,
+    /// decides it: build 236 sends no header, never reaches the challenge, and keeps the token it
+    /// gets here as its session.
+    /// </summary>
+    private bool ReplacesThisTokenWithADeviceBoundOne => ClientPlatform.SaysItIsMobile(Request.Headers);
+
     private void ClearRefreshTokenCookie()
     {
         // Path + Secure + SameSite must match the Append call above, or the browser
@@ -156,7 +165,10 @@ public sealed class AuthController : ControllerBase
 
         try
         {
-            var result = await _verifyCodeHandler.HandleAsync(command, cancellationToken);
+            var result = await _verifyCodeHandler.HandleAsync(
+                command,
+                cancellationToken,
+                deviceBindingPending: ReplacesThisTokenWithADeviceBoundOne);
             SetRefreshTokenCookie(result.RefreshToken);
             // The body carries the refresh token only for the native app. A browser gets the
             // HttpOnly cookie and nothing else.
@@ -253,7 +265,10 @@ public sealed class AuthController : ControllerBase
 
         try
         {
-            var result = await _verifyTwoFactorHandler.HandleAsync(command, cancellationToken);
+            var result = await _verifyTwoFactorHandler.HandleAsync(
+                command,
+                cancellationToken,
+                deviceBindingPending: ReplacesThisTokenWithADeviceBoundOne);
             SetRefreshTokenCookie(result.RefreshToken);
             // The body carries the refresh token only for the native app, exactly as in /verify.
             return Ok(IsNativeClient ? result : result with { RefreshToken = null });
