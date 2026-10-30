@@ -51,21 +51,48 @@ internal static class VoucherDeletionGuard
     /// specific signal rather than returning a bare "cannot delete", because an admin deleting a
     /// mixed selection needs to know which of the vouchers in front of them is the problem.
     /// </summary>
-    internal static string Reason(FuelVoucher voucher)
-    {
-        var what = voucher.Status switch
-        {
-            VoucherStatus.Assigned => $"status is {VoucherStatus.Assigned} - it is in a customer's hands",
-            VoucherStatus.PendingReconciliation => "it is awaiting supplier reconciliation",
-            VoucherStatus.Used => "it has already been used",
-            VoucherStatus.Expired => "it has already expired",
-            VoucherStatus.Blocked => "it is blocked",
-            VoucherStatus.Deactivated => "it is deactivated",
-            _ => "it is part of an order"
-        };
+    internal static string Reason(FuelVoucher voucher) =>
+        $"Voucher {voucher.VoucherNumber} cannot be deleted: {GapProse[Gap(voucher)]}. " +
+        "A paid voucher is never deleted - it is the record of what the customer bought. " +
+        "Use unarchive if this was archived by mistake.";
 
-        return $"Voucher {voucher.VoucherNumber} cannot be deleted: {what}. " +
-               "A paid voucher is never deleted - it is the record of what the customer bought. " +
-               "Use unarchive if this was archived by mistake.";
-    }
+    /// <summary>
+    /// Which signal refused the voucher, as a stable token the admin renders in its own language.
+    /// </summary>
+    /// <remarks>
+    /// A token rather than the sentence, for the same reason every other refusal travels as a code:
+    /// the panel is localized into four languages and this sentence is English. The tokens are the
+    /// values of <c>extra.gap</c> on a <c>vouchers_not_deletable</c> refusal, and one of them per
+    /// signal is what lets the operator read "it is in a customer's hands" in Ukrainian.
+    /// <para>
+    /// The status answers first, because "it has already been used" is what the operator needs to
+    /// hear about a used voucher even though it also carries an order. The three fields answer after
+    /// it, in the order <see cref="IsStock"/> checks them: a voucher whose status reads Available can
+    /// still be refused for having been handed to a worker or kept as part of an order.
+    /// </para>
+    /// </remarks>
+    internal static string Gap(FuelVoucher voucher) => voucher.Status switch
+    {
+        VoucherStatus.Assigned => "assigned",
+        VoucherStatus.PendingReconciliation => "pending_reconciliation",
+        VoucherStatus.Used => "used",
+        VoucherStatus.Expired => "expired",
+        VoucherStatus.Blocked => "blocked",
+        VoucherStatus.Deactivated => "deactivated",
+        _ when voucher.WorkerUserId != null => "worker",
+        _ when voucher.AssignedToUserId != null => "assigned",
+        _ => "order"
+    };
+
+    private static readonly IReadOnlyDictionary<string, string> GapProse = new Dictionary<string, string>
+    {
+        ["assigned"] = "it has been handed to its holder",
+        ["pending_reconciliation"] = "it is awaiting supplier reconciliation",
+        ["used"] = "it has already been used",
+        ["expired"] = "it has already expired",
+        ["blocked"] = "it is blocked",
+        ["deactivated"] = "it is deactivated",
+        ["worker"] = "it is with a worker",
+        ["order"] = "it is part of an order"
+    };
 }

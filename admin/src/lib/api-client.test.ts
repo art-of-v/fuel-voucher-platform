@@ -217,6 +217,63 @@ describe("apiRequest response parsing", () => {
     });
   });
 
+  // A refusal that must name something the sentence cannot recompute — the voucher that stopped an
+  // archive, the signal that refused it — attaches it to the problem document under its own key.
+  // Reading them generically is what lets the admin word a new refusal without touching this file.
+  describe("structured error extras", () => {
+    it("carries the named members the document adds beside the sentence", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, {
+          title: "Bad Request",
+          status: 400,
+          detail: "Voucher V-123 cannot be deleted",
+          code: "vouchers_not_deletable",
+          data: { refusedCount: 1, totalCount: 1 },
+          voucherNumber: "V-123",
+          gap: "used",
+        }),
+      );
+
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/vouchers/bulk-action",
+        {},
+      ).catch((e) => e);
+
+      expect((err as ApiError).extra).toEqual({
+        voucherNumber: "V-123",
+        gap: "used",
+      });
+    });
+
+    it("keeps the envelope's own members out of extra", async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse(400, {
+          title: "Bad Request",
+          status: 400,
+          detail: "Cannot activate",
+          instance: "/api/admin/vouchers/bulk-action",
+          traceId: "0af7651916cd43dd8448eb211c80319c",
+          code: "fuel_not_priced",
+          data: { voucherCount: 2 },
+          unpricedFuels: [{ name: "ДП", gap: "margin" }],
+          empty: null,
+        }),
+      );
+
+      const err = await apiRequest(
+        "POST",
+        "/api/admin/vouchers/bulk-action",
+        {},
+      ).catch((e) => e);
+
+      expect((err as ApiError).extra).toBeUndefined();
+      expect((err as ApiError).unpricedFuels).toEqual([
+        { name: "ДП", gap: "margin" },
+      ]);
+    });
+  });
+
   it("returns undefined for a 204 No Content response without throwing", async () => {
     // Regression: admin user activate/deactivate/role/ban/unban/delete all return
     // 204. Calling response.json() on the empty body threw "Unexpected end of JSON

@@ -14,7 +14,7 @@
     },
     {
       "path": "admin/src/pages/admin/VouchersTab.tsx",
-      "lines": 795,
+      "lines": 796,
       "reason": "Existing admin screen, recorded when the target was adopted (planning #688); split when next materially changed."
     },
     {

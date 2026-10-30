@@ -136,11 +136,13 @@ public sealed class AdminVoucherController : ControllerBase
             new BulkActionVouchersCommand(request.Action, request.Ids, request.TargetUserId, userId, GetUserName()), cancellationToken);
 
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-            return ActivationError.BadRequest(
+            return VoucherRefusalError.BadRequest(
                 result.Error,
                 result.Code,
                 result.UnpricedFuels,
-                result.UncostedVoucherCount);
+                result.UncostedVoucherCount,
+                result.Data,
+                result.Extra);
 
         return Ok(new { success = result.Success, count = result.Count });
     }

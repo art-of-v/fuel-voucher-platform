@@ -92,7 +92,7 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse("a fuel with no margin has no price to sell at");
         result.Error.Should().Contain("no margin");
-        result.Code.Should().Be(ActivationCodes.FuelNotPriced,
+        result.Code.Should().Be(VoucherRefusalCodes.FuelNotPriced,
             "the admin writes the sentence in the operator's language and needs a code to do it");
         result.UnpricedFuels.Should().Equal([new UnpricedFuel("A-95", "margin")]);
 
@@ -174,7 +174,7 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("no margin");
-        result.Code.Should().Be(ActivationCodes.FuelNotPriced,
+        result.Code.Should().Be(VoucherRefusalCodes.FuelNotPriced,
             "both doors refuse in the same words, so both carry the same code");
         result.UnpricedFuels.Should().Equal([new UnpricedFuel("A-95", "margin")]);
         result.Affected.Should().Be(0);
