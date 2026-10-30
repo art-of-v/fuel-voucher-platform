@@ -461,6 +461,17 @@ export default function MyCodesScreen() {
       </View>
     ) : null;
 
+  // The filter hides receipts; it does not delete them from the account. Counting the summary
+  // from `fulfilledOrders` alone made it report one fulfilled order fewer than the customer
+  // owns as soon as one of them was fully spent, and zero when they all were.
+  const fulfilledWalletCount = showSpent
+    ? fulfilledOrders.length
+    : fulfilledOrders.length + spentOrderCount;
+
+  // "Nothing to use" is not "nothing bought": when the only receipts left are spent ones, the
+  // default view has emptied the list, but the orders and their vouchers are still there.
+  const onlySpentLeft = !isWorkerContext && spentOrderCount > 0;
+
   // Company context header: which company's stock this is + pool/distributed/worker counts.
   // Worker context header (epic #103 S5): who issued the fuel, and how much is
   // left. Buying stays in the personal context, so say so rather than hiding it.
@@ -523,6 +534,15 @@ export default function MyCodesScreen() {
           </View>
         ) : isEmpty ? (
           <>
+            {/* The counts stay on screen in this state on purpose: they are the proof that the
+                wallet is filtered, not empty, and they are the numbers the customer remembers. */}
+            {onlySpentLeft ? (
+              <WalletSummaryBar
+                ordersCount={orders.length}
+                fulfilledCount={fulfilledWalletCount}
+                pendingCount={pendingOrders.length}
+              />
+            ) : null}
             {spentFilter}
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconBox}>
@@ -535,21 +555,25 @@ export default function MyCodesScreen() {
                 animatedValue={pulseAnim}
                 style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
               >
-                {isWorkerContext
-                  ? t('codes.stock.workerEmpty')
-                  : isCompanyContext
-                    ? t('codes.stock.companyEmpty')
-                    : t('codes.noAssets')}
+                {onlySpentLeft
+                  ? t('codes.emptySpentTitle')
+                  : isWorkerContext
+                    ? t('codes.stock.workerEmpty')
+                    : isCompanyContext
+                      ? t('codes.stock.companyEmpty')
+                      : t('codes.noAssets')}
               </GlowText>
               <Text
                 allowFontScaling={false}
                 style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}
               >
-                {isWorkerContext
-                  ? t('codes.stock.workerEmptySub')
-                  : isCompanyContext
-                    ? t('codes.stock.companyEmptySub')
-                    : t('codes.purchaseFuel')}
+                {onlySpentLeft
+                  ? t('codes.emptySpentSubtitle')
+                  : isWorkerContext
+                    ? t('codes.stock.workerEmptySub')
+                    : isCompanyContext
+                      ? t('codes.stock.companyEmptySub')
+                      : t('codes.purchaseFuel')}
               </Text>
               <Pressable
                 onPress={() => {
@@ -590,9 +614,9 @@ export default function MyCodesScreen() {
             ) : (
               <>
                 <WalletSummaryBar
-                  orders={orders}
-                  fulfilledOrders={fulfilledOrders}
-                  pendingOrders={pendingOrders}
+                  ordersCount={orders.length}
+                  fulfilledCount={fulfilledWalletCount}
+                  pendingCount={pendingOrders.length}
                 />
                 {spentFilter}
               </>

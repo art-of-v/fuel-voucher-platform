@@ -211,6 +211,8 @@ export const en: Record<string, string> = {
   'codes.noVouchersYet': 'No vouchers yet',
   'codes.used': 'USED',
   'codes.spentFilter': 'USED',
+  'codes.emptySpentTitle': 'ALL CODES ARE USED',
+  'codes.emptySpentSubtitle': 'Turn on "USED" to see the order history',
   'codes.redeemed': 'REDEEMED',
   'codes.pendingReconciliation': 'AWAITING CONFIRMATION',
   'codes.withdrawReport': 'Withdraw report',

@@ -213,6 +213,8 @@ export const es: Record<string, string> = {
   'codes.noVouchersYet': 'Aún no hay vales',
   'codes.used': 'USADO',
   'codes.spentFilter': 'USADOS',
+  'codes.emptySpentTitle': 'TODOS LOS CÓDIGOS ESTÁN USADOS',
+  'codes.emptySpentSubtitle': 'Active «USADOS» para ver el historial de pedidos',
   'codes.redeemed': 'CANJEADO',
   'codes.pendingReconciliation': 'PENDIENTE',
   'codes.withdrawReport': 'Retirar informe',
