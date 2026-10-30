@@ -21,10 +21,10 @@ import { Text } from './Text';
  *
  * The region cannot come from `hitSlop` — React Native clips it to every ancestor's
  * frame, and overlapping slops resolve by z-order — so it is the pressable's own
- * frame, padded with transparent borders and pulled back with matching negative
- * margins: the layout does not move, only the region a touch may land in. The row
- * spans the same bands for the same reason, and is `pointerEvents="box-none"` so
- * the pixels away from a corner still reach the content.
+ * frame, padding that pulls the layout back with matching negative margins: the
+ * layout does not move, only the region a touch may land in. The row spans the same
+ * bands as transparent borders for the same reason, and is `pointerEvents="box-none"`
+ * so the pixels away from a corner still reach the content.
  *
  * `left: 0` on the leading corner is deliberate: iOS starts its swipe-back gesture
  * in a strip along the leading edge and react-native-screens cancels the touch of
