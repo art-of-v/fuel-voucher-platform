@@ -108,9 +108,12 @@ public sealed class TheThrowawayRefreshTokenDoesNotOutliveTheBind : IClassFixtur
 
         var after = await TokensAsync(userId);
 
-        after.Single(t => t.Token == SecretsHasher.Hash(browserToken)).IsRevoked.Should().BeFalse(
+        // Found by id, not by hashing the cookie: the token is base64 and the cookie carries it
+        // percent-encoded, so the header value is not the string the database hashed.
+        after.Single(t => t.Id == browserRow.Id).IsRevoked.Should().BeFalse(
             "revoking the throwaway must not sign the browser panel out");
-        after.Single(t => t.Token == SecretsHasher.Hash(throwaway)).IsRevoked.Should().BeTrue();
+        after.Single(t => t.Purpose == RefreshTokenPurpose.DeviceBinding).IsRevoked.Should().BeTrue(
+            "the token the signed challenge replaces must not outlive the bind");
 
         after.Where(t => !t.IsRevoked).Should().HaveCount(2, "the browser session and the new device session");
     }
