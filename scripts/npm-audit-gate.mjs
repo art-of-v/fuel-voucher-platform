@@ -18,6 +18,15 @@
 // It reads the lockfile, not node_modules, so it needs no install: `npm audit` resolves the tree
 // from package-lock.json. That keeps the job cheap and lets it run before anything is installed.
 //
+// The failure has to be actionable (planning #733). A new advisory blocks every open pull request
+// the moment npm publishes it, and the first version of this gate said what the advisory was but
+// not what to do about it - the operator went to the advisory page to learn that a one-line bump
+// fixed it. A blocking advisory now prints the version the tree resolves, the affected range, and
+// the patched version with the command that installs it, all read from the report and the lockfile
+// the gate already has. A package the lockfile marks dev-only is named as build-time: it is in the
+// toolchain, not in the app the customer installs, which is a fact the acceptance decision needs
+// and the advisory page does not say.
+//
 // Usage:
 //   node scripts/npm-audit-gate.mjs [--level <severity>] [--allow-list <file>] [--report-dir <dir>] <app> [<app>...]
 //
@@ -131,6 +140,17 @@ function runAudit(appDir, reportDir) {
   }
 }
 
+// The lockfile is the second half of the answer: `npm audit` says what is wrong, the lockfile says
+// which version of it this tree actually has. A missing or unreadable lockfile is not fatal - the
+// report still fails the build - so this returns null and the output says the version is unknown.
+function readLockfile(appDir) {
+  try {
+    return JSON.parse(readFileSync(join(appDir, "package-lock.json"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 // npm's report lists two kinds of `via` entries: the advisory itself (an object with the URL,
 // the title and the affected range) and the name of another vulnerable package (a string). Only
 // the first is an advisory; the second is the propagation of one, and it is counted where it
@@ -153,11 +173,67 @@ function collectAdvisories(report) {
         range: via.range ?? "",
         url: via.url ?? "",
         direct: entry.isDirect === true,
+        // The exact nodes npm blames, and what it believes clears the advisory. Both are in the
+        // report the gate already reads; without them the failure is a name and a URL.
+        nodes: Array.isArray(entry.nodes) ? entry.nodes : [],
+        fixAvailable: entry.fixAvailable,
       });
     }
   }
 
   return advisories;
+}
+
+// The installed version of the package the advisory blames, read from the app's lockfile.
+// `nodes` is the authoritative answer when the report carries it; the name match is the fallback
+// for a report that does not, and it takes the shallowest copy, which is the one npm reports first.
+function lockEntry(advisory, lock) {
+  const packages = lock?.packages;
+  if (!packages) return null;
+
+  for (const node of advisory.nodes) {
+    const entry = packages[node];
+    if (entry?.version) {
+      return { version: entry.version, dev: entry.dev === true, path: node };
+    }
+  }
+
+  const suffix = `node_modules/${advisory.package}`;
+  const matches = Object.entries(packages)
+    .filter(([path, entry]) => entry?.version && path.endsWith(suffix))
+    .sort(([a], [b]) => a.split("node_modules/").length - b.split("node_modules/").length);
+
+  return matches.length === 0
+    ? null
+    : { version: matches[0][1].version, dev: matches[0][1].dev === true, path: matches[0][0] };
+}
+
+function resolvedLine(advisory, resolved) {
+  const affected = advisory.range ? `, the advisory affects ${advisory.range}` : "";
+  if (!resolved) {
+    return `the lockfile does not name ${advisory.package}${affected} - the report and the tree disagree, so read the advisory before acting on it`;
+  }
+  return `resolved ${resolved.version} (${resolved.path})${affected}`;
+}
+
+// What to do, in one line. `fixAvailable` is npm's answer: false (nothing published fixes it),
+// true (something does, but it could not name a version), or {name, version, isSemVerMajor} where
+// `name` is the package to install - a parent when the vulnerable package is transitive.
+function fixLine(advisory, appName) {
+  const fix = advisory.fixAvailable;
+  if (fix === false || fix == null) {
+    return "no published version clears this - the accepted-risk list, with the reason, is the only way to record the decision";
+  }
+  if (fix === true) {
+    return "npm reports a fix exists but names no version - run `npm audit` in the app for the upgrade path";
+  }
+
+  const command = `cd ${appName} && npm install ${fix.name}@${fix.version}`;
+  const major = fix.isSemVerMajor ? "a major bump" : "a bump";
+  if (fix.name === advisory.package) {
+    return `patched ${fix.version} - ${command}`;
+  }
+  return `the fix is ${fix.name}@${fix.version}, ${major} of the package that carries ${advisory.package} - ${command}`;
 }
 
 function evaluate(appName, advisories, accepted, level) {
@@ -185,7 +261,7 @@ function evaluate(appName, advisories, accepted, level) {
   return { blocked, acceptedHere, stale };
 }
 
-function describe(appName, result, level) {
+function describe(appName, result, level, lock) {
   const lines = [];
   const blocking = result.blocked.length;
   const listed = result.acceptedHere.filter((item) => item.entry).length;
@@ -213,9 +289,19 @@ function describe(appName, result, level) {
       `   ${blocking} advisory/advisories at or above the level '${level}' are NOT on the accepted-risk list:`
     );
     for (const advisory of result.blocked) {
-      lines.push(`   ${advisory.severity.padEnd(8)} ${advisory.id}  ${advisory.package}`);
+      const resolved = lockEntry(advisory, lock);
+      lines.push(
+        `   ${advisory.severity.padEnd(8)} ${advisory.id}  ${advisory.package}${advisory.direct ? "  (direct dependency)" : ""}`
+      );
       lines.push(`            ${advisory.title}`);
       lines.push(`            ${advisory.url}`);
+      lines.push(`            ${resolvedLine(advisory, resolved)}`);
+      lines.push(`            ${fixLine(advisory, appName)}`);
+      if (resolved?.dev) {
+        lines.push(
+          "            build-time only: the lockfile marks this package dev-only, so it is in the toolchain, not in the app the customer installs"
+        );
+      }
     }
   }
 
@@ -245,7 +331,7 @@ function main() {
     const advisories = collectAdvisories(report);
     const result = evaluate(basename(appDir), advisories, accepted, level);
 
-    console.log(describe(basename(appDir), result, level));
+    console.log(describe(basename(appDir), result, level, readLockfile(appDir)));
     blocked += result.blocked.length;
   }
 
