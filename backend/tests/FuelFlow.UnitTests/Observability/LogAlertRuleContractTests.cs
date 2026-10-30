@@ -158,7 +158,7 @@ public class LogAlertRuleContractTests
     public void UpgWogRepricing_IsLoggedAtInformation()
     {
         var source = ReadFile(Path.Combine(
-            RepositoryRoot(), "backend", "src", "FuelFlow.API", "BackgroundJobs", "UpgWogPriceSyncService.cs"));
+            RepositoryRoot(), "backend", "src", "FuelFlow.API", "BackgroundJobs", "UpgPriceSyncService.cs"));
 
         source.Should().MatchRegex(
             @"LogInformation\(\s*""\{Brand\} sync repriced",

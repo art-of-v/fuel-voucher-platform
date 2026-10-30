@@ -48,11 +48,11 @@ public sealed class AdminSyncCatalogueController : ControllerBase
     public IActionResult Sync()
     {
         _jobs.Enqueue<OkkoPriceSyncService>(job => job.SyncCatalogueAndPricesAsync(CancellationToken.None));
-        _jobs.Enqueue<UpgWogPriceSyncService>(job => job.SyncCatalogueAndPricesAsync(CancellationToken.None));
-        _jobs.Enqueue<KloPriceSyncService>(job => job.SyncCatalogueAndPricesAsync(CancellationToken.None));
+        _jobs.Enqueue<UpgPriceSyncService>(job => job.SyncCatalogueAndPricesAsync(CancellationToken.None));
+        _jobs.Enqueue<MinfinPriceSyncService>(job => job.SyncCatalogueAndPricesAsync(CancellationToken.None));
 
         return Accepted(
-            "The catalogue check is running for OKKO, UPG, WOG and KLO. What it found is in the "
+            "The catalogue check is running for OKKO, UPG, KLO and WOG. What it found is in the "
             + "backend log, and what it changed is in the brands screen.");
     }
 }
