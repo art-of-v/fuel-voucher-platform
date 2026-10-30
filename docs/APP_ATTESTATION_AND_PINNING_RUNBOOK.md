@@ -109,8 +109,10 @@ middleware returning before it looked at a request. The first verdict is in Loki
 Attestation Missing for "POST" "/api/auth/verify" from device "-" os null version null; report-only, request continues
 ```
 
-A git deploy does not touch the droplet's env file, so the live value is the droplet's value. On the
-droplet:
+A git deploy does not touch the droplet's env file, so the live value is the droplet's value. Since
+#753 `preflight.sh` compares those three keys with `deploy/.env.production.example` and stops
+`restart.sh` before it restarts anything on a difference, naming the key, both values and the file —
+an unrecorded drift cannot survive a deploy any more. On the droplet:
 
 ```bash
 cd /root/FuelFlow/deploy
@@ -151,8 +153,12 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs --sinc
 
 Expected: `Missing` for the 1.1.0 fleet, no attestation-caused 401/503, and `Valid` only after a
 new native build is installed. Do not set `ATTESTATION_MODE=Enforce` yet. To roll the measurement
-back, set `ATTESTATION_ENABLED=false` (keep the acknowledgement true) and restart; no client
-release is involved.
+back, set `ATTESTATION_ENABLED=false` (keep the acknowledgement true), add
+`ENV_DRIFT_ACKNOWLEDGED="ATTESTATION_ENABLED"` to the same `.env.production`, and restart; no client
+release is involved. The acknowledgement is not bookkeeping: `preflight.sh` compares this file with
+`deploy/.env.production.example` and refuses to restart on a difference nobody recorded (#753), so
+without it the rollback stops at the preflight — and with it, every restart says out loud that the
+switch is off on purpose.
 
 **What the measurement can and cannot see.** The protected set is
 `backend/src/FuelFlow.API/SharedKernel/Options/AttestationOptions.cs:126`: `/api/auth/send-code`,
