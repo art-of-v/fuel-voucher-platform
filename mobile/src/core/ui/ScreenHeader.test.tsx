@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
-import { HEADER_BOTTOM_HIT, HEADER_DROP, HEADER_REACH, ScreenHeader } from './ScreenHeader';
+import { HEADER_BOTTOM_HIT, HEADER_DROP, HEADER_LIFT, ScreenHeader } from './ScreenHeader';
 import { Haptics } from '../utils/haptics';
 
 /**
@@ -44,23 +44,28 @@ it('makes the back target the whole header corner', () => {
   const slop = back().props.hitSlop;
 
   // 48pt of box plus the reach on both axes. The height is the one that matters:
-  // a thumb reaching for the top-left corner lands 20-40pt below the glyph, so the
-  // target has to run past the bottom of the row.
+  // a thumb reaching for the top-left corner lands 20-40pt below the glyph when it
+  // comes from the content and above it when it comes down from the status bar, so
+  // the target has to run past both edges of the row.
   expect(style.width + slop.left + slop.right).toBeGreaterThanOrEqual(80);
-  expect(style.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(92);
+  expect(style.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(120);
 });
 
-it('lets the corner answer below the row without eating the content', () => {
+it('lets the corner answer above and below the row without eating the content', () => {
   render(<ScreenHeader title="OKKO" testID="header" />);
 
   // `hitSlop` is clipped by every ancestor's frame, so the row itself has to own
-  // the extra band — and `box-none` keeps that band from swallowing content taps
+  // the extra bands — and `box-none` keeps them from swallowing content taps
   // outside the corner targets.
   const row = screen.getByTestId('header');
   const style = StyleSheet.flatten(row.props.style);
 
   expect(style.borderBottomWidth).toBe(HEADER_DROP);
   expect(style.marginBottom).toBe(-HEADER_DROP);
+  // Above the row the band is the safe area `PageLayout` reserves: the border must
+  // be as deep as the margin is negative, or the row slides off its own line.
+  expect(style.borderTopWidth).toBeGreaterThan(0);
+  expect(style.marginTop).toBe(-style.borderTopWidth);
   expect(row.props.pointerEvents).toBe('box-none');
 });
 
@@ -81,9 +86,9 @@ it('gives a trailing action a frame its hitSlop can reach into', () => {
   const slot = screen.getByTestId('header-actions');
   const style = StyleSheet.flatten(slot.props.style);
 
-  expect(style.borderTopWidth).toBe(HEADER_REACH);
+  expect(style.borderTopWidth).toBe(HEADER_LIFT);
   expect(style.borderBottomWidth).toBe(HEADER_BOTTOM_HIT);
-  expect(style.marginTop).toBe(-HEADER_REACH);
+  expect(style.marginTop).toBe(-HEADER_LIFT);
   expect(style.marginBottom).toBe(-HEADER_BOTTOM_HIT);
   expect(slot.props.pointerEvents).toBe('box-none');
 });

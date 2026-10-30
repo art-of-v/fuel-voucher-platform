@@ -86,12 +86,28 @@ export function useContentInsets(options?: {
 }
 
 /**
+ * The band `PageLayout` reserves above a `ScreenHeader`: the safe-area inset plus
+ * the gap the row leaves under it.
+ *
+ * The header needs the number to grow its own touch frame into the band — a touch
+ * is never delivered past an ancestor's frame, and the safe area is the ancestor's
+ * padding. Both sides read it from here so they cannot drift.
+ */
+export function useHeaderTopBand(): number {
+  const insets = useSafeAreaInsets();
+  const tokens = useDesignTokens();
+  return insets.top + tokens.spacing.sm;
+}
+
+/**
  * The screen container. Owns every ergonomic rule so no screen has to.
  *
  * What it owns:
- * - **Safe areas.** Top/left/right via `SafeAreaView`; the bottom inset is applied
- *   to content padding and to the footer, never to the canvas, so backgrounds
- *   still reach the edge of the display.
+ * - **Safe areas.** Left/right via `SafeAreaView`; the top inset is applied to the
+ *   header slot instead, so the header's touch frame reaches the top of the screen
+ *   (the same pixels either way — the header's row takes the band back with a
+ *   negative margin). The bottom inset is applied to content padding and to the
+ *   footer, never to the canvas, so backgrounds still reach the edge of the display.
  * - **Bottom clearance.** Content bottom padding is derived:
  *   `insets.bottom + (tab bar ? tabBarHeight : 0) + (footer ? footerHeight : 0) +
  *   contentBottomGap`. This replaces the previous fixed `paddingBottom: 150` in
@@ -123,6 +139,7 @@ export function PageLayout({
 }: PageLayoutProps) {
   const tokens = useDesignTokens();
   const insets = useSafeAreaInsets();
+  const headerBand = useHeaderTopBand();
   const { bottom: contentBottomPadding, hasTabBar: tabBarShown } = useContentInsets({
     hasFooter: !!footer,
     hasTabBar,
@@ -166,7 +183,7 @@ export function PageLayout({
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right']}
+      edges={['left', 'right']}
       style={[{ flex: 1, backgroundColor: tokens.colors.background }, style]}
       testID={testID}
     >
@@ -187,11 +204,23 @@ export function PageLayout({
       ) : null}
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={{ flex: 1, paddingTop: header ? 0 : insets.top }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {header ? (
-          <View style={{ zIndex: tokens.zIndex.header, paddingTop: tokens.spacing.sm }}>
+          <View
+            pointerEvents="box-none"
+            testID="page-header-slot"
+            style={{
+              zIndex: tokens.zIndex.header,
+              // The slot owns the band the header's corner targets may answer in:
+              // the safe area plus the row's gap above it, and the corner drop
+              // below. `box-none` keeps it from swallowing those pixels itself.
+              paddingTop: headerBand,
+              paddingBottom: tokens.chrome.headerCornerDrop,
+              marginBottom: -tokens.chrome.headerCornerDrop,
+            }}
+          >
             {header}
           </View>
         ) : null}
