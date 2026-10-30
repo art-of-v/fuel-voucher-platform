@@ -2,9 +2,11 @@ import React from 'react';
 import { StyleProp, View, ViewStyle } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { chrome } from '../design/layout';
 import { useDesignTokens } from '../hooks/useTheme';
 import { useI18n } from '../i18n';
 import { IconButton } from './IconButton';
+import { useHeaderTopBand } from './PageLayout';
 import { Text } from './Text';
 
 /**
@@ -12,16 +14,17 @@ import { Text } from './Text';
  *
  * The header is the one row where each end has an empty corner, so a thumb that
  * lands beside the 22pt glyph should still count. On a device the miss was almost
- * always *below* the glyph: a hand reaching for the top-left corner lands 20-40pt
- * under the control, in the blank space above the content. So a corner keeps
- * answering taps past the bottom of the row, not only in the ring around the box.
+ * always off the control's own band — under it when the hand comes from below, and
+ * over it into the safe-area strip when the hand reaches from above — so a corner
+ * owns a slice of both, not only a ring around the box.
  *
  * The reach cannot come from `hitSlop` on its own — React Native never delivers a
- * touch past an ancestor's frame — so the row and its slots carry it as a
- * transparent border and take the space back with a matching negative margin: the
- * layout does not move, only the frame a touch may land in. The row is
- * `pointerEvents="box-none"`, so the band it adds over the content answers only
- * inside a corner target and never across the full width.
+ * touch past an ancestor's frame — so the row carries it as a transparent border
+ * and takes the space back with a matching negative margin: the layout does not
+ * move, only the frame a touch may land in. Above the row the band is the
+ * safe-area inset `PageLayout` reserves (`useHeaderTopBand`); below it is
+ * `headerCornerDrop`. The row is `pointerEvents="box-none"`, so the band it adds
+ * over the content answers only inside a corner target, never across the width.
  *
  * `left: 0` on the leading control is deliberate: iOS starts its swipe-back
  * gesture in a strip along the leading edge and react-native-screens cancels the
@@ -29,19 +32,21 @@ import { Text } from './Text';
  */
 export const HEADER_REACH = 12;
 /** How far below the row a corner target keeps answering taps. */
-export const HEADER_DROP = 28;
+export const HEADER_DROP = chrome.headerCornerDrop;
+/** How far above the row a corner target reaches into the safe-area band. */
+export const HEADER_LIFT = chrome.headerCornerLift;
 /** The row's own padding below the controls — reach past it is `HEADER_DROP` more. */
 const HEADER_ROW_PAD = 16;
 /** Total reach below a control's bottom edge, so the corner ends level on both ends. */
 export const HEADER_BOTTOM_HIT = HEADER_ROW_PAD + HEADER_DROP;
 export const HEADER_LEADING_HIT_SLOP = {
-  top: HEADER_REACH,
+  top: HEADER_LIFT,
   bottom: HEADER_BOTTOM_HIT,
   left: 0,
   right: 32,
 };
 export const HEADER_TRAILING_HIT_SLOP = {
-  top: HEADER_REACH,
+  top: HEADER_LIFT,
   bottom: HEADER_BOTTOM_HIT,
   left: 32,
   right: HEADER_REACH,
@@ -49,12 +54,12 @@ export const HEADER_TRAILING_HIT_SLOP = {
 
 /** The frame a header action's touch may land in, as a style a slot must carry. */
 export const HEADER_ACTION_FRAME = {
-  borderTopWidth: HEADER_REACH,
+  borderTopWidth: HEADER_LIFT,
   borderLeftWidth: HEADER_REACH,
   borderRightWidth: HEADER_REACH,
   borderBottomWidth: HEADER_BOTTOM_HIT,
   borderColor: 'transparent',
-  marginTop: -HEADER_REACH,
+  marginTop: -HEADER_LIFT,
   marginLeft: -HEADER_REACH,
   marginRight: -HEADER_REACH,
   marginBottom: -HEADER_BOTTOM_HIT,
@@ -111,6 +116,10 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const tokens = useDesignTokens();
   const t = useI18n((s) => s.t);
+  // The safe-area band above the row that `PageLayout` reserves. This row's frame
+  // has to include it: a touch never reaches past an ancestor's frame, so a corner
+  // cannot answer a hand that comes down from the status bar unless the frame does.
+  const headerBand = useHeaderTopBand();
 
   const handleBack = onBack ?? (() => router.back());
 
@@ -126,10 +135,14 @@ export function ScreenHeader({
           minHeight: tokens.chrome.headerHeight,
           paddingHorizontal: tokens.spacing.containerPadding,
           paddingBottom: tokens.spacing.lg,
-          // The band a corner keeps answering in below the row. `box-none` keeps
-          // it from swallowing content taps outside the corner targets.
+          // The bands a corner keeps answering in, above and below the row. The
+          // borders grow the frame, the margins take the same space back, so the
+          // layout does not move. `box-none` keeps the bands from swallowing
+          // content taps outside the corner targets.
+          borderTopWidth: headerBand,
           borderBottomWidth: HEADER_DROP,
           borderColor: 'transparent',
+          marginTop: -headerBand,
           marginBottom: -HEADER_DROP,
         },
         style,

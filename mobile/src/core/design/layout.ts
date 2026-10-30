@@ -214,6 +214,18 @@ export const chrome = {
   tabBarHeight: 56,
   /** Height of a screen header row (the back/title/action line). */
   headerHeight: 56,
+  /**
+   * How far below the header row its corner controls keep answering taps. A thumb
+   * reaching for the top corner lands under the drawn control, so the corner owns
+   * this much of the content's top edge — `PageLayout` reserves it and the row
+   * carries it as a transparent border.
+   */
+  headerCornerDrop: 28,
+  /**
+   * How far above the header row a corner answers, measured into the safe-area
+   * band. The status bar's own strip stays out of it.
+   */
+  headerCornerLift: 32,
   /** Breathing room between the last content item and the chrome below it. */
   contentBottomGap: spacing.lg,
   /** Height of a sticky footer action bar, excluding the safe-area inset. */
