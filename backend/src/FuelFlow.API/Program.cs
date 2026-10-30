@@ -12,7 +12,6 @@ using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Time;
 using Hangfire;
-using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Features;
@@ -172,6 +171,11 @@ try
         options.MultipartBodyLengthLimit = RequestSizeLimits.DefaultMaxRequestBodySize);
     builder.WebHost.ConfigureKestrel(options =>
         options.Limits.MaxRequestBodySize = RequestSizeLimits.DefaultMaxRequestBodySize);
+    // The job dashboard validates a request token on every non-GET request
+    // (Middleware/HangfireDashboardSetup.cs), and it resolves IAntiforgery from the container. MVC
+    // registers it as a side effect; naming it here says what the dashboard depends on, and keeps
+    // the dependency if MVC's own registration ever stops arriving with AddControllers.
+    builder.Services.AddAntiforgery();
     builder.Services.AddControllers(options =>
         {
             // Every failure leaves the API as the same RFC 9457 document, with the request path
@@ -193,11 +197,7 @@ try
     app.UseAppPipeline();
 
     var allowDashboardBypass = builder.Configuration.GetValue<bool>("Auth:DevBypass");
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions
-    {
-        Authorization = new[] { new HangfireDashboardAuthorizationFilter(allowDashboardBypass) },
-        IgnoreAntiforgeryToken = true
-    });
+    app.UseHangfireDashboard("/hangfire", HangfireDashboardSetup.Options(allowDashboardBypass));
     app.MigrateDatabaseOnStartup();
 
     using (var scope = app.Services.CreateScope())
