@@ -509,6 +509,46 @@ jobs:
       - name: Scan the JavaScript dependencies
         run: node scripts/npm-audit-gate.mjs admin mobile
 
+  # The code-size target, from docs/CODE_SIZE.md in the planning repo.
+  #
+  # The document adopted "no new production file above 500 non-blank lines" on 2026-10-22 and
+  # called itself a review target rather than a gate. Eight days later four production files had
+  # crossed the line, the table of grandfathered files had never heard of them, and three recorded
+  # counts had drifted - because the rule's only memory was a table somebody had to remember to
+  # edit (planning #747). This job is that memory: scripts/code-size-exceptions.json holds the
+  # recorded rows, and the gate refuses a file that is over the line and unrecorded, a row whose
+  # count no longer matches, a row for a file that is now under the line, and a row that points at
+  # nothing.
+  #
+  # It measures every production directory, not just the one that changed - a file cannot be
+  # measured without the tree, and the whole tree takes a second - so a change to any of the four
+  # app directories or to scripts/ runs it. Anything outside them sets every flag, so a repo-root
+  # change runs it too.
+  #
+  # Read-only: it needs no install, no network and no toolchain beyond the Node the other jobs use.
+  code-size:
+    name: Code size
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.admin == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.website == 'true' || needs.changes.outputs.scripts == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The negative control: a synthetic tree that disagrees with its table, so the failure
+      # classes and the exit codes are proved before the real tree is measured. A gate that
+      # passes everything looks exactly like a gate that passes the right things.
+      - name: Test the code-size gate
+        run: node --test scripts/code-size-gate.test.mjs
+
+      - name: Measure the production tree
+        run: node scripts/code-size-gate.mjs
+
   website:
     name: Website (Next.js static)
     runs-on: ubuntu-latest
@@ -1470,7 +1510,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, local-stack, npm-audit, dryrun-dump, dryrun-migrate, dryrun-staging-migrate, fromzero-schema]
+    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, local-stack, npm-audit, code-size, dryrun-dump, dryrun-migrate, dryrun-staging-migrate, fromzero-schema]
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed

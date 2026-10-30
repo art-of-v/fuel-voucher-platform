@@ -176,6 +176,22 @@ dependency, is a one-line bump read off the failure rather than a trip to the ad
 The `overrides` blocks in `admin/package.json` and `mobile/package.json` pin the transitive
 dependencies whose advisory has a fix, so a lockfile refresh cannot quietly bring one back.
 
+### Code size
+
+CI refuses a production file above 500 non-blank lines unless the table records it — the target is
+`docs/CODE_SIZE.md` in the planning repo:
+
+```bash
+node scripts/code-size-gate.mjs                 # what CI runs
+node --test scripts/code-size-gate.test.mjs     # the gate's own tests
+```
+
+`scripts/code-size-exceptions.json` is the record: every file already over the line, its count and
+the reason it stays. The gate fails if a file is over the line and unrecorded, if a recorded count no
+longer matches the tree, if a row names a file that is now under the line (delete it) or no longer
+exists. A file that grows past the line is split by responsibility in the pull request that grows
+it; adding a row instead is a decision that names a reason and a follow-up issue.
+
 ### Database migrations
 
 Migrations auto-apply on startup (`RunMigrationsOnBoot`, default `true`); to apply them by hand:
