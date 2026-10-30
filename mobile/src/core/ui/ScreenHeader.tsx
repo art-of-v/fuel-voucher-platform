@@ -11,36 +11,53 @@ import { Text } from './Text';
  * How far a header control reaches past the box it draws.
  *
  * The header is the one row where each end has an empty corner, so a thumb that
- * lands beside the 22pt glyph should still count: 48pt of box plus this reach is
- * 72pt across and taller than the row, which is close to twice the area of the box
- * alone. The reach cannot come from `hitSlop` on its own — React Native never
- * delivers a touch past an ancestor's frame — so the slots carry it as a
+ * lands beside the 22pt glyph should still count. On a device the miss was almost
+ * always *below* the glyph: a hand reaching for the top-left corner lands 20-40pt
+ * under the control, in the blank space above the content. So a corner keeps
+ * answering taps past the bottom of the row, not only in the ring around the box.
+ *
+ * The reach cannot come from `hitSlop` on its own — React Native never delivers a
+ * touch past an ancestor's frame — so the row and its slots carry it as a
  * transparent border and take the space back with a matching negative margin: the
- * layout does not move, only the frame a touch may land in.
+ * layout does not move, only the frame a touch may land in. The row is
+ * `pointerEvents="box-none"`, so the band it adds over the content answers only
+ * inside a corner target and never across the full width.
  *
  * `left: 0` on the leading control is deliberate: iOS starts its swipe-back
  * gesture in a strip along the leading edge and react-native-screens cancels the
  * touch of anything under it, so the leading reach may only go inwards.
  */
 export const HEADER_REACH = 12;
+/** How far below the row a corner target keeps answering taps. */
+export const HEADER_DROP = 28;
+/** The row's own padding below the controls — reach past it is `HEADER_DROP` more. */
+const HEADER_ROW_PAD = 16;
+/** Total reach below a control's bottom edge, so the corner ends level on both ends. */
+export const HEADER_BOTTOM_HIT = HEADER_ROW_PAD + HEADER_DROP;
 export const HEADER_LEADING_HIT_SLOP = {
   top: HEADER_REACH,
-  bottom: 16,
+  bottom: HEADER_BOTTOM_HIT,
   left: 0,
-  right: 24,
+  right: 32,
 };
 export const HEADER_TRAILING_HIT_SLOP = {
   top: HEADER_REACH,
-  bottom: 16,
-  left: HEADER_REACH,
+  bottom: HEADER_BOTTOM_HIT,
+  left: 32,
   right: HEADER_REACH,
 };
 
 /** The frame a header action's touch may land in, as a style a slot must carry. */
 export const HEADER_ACTION_FRAME = {
-  borderWidth: HEADER_REACH,
+  borderTopWidth: HEADER_REACH,
+  borderLeftWidth: HEADER_REACH,
+  borderRightWidth: HEADER_REACH,
+  borderBottomWidth: HEADER_BOTTOM_HIT,
   borderColor: 'transparent',
-  margin: -HEADER_REACH,
+  marginTop: -HEADER_REACH,
+  marginLeft: -HEADER_REACH,
+  marginRight: -HEADER_REACH,
+  marginBottom: -HEADER_BOTTOM_HIT,
 } as const;
 
 export interface ScreenHeaderProps {
@@ -100,6 +117,7 @@ export function ScreenHeader({
   return (
     <View
       testID={testID}
+      pointerEvents="box-none"
       style={[
         {
           flexDirection: 'row',
@@ -108,6 +126,11 @@ export function ScreenHeader({
           minHeight: tokens.chrome.headerHeight,
           paddingHorizontal: tokens.spacing.containerPadding,
           paddingBottom: tokens.spacing.lg,
+          // The band a corner keeps answering in below the row. `box-none` keeps
+          // it from swallowing content taps outside the corner targets.
+          borderBottomWidth: HEADER_DROP,
+          borderColor: 'transparent',
+          marginBottom: -HEADER_DROP,
         },
         style,
       ]}
@@ -148,6 +171,7 @@ export function ScreenHeader({
       {actions ? (
         <View
           testID="header-actions"
+          pointerEvents="box-none"
           style={[
             { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm },
             // Grows the frame an action's `hitSlop` can reach into, without moving
