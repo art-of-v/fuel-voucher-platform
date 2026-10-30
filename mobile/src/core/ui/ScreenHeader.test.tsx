@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
-import { HEADER_ACTION_FRAME, ScreenHeader } from './ScreenHeader';
+import { HEADER_BOTTOM_HIT, HEADER_DROP, HEADER_REACH, ScreenHeader } from './ScreenHeader';
 import { Haptics } from '../utils/haptics';
 
 /**
@@ -43,10 +43,25 @@ it('makes the back target the whole header corner', () => {
   const style = StyleSheet.flatten(back().props.style);
   const slop = back().props.hitSlop;
 
-  // 48pt of box plus the reach on both axes: 72 across and the full row height,
-  // which is what a thumb that lands beside the glyph needs to still count.
-  expect(style.width + slop.left + slop.right).toBeGreaterThanOrEqual(72);
-  expect(style.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(64);
+  // 48pt of box plus the reach on both axes. The height is the one that matters:
+  // a thumb reaching for the top-left corner lands 20-40pt below the glyph, so the
+  // target has to run past the bottom of the row.
+  expect(style.width + slop.left + slop.right).toBeGreaterThanOrEqual(80);
+  expect(style.height + slop.top + slop.bottom).toBeGreaterThanOrEqual(92);
+});
+
+it('lets the corner answer below the row without eating the content', () => {
+  render(<ScreenHeader title="OKKO" testID="header" />);
+
+  // `hitSlop` is clipped by every ancestor's frame, so the row itself has to own
+  // the extra band — and `box-none` keeps that band from swallowing content taps
+  // outside the corner targets.
+  const row = screen.getByTestId('header');
+  const style = StyleSheet.flatten(row.props.style);
+
+  expect(style.borderBottomWidth).toBe(HEADER_DROP);
+  expect(style.marginBottom).toBe(-HEADER_DROP);
+  expect(row.props.pointerEvents).toBe('box-none');
 });
 
 it('keeps the title from swallowing half of the back target', () => {
@@ -61,11 +76,16 @@ it('gives a trailing action a frame its hitSlop can reach into', () => {
   render(<ScreenHeader title="OKKO" actions={<View testID="action" />} />);
 
   // React Native never delivers a touch past an ancestor's frame, so a trailing
-  // action's reach only exists if its slot carries one.
-  const slot = StyleSheet.flatten(screen.getByTestId('header-actions').props.style);
+  // action's reach only exists if its slot carries one — upwards, sideways, and
+  // the same drop below the row that the leading control gets.
+  const slot = screen.getByTestId('header-actions');
+  const style = StyleSheet.flatten(slot.props.style);
 
-  expect(slot.borderWidth).toBe(HEADER_ACTION_FRAME.borderWidth);
-  expect(slot.margin).toBe(-HEADER_ACTION_FRAME.borderWidth);
+  expect(style.borderTopWidth).toBe(HEADER_REACH);
+  expect(style.borderBottomWidth).toBe(HEADER_BOTTOM_HIT);
+  expect(style.marginTop).toBe(-HEADER_REACH);
+  expect(style.marginBottom).toBe(-HEADER_BOTTOM_HIT);
+  expect(slot.props.pointerEvents).toBe('box-none');
 });
 
 it('renders no back control when the screen is a root', () => {
