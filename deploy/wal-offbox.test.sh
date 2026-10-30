@@ -12,7 +12,10 @@
 #   * a second run uploads nothing and does not fail;
 #   * a quiet database (no finished segment) exits 0 - "nothing to ship" is not a failure;
 #   * an upload failure exits non-zero (the unit's OnFailure alert depends on it);
-#   * the remote retention prune removes old segments and leaves status.txt alone;
+#   * a shipment NEVER scans or prunes the remote - a full-prefix prune every minute is
+#     what timed out runs whose shipment had already succeeded (2026-10-29);
+#   * the nightly retention prune (wal_prune_remote) removes old segments and leaves
+#     status.txt alone;
 #   * the restore library finds the newest base backup, fetches it, and decrypts a set of
 #     per-segment objects;
 #   * the drill refuses a remote that is not a drill prefix, so a drill can never write
@@ -145,7 +148,6 @@ run_ship() {
     BACKUP_AGE_RECIPIENT= \
     WAL_ARCHIVE_DIR="$TMP/archive" \
     WAL_SHIP_STATE_DIR="$TMP/state" \
-    WAL_REMOTE_RETENTION_DAYS=31 \
     WAL_SEGMENT_SIZE="$SEGMENT_SIZE" \
     ENV_FILE="$TMP/env" \
     RCLONE_BIN="$FAKEBIN/rclone" \
@@ -207,14 +209,27 @@ run_ship
 assert_status "the next run recovers and ships" 0
 assert_file "the retried segment is off-box" "$TMP/remote/wal/$SEG2.age"
 
-# Retention: an old segment object is pruned; the status object is not.
+# Retention is NOT the shipper's job. A full-prefix scan costs about a tenth of a second
+# per object, so running it every minute is what timed out shipments that had already
+# succeeded on 2026-10-29 (2.5-10 minutes inside a 600 s unit timeout).
+RCLONE="$FAKEBIN/rclone"
+AGE="$FAKEBIN/age"
+# shellcheck source=wal-offbox.sh
+source "$SCRIPT_DIR/wal-offbox.sh"
+
 OLD=0000000100000000000000FF
 printf 'old\n' > "$TMP/remote/wal/$OLD.age"
 touch -d '40 days ago' "$TMP/remote/wal/$OLD.age"
 run_ship
-assert_status "the prune run succeeds" 0
-assert_no_file "an old remote segment is pruned" "$TMP/remote/wal/$OLD.age"
-assert_file "the status object survives the prune" "$TMP/remote/wal/status.txt"
+assert_status "a shipment with an old object in the prefix succeeds" 0
+assert_file "a shipment does not prune the remote" "$TMP/remote/wal/$OLD.age"
+assert_file "the status object is still written" "$TMP/remote/wal/status.txt"
+
+# The nightly backup prunes the prefix instead, through the shared helper.
+wal_prune_remote "$TMP/remote/wal" 31
+assert_no_file "the nightly prune removes the old segment" "$TMP/remote/wal/$OLD.age"
+assert_file "the nightly prune leaves the status object" "$TMP/remote/wal/status.txt"
+assert_file "the nightly prune leaves a young segment" "$TMP/remote/wal/$SEG1.age"
 
 # --- a half-written segment must not reach the bucket ------------------------------------
 # The archiver's cp writes a segment into the archive directory IN PLACE, so the file is
@@ -275,10 +290,6 @@ fi
 # The off-box sizes are read with rclone's own separator ("; "), not a space: the first
 # version of this parser split on whitespace only and therefore read NO sizes at all,
 # which made the whole verification say "everything is missing".
-RCLONE="$FAKEBIN/rclone"
-AGE="$FAKEBIN/age"
-# shellcheck source=wal-offbox.sh
-source "$SCRIPT_DIR/wal-offbox.sh"
 assert_eq "the off-box object sizes are read" \
   "$(wal_remote_object_sizes "$TMP/remote/wal" | awk -v n="$SEG1.age" '$1 == n { print $2; exit }')" \
   "$SEGMENT_SIZE"

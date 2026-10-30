@@ -16,8 +16,16 @@
 #   3. re-uploads any segment whose off-box object is shorter than the segment itself -
 #      a half-written upload that was never replaced;
 #   4. writes wal/status.txt with the newest segment, its archive time, the upload time
-#      and the lag - so "is it shipping?" has an answer that is not a guess;
-#   5. prunes remote segments older than WAL_REMOTE_RETENTION_DAYS (default 31).
+#      and the lag - so "is it shipping?" has an answer that is not a guess.
+#
+# It does NOT prune, and that is deliberate. A prune is a full scan of the wal/ prefix and
+# costs about a tenth of a second per object: measured on the production box on
+# 2026-10-29, 60-105 s for 707 objects to delete NOTHING (the oldest segment was six days
+# old), and several minutes when a connection stalled. Under this unit's 600 s timeout
+# that failed runs whose shipment had already succeeded - 30+ OnFailure alerts in one day -
+# and at the 31 days of retention the bucket is sized for it extrapolates to five minutes
+# or more, over the budget on its own. Retention is the nightly backup's job
+# (deploy/backup.sh); this script must stay proportional to the number of NEW segments.
 #
 # "Complete" is checked, not assumed: the archiver's cp writes a segment into the
 # archive directory in place, so the file is briefly shorter than a segment while it is
@@ -46,7 +54,6 @@ ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env.production}"
 WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 WAL_SHIP_STATE_DIR="${WAL_SHIP_STATE_DIR:-/var/lib/fuelflow}"
 WAL_SHIP_MAX_LAG_SECONDS="${WAL_SHIP_MAX_LAG_SECONDS:-900}"
-WAL_REMOTE_RETENTION_DAYS="${WAL_REMOTE_RETENTION_DAYS:-31}"
 RCLONE="${RCLONE_BIN:-rclone}"
 AGE="${AGE_BIN:-age}"
 
@@ -106,7 +113,7 @@ fi
 # prefix may not exist on the first run, and the upload below creates it. If the remote
 # is really unreachable, the upload fails and the unit alerts.
 declare -A REMOTE=()
-if LISTING="$("$RCLONE" lsf "$REMOTE_DIR" --files-only 2>/dev/null)"; then
+if LISTING="$("$RCLONE" lsf "$REMOTE_DIR" --files-only "${WAL_RCLONE_TIMEOUT[@]}" 2>/dev/null)"; then
   while IFS= read -r name; do
     [[ -n "$name" ]] || continue
     REMOTE["$name"]=1
@@ -243,20 +250,11 @@ STATUS_TMP="$TMP/status.txt"
   printf 'last_upload_lag_seconds=%s\n' "${LAST_LAG:--}"
 } > "$STATUS_TMP"
 
-if ! "$RCLONE" copyto "$STATUS_TMP" "$REMOTE_DIR/status.txt"; then
+if ! "$RCLONE" copyto "$STATUS_TMP" "$REMOTE_DIR/status.txt" "${WAL_RCLONE_TIMEOUT[@]}"; then
   echo "ERROR: the segments uploaded, but the status object could not be written." >&2
   echo "       That is an observability failure, so this run still fails and alerts." >&2
   exit 1
 fi
 cp "$STATUS_TMP" "$WAL_SHIP_STATE_DIR/status.txt"
-
-# The off-box copy is the disaster-recovery copy, so it is kept longer than the on-box
-# archive (3 days). It is not fatal: the upload above already succeeded, and a transient
-# delete failure must not page anyone or discard a good night's copy.
-if ! "$RCLONE" delete --min-age "${WAL_REMOTE_RETENTION_DAYS}d" \
-     --include '*.age' "$REMOTE_DIR" 2>/dev/null; then
-  echo "[$(date -Is)] WARNING: remote prune failed; old segments may accumulate until the" \
-       "next successful run." >&2
-fi
 
 echo "[$(date -Is)] done: $UPLOADED new segment(s), newest off-box ${NEWEST_SHIPPED:--}."

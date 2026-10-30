@@ -24,8 +24,9 @@ HOST="$(hostname 2>/dev/null || echo unknown-host)"
 CONTEXT="$(journalctl -u "$FAILED_UNIT" -n 25 --no-pager -o cat 2>/dev/null || true)"
 
 SUBJECT="FuelFlow WAL OFF-BOX SHIPPING FAILED"
-ADVICE="A WAL segment could not be encrypted or uploaded, or the status object could not be
-written. The archive on the box is intact, but the copy that survives losing the host is
+ADVICE="A WAL segment could not be encrypted or uploaded, the status object could not be
+written, or the run hit its 600-second time budget ('start operation timed out' below).
+The archive on the box is intact, but the copy that survives losing the host is
 now older than it should be. Find out why before the next one:
     journalctl -u ${FAILED_UNIT} -n 50 --no-pager
     rclone lsf \${BACKUP_REMOTE}/wal | tail
