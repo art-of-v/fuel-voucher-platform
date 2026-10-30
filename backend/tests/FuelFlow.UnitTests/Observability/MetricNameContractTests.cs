@@ -19,6 +19,7 @@ namespace FuelFlow.UnitTests.Observability;
 /// the build would notice.
 /// </para>
 /// </summary>
+[Collection(BusinessGaugeCollection.Name)]
 public class MetricNameContractTests
 {
     /// <summary>
