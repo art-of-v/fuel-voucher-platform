@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Features.Ledger.GetTrialBalance;
+using FuelFlow.Features.Ledger.ManualEntries;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Time;
@@ -10,15 +11,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Ledger;
 
 /// <summary>
-/// The ledger's operator surface: the close check, and the one correction a close needs.
+/// The ledger's operator surface: the close check, and the corrections a close needs.
 /// </summary>
 /// <remarks>
 /// Separate from <c>api/admin/reconciliation/statement</c> on purpose. That act compares the acquirer
 /// against our orders, which is a reconciliation of business facts; this is the books themselves -
 /// what is posted, what is still a draft, and whether the bank account agrees with the bank.
 /// <para>
-/// The capability is per action, not per controller: reading the trial balance is the read surface,
-/// booking a receipt writes money into the books and carries the money capability.
+/// The capability is per action, not per controller: reading the trial balance is the read surface;
+/// booking a receipt or posting a manual adjustment writes money into the books and carries the
+/// money capability.
 /// </para>
 /// </remarks>
 [ApiController]
@@ -27,13 +29,16 @@ public sealed class LedgerController : ControllerBase
 {
     private readonly GetTrialBalanceQueryHandler _trialBalance;
     private readonly BookUnappliedReceiptsCommandHandler _bookUnapplied;
+    private readonly PostManualJournalEntryCommandHandler _manualEntries;
 
     public LedgerController(
         GetTrialBalanceQueryHandler trialBalance,
-        BookUnappliedReceiptsCommandHandler bookUnapplied)
+        BookUnappliedReceiptsCommandHandler bookUnapplied,
+        PostManualJournalEntryCommandHandler manualEntries)
     {
         _trialBalance = trialBalance;
         _bookUnapplied = bookUnapplied;
+        _manualEntries = manualEntries;
     }
 
     /// <summary>The close check as JSON. Defaults to the current calendar month.</summary>
@@ -96,6 +101,61 @@ public sealed class LedgerController : ControllerBase
 
         var result = await _bookUnapplied.HandleAsync(command, cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Posts a journal entry a person composed: a reclassification, an accrual, an opening balance
+    /// (planning #795).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The only write in the ledger that names its accounts. Everything else posts through
+    /// <c>ledger_mapping_rules</c>; a human adjustment is the case where the accounts <em>are</em> the
+    /// decision, and the alternative to this endpoint was hand-written SQL that skips the numbering,
+    /// the period check and the tamper hash.
+    /// </para>
+    /// <para>
+    /// The operator comes from the session, never the body: a posting nobody can be asked about is
+    /// not a posting this ledger takes. Idempotent on <c>reference</c> - a retry returns the entry the
+    /// first call wrote instead of posting the same adjustment twice.
+    /// </para>
+    /// </remarks>
+    [HttpPost("entries")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
+    [ProducesResponseType(typeof(PostManualJournalEntryResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> PostManualEntry(
+        [FromBody] PostManualJournalEntryRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (CurrentUserId() is not { } userId)
+        {
+            return ApiError.Unauthorized(
+                "The posting must name the operator who stands behind it, and this session does not.");
+        }
+
+        if (request is null)
+        {
+            return ApiError.BadRequest(
+                "A manual entry needs a body: a date, a reference, a description and balanced legs.");
+        }
+
+        // LedgerPostingException and LedgerPeriodClosedException are the ledger's deliberate
+        // validation channel and carry sentences written for the caller. The global handler maps
+        // neither, so without this they would surface as a 500 - the one status that says "our
+        // fault" about a request the caller can fix.
+        try
+        {
+            var entry = await _manualEntries.HandleAsync(request, userId, cancellationToken);
+            return Ok(entry);
+        }
+        catch (LedgerPeriodClosedException exception)
+        {
+            return ApiError.BadRequest(exception.Message, LedgerPeriodClosedException.Code);
+        }
+        catch (LedgerPostingException exception)
+        {
+            return ApiError.BadRequest(exception.Message, LedgerPostingException.Code);
+        }
     }
 
     private Guid? CurrentUserId()

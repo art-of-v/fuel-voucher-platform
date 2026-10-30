@@ -170,6 +170,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
 
         // ---- the money ---------------------------------------------------------------
         ["DELETE /api/admin/orders/{id}"] = AuthPolicies.MoneyMovement,
+        // A manual adjustment composes its own accounts - the one write in the ledger that does not
+        // go through ledger_mapping_rules - and it posts money, so it carries the money capability
+        // and not the read surface's (#795).
+        ["POST /api/admin/ledger/entries"] = AuthPolicies.MoneyMovement,
         // Writes money into the books: Dr 311 / Cr 681 for a received capture no order accounts
         // for. It is the operator standing behind the posting, and the journal records them (#780).
         ["POST /api/admin/ledger/unapplied-receipts"] = AuthPolicies.MoneyMovement,
