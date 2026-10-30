@@ -170,6 +170,27 @@ public sealed class VerifyChallengeCommandHandler
             user.TokenVersion);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
+        // The sign-in is complete, so the token that preceded it is dead weight: the app used the
+        // access token beside it to register this device and sign this challenge, and stores only
+        // the device-bound pair minted below. Revoking it here keeps "one live refresh token per
+        // device" true and stops the session count from growing with every sign-in (planning #739).
+        // The sweep is scoped to this account's DeviceBinding rows - a browser session is a Session
+        // token, and an abandoned bind of another phone is a throwaway its client has already
+        // dropped, so neither loses anything it would use.
+        var now = SystemClock.UtcNow;
+        var replaced = await _context.RefreshTokens
+            .Where(rt => rt.UserId == user.Id
+                && rt.Purpose == RefreshTokenPurpose.DeviceBinding
+                && !rt.IsRevoked)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in replaced)
+        {
+            token.IsRevoked = true;
+            token.RevokedAtUtc = now;
+            _context.RefreshTokens.Update(token);
+        }
+
         var refreshTokenEntity = new RefreshToken
         {
             Id = Guid.CreateVersion7(),
@@ -179,17 +200,26 @@ public sealed class VerifyChallengeCommandHandler
         FamilyId = Guid.NewGuid(),
             DeviceId = command.DeviceId,
             RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
+            Purpose = RefreshTokenPurpose.Session,
             // Store the HASH, exactly like the standard refresh flow does — /api/auth/refresh
             // looks tokens up by SHA-256, so a raw value here is silently unfetchable and every
             // device session dies at first refresh with "Invalid or expired refresh token".
             Token = SecretsHasher.Hash(refreshToken),
-            ExpiresAtUtc = SystemClock.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
-            CreatedAtUtc = SystemClock.UtcNow,
+            ExpiresAtUtc = now.AddDays(_jwtOptions.RefreshTokenExpirationDays),
+            CreatedAtUtc = now,
             IsRevoked = false
         };
 
         _context.RefreshTokens.Add(refreshTokenEntity);
         await _context.SaveChangesAsync(cancellationToken);
+
+        if (replaced.Count > 0)
+        {
+            _logger.LogInformation(
+                "Device-bound session minted for user {UserId}; revoked {Count} device-binding refresh token(s) it replaces",
+                user.Id,
+                replaced.Count);
+        }
 
         _logger.LogInformation(
             "Challenge verified successfully for device {DeviceId}, user {UserId}",

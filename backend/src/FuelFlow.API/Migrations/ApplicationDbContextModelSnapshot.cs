@@ -343,6 +343,15 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("is_revoked")
                         .HasComment("Whether the token has been taken back.");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("Session")
+                        .HasColumnName("purpose")
+                        .HasComment("What the token is for. Session = the client keeps and rotates it. DeviceBinding = the throwaway a native sign-in discards once the signed challenge mints the device-bound token; completing that challenge revokes it, and it never outlives the binding window.");
+
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at_utc")

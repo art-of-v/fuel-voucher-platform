@@ -194,8 +194,13 @@ public sealed class RefreshTokenCommandHandler
             FamilyId = identityToken.FamilyId,
             DeviceId = identityToken.DeviceId, // Preserve device linkage on rotation
             RoleNameAtIssue = identityToken.RoleNameAtIssue, // Carry the session's pinned role forward unchanged
+            // A rotation never turns a throwaway into a long-lived session: the device-binding
+            // window is the whole life of that kind of token.
+            Purpose = identityToken.Purpose,
             Token = SecretsHasher.Hash(newRefreshTokenValue),
-            ExpiresAtUtc = now.AddDays(_jwtOptions.RefreshTokenExpirationDays),
+            ExpiresAtUtc = identityToken.Purpose == RefreshTokenPurpose.DeviceBinding
+                ? now.Add(RefreshTokenPurposePolicy.DeviceBindingWindow)
+                : now.AddDays(_jwtOptions.RefreshTokenExpirationDays),
             CreatedAtUtc = now,
             IsRevoked = false
         };

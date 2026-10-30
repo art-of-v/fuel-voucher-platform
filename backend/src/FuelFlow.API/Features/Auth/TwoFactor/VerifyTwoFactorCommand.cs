@@ -39,7 +39,8 @@ public sealed class VerifyTwoFactorCommandHandler
 
     public async Task<VerifyCodeResponse> HandleAsync(
         VerifyTwoFactorCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool deviceBindingPending = false)
     {
         var result = await _twoFactor.CompleteAsync(command.Challenge, command.Code, cancellationToken);
 
@@ -65,6 +66,6 @@ public sealed class VerifyTwoFactorCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired verification code");
         }
 
-        return await _sessions.IssueSessionAsync(user, isNewUser: false, cancellationToken);
+        return await _sessions.IssueSessionAsync(user, isNewUser: false, cancellationToken, deviceBindingPending);
     }
 }
