@@ -29,6 +29,15 @@ public sealed class GetTrialBalanceQueryHandler
     /// <summary>The bank account. Named once, here, so the check does not hunt for it by name.</summary>
     internal const string BankAccountCode = "311";
 
+    /// <summary>VAT charged and not yet declared (planning #787).</summary>
+    internal const string VatLiabilityAccountCode = "643";
+
+    /// <summary>VAT declared and not yet paid - the account a filed return settles 643 into.</summary>
+    internal const string TaxPayableAccountCode = "641";
+
+    /// <summary>Stock on the shelf; an asset, so a credit balance here is a missing buy side.</summary>
+    internal const string InventoryAccountCode = "281";
+
     private readonly ApplicationDbContext _context;
 
     public GetTrialBalanceQueryHandler(ApplicationDbContext context)
@@ -93,8 +102,66 @@ public sealed class GetTrialBalanceQueryHandler
                 bank?.ClosingBalance ?? 0m,
                 difference,
                 difference == 0m && unbooked.Count == 0),
+            BuildVatCheck(accounts),
+            BuildStockCheck(accounts),
             unbooked);
     }
+
+    /// <summary>
+    /// The VAT half: what 643 carried in, what the period charged, and what a filed return settled.
+    /// </summary>
+    /// <remarks>
+    /// Absent accounts are zero rather than an error. A period in which nothing was sold has no 643
+    /// row at all, and a check that refused to run there would make "nothing happened" look like a
+    /// broken report.
+    /// </remarks>
+    private static VatCheck BuildVatCheck(IReadOnlyList<TrialBalanceAccount> accounts)
+    {
+        var liability = accounts.FirstOrDefault(a => a.Code == VatLiabilityAccountCode);
+        var payable = accounts.FirstOrDefault(a => a.Code == TaxPayableAccountCode);
+
+        var carriedIn = CreditBalance(liability?.OpeningBalance ?? 0m, liability?.OpeningSide);
+        var settled = liability?.Debit ?? 0m;
+        var olderThanOnePeriod = Math.Max(0m, carriedIn - settled);
+
+        return new VatCheck(
+            carriedIn,
+            liability?.Credit ?? 0m,
+            settled,
+            CreditBalance(liability?.ClosingBalance ?? 0m, liability?.ClosingSide),
+            CreditBalance(payable?.ClosingBalance ?? 0m, payable?.ClosingSide),
+            olderThanOnePeriod,
+            olderThanOnePeriod == 0m);
+    }
+
+    private static StockCheck BuildStockCheck(IReadOnlyList<TrialBalanceAccount> accounts)
+    {
+        var inventory = accounts.FirstOrDefault(a => a.Code == InventoryAccountCode);
+        var closing = SignedBalance(inventory?.ClosingBalance ?? 0m, inventory?.ClosingSide);
+        var missingBuySide = Math.Max(0m, -closing);
+
+        return new StockCheck(
+            Math.Abs(closing),
+            inventory?.ClosingSide,
+            missingBuySide,
+            missingBuySide == 0m);
+    }
+
+    /// <summary>The balance as the credit column reads it: positive on the credit side.</summary>
+    private static decimal CreditBalance(decimal amount, NormalBalance? side) => side switch
+    {
+        NormalBalance.Credit => amount,
+        NormalBalance.Debit => -amount,
+        _ => 0m,
+    };
+
+    /// <summary>The balance as the debit column reads it: positive on the debit side.</summary>
+    private static decimal SignedBalance(decimal amount, NormalBalance? side) => side switch
+    {
+        NormalBalance.Debit => amount,
+        NormalBalance.Credit => -amount,
+        _ => 0m,
+    };
 
     /// <summary>
     /// Reads one account's whole history in one query: everything before the period is its opening

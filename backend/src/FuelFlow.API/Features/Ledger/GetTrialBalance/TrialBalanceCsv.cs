@@ -32,6 +32,8 @@ public static class TrialBalanceCsv
         sb.AppendLine(FormattableString.Invariant($"Period,{report.FromDate:yyyy-MM-dd},{report.ToDate:yyyy-MM-dd}"));
         sb.AppendLine("Balanced," + Yes(report.Totals.Balanced));
         sb.AppendLine("Bank matches the books," + Yes(report.Bank.Matches));
+        sb.AppendLine("VAT carried in is settled," + Yes(report.Vat.Settled));
+        sb.AppendLine("Stock buy side is complete," + Yes(report.Stock.Complete));
         sb.AppendLine("Unbooked captures," + report.UnbookedCaptures.Count.ToString(CultureInfo.InvariantCulture));
         sb.AppendLine("Ready to close," + Yes(report.ReadyToClose));
         sb.AppendLine();
@@ -49,6 +51,23 @@ public static class TrialBalanceCsv
         sb.AppendLine("Ledger 311 closing UAH," + N(report.Bank.Ledger311ClosingUah));
         sb.AppendLine("Difference UAH," + N(report.Bank.DifferenceUah));
         sb.AppendLine("Matches," + Yes(report.Bank.Matches));
+        sb.AppendLine();
+
+        sb.AppendLine("VAT check");
+        sb.AppendLine("643 carried in UAH," + N(report.Vat.LiabilityCarriedInUah));
+        sb.AppendLine("643 charged in period UAH," + N(report.Vat.ChargedInPeriodUah));
+        sb.AppendLine("643 settled in period UAH," + N(report.Vat.SettledInPeriodUah));
+        sb.AppendLine("643 closing UAH," + N(report.Vat.LiabilityClosingUah));
+        sb.AppendLine("641 payable to budget UAH," + N(report.Vat.PayableToBudgetUah));
+        sb.AppendLine("Older than one period UAH," + N(report.Vat.OlderThanOnePeriodUah));
+        sb.AppendLine("Settled," + Yes(report.Vat.Settled));
+        sb.AppendLine();
+
+        sb.AppendLine("Stock check");
+        sb.AppendLine("281 closing UAH," + N(report.Stock.InventoryClosingUah));
+        sb.AppendLine("281 closing side," + Q(report.Stock.ClosingSide?.ToString()));
+        sb.AppendLine("Missing buy side UAH," + N(report.Stock.MissingBuySideUah));
+        sb.AppendLine("Complete," + Yes(report.Stock.Complete));
         sb.AppendLine();
 
         if (report.UnbookedCaptures.Count > 0)
