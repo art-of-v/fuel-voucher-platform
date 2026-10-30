@@ -17,6 +17,7 @@
 #   install      install + enable + start fueflow-wal-ship.timer
 #   ship-once    run one shipment by hand and show what it did
 #   lag          how old the newest off-box segment is, right now
+#   prune        run the nightly retention prune now (deploy/backup.sh --prune-only)
 #   verify       is every off-box segment WHOLE, or is one of them half-written
 #   alert-drill  break the remote on purpose and prove the alert fires
 #   drill        the real-R2 host-loss drill (real bucket, isolated prefix)
@@ -28,7 +29,9 @@
 # runner is the only channel that reaches it. Every command is idempotent and can be
 # run on its own; `all` is just the sequence.
 #
-# NOTHING HERE DELETES PRODUCTION DATA.
+# NOTHING HERE DELETES DATA THAT IS NOT ALREADY PAST ITS RETENTION.
+#   * `prune` deletes exactly what the nightly backup deletes - WAL objects older than
+#     WAL_REMOTE_RETENTION_DAYS (31 by default) - because it runs the backup's own code;
 #   * the alert drill points the shipper at a remote that does not exist, by handing the
 #     service an environment file for the length of one run - and the run after it must
 #     succeed, which is the proof that the failure was injected and not pre-existing;
@@ -225,6 +228,35 @@ cmd_ship_once() {
   say ""
   say "  the newest objects in $REMOTE_WAL:"
   "$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null | sort | tail -20 | sed 's/^/    /' || true
+}
+
+# --- the retention prune, by hand ------------------------------------------------------
+# Retention belongs to the nightly backup (see deploy/backup.sh), and there was no way to
+# watch it work without waiting for 03:20. This runs backup.sh --prune-only: the same two
+# deletes, in the same order, without a dump, a base backup or an upload.
+cmd_prune() {
+  section "The nightly retention prune, by hand"
+  say "  this is deploy/backup.sh --prune-only: the same deletes the 03:20 run does,"
+  say "  and nothing else."
+  say ""
+  local before after
+  before="$("$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null | wc -l)" || before=0
+  before="${before//[!0-9]/}"
+  say "  segments off-box before: ${before:-0}"
+  say ""
+
+  local rc=0
+  bash "$SCRIPT_DIR/backup.sh" --prune-only || rc=$?
+
+  say ""
+  after="$("$RCLONE" lsf "$REMOTE_WAL" --files-only 2>/dev/null | wc -l)" || after=0
+  after="${after//[!0-9]/}"
+  say "  segments off-box after : ${after:-0}"
+  say "  deleted by this run    : $(( ${before:-0} - ${after:-0} ))"
+  if (( rc != 0 )); then
+    say "  ERROR: the prune returned $rc; the deletes above say which half failed." >&2
+  fi
+  return "$rc"
 }
 
 # --- the lag --------------------------------------------------------------------------
@@ -538,6 +570,7 @@ ops_function() {
     install)     echo cmd_install ;;
     ship-once)   echo cmd_ship_once ;;
     lag)         echo cmd_lag ;;
+    prune)       echo cmd_prune ;;
     alert-drill) echo cmd_alert_drill ;;
     drill)       echo cmd_drill ;;
     verify)      echo cmd_verify ;;

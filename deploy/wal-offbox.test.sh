@@ -15,7 +15,7 @@
 #   * a shipment NEVER scans or prunes the remote - a full-prefix prune every minute is
 #     what timed out runs whose shipment had already succeeded (2026-10-29);
 #   * the nightly retention prune (wal_prune_remote) removes old segments and leaves
-#     status.txt alone;
+#     status.txt alone, and the same rule can be run by hand as `backup.sh --prune-only`;
 #   * the restore library finds the newest base backup, fetches it, and decrypts a set of
 #     per-segment objects;
 #   * the drill refuses a remote that is not a drill prefix, so a drill can never write
@@ -231,6 +231,31 @@ assert_no_file "the nightly prune removes the old segment" "$TMP/remote/wal/$OLD
 assert_file "the nightly prune leaves the status object" "$TMP/remote/wal/status.txt"
 assert_file "the nightly prune leaves a young segment" "$TMP/remote/wal/$SEG1.age"
 
+# ...and it can be run by hand, without a dump and without an upload: `--prune-only` is
+# the same two deletes the 03:20 run makes, so this executes the retention rule instead of
+# describing it. Measured on the production box on 2026-10-29, the per-minute version of
+# this scan cost 60-105 s over 707 objects and timed the shipper out; nobody had ever
+# watched the nightly one run.
+mkdir -p "$TMP/deploy-copy"
+cp "$SCRIPT_DIR"/*.sh "$TMP/deploy-copy"/
+printf 'BACKUP_REMOTE=%s\nPOSTGRES_DB=fuelflow\n' "$TMP/remote" > "$TMP/deploy-copy/.env.production"
+OLD2=0000000100000000000000FE
+printf 'old two\n' > "$TMP/remote/wal/$OLD2.age"
+touch -d '40 days ago' "$TMP/remote/wal/$OLD2.age"
+OUTPUT="$(PATH="$FAKEBIN:$PATH" BACKUP_DIR="$TMP/backups" \
+  bash "$TMP/deploy-copy/backup.sh" --prune-only 2>&1)"
+STATUS=$?
+assert_status "backup.sh --prune-only succeeds" 0
+assert_contains "it says it is doing only the prune" "Prune-only run"
+assert_contains "it reports the segment prune" "Remote segment prune done"
+assert_no_file "the hand-run prune removes the old segment" "$TMP/remote/wal/$OLD2.age"
+assert_file "the hand-run prune leaves a young segment" "$TMP/remote/wal/$SEG2.age"
+assert_file "the hand-run prune leaves the status object" "$TMP/remote/wal/status.txt"
+if [[ -d "$TMP/backups" ]]; then bad "prune-only created a backup directory (it must not touch the disk)"; else ok "prune-only writes no dump"; fi
+OUTPUT="$(PATH="$FAKEBIN:$PATH" bash "$TMP/deploy-copy/backup.sh" --nonsense 2>&1)"
+STATUS=$?
+if [[ "$STATUS" -ne 0 ]]; then ok "an unknown flag is refused"; else bad "an unknown flag was accepted"; fi
+
 # --- a half-written segment must not reach the bucket ------------------------------------
 # The archiver's cp writes a segment into the archive directory IN PLACE, so the file is
 # briefly shorter than a segment. Uploading that would put a hole in the off-box chain:
@@ -360,7 +385,7 @@ fi
 
 # --- the production ops script --------------------------------------------------------
 assert_file "the ops script exists" "$SCRIPT_DIR/wal-ship-ops.sh"
-for cmd in preflight install ship-once lag alert-drill drill report all; do
+for cmd in preflight install ship-once lag prune alert-drill drill report all; do
   if grep -qE "^[[:space:]]+$cmd\)" "$SCRIPT_DIR/wal-ship-ops.sh"; then
     ok "the ops script has the '$cmd' command"
   else
@@ -389,6 +414,16 @@ if grep -q 'config file' "$SCRIPT_DIR/wal-ship-ops.sh" \
   ok "the preflight reports how rclone is configured"
 else
   bad "the preflight does not report the rclone configuration"
+fi
+if grep -q 'bash "\$SCRIPT_DIR/backup.sh" --prune-only' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the 'prune' command runs the nightly backup's own prune, not a second copy of it"
+else
+  bad "the 'prune' command does not call backup.sh --prune-only"
+fi
+if grep -q 'for step in preflight install ship-once lag verify alert-drill drill;' "$SCRIPT_DIR/wal-ship-ops.sh"; then
+  ok "the campaign does not include a deletion step"
+else
+  bad "the campaign's step list changed (a deletion must not ride along in 'all')"
 fi
 if grep -q 'rclone_lsf()' "$SCRIPT_DIR/drill-wal-offbox.sh" \
    && grep -q 'rclone_lsf "\$REMOTE" --recursive' "$SCRIPT_DIR/drill-wal-offbox.sh"; then
