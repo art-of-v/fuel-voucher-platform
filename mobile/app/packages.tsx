@@ -91,7 +91,9 @@ export default function PackagesScreen() {
               variant="outlined"
               hapticStyle="medium"
               // The basket is one of the two controls people miss on the first tap,
-              // and the header's corner is empty space nobody else needs.
+              // and the header's corner is empty space nobody else needs. Same `lg`
+              // box as the back control, so the two corners read as one system.
+              size="lg"
               hitSlop={HEADER_TRAILING_HIT_SLOP}
             />
             {cartItemCount > 0 && (
