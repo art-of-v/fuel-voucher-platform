@@ -10,6 +10,7 @@ using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -53,7 +54,7 @@ public sealed class TheThrowawayRefreshTokenDoesNotOutliveTheBind : IClassFixtur
         pending[0].Purpose.Should().Be(RefreshTokenPurpose.DeviceBinding);
         pending[0].Token.Should().Be(SecretsHasher.Hash(throwaway));
         pending[0].ExpiresAtUtc.Should().BeCloseTo(
-            DateTime.UtcNow.Add(RefreshTokenPurposePolicy.DeviceBindingWindow),
+            TestClock.UtcNow.Add(RefreshTokenPurposePolicy.DeviceBindingWindow),
             TimeSpan.FromMinutes(2),
             "an abandoned sign-in must not leave a 14-day token behind");
 
@@ -92,7 +93,7 @@ public sealed class TheThrowawayRefreshTokenDoesNotOutliveTheBind : IClassFixtur
         var browserRow = (await TokensAsync(userId)).Single();
         browserRow.Purpose.Should().Be(RefreshTokenPurpose.Session, "a browser keeps the token it is given");
         browserRow.ExpiresAtUtc.Should().BeAfter(
-            DateTime.UtcNow.AddDays(1),
+            TestClock.UtcNow.AddDays(1),
             "a browser session is not the throwaway the signed challenge replaces");
 
         // The same account now completes a signed sign-in on a phone.
@@ -173,8 +174,8 @@ public sealed class TheThrowawayRefreshTokenDoesNotOutliveTheBind : IClassFixtur
             PublicKey = publicKeyPem,
             SignaturePayloadVersion = DeviceSignatureVerifier.Version2,
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow,
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();
     }
