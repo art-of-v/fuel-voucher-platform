@@ -80,7 +80,9 @@ jest.mock('../src/core/i18n', () => ({
 }));
 
 jest.mock('../src/features/vouchers/hooks/useMyCodes', () => ({
-  useMyCodes: () => mockUseMyCodes(),
+  // Forward the screen's options: the spent-fuel filter IS an option, and a factory that
+  // swallowed it would make the chip's wiring untestable.
+  useMyCodes: (options?: unknown) => mockUseMyCodes(options),
 }));
 
 jest.mock('../src/features/vouchers/renewal/api/renewal', () => ({
@@ -201,6 +203,7 @@ const baseData = {
   currentCompany: null,
   pendingOrders: [],
   fulfilledOrders: [],
+  spentOrderCount: 0,
   issuanceOrders: [],
   looseIssuanceVouchers: [],
   loadData: jest.fn(),
@@ -478,6 +481,33 @@ describe('MyCodesScreen', () => {
 
       fireEvent.press(screen.getByTestId('toggle-t-1'));
       expect(screen.getByTestId('expanded-t-1')).toHaveTextContent(/false/);
+    });
+  });
+
+  describe('the spent-fuel filter', () => {
+    it('is absent when no order is fully spent', () => {
+      renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')] });
+
+      expect(screen.queryByTestId('spent-orders-toggle')).toBeNull();
+    });
+
+    it('asks the data layer for spent vouchers once it is switched on', () => {
+      // One switch covers both levels: the hook hands back the fully spent orders AND the spent
+      // vouchers inside every order it already shows.
+      renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')], spentOrderCount: 3 });
+
+      fireEvent.press(screen.getByTestId('spent-orders-toggle'));
+
+      const calls = mockUseMyCodes.mock.calls;
+      expect(calls[calls.length - 1][0]).toEqual({ includeSpent: true });
+    });
+
+    it('is offered when every order is spent, so the history is not lost', () => {
+      // Nothing live means the empty state, and the empty state is exactly where a toggle hidden
+      // behind "not empty" would strand the customer's receipts.
+      renderScreen({ fulfilledOrders: [], spentOrderCount: 2 });
+
+      expect(screen.getByTestId('spent-orders-toggle')).toBeTruthy();
     });
   });
 

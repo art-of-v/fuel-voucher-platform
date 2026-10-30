@@ -201,6 +201,67 @@ describe('useMyCodes', () => {
     expect(result.current.fulfilledOrders).toEqual([]);
   });
 
+  it('brings a fully spent order back, with its spent vouchers, when the filter is on', async () => {
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({
+        id: 'spent',
+        status: 'FULFILLED',
+        vouchers: [makeVoucher({ id: 'v-old', status: 'Used' })],
+      }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes({ includeSpent: true }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.fulfilledOrders.map((o) => o.id)).toEqual(['spent']);
+    expect(result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-old']);
+  });
+
+  it('counts the fully spent orders the filter would reveal, and nothing else', async () => {
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({
+        id: 'spent',
+        status: 'FULFILLED',
+        vouchers: [makeVoucher({ id: 'v-old', status: 'used' })],
+      }),
+      makeOrder({ id: 'live', status: 'FULFILLED', vouchers: [makeVoucher({ id: 'v-live' })] }),
+      // No voucher ever attached: not a spent card, just not a card.
+      makeOrder({ id: 'empty', status: 'FULFILLED' }),
+      makeOrder({ id: 'unpaid', status: 'PENDING_PAYMENT' }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.spentOrderCount).toBe(1);
+  });
+
+  it('shows the spent vouchers of a mixed order only when the filter is on, live first', async () => {
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({
+        id: 'mixed',
+        status: 'FULFILLED',
+        vouchers: [
+          makeVoucher({ id: 'v-used', status: 'used' }),
+          makeVoucher({ id: 'v-live', status: 'assigned' }),
+        ],
+      }),
+    ]);
+
+    const off = renderHook(() => useMyCodes());
+    await waitFor(() => expect(off.result.current.loading).toBe(false));
+    expect(off.result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-live']);
+    // The order still has live fuel, so the filter has no hidden order to promise.
+    expect(off.result.current.spentOrderCount).toBe(0);
+
+    const on = renderHook(() => useMyCodes({ includeSpent: true }));
+    await waitFor(() => expect(on.result.current.loading).toBe(false));
+    expect(on.result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual([
+      'v-live',
+      'v-used',
+    ]);
+  });
+
   it('files a replacement under the original purchase even though a renewal order delivered it', async () => {
     // A replace delivers its stock voucher under the RENEWAL order's fulfillment, so the wallet has
     // to scan renewal orders too and file the voucher by its `originOrderId`. Scanning purchase

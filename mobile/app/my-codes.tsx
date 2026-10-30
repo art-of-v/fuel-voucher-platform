@@ -17,10 +17,13 @@ import {
   RefreshCw,
   Fuel,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import type { Order, Voucher } from '../src/core/types/api';
 import { useMyCodes } from '../src/features/vouchers/hooks/useMyCodes';
 import {
+  Chip,
   GridBackground,
   GridPageLayout,
   LoadingState,
@@ -165,6 +168,9 @@ export default function MyCodesScreen() {
   // Set by a tapped "order fulfilled" push (/my-codes?orderId=…). See the
   // deep-link focus effect below.
   const { orderId: focusOrderId } = useLocalSearchParams<{ orderId?: string }>();
+  // The wallet opens on what can still be used. The filter chip reveals the rest: fully spent
+  // orders and the spent vouchers inside every order (see `useMyCodes`).
+  const [showSpent, setShowSpent] = useState(false);
   const {
     isAuthenticated,
     authLoading,
@@ -180,12 +186,13 @@ export default function MyCodesScreen() {
     currentCompany,
     pendingOrders,
     fulfilledOrders,
+    spentOrderCount,
     issuanceOrders,
     looseIssuanceVouchers,
     loadData,
     toggleUsed,
     deleteOrder,
-  } = useMyCodes();
+  } = useMyCodes({ includeSpent: showSpent });
 
   // The worker's own usage report (epic #103 S5, #150). Fetched only in a worker context: an owner
   // already has the stock and P&L views, and the endpoint would answer with their own empty
@@ -435,6 +442,25 @@ export default function MyCodesScreen() {
     issuedToMe: workerIssued.length,
   });
 
+  // The spent-fuel filter. One switch covers both levels: it reveals the receipts whose every
+  // voucher is spent, and the spent vouchers inside any receipt the wallet already shows. Offered
+  // whenever such an order exists - including in the empty state, because "nothing to use" must
+  // not mean "nothing to look at": the history is one tap away rather than gone.
+  // A worker's list is not order-filtered the same way and carries its own status filter (#161 H0).
+  const spentFilter =
+    !isWorkerContext && spentOrderCount > 0 ? (
+      <View style={{ flexDirection: 'row' }}>
+        <Chip
+          testID="spent-orders-toggle"
+          label={t('codes.spentFilter')}
+          count={spentOrderCount}
+          selected={showSpent}
+          icon={showSpent ? <Eye size={16} /> : <EyeOff size={16} />}
+          onPress={() => setShowSpent((value) => !value)}
+        />
+      </View>
+    ) : null;
+
   // Company context header: which company's stock this is + pool/distributed/worker counts.
   // Worker context header (epic #103 S5): who issued the fuel, and how much is
   // left. Buying stays in the personal context, so say so rather than hiding it.
@@ -496,54 +522,57 @@ export default function MyCodesScreen() {
             </Pressable>
           </View>
         ) : isEmpty ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconBox}>
-              <QrIcon size={40} color={tokens.colors.primary} />
-            </View>
-            <GlowText
-              intensity="low"
-              align="center"
-              animation="pulse"
-              animatedValue={pulseAnim}
-              style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
-            >
-              {isWorkerContext
-                ? t('codes.stock.workerEmpty')
-                : isCompanyContext
-                  ? t('codes.stock.companyEmpty')
-                  : t('codes.noAssets')}
-            </GlowText>
-            <Text
-              allowFontScaling={false}
-              style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}
-            >
-              {isWorkerContext
-                ? t('codes.stock.workerEmptySub')
-                : isCompanyContext
-                  ? t('codes.stock.companyEmptySub')
-                  : t('codes.purchaseFuel')}
-            </Text>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                loadData();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.retry')}
-              style={{
-                marginTop: tokens.spacing['2xl'],
-                padding: tokens.spacing.md,
-                borderWidth: 1,
-                borderColor: tokens.colors.primary,
-              }}
-            >
-              <Text
-                style={{ color: tokens.colors.primary, fontSize: tokens.type.caption.fontSize }}
+          <>
+            {spentFilter}
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconBox}>
+                <QrIcon size={40} color={tokens.colors.primary} />
+              </View>
+              <GlowText
+                intensity="low"
+                align="center"
+                animation="pulse"
+                animatedValue={pulseAnim}
+                style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
               >
-                ⟳ REFRESH
+                {isWorkerContext
+                  ? t('codes.stock.workerEmpty')
+                  : isCompanyContext
+                    ? t('codes.stock.companyEmpty')
+                    : t('codes.noAssets')}
+              </GlowText>
+              <Text
+                allowFontScaling={false}
+                style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}
+              >
+                {isWorkerContext
+                  ? t('codes.stock.workerEmptySub')
+                  : isCompanyContext
+                    ? t('codes.stock.companyEmptySub')
+                    : t('codes.purchaseFuel')}
               </Text>
-            </Pressable>
-          </View>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  loadData();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.retry')}
+                style={{
+                  marginTop: tokens.spacing['2xl'],
+                  padding: tokens.spacing.md,
+                  borderWidth: 1,
+                  borderColor: tokens.colors.primary,
+                }}
+              >
+                <Text
+                  style={{ color: tokens.colors.primary, fontSize: tokens.type.caption.fontSize }}
+                >
+                  ⟳ REFRESH
+                </Text>
+              </Pressable>
+            </View>
+          </>
         ) : (
           <View style={{ gap: tokens.spacing['2xl'] }}>
             {isWorkerContext ? (
@@ -559,11 +588,14 @@ export default function MyCodesScreen() {
                 <WorkerUsageSection report={workerUsage.report} isLoading={workerUsage.isLoading} />
               </>
             ) : (
-              <WalletSummaryBar
-                orders={orders}
-                fulfilledOrders={fulfilledOrders}
-                pendingOrders={pendingOrders}
-              />
+              <>
+                <WalletSummaryBar
+                  orders={orders}
+                  fulfilledOrders={fulfilledOrders}
+                  pendingOrders={pendingOrders}
+                />
+                {spentFilter}
+              </>
             )}
 
             {/* NEAR-EXPIRY RENEWAL CTA — the discoverable entry point.

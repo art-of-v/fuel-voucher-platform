@@ -212,6 +212,7 @@ export const es: Record<string, string> = {
   'codes.hide': 'OCULTAR',
   'codes.noVouchersYet': 'Aún no hay vales',
   'codes.used': 'USADO',
+  'codes.spentFilter': 'USADOS',
   'codes.redeemed': 'CANJEADO',
   'codes.pendingReconciliation': 'PENDIENTE',
   'codes.withdrawReport': 'Retirar informe',

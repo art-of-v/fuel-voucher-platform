@@ -210,6 +210,7 @@ export const en: Record<string, string> = {
   'codes.hide': 'HIDE',
   'codes.noVouchersYet': 'No vouchers yet',
   'codes.used': 'USED',
+  'codes.spentFilter': 'USED',
   'codes.redeemed': 'REDEEMED',
   'codes.pendingReconciliation': 'AWAITING CONFIRMATION',
   'codes.withdrawReport': 'Withdraw report',
