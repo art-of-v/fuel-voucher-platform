@@ -11,11 +11,11 @@ import {
   EmptyState,
   ErrorState,
   GridPageLayout,
-  HEADER_ACTION_FRAME,
-  HEADER_TRAILING_HIT_SLOP,
   IconButton,
   LoadingState,
   ScreenHeader,
+  frameToStyle,
+  useHeaderCornerFrames,
 } from '../src/core/ui';
 import { PackageCard } from '../src/features/stations/components/PackageCard';
 import { BRAND_COLORS } from '../src/core/design/tokens';
@@ -40,6 +40,7 @@ export default function PackagesScreen() {
   // buying *for the company* is the owner-only act this protects. The basket tab is
   // dropped in this context and /basket + /checkout refuse it as a backstop.
   const canPurchase = canBuyInContext(useAccountContext());
+  const cornerFrames = useHeaderCornerFrames();
 
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
@@ -83,7 +84,11 @@ export default function PackagesScreen() {
       subtitle={t('packages.selectCards')}
       actions={
         canPurchase ? (
-          <View style={HEADER_ACTION_FRAME}>
+          // The badge needs a positioned parent, and a plain one would clip the
+          // button's frame back to the 52pt box — every ancestor between the header
+          // and a corner control has to own the same corner. `box-none` keeps the
+          // wrapper from taking a tap that belongs to the button.
+          <View pointerEvents="box-none" style={frameToStyle(cornerFrames.trailing)}>
             <IconButton
               icon={<ShoppingCart />}
               onPress={() => router.push('/basket')}
@@ -92,9 +97,10 @@ export default function PackagesScreen() {
               hapticStyle="medium"
               // The basket is one of the two controls people miss on the first tap,
               // and the header's corner is empty space nobody else needs. Same `lg`
-              // box as the back control, so the two corners read as one system.
+              // box and the same whole-corner target as the back control, so the two
+              // corners read as one system.
               size="lg"
-              hitSlop={HEADER_TRAILING_HIT_SLOP}
+              frame={cornerFrames.trailing}
             />
             {cartItemCount > 0 && (
               <View

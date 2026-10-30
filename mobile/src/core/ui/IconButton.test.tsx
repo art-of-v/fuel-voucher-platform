@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ChevronLeft } from 'lucide-react-native';
 
@@ -57,6 +57,56 @@ describe('size', () => {
     const { button } = renderButton({ hitSlop: 4 });
 
     expect(button.props.hitSlop).toBe(4);
+  });
+});
+
+describe('frame', () => {
+  const frame = { top: 20, bottom: 40, left: 0, right: 12 };
+
+  it('grows the pressable to the region and gives the layout back', () => {
+    const { button } = renderButton({ size: 'lg', frame });
+
+    const style = StyleSheet.flatten(button.props.style);
+
+    expect(style.borderTopWidth).toBe(20);
+    expect(style.borderBottomWidth).toBe(40);
+    expect(style.borderLeftWidth).toBe(0);
+    expect(style.borderRightWidth).toBe(12);
+
+    // The margins are the negative of the borders, or the control moves: a zero
+    // edge has to stay `0` and not `-0`.
+    expect(style.marginTop).toBe(-20);
+    expect(style.marginBottom).toBe(-40);
+    expect(style.marginLeft).toBe(0);
+    expect(style.marginRight).toBe(-12);
+
+    // The drawn box is untouched.
+    expect(style.width).toBe(52);
+    expect(style.height).toBe(52);
+  });
+
+  it('drops the slop, because a frame and a slop are two different targets', () => {
+    const { button } = renderButton({ frame });
+
+    expect(button.props.hitSlop).toBeUndefined();
+  });
+
+  it('paints the skin on the drawn box, never across the frame', () => {
+    const { button } = renderButton({ variant: 'filled', size: 'lg', frame });
+
+    const pressable = StyleSheet.flatten(button.props.style);
+
+    // A background on the pressable would tint the whole corner the moment it is
+    // pressed — a 52pt control turning a 100pt-plus region into a coloured block.
+    expect(pressable.backgroundColor).toBeUndefined();
+    expect(pressable.borderRadius).toBeUndefined();
+
+    const skins = screen
+      .UNSAFE_getAllByType(View)
+      .filter((v) => StyleSheet.flatten(v.props.style)?.borderRadius !== undefined);
+
+    expect(skins).toHaveLength(1);
+    expect(StyleSheet.flatten(skins[0].props.style).width).toBe(52);
   });
 });
 

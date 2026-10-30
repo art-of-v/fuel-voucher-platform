@@ -105,6 +105,14 @@ jest.mock('../src/core/ui', () => {
         { testID: 'cart-button', onPress, accessibilityLabel },
         R.createElement(RNText, null, 'cart'),
       ),
+    // Geometry only: the frame the basket answers in, and the style that carries it.
+    // The mock draws neither, so the numbers are irrelevant here — their contract is
+    // pinned in `ScreenHeader.test.tsx` and `IconButton.test.tsx`.
+    useHeaderCornerFrames: () => ({
+      leading: { top: 0, bottom: 0, left: 0, right: 0 },
+      trailing: { top: 0, bottom: 0, left: 0, right: 0 },
+    }),
+    frameToStyle: () => ({}),
   };
 });
 

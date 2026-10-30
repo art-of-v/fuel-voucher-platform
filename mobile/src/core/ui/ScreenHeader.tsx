@@ -1,73 +1,69 @@
 import React from 'react';
-import { StyleProp, View, ViewStyle } from 'react-native';
+import { Insets, StyleProp, View, ViewStyle } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { chrome, spacing } from '../design/layout';
 import { useDesignTokens } from '../hooks/useTheme';
 import { useI18n } from '../i18n';
-import { IconButton } from './IconButton';
+import { IconButton, frameToStyle } from './IconButton';
 import { useHeaderTopBand } from './PageLayout';
 import { Text } from './Text';
 
 /**
- * How far a header control reaches past the box it draws.
+ * How far a header corner answers past the box it draws.
  *
  * The header is the one row where each end has an empty corner, and the one row
  * people press without looking — a hand arriving at the top-left corner lands as
  * often 20-40pt under the control as on it, and as often over it, in the safe-area
- * strip, when it comes down from the status bar. The drawn control is `lg` (52pt
- * box, 24pt glyph) for that reason, and the corner around it answers as well.
+ * strip, when it comes down from the status bar. So the corner is not a ring around
+ * a button: the whole region is the button, and the drawn control is what sits in
+ * it (`lg`: 52pt box, 24pt glyph).
  *
- * The reach cannot come from `hitSlop` on its own — React Native never delivers a
- * touch past an ancestor's frame — so the row carries it as a transparent border
- * and takes the space back with a matching negative margin: the layout does not
- * move, only the frame a touch may land in. Above the row the band is the
- * safe-area inset `PageLayout` reserves (`useHeaderTopBand`); below it is
- * `headerCornerDrop`. The row is `pointerEvents="box-none"`, so the band it adds
- * over the content answers only inside a corner target, never across the width.
+ * The region cannot come from `hitSlop` — React Native clips it to every ancestor's
+ * frame, and overlapping slops resolve by z-order — so it is the pressable's own
+ * frame, padded with transparent borders and pulled back with matching negative
+ * margins: the layout does not move, only the region a touch may land in. The row
+ * spans the same bands for the same reason, and is `pointerEvents="box-none"` so
+ * the pixels away from a corner still reach the content.
  *
- * `left: 0` on the leading control is deliberate: iOS starts its swipe-back
- * gesture in a strip along the leading edge and react-native-screens cancels the
- * touch of anything under it, so the leading reach may only go inwards.
+ * `left: 0` on the leading corner is deliberate: iOS starts its swipe-back gesture
+ * in a strip along the leading edge and react-native-screens cancels the touch of
+ * anything under it, so the leading corner may only spend its width inwards.
  */
 export const HEADER_REACH = 12;
-/** How far below the row a corner target keeps answering taps. */
+/** How far below the row a corner keeps answering taps. */
 export const HEADER_DROP = chrome.headerCornerDrop;
-/** How far above the row a corner target reaches into the safe-area band. */
-export const HEADER_LIFT = chrome.headerCornerLift;
 /**
- * The row's own padding below the controls — reach past it is `HEADER_DROP` more.
- * It is the token, not a copy of it: the `lg` box fills a 64pt row with this much
- * left under it, so a change here silently moves the corner's whole geometry.
+ * The row's own padding below the controls — the corner runs past it by
+ * `HEADER_DROP` more. It is the token, not a copy of it: the `lg` box fills a 64pt
+ * row with this much left under it, so a change here moves the corner's geometry.
  */
 const HEADER_ROW_PAD = spacing.md;
-/** Total reach below a control's bottom edge, so the corner ends level on both ends. */
+/** How far below a control's bottom edge the corner runs, to the row's frame. */
 export const HEADER_BOTTOM_HIT = HEADER_ROW_PAD + HEADER_DROP;
-export const HEADER_LEADING_HIT_SLOP = {
-  top: HEADER_LIFT,
-  bottom: HEADER_BOTTOM_HIT,
-  left: 0,
-  right: 32,
-};
-export const HEADER_TRAILING_HIT_SLOP = {
-  top: HEADER_LIFT,
-  bottom: HEADER_BOTTOM_HIT,
-  left: 32,
-  right: HEADER_REACH,
-};
+/** How far a corner spends inwards, over the title's edge. */
+export const HEADER_CORNER_INWARD = 32;
 
-/** The frame a header action's touch may land in, as a style a slot must carry. */
-export const HEADER_ACTION_FRAME = {
-  borderTopWidth: HEADER_LIFT,
-  borderLeftWidth: HEADER_REACH,
-  borderRightWidth: HEADER_REACH,
-  borderBottomWidth: HEADER_BOTTOM_HIT,
-  borderColor: 'transparent',
-  marginTop: -HEADER_LIFT,
-  marginLeft: -HEADER_REACH,
-  marginRight: -HEADER_REACH,
-  marginBottom: -HEADER_BOTTOM_HIT,
-} as const;
+/**
+ * The frame each header corner answers in, as `IconButton`'s `frame`.
+ *
+ * The top is the whole safe-area band `PageLayout` reserves, so a hand coming down
+ * from the status bar lands in the corner; the bottom reaches the row's own frame.
+ * Both ends derive from the same numbers the row uses, so a corner cannot describe a
+ * region its row does not cover.
+ */
+export function useHeaderCornerFrames(): { leading: Insets; trailing: Insets } {
+  const band = useHeaderTopBand();
+  return {
+    leading: { top: band, bottom: HEADER_BOTTOM_HIT, left: 0, right: HEADER_CORNER_INWARD },
+    trailing: {
+      top: band,
+      bottom: HEADER_BOTTOM_HIT,
+      left: HEADER_CORNER_INWARD,
+      right: HEADER_REACH,
+    },
+  };
+}
 
 export interface ScreenHeaderProps {
   /** The screen's name. Sentence case — this is a title, not a label. */
@@ -124,6 +120,7 @@ export function ScreenHeader({
   // has to include it: a touch never reaches past an ancestor's frame, so a corner
   // cannot answer a hand that comes down from the status bar unless the frame does.
   const headerBand = useHeaderTopBand();
+  const cornerFrames = useHeaderCornerFrames();
 
   const handleBack = onBack ?? (() => router.back());
 
@@ -162,19 +159,20 @@ export function ScreenHeader({
           // sits in a row the eye leads to; this one is reached blind, at the far
           // corner, so it gets the largest box the 64pt row holds without moving.
           size="lg"
-          // The reach goes right, never left: iOS starts its swipe-back gesture in a
-          // strip along the leading edge, and react-native-screens cancels the RN
-          // touch of anything under it the moment the finger drifts horizontally
-          // (`cancelTouchesInParent` in RNSScreenStack.mm — "cancel RN touch events"
-          // for a Touchable "close to an edge"). A control pulled to the edge with a
-          // negative margin, as this one used to be, loses exactly those taps.
-          hitSlop={HEADER_LEADING_HIT_SLOP}
+          // The whole corner is this button. The frame goes right, never left: iOS
+          // starts its swipe-back gesture in a strip along the leading edge, and
+          // react-native-screens cancels the RN touch of anything under it the moment
+          // the finger drifts horizontally (`cancelTouchesInParent` in
+          // RNSScreenStack.mm — "cancel RN touch events" for a Touchable "close to an
+          // edge"). A control pulled to the edge with a negative margin, as this one
+          // used to be, loses exactly those taps.
+          frame={cornerFrames.leading}
         />
       )}
 
       {/*
-        Inert, and deliberately transparent to touches: the back control's reach
-        extends 24pt inwards over this block, and a plain View in front of it would
+        Inert, and deliberately transparent to touches: the back corner runs through
+        the row's gap and into this block, and a plain View in front of it would
         swallow that half of the target.
       */}
       <View testID="header-title" style={{ flex: 1, gap: 2 }} pointerEvents="none">
@@ -194,9 +192,10 @@ export function ScreenHeader({
           pointerEvents="box-none"
           style={[
             { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm },
-            // Grows the frame an action's `hitSlop` can reach into, without moving
-            // the action: the border pads, the margin takes the same space back.
-            HEADER_ACTION_FRAME,
+            // The slot spans the corner its action answers in, or the action's frame
+            // would be clipped by the slot's own — the bug this whole area keeps
+            // producing. `box-none` keeps the slot itself out of the hit test.
+            frameToStyle(cornerFrames.trailing),
           ]}
         >
           {actions}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Insets, Pressable, StyleProp, ViewStyle } from 'react-native';
+import { Insets, Pressable, StyleProp, View, ViewStyle } from 'react-native';
 import { useDesignTokens } from '../hooks/useTheme';
 import { Haptics } from '../utils/haptics';
 
@@ -22,11 +22,22 @@ export interface IconButtonProps {
   round?: boolean;
   hapticStyle?: 'light' | 'medium' | 'heavy';
   /**
-   * Extra reach beyond the box. Only pass it when the space around the control
-   * belongs to nobody else — two adjacent targets with overlapping slop resolve
-   * by z-order, so the nearer one steals the press.
+   * Extra reach beyond the box, for space that belongs to nobody else. Clipped by
+   * every ancestor's frame, and two overlapping slops resolve by z-order — when the
+   * reach has to be a real region, use `frame` instead.
    */
   hitSlop?: Insets | number;
+  /**
+   * The region the pressable itself answers in, past the box it draws — a corner
+   * that is one button rather than a ring around one. The borders pad the
+   * pressable, the negative margins take the same space back, so nothing moves and
+   * the background stays on the drawn box. The caller must own every pixel the
+   * frame covers: the pressable takes those taps.
+   *
+   * Unlike `hitSlop` this is the element's frame, so it survives ancestor clipping
+   * exactly as the layout does — the ancestors still have to contain it.
+   */
+  frame?: Insets;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -40,6 +51,31 @@ export interface IconButtonProps {
  */
 const BOX: Record<IconButtonSize, number> = { sm: 36, md: 48, lg: 52 };
 const GLYPH: Record<IconButtonSize, number> = { sm: 18, md: 22, lg: 24 };
+
+/**
+ * An `Insets` frame as a style: the borders pad the view, the margins take the same
+ * space back, so the frame grows and the layout does not.
+ *
+ * `0 - v`, not `-v`: a zero edge must produce `0`, and `-0` is a different value to
+ * anything that compares styles.
+ */
+export function frameToStyle(frame: Insets): ViewStyle {
+  const top = frame.top ?? 0;
+  const right = frame.right ?? 0;
+  const bottom = frame.bottom ?? 0;
+  const left = frame.left ?? 0;
+  return {
+    borderTopWidth: top,
+    borderRightWidth: right,
+    borderBottomWidth: bottom,
+    borderLeftWidth: left,
+    borderColor: 'transparent',
+    marginTop: 0 - top,
+    marginRight: 0 - right,
+    marginBottom: 0 - bottom,
+    marginLeft: 0 - left,
+  };
+}
 
 /**
  * A single-icon action: back, close, share, expand, overflow.
@@ -57,6 +93,7 @@ export function IconButton({
   round = false,
   hapticStyle = 'light',
   hitSlop,
+  frame,
   style,
   testID,
 }: IconButtonProps) {
@@ -96,6 +133,8 @@ export function IconButton({
     }
   };
 
+  const frameStyle = frame ? frameToStyle(frame) : null;
+
   return (
     <Pressable
       onPress={() => {
@@ -109,34 +148,34 @@ export function IconButton({
         onPress();
       }}
       disabled={disabled}
-      hitSlop={hitSlop ?? tokens.touchTarget.slopFor(box)}
+      hitSlop={frame ? undefined : (hitSlop ?? tokens.touchTarget.slopFor(box))}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       testID={testID}
-      style={({ pressed }) => {
-        const s = skin(pressed && !disabled);
-        return [
-          {
-            width: box,
-            height: box,
-            borderRadius: round ? tokens.radius.full : tokens.radius.md,
-            alignItems: 'center' as const,
-            justifyContent: 'center' as const,
-            backgroundColor: s.background,
-            borderWidth: s.border === 'transparent' ? 0 : 1,
-            borderColor: s.border,
-          },
-          style,
-        ];
-      }}
+      style={[{ width: box, height: box }, frameStyle, style]}
     >
-      {({ pressed }) =>
-        React.cloneElement(icon, {
-          size: GLYPH[size],
-          color: skin(pressed && !disabled).content,
-        })
-      }
+      {({ pressed }) => {
+        const s = skin(pressed && !disabled);
+        // The skin lives on the drawn box, never on the pressable: a background on
+        // a framed pressable would paint the whole corner.
+        return (
+          <View
+            style={{
+              width: box,
+              height: box,
+              borderRadius: round ? tokens.radius.full : tokens.radius.md,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: s.background,
+              borderWidth: s.border === 'transparent' ? 0 : 1,
+              borderColor: s.border,
+            }}
+          >
+            {React.cloneElement(icon, { size: GLYPH[size], color: s.content })}
+          </View>
+        );
+      }}
     </Pressable>
   );
 }

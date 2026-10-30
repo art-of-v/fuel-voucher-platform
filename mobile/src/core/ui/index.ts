@@ -14,12 +14,7 @@
 export { PageLayout, useContentInsets } from './PageLayout';
 export type { ContentInsets, PageLayoutProps } from './PageLayout';
 export { GridPageLayout } from './GridPageLayout';
-export {
-  ScreenHeader,
-  HEADER_ACTION_FRAME,
-  HEADER_LEADING_HIT_SLOP,
-  HEADER_TRAILING_HIT_SLOP,
-} from './ScreenHeader';
+export { ScreenHeader, useHeaderCornerFrames } from './ScreenHeader';
 export type { ScreenHeaderProps } from './ScreenHeader';
 export { SectionHeader } from './SectionHeader';
 export type { SectionHeaderProps } from './SectionHeader';
@@ -33,7 +28,7 @@ export type { TextProps, TextTone } from './Text';
 /* Controls ----------------------------------------------------------------- */
 export { Button } from './Button';
 export type { ButtonProps, ButtonSize, ButtonVariant } from './Button';
-export { IconButton } from './IconButton';
+export { IconButton, frameToStyle } from './IconButton';
 export type { IconButtonProps, IconButtonSize, IconButtonVariant } from './IconButton';
 export { Chip } from './Chip';
 export type { ChipProps } from './Chip';
