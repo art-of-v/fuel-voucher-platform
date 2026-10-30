@@ -68,21 +68,29 @@ describe('frame', () => {
 
     const style = StyleSheet.flatten(button.props.style);
 
-    expect(style.borderTopWidth).toBe(20);
-    expect(style.borderBottomWidth).toBe(40);
-    expect(style.borderLeftWidth).toBe(0);
-    expect(style.borderRightWidth).toBe(12);
+    expect(style.paddingTop).toBe(20);
+    expect(style.paddingBottom).toBe(40);
+    expect(style.paddingLeft).toBe(0);
+    expect(style.paddingRight).toBe(12);
 
-    // The margins are the negative of the borders, or the control moves: a zero
+    // The margins are the negative of the padding, or the control moves: a zero
     // edge has to stay `0` and not `-0`.
     expect(style.marginTop).toBe(-20);
     expect(style.marginBottom).toBe(-40);
     expect(style.marginLeft).toBe(0);
     expect(style.marginRight).toBe(-12);
+  });
 
-    // The drawn box is untouched.
-    expect(style.width).toBe(52);
-    expect(style.height).toBe(52);
+  it('leaves the size to the drawn box, because `width` is the border box', () => {
+    const { button } = renderButton({ size: 'lg', frame });
+
+    const style = StyleSheet.flatten(button.props.style);
+
+    // 52pt of `height` around 60pt of frame would leave the drawn 52pt box hanging
+    // out of a 4pt content area — the control sat ~24pt low on the device and the
+    // basket ran off the trailing edge.
+    expect(style.width).toBeUndefined();
+    expect(style.height).toBeUndefined();
   });
 
   it('drops the slop, because a frame and a slop are two different targets', () => {

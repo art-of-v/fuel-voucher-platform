@@ -29,9 +29,9 @@ export interface IconButtonProps {
   hitSlop?: Insets | number;
   /**
    * The region the pressable itself answers in, past the box it draws — a corner
-   * that is one button rather than a ring around one. The borders pad the
-   * pressable, the negative margins take the same space back, so nothing moves and
-   * the background stays on the drawn box. The caller must own every pixel the
+   * that is one button rather than a ring around one. The frame is padding on the
+   * pressable and the negative margins take the same space back, so nothing moves
+   * and the background stays on the drawn box. The caller must own every pixel the
    * frame covers: the pressable takes those taps.
    *
    * Unlike `hitSlop` this is the element's frame, so it survives ancestor clipping
@@ -53,8 +53,15 @@ const BOX: Record<IconButtonSize, number> = { sm: 36, md: 48, lg: 52 };
 const GLYPH: Record<IconButtonSize, number> = { sm: 18, md: 22, lg: 24 };
 
 /**
- * An `Insets` frame as a style: the borders pad the view, the margins take the same
- * space back, so the frame grows and the layout does not.
+ * An `Insets` frame as a style for a **container**: the borders pad the view, the
+ * margins take the same space back, so the frame grows, the children stay where they
+ * were and the layout does not move.
+ *
+ * Do not put this on an element that also sets `width`/`height`. Yoga sizes those to
+ * the border box, so the borders would eat the box instead of growing the frame — a
+ * 52pt control framed by 40pt of drop shrinks to 4pt of content and sits off its
+ * line. `IconButton` frames its pressable with padding (`paddingForFrame`) for
+ * exactly that reason.
  *
  * `0 - v`, not `-v`: a zero edge must produce `0`, and `-0` is a different value to
  * anything that compares styles.
@@ -70,6 +77,30 @@ export function frameToStyle(frame: Insets): ViewStyle {
     borderBottomWidth: bottom,
     borderLeftWidth: left,
     borderColor: 'transparent',
+    marginTop: 0 - top,
+    marginRight: 0 - right,
+    marginBottom: 0 - bottom,
+    marginLeft: 0 - left,
+  };
+}
+
+/**
+ * The same frame on the pressable itself, as padding.
+ *
+ * The pressable sets no `width`/`height` while framed: the drawn box is a child, and
+ * it is what sizes the pressable. Padding puts the box on its line, the negative
+ * margins give the layout back, and the touch area is the padding box.
+ */
+function paddingForFrame(frame: Insets): ViewStyle {
+  const top = frame.top ?? 0;
+  const right = frame.right ?? 0;
+  const bottom = frame.bottom ?? 0;
+  const left = frame.left ?? 0;
+  return {
+    paddingTop: top,
+    paddingRight: right,
+    paddingBottom: bottom,
+    paddingLeft: left,
     marginTop: 0 - top,
     marginRight: 0 - right,
     marginBottom: 0 - bottom,
@@ -133,7 +164,9 @@ export function IconButton({
     }
   };
 
-  const frameStyle = frame ? frameToStyle(frame) : null;
+  // With a frame the drawn box sizes the pressable: `width`/`height` would be the
+  // border box, and 52pt of them around 92pt of frame leaves a 4pt control.
+  const sizing = frame ? paddingForFrame(frame) : { width: box, height: box };
 
   return (
     <Pressable
@@ -153,7 +186,7 @@ export function IconButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       testID={testID}
-      style={[{ width: box, height: box }, frameStyle, style]}
+      style={[sizing, style]}
     >
       {({ pressed }) => {
         const s = skin(pressed && !disabled);

@@ -21,8 +21,8 @@ import { Haptics } from '../utils/haptics';
  * button with a ring of slop: the whole region is the button, and its frame is the
  * region. `hitSlop` cannot express that — React Native clips it to every ancestor's
  * frame and resolves overlapping slops by z-order — so these tests pin the frame:
- * transparent borders that grow the target, negative margins that give the layout
- * back, and `0` on the leading edge, which iOS reserves for its swipe-back gesture.
+ * padding that grows the target, negative margins that give the layout back, and `0`
+ * on the leading edge, which iOS reserves for its swipe-back gesture.
  */
 
 beforeEach(() => {
@@ -38,9 +38,26 @@ it('is the whole corner, not a slop around a control', () => {
 
   // A frame and a slop would describe two different targets, one of them clipped.
   expect(back().props.hitSlop).toBeUndefined();
-  // `lg` is the drawn control: 52pt box, 24pt glyph.
-  expect(backStyle().width).toBe(52);
-  expect(backStyle().height).toBe(52);
+});
+
+it('draws a 52pt control inside a pressable that has no size of its own', () => {
+  render(<ScreenHeader title="OKKO" />);
+
+  // `lg` is the drawn control: 52pt box, 24pt glyph — the only rounded box here.
+  const drawn = screen
+    .UNSAFE_getAllByType(View)
+    .map((v) => StyleSheet.flatten(v.props.style))
+    .filter((s) => s?.borderRadius !== undefined);
+
+  expect(drawn).toHaveLength(1);
+  expect(drawn[0].width).toBe(52);
+  expect(drawn[0].height).toBe(52);
+
+  // Yoga sizes `width`/`height` to the border box, so a framed pressable that also
+  // set them would squeeze the drawn box into the gap between its own padding and
+  // drop it off the row's line — which is exactly what the first build did.
+  expect(backStyle().width).toBeUndefined();
+  expect(backStyle().height).toBeUndefined();
 });
 
 it('reaches inwards and down, and takes the layout back', () => {
@@ -48,9 +65,9 @@ it('reaches inwards and down, and takes the layout back', () => {
 
   const style = backStyle();
 
-  expect(style.borderRightWidth).toBe(HEADER_CORNER_INWARD);
+  expect(style.paddingRight).toBe(HEADER_CORNER_INWARD);
   expect(style.marginRight).toBe(-HEADER_CORNER_INWARD);
-  expect(style.borderBottomWidth).toBe(HEADER_BOTTOM_HIT);
+  expect(style.paddingBottom).toBe(HEADER_BOTTOM_HIT);
   expect(style.marginBottom).toBe(-HEADER_BOTTOM_HIT);
 });
 
@@ -62,7 +79,7 @@ it('never spends a pixel on the leading edge', () => {
   // finger drifts horizontally (`cancelTouchesInParent` in RNSScreenStack.mm).
   const style = backStyle();
 
-  expect(style.borderLeftWidth).toBe(0);
+  expect(style.paddingLeft).toBe(0);
   expect(style.marginLeft).toBe(0);
 });
 
@@ -73,10 +90,11 @@ it('reaches up into the band the row reserves, by the row’s own number', () =>
   const row = StyleSheet.flatten(screen.getByTestId('header').props.style);
 
   // Both frames have to start where the safe-area band starts, or the part of the
-  // region above the row is clipped by the row and never sees the touch.
-  expect(style.borderTopWidth).toBeGreaterThan(0);
-  expect(style.borderTopWidth).toBe(row.borderTopWidth);
-  expect(style.marginTop).toBe(-style.borderTopWidth);
+  // region above the row is clipped by the row and never sees the touch. The row is
+  // a plain container, so it grows its frame with borders and carries no size.
+  expect(style.paddingTop).toBeGreaterThan(0);
+  expect(style.paddingTop).toBe(row.borderTopWidth);
+  expect(style.marginTop).toBe(-style.paddingTop);
 });
 
 it('lets the row own the same bands without eating the content', () => {
