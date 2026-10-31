@@ -44,7 +44,10 @@ public static class StatementReconciliationCsv
         // The destination sits BESIDE the reference, not instead of it: the reference is our own
         // echo, which is what ties the row to our invoice, and the destination is what the
         // customer typed - evidence for a dispute, and never a match key.
-        sb.AppendLine("StatementId,Status,InvoiceId,Reference,Destination,AcquirerAmount,LocalAmount,OrderId,OrderStatus,AcquirerCreatedAt,Note");
+        // The seen time and the lag sit beside the acquirer's time, because the pair is the only way
+        // to tell a row that is late from a row that is missing: the acquirer's own timestamp says
+        // when the money moved, ours says when the import learned about it.
+        sb.AppendLine("StatementId,Status,InvoiceId,Reference,Destination,AcquirerAmount,LocalAmount,OrderId,OrderStatus,AcquirerCreatedAt,Note,StatementSeenAt,LagMinutes");
 
         foreach (var row in act.Rows)
         {
@@ -62,7 +65,9 @@ public static class StatementReconciliationCsv
                 Q(row.OrderReference),
                 Q(row.OrderStatus?.ToString()),
                 Q(row.AcquirerCreatedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
-                Q(row.Note)
+                Q(row.Note),
+                Q(row.StatementSeenAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                Q(row.StatementLagMinutes?.ToString(CultureInfo.InvariantCulture))
             }));
         }
 

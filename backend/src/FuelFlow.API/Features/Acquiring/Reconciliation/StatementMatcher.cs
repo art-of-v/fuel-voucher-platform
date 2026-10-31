@@ -44,6 +44,12 @@ public enum StatementMatchStatus
 /// <param name="Status">The verdict.</param>
 /// <param name="Note">A human-readable reason, in the act's language, for anything not plain
 /// <see cref="StatementMatchStatus.Matched"/>.</param>
+/// <param name="StatementSeenAtUtc">When our importer first saw this row in the acquirer's
+/// statement. The acquirer's own <paramref name="AcquirerCreatedAtUtc"/> says when the money moved;
+/// this says when we learned about it.</param>
+/// <param name="StatementLagMinutes">The gap between the two, in whole minutes. It is the timing an
+/// operator may legitimately see before treating a missing row as a fault, so it is reported per row
+/// rather than only inferred from the import schedule.</param>
 public sealed record StatementMatchRow(
     string StatementId,
     StatementMatchStatus Status,
@@ -59,7 +65,9 @@ public sealed record StatementMatchRow(
     string? OrderReference,
     OrderStatus? OrderStatus,
     DateTime? AcquirerCreatedAtUtc,
-    string? Note);
+    string? Note,
+    DateTime? StatementSeenAtUtc = null,
+    int? StatementLagMinutes = null);
 
 /// <summary>
 /// Compares one period of acquirer statement against our own orders and refunds.
@@ -103,6 +111,10 @@ public static class StatementMatcher
         {
             var amount = entry.AmountKopecks is null ? (decimal?)null : entry.AmountKopecks.Value / 100m;
 
+            var lagMinutes = entry.AcquirerCreatedAtUtc is { } created
+                ? (int)Math.Round((entry.FirstSeenAtUtc - created).TotalMinutes, MidpointRounding.AwayFromZero)
+                : (int?)null;
+
             var invoiceId = entry.InvoiceId;
 
             // The capture. The ORDER is looked up first, and that order is what the row is: the
@@ -138,7 +150,9 @@ public static class StatementMatcher
                         // under a comma-decimal locale is the kind of thing nobody notices until
                         // the document is wrong in front of someone.
                         : FormattableString.Invariant(
-                            $"Acquirer reports {amount:0.00}, the order was priced {order.Price:0.00}")));
+                            $"Acquirer reports {amount:0.00}, the order was priced {order.Price:0.00}"),
+                    entry.FirstSeenAtUtc,
+                    lagMinutes));
                 continue;
             }
 
@@ -162,7 +176,9 @@ public static class StatementMatcher
                     entry.Destination,
                     entry.AmountKopecks, amount, refundOrderId, refund.AmountKopecks / 100m,
                     refund.ProviderInvoiceId, null, entry.AcquirerCreatedAtUtc,
-                    $"Refund {refund.Id:N} gave this invoice back on {reference} - no order of ours carries it"));
+                    $"Refund {refund.Id:N} gave this invoice back on {reference} - no order of ours carries it",
+                    entry.FirstSeenAtUtc,
+                    lagMinutes));
                 continue;
             }
 
@@ -171,7 +187,9 @@ public static class StatementMatcher
                 entry.Destination,
                 entry.AmountKopecks, amount,
                 null, null, null, null, entry.AcquirerCreatedAtUtc,
-                "No order or refund of ours carries this invoice"));
+                "No order or refund of ours carries this invoice",
+                entry.FirstSeenAtUtc,
+                lagMinutes));
         }
 
         return rows;

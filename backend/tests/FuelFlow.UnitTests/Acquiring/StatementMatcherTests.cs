@@ -21,8 +21,30 @@ public class StatementMatcherTests
             StatementId = statementId,
             InvoiceId = invoiceId,
             AmountKopecks = amountKopecks,
-            AcquirerCreatedAtUtc = new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc)
+            AcquirerCreatedAtUtc = new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc),
+            FirstSeenAtUtc = new DateTime(2026, 10, 5, 9, 20, 0, DateTimeKind.Utc)
         };
+
+    /// <summary>
+    /// Every row reports when the importer first saw it and how far that is from the acquirer's own
+    /// time. The pair is the only way to tell a late row from a missing one, so it travels with the
+    /// verdict rather than being reconstructed from the import schedule.
+    /// </summary>
+    [Fact]
+    public void A_Row_Carries_How_Long_After_The_Acquirer_We_Saw_It()
+    {
+        var entry = Entry("ST1", "INV1", 97857);
+        entry.FirstSeenAtUtc = new DateTime(2026, 10, 5, 10, 35, 0, DateTimeKind.Utc);
+
+        var rows = StatementMatcher.Match(
+            new[] { entry },
+            new[] { Order("INV1", 978.57m) },
+            Array.Empty<Payment>());
+
+        rows.Should().ContainSingle();
+        rows[0].StatementSeenAtUtc.Should().Be(entry.FirstSeenAtUtc);
+        rows[0].StatementLagMinutes.Should().Be(95);
+    }
 
     /// <summary>
     /// The note on a row that only a refund of ours carries names the order's own idempotency key.

