@@ -25,7 +25,7 @@ export const es: Record<string, string> = {
   // Rechazo en la compra: nuestro motivo es una decisión de margen sobre la que el cliente no puede
   // actuar, así que solo se le dice lo que le afecta: este combustible no se puede comprar ahora.
   'purchase.error.belowCost':
-    'Este combustible no está disponible para compra ahora. Elija otro o inténtelo más tarde.',
+    'Este código de combustible no está disponible ahora. Elija otro o inténtelo más tarde.',
   // El estante quedó vacío al pagar: a diferencia del precio bajo coste, esto se resuelve solo en
   // cuanto se activa existencias.
   'purchase.error.outOfStock':
@@ -126,7 +126,7 @@ export const es: Record<string, string> = {
   // está vacío en la oferta y no en un pago rechazado.
   'packages.outOfStock': 'No disponible en almacén',
   'packages.browseOnly':
-    'Aquí solo consultas. Para comprar combustible, cambia a tu contexto personal.',
+    'Aquí solo consultas. Para comprar un código de combustible, cambia a tu contexto personal.',
   'packages.addedToCart': 'AÑADIDO AL CARRITO',
   'packages.quantity': 'Cantidad',
   'packages.total': 'TOTAL',
@@ -159,7 +159,7 @@ export const es: Record<string, string> = {
 
   'codes.title': 'MIS CÓDIGOS DE COMBUSTIBLE',
   'codes.noAssets': 'NO SE ENCONTRARON CÓDIGOS',
-  'codes.purchaseFuel': 'Compra combustible para comenzar',
+  'codes.purchaseFuel': 'Compra un código de combustible para comenzar',
   'codes.availablePayloads': 'PAQUETES DE COMBUSTIBLE DISPONIBLES',
   'codes.processingPurchases': 'PROCESANDO COMPRAS',
   'codes.fulfilledOrders': 'PEDIDOS CUMPLIDOS',
@@ -229,7 +229,7 @@ export const es: Record<string, string> = {
   // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
   'codes.stock.companyEmpty': 'AÚN NO HAY COMPRAS',
   'codes.stock.companyEmptySub':
-    'El combustible que se compre para la empresa aparecerá aquí como recibo',
+    'Los códigos de combustible comprados para la empresa aparecerán aquí como recibo',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'ENTREGADO A VOS',
@@ -241,7 +241,7 @@ export const es: Record<string, string> = {
   'codes.stock.pendingShort': 'PENDIENTES',
   'codes.stock.workerEmpty': 'SIN COMBUSTIBLE',
   'codes.stock.workerEmptySub': 'La empresa todavía no te ha entregado combustible',
-  'codes.stock.workerNoBuying': 'Para comprar combustible, cambia a tu contexto personal',
+  'codes.stock.workerNoBuying': 'Para comprar un código de combustible, cambia a tu contexto personal',
 
   'company.usage.title': 'MI CONSUMO',
   'company.usage.received': 'recibido',
@@ -277,7 +277,7 @@ export const es: Record<string, string> = {
   'profile.personalSection': 'INFORMACIÓN PERSONAL',
   'profile.registerCompany': 'HACERSE CLIENTE EMPRESARIAL',
   'profile.registerCompanySubtitle':
-    'Registre su empresa para comprar combustible mediante contrato',
+    'Registre su empresa para obtener códigos de combustible mediante contrato',
   'profile.language': 'IDIOMA',
   'profile.theme': 'TEMA',
   'profile.themeLemberg': 'Lemberg (Neón)',
@@ -291,7 +291,7 @@ export const es: Record<string, string> = {
   'profile.legalEntityTitle': 'ENTIDAD LEGAL',
   'profile.legalToggle': 'SOY REPRESENTANTE DE UNA ENTIDAD LEGAL',
   'profile.legalDescription':
-    'Active este modo para comprar combustible como entidad legal y recibir los documentos necesarios.',
+    'Active este modo para recibir códigos de combustible para su personal como entidad legal y los documentos necesarios.',
   'profile.companyName': 'NOMBRE DE LA EMPRESA',
   'profile.edrpou': 'EDRPOU',
   'profile.vatNumber': 'NIF (SI CORRESPONDE)',
@@ -644,10 +644,10 @@ export const es: Record<string, string> = {
   'onboarding.start': 'Comenzar',
   'onboarding.slide1.title': 'El combustible ya está en tu teléfono.',
   'onboarding.slide1.body':
-    'Compra litros por adelantado: se guardan en la app como una cartera digital de combustible.',
+    'Recibe litros por adelantado: se guardan en la app como una cartera digital de combustible.',
   'onboarding.slide2.title': 'Fija el precio para siempre.',
   'onboarding.slide2.body':
-    'El precio se fija en el momento del pago. Por más que suba el combustible después, tus litros ya están pagados.',
+    'El precio se fija en el momento del pago. Por más que suba el combustible después, el código de tus litros ya es tuyo.',
   'onboarding.slide3.title': 'Muestra el QR y reposta.',
   'onboarding.slide3.body':
     'Un solo código en la bomba. Sin efectivo, sin tarjetas, sin cupones de papel.',
