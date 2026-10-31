@@ -1,8 +1,10 @@
+using System.Diagnostics.Metrics;
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -89,7 +91,8 @@ public class MonobankStatementImportServiceTests
             context,
             factory,
             Options.Create(new MonobankOptions { Enabled = enabled, StatementImportWindowDays = 35 }),
-            NullLogger<MonobankStatementImportService>.Instance);
+            NullLogger<MonobankStatementImportService>.Instance,
+            new FuelFlowMetrics());
 
         return (service, context, factory);
     }
@@ -168,7 +171,8 @@ public class MonobankStatementImportServiceTests
         var second = new MonobankStatementImportService(
             context, factory,
             Options.Create(new MonobankOptions { Enabled = true }),
-            NullLogger<MonobankStatementImportService>.Instance);
+            NullLogger<MonobankStatementImportService>.Instance,
+            new FuelFlowMetrics());
 
         await second.ImportRecentStatementsAsync();
 
@@ -245,7 +249,8 @@ public class MonobankStatementImportServiceTests
         var service = new MonobankStatementImportService(
             context, factory,
             Options.Create(new MonobankOptions { Enabled = true, StatementImportWindowDays = 0 }),
-            NullLogger<MonobankStatementImportService>.Instance);
+            NullLogger<MonobankStatementImportService>.Instance,
+            new FuelFlowMetrics());
 
         await service.ImportRecentStatementsAsync();
 
@@ -264,7 +269,8 @@ public class MonobankStatementImportServiceTests
         var service = new MonobankStatementImportService(
             context, factory,
             Options.Create(new MonobankOptions { Enabled = true, StatementImportWindowDays = 35 }),
-            NullLogger<MonobankStatementImportService>.Instance);
+            NullLogger<MonobankStatementImportService>.Instance,
+            new FuelFlowMetrics());
 
         await service.ImportRecentStatementsAsync();
 
@@ -287,6 +293,70 @@ public class MonobankStatementImportServiceTests
         factory.LiveFroms.Should().BeEmpty();
     }
 
+    // #824. The alert is about money on the acquirer's statement that no payment row of ours holds;
+    // before this the only notice was a log line read at the close. The pass is the gauge's only
+    // writer, because "unbooked" stays UnappliedReceipts' one definition - so this pins both ends:
+    // a pass that finds an unexplained capture publishes it, and a quiet pass publishes 0 rather
+    // than leaving the alert on NoData.
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public async Task The_Pass_Publishes_The_Unbooked_Capture_Count(bool withAnUnbookedCapture, int expected)
+    {
+        var context = NewContext();
+        var rows = withAnUnbookedCapture
+            ? new Dictionary<MonobankMerchant, List<MonobankStatementItem>> { [MonobankMerchant.Live] = new() { Item("L1") } }
+            : new Dictionary<MonobankMerchant, List<MonobankStatementItem>>();
+
+        var readings = new List<int>();
+
+        // The meter name is process-wide and other suites publish the same gauge while this one
+        // runs, so the listener keeps only the instrument this test's metrics created. The capture
+        // is by the constructing thread, because InstrumentPublished runs on it.
+        var testThread = Environment.CurrentManagedThreadId;
+        Instrument? gauge = null;
+
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name != ObservabilityConstants.MeterName)
+            {
+                return;
+            }
+
+            l.EnableMeasurementEvents(instrument);
+
+            if (instrument.Name == "fuelflow.payments.unbooked_captures"
+                && Environment.CurrentManagedThreadId == testThread)
+            {
+                gauge = instrument;
+            }
+        };
+        listener.SetMeasurementEventCallback<int>((instrument, value, _, _) =>
+        {
+            if (ReferenceEquals(instrument, gauge))
+            {
+                readings.Add(value);
+            }
+        });
+        listener.Start();
+
+        // Created after the listener starts - and on this thread - so its instrument is published here.
+        var service = new MonobankStatementImportService(
+            context,
+            new FakeMonobankClientFactory(rows),
+            Options.Create(new MonobankOptions { Enabled = true, StatementImportWindowDays = 35 }),
+            NullLogger<MonobankStatementImportService>.Instance,
+            new FuelFlowMetrics());
+
+        await service.ImportRecentStatementsAsync();
+        listener.RecordObservableInstruments();
+
+        readings.Should().ContainSingle(
+                "the pass reports once per window, and zero is a reported value rather than a missing series")
+            .Which.Should().Be(expected);
+    }
+
     [Fact]
     public async Task One_Merchant_Failing_Does_Not_Stop_The_Other()
     {
@@ -296,7 +366,8 @@ public class MonobankStatementImportServiceTests
         var service = new MonobankStatementImportService(
             context, factory,
             Options.Create(new MonobankOptions { Enabled = true }),
-            NullLogger<MonobankStatementImportService>.Instance);
+            NullLogger<MonobankStatementImportService>.Instance,
+            new FuelFlowMetrics());
 
         await service.ImportRecentStatementsAsync();
 

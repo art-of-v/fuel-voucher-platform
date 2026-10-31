@@ -198,6 +198,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
 
         if (order.Status == targetStatus)
         {
+            _metrics.MonobankWebhookDuplicate("target_status");
             _logger.LogInformation(
                 "Order {OrderId} already in target status {Status}; duplicate webhook acknowledged",
                 order.Id, targetStatus);

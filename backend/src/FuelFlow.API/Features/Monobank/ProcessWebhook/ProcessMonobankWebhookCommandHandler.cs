@@ -78,6 +78,9 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
 
         if (outcome.Decision != WebhookRecordDecision.Process)
         {
+            _metrics.MonobankWebhookDuplicate(
+                outcome.Decision == WebhookRecordDecision.InFlight ? "in_flight" : "redelivery");
+
             // Acknowledged, not processed. Monobank retries on a non-2xx, so anything else here turns
             // one redelivery into a loop against an event we already acted on - or, when another
             // attempt still holds the lease, into a second attempt at the same money.
@@ -101,7 +104,10 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         {
             // The delivery is on file and still marked outstanding, which is the point: "we received
             // it and could not act on it" is a state an operator can find, and it is the opposite of
-            // the delivery silently disappearing.
+            // the delivery silently disappearing. Counted as a failure here because this path has no
+            // other metric - the row's own error column is only visible to someone already looking.
+            _metrics.MonobankWebhookFailed("exception");
+
             await WebhookEventRecorder.CompleteAsync(
                 _context, stored, WebhookReceiptStatus.Failed, ex.Message, _logger, cancellationToken);
             throw;

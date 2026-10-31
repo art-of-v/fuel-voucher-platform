@@ -566,6 +566,120 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0] }
 
+      # #824. Money the acquirer took that no payment row of ours holds. Nothing books it
+      # automatically - an unexplained receipt becomes a liability under a named operator - so the
+      # only other notice was the statement pass's warning line, found at the close.
+      #
+      # The gauge is set by the hourly statement pass, and a capture can legitimately take up to an
+      # hour to appear in the statement, so the rule waits two hours before calling it a fault.
+      # NoData is a brief, honest state after a restart (the pass has not reported yet); a gauge that
+      # has reported says 0, so "we looked and there is nothing" is a value, not silence.
+      - uid: fuelflow-unbooked-captures
+        title: UnbookedCaptures
+        condition: C
+        for: 2h
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $values.B }} received capture(s) have no payment row and are not in the books"
+          description: "The acquirer's live statement holds charges the payments table cannot explain. Book them before the period closes with POST /api/admin/ledger/unapplied-receipts, naming the invoices from the statement pass warning line; the procedure is in docs/RECONCILIATION.md."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 7200, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: fuelflow_payments_unbooked_captures
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      # #824. A delivery that ended Failed: the money step threw, an amount did not match, or an
+      # invoice had no order. reconcile-monobank-payments re-feeds the invoice every two minutes, so
+      # a single failure may already be recovering; a sustained count is a money path that is not
+      # settling. The row's error column and the API log name the invoice.
+      - uid: fuelflow-webhook-delivery-failed
+        title: WebhookDeliveryFailed
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: OK
+        annotations:
+          summary: "Monobank webhooks are failing ({{ $values.B }} in the last ten minutes)"
+          description: "At least one delivery ended Failed. Check webhook_events.error for the invoice and the API log for the exception; the order may still be recoverable by the reconciliation poll, which re-feeds the same handler."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              # reason is deliberately aggregated away: the alert is "a money path is failing",
+              # and the reason belongs in the log line the operator opens next.
+              expr: sum(increase(fuelflow_monobank_webhook_failed_webhooks_total[10m])) or vector(0)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      # #824. A duplicate is normal by design: Monobank retries, and a retry that finds the work done
+      # is the system working. Only a burst is worth waking someone - it means the delivery is not
+      # being acknowledged (a 5xx loop), a client keeps re-polling the same state, or a retry storm
+      # is under way.
+      - uid: fuelflow-webhook-duplicate-burst
+        title: WebhookDuplicateBurst
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: OK
+        annotations:
+          summary: "Monobank is redelivering webhooks in a burst ({{ $values.B }} duplicates in ten minutes)"
+          description: "More than 20 duplicate deliveries in ten minutes, sustained. Check that the webhook endpoint answers 200 and that the event is being recorded - a redelivery loop is what an unacknowledged delivery looks like from the acquirer's side."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1200, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: sum(increase(fuelflow_monobank_webhook_duplicate_webhooks_total[10m])) or vector(0)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+
       # A feed that stops is not an error anywhere else in the stack. Every pump-price sync keeps the
       # last known prices when its fetch fails - deliberately, so an outage cannot blank the
       # catalogue - and the job returns normally, so nothing reaches Hangfire's failed state and

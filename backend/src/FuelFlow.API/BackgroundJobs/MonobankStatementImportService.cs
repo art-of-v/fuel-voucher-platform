@@ -4,6 +4,7 @@ using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -41,17 +42,20 @@ public class MonobankStatementImportService
     private readonly IMonobankClientFactory _monobankClientFactory;
     private readonly MonobankOptions _options;
     private readonly ILogger<MonobankStatementImportService> _logger;
+    private readonly FuelFlowMetrics _metrics;
 
     public MonobankStatementImportService(
         ApplicationDbContext context,
         IMonobankClientFactory monobankClientFactory,
         IOptions<MonobankOptions> options,
-        ILogger<MonobankStatementImportService> logger)
+        ILogger<MonobankStatementImportService> logger,
+        FuelFlowMetrics metrics)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
         _options = options.Value;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public virtual async Task ImportRecentStatementsAsync(CancellationToken cancellationToken = default)
@@ -118,6 +122,30 @@ public class MonobankStatementImportService
                 }
             }
         }
+
+        await ReportUnbookedCapturesAsync(fromUtc, toUtc, cancellationToken);
+    }
+
+    /// <summary>
+    /// Publishes the count of received LIVE statement captures that no payment row holds.
+    /// </summary>
+    /// <remarks>
+    /// Once per pass, over the whole configured window rather than per slice. The slices exist
+    /// because the acquirer refuses a range wider than 31 days; reporting the last slice's count
+    /// would make a capture outside it look resolved until the next pass. Reading the stored rows
+    /// rather than the ones this pass fetched means a failed slice still contributes what an earlier
+    /// pass imported. The gauge is set even at zero, so "we looked and there is nothing" is a value
+    /// rather than a missing series.
+    /// </remarks>
+    private async Task ReportUnbookedCapturesAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken)
+    {
+        var unbooked = await UnappliedReceipts.FindAsync(
+            _context, MonobankMerchant.Live, fromUtc, toUtc, cancellationToken);
+
+        _metrics.UnbookedCaptures(unbooked.Count);
     }
 
     private async Task ImportMerchantAsync(
