@@ -28,9 +28,18 @@ public sealed record UpdateAdminSettingsResult(
     VoucherTermSettingsUpdate? VoucherTerm,
     FeedbackBotSettingsUpdate? FeedbackBot)
 {
+    /// <summary>
+    /// The stable machine code of the refusal, when there was one. The admin renders its own
+    /// sentence from this and shows <see cref="Error"/> only for a code it has not learnt.
+    /// </summary>
+    public string? Code { get; init; }
+
     /// <summary>The refusal for a request that carries no section at all.</summary>
     public static UpdateAdminSettingsResult NoSettingsSupplied()
-        => new(false, "No settings supplied", null, null, null, null, null, null, null);
+        => new(false, "No settings supplied", null, null, null, null, null, null, null)
+        {
+            Code = "settings_none_supplied"
+        };
 }
 
 /// <summary>What the auto-refund switch became.</summary>

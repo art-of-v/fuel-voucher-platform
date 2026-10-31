@@ -7,7 +7,30 @@ import type { ReactNode } from "react";
 import ContractsTab from "@/components/ContractsTab";
 import { defaultQueryFn } from "@/lib/query-defaults";
 
-vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
+vi.mock("@/lib/api-client", () => {
+  // The refusal tests need the same class `codedErrorMessage` narrows on, so the mock ships it
+  // rather than leaving the module's real reader undefined.
+  class ApiError extends Error {
+    readonly code?: string;
+    readonly data?: Record<string, number>;
+    readonly extra?: Record<string, unknown>;
+
+    constructor(
+      message: string,
+      code?: string,
+      data?: Record<string, number>,
+      extra?: Record<string, unknown>,
+    ) {
+      super(message);
+      this.name = "ApiError";
+      this.code = code;
+      this.data = data;
+      this.extra = extra;
+    }
+  }
+
+  return { apiRequest: vi.fn(), ApiError };
+});
 vi.mock("@/lib/i18n", () => ({
   useI18n: () => ({
     t: (key: string, ...p: string[]) => (p.length ? `${key}:${p[0]}` : key),
@@ -25,8 +48,9 @@ vi.mock("@/lib/session-store", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, ApiError } from "@/lib/api-client";
 const mockedApiRequest = apiRequest as unknown as ReturnType<typeof vi.fn>;
+import { toast } from "sonner";
 
 /**
  * The contracts tab, read against what the server actually returns.
@@ -127,6 +151,7 @@ function cellTexts(): string[] {
 
 beforeEach(() => {
   mockedApiRequest.mockReset();
+  vi.mocked(toast.error).mockClear();
   mockedApiRequest.mockImplementation((_method: string, url: string) => {
     if (url.includes("signed-contracts/uc-1"))
       return Promise.resolve(SIGNATURE);
@@ -222,5 +247,48 @@ describe("ContractsTab", () => {
     expect(form.get("brandId")).toBe("b-okko");
     expect(form.get("termDays")).toBe("365");
     expect((form.get("file") as File).name).toBe("terms.docx");
+  });
+
+  it("words a refused publish in the panel's language", async () => {
+    const user = userEvent.setup();
+    renderTab();
+
+    await waitFor(() => expect(cellTexts()).toContain("OKKO"));
+
+    // Everything else answers as before; only the publish is refused, by the code the endpoint
+    // sends when a scanned document has no text to read.
+    mockedApiRequest.mockImplementation((_method: string, url: string) => {
+      if (url.includes("contract-versions/upload"))
+        return Promise.reject(
+          new ApiError(
+            "The document has no text in it",
+            "contract_document_no_text",
+          ),
+        );
+      if (url.includes("signed-contracts")) return Promise.resolve(SIGNED_PAGE);
+      if (url.includes("legal-entity/contracts"))
+        return Promise.resolve([CONTRACT]);
+      if (url.includes("/api/admin/brands")) return Promise.resolve(BRANDS);
+      return Promise.resolve([]);
+    });
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "OKKO" }));
+
+    const file = new File(["scanned"], "terms.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(fileInput, file);
+
+    await user.click(screen.getByText("contracts.upload"));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "contracts.error.documentNoText",
+      ),
+    );
   });
 });

@@ -70,6 +70,8 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Color theme",
     "appearance.themeHint":
       "Applies to this browser only. Saved on this device.",
+    "settings.error.noneSupplied": "There was nothing to save.",
+    "settings.error.qaNoValue": "The switch did not say which way to move.",
   },
   uk: {
     "settings.autoRefund": "Автоповернення",
@@ -141,6 +143,8 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Кольорова тема",
     "appearance.themeHint":
       "Застосовується лише в цьому браузері. Збережено на цьому пристрої.",
+    "settings.error.noneSupplied": "Не було що зберігати.",
+    "settings.error.qaNoValue": "Перемикач не вказав, у який бік змінюватися.",
   },
   de: {
     "settings.autoRefund": "Automatische Erstattung",
@@ -213,6 +217,9 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Farbthema",
     "appearance.themeHint":
       "Gilt nur für diesen Browser. Auf diesem Gerät gespeichert.",
+    "settings.error.noneSupplied": "Es gab nichts zu speichern.",
+    "settings.error.qaNoValue":
+      "Der Schalter hat nicht angegeben, in welche Richtung er wechseln soll.",
   },
   es: {
     "settings.autoRefund": "Reembolso automático",
@@ -283,5 +290,8 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Tema de color",
     "appearance.themeHint":
       "Se aplica solo a este navegador. Guardado en este dispositivo.",
+    "settings.error.noneSupplied": "No había nada que guardar.",
+    "settings.error.qaNoValue":
+      "El interruptor no indicó en qué dirección cambiar.",
   },
 };

@@ -101,7 +101,7 @@ public sealed class ErrorLogsController : ControllerBase
 
         return result.Status switch
         {
-            "NoIds" => ApiError.BadRequest(result.Error),
+            "NoIds" => ApiError.BadRequest(result.Error, ErrorLogRefusalCodes.NoIds),
             "Unauthenticated" => ApiError.Unauthorized("Unauthorized"),
             _ => Ok(new { success = true, changed = result.Changed })
         };

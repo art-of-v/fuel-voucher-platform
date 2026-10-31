@@ -44,7 +44,7 @@ public sealed class AdminSettingsController : ControllerBase
 
         if (!result.Success)
         {
-            return ApiError.BadRequest(result.Error);
+            return ApiError.BadRequest(result.Error, result.Code);
         }
 
         return Ok(new

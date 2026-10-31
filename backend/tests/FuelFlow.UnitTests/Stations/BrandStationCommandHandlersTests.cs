@@ -81,6 +81,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
 
         result.Conflict.Should().BeTrue();
         result.Error.Should().Contain("already exists");
+        result.Code.Should().Be(BrandStationRefusalCodes.ExternalIdConflict);
     }
 
     [Fact]
@@ -91,6 +92,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("does not exist");
+        result.Code.Should().Be(BrandStationRefusalCodes.BrandMissing);
     }
 
     [Fact]
@@ -102,6 +104,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("Lat");
+        result.Code.Should().Be(BrandStationRefusalCodes.CoordinatesInvalid);
     }
 
     [Fact]
@@ -131,6 +134,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
             .HandleAsync(new UpdateBrandStationCommand(NodeId("missing"), Node("missing", OkkoId, "X", 50.0, 30.0)));
 
         result.NotFound.Should().BeTrue();
+        result.Code.Should().Be(BrandStationRefusalCodes.NotFound);
     }
 
     [Fact]
@@ -145,6 +149,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("does not exist");
+        result.Code.Should().Be(BrandStationRefusalCodes.BrandMissing);
     }
 
     [Fact]

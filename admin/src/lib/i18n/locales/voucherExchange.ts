@@ -80,6 +80,8 @@ export const voucherExchange: Record<Language, Record<string, string>> = {
     "voucherExchange.historyPage": "Page {0} of {1}",
     "voucherExchange.historyEmpty": "No exchanges recorded yet.",
     "voucherExchange.historyLoadFailed": "Could not load the exchange history.",
+    "voucherExchange.error.alreadyExchanged":
+      "One of the selected vouchers was already exchanged. Refresh the list and choose again.",
   },
   uk: {
     "voucherExchange.title": "Заміна талонів",
@@ -162,6 +164,8 @@ export const voucherExchange: Record<Language, Record<string, string>> = {
     "voucherExchange.historyEmpty": "Обмінів ще не записано.",
     "voucherExchange.historyLoadFailed":
       "Не вдалося завантажити історію обмінів.",
+    "voucherExchange.error.alreadyExchanged":
+      "Один із вибраних талонів уже обміняно. Оновіть список і виберіть знову.",
   },
   de: {
     "voucherExchange.title": "Gutschein-Tausch",
@@ -244,6 +248,8 @@ export const voucherExchange: Record<Language, Record<string, string>> = {
     "voucherExchange.historyEmpty": "Noch keine Tauschvorgänge erfasst.",
     "voucherExchange.historyLoadFailed":
       "Der Tauschverlauf konnte nicht geladen werden.",
+    "voucherExchange.error.alreadyExchanged":
+      "Einer der ausgewählten Gutscheine wurde bereits umgetauscht. Aktualisieren Sie die Liste und wählen Sie erneut.",
   },
   es: {
     "voucherExchange.title": "Canje de vales",
@@ -326,5 +332,7 @@ export const voucherExchange: Record<Language, Record<string, string>> = {
     "voucherExchange.historyEmpty": "Todavía no hay canjes registrados.",
     "voucherExchange.historyLoadFailed":
       "No se pudo cargar el historial de canjes.",
+    "voucherExchange.error.alreadyExchanged":
+      "Uno de los vales seleccionados ya se canjeó. Actualice la lista y elija de nuevo.",
   },
 };

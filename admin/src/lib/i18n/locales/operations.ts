@@ -122,6 +122,21 @@ export const operations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoggedIn": "Admin Logged In",
     "auditlog.event.AdminLoginFailed": "Admin Login Failed",
     "auditlog.event.UserDeleted": "User Deleted",
+    "stationNodes.error.brandAndNameRequired":
+      "The brand and the name are required.",
+    "stationNodes.error.coordinatesInvalid":
+      "The coordinates must be within -90..90 and -180..180.",
+    "stationNodes.error.brandMissing":
+      "This brand does not exist. Refresh the list and try again.",
+    "stationNodes.error.externalIdConflict":
+      "A station with this external id already exists for this brand.",
+    "stationNodes.error.notFound":
+      "This station no longer exists. Refresh the list.",
+    "feedback.error.noIds": "Select at least one message.",
+    "feedback.error.unknownStatus": "This state is not one the panel knows.",
+    "feedback.error.deleteRefused":
+      "Nothing was selected to clear. Refresh the page and try again.",
+    "errorlogs.error.noIds": "Select at least one error.",
   },
   uk: {
     "stationNodes.allBrands": "Усі бренди",
@@ -246,6 +261,20 @@ export const operations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoggedIn": "Вхід адміністратора",
     "auditlog.event.AdminLoginFailed": "Невдалий вхід адміністратора",
     "auditlog.event.UserDeleted": "Користувача видалено",
+    "stationNodes.error.brandAndNameRequired": "Бренд і назва обов'язкові.",
+    "stationNodes.error.coordinatesInvalid":
+      "Координати мають бути в межах -90..90 і -180..180.",
+    "stationNodes.error.brandMissing":
+      "Цього бренду не існує. Оновіть список і спробуйте ще раз.",
+    "stationNodes.error.externalIdConflict":
+      "Станція з таким зовнішнім ідентифікатором уже є в цього бренду.",
+    "stationNodes.error.notFound":
+      "Цієї станції більше не існує. Оновіть список.",
+    "feedback.error.noIds": "Виберіть хоча б одне повідомлення.",
+    "feedback.error.unknownStatus": "Панель не знає такого стану.",
+    "feedback.error.deleteRefused":
+      "Нічого не вибрано для очищення. Оновіть сторінку і спробуйте ще раз.",
+    "errorlogs.error.noIds": "Виберіть хоча б одну помилку.",
   },
   de: {
     "stationNodes.allBrands": "Alle Marken",
@@ -370,6 +399,21 @@ export const operations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoggedIn": "Admin angemeldet",
     "auditlog.event.AdminLoginFailed": "Admin-Anmeldung fehlgeschlagen",
     "auditlog.event.UserDeleted": "Benutzer gelöscht",
+    "stationNodes.error.brandAndNameRequired":
+      "Marke und Name sind erforderlich.",
+    "stationNodes.error.coordinatesInvalid":
+      "Die Koordinaten müssen zwischen -90..90 und -180..180 liegen.",
+    "stationNodes.error.brandMissing":
+      "Diese Marke existiert nicht. Aktualisieren Sie die Liste und versuchen Sie es erneut.",
+    "stationNodes.error.externalIdConflict":
+      "Eine Station mit dieser externen Kennung existiert bei dieser Marke bereits.",
+    "stationNodes.error.notFound":
+      "Diese Station existiert nicht mehr. Aktualisieren Sie die Liste.",
+    "feedback.error.noIds": "Wählen Sie mindestens eine Nachricht aus.",
+    "feedback.error.unknownStatus": "Diesen Status kennt die Oberfläche nicht.",
+    "feedback.error.deleteRefused":
+      "Es wurde nichts zum Leeren ausgewählt. Aktualisieren Sie die Seite und versuchen Sie es erneut.",
+    "errorlogs.error.noIds": "Wählen Sie mindestens einen Fehler aus.",
   },
   es: {
     "stationNodes.allBrands": "Todas las marcas",
@@ -495,5 +539,20 @@ export const operations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoginFailed":
       "Error de inicio de sesión del administrador",
     "auditlog.event.UserDeleted": "Usuario eliminado",
+    "stationNodes.error.brandAndNameRequired":
+      "La marca y el nombre son obligatorios.",
+    "stationNodes.error.coordinatesInvalid":
+      "Las coordenadas deben estar entre -90..90 y -180..180.",
+    "stationNodes.error.brandMissing":
+      "Esta marca no existe. Actualice la lista e inténtelo de nuevo.",
+    "stationNodes.error.externalIdConflict":
+      "Ya existe una estación con este identificador externo en esta marca.",
+    "stationNodes.error.notFound":
+      "Esta estación ya no existe. Actualice la lista.",
+    "feedback.error.noIds": "Seleccione al menos un mensaje.",
+    "feedback.error.unknownStatus": "La interfaz no conoce este estado.",
+    "feedback.error.deleteRefused":
+      "No hay nada seleccionado para borrar. Actualice la página e inténtelo de nuevo.",
+    "errorlogs.error.noIds": "Seleccione al menos un error.",
   },
 };

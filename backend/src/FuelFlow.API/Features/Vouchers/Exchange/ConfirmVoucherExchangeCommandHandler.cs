@@ -44,7 +44,8 @@ public sealed record ConfirmVoucherExchangeResult(
     int UnpairedOldCount,
     int UnpairedNewCount,
     decimal? BlendedCostPerLiter,
-    IReadOnlyList<ExchangeFuelBlended> BlendedByFuel);
+    IReadOnlyList<ExchangeFuelBlended> BlendedByFuel,
+    string? Code = null);
 
 public sealed class ConfirmVoucherExchangeCommandHandler
 {
@@ -304,7 +305,9 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             new BulkActionVouchersCommand("activate", newIds, null, command.ActingUserId, command.ActingUserName),
             ct);
         if (!activateResult.Success)
-            throw new ExchangeAborted(activateResult.Error ?? "Failed to activate the new vouchers.");
+            throw new ExchangeAborted(
+                activateResult.Error ?? "Failed to activate the new vouchers.",
+                activateResult.Code);
 
         // One settlement per confirm action.
         var batchId = Guid.CreateVersion7();
@@ -455,7 +458,9 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             // cover, two operators confirming the same selection at the same moment - and the answer
             // is the same answer the check gives, not a 500. The throw rolls the transaction back on
             // the way out of this method, so nothing half-exchanged survives.
-            throw new ExchangeAborted("One or more selected vouchers were already exchanged.");
+            throw new ExchangeAborted(
+                "One or more selected vouchers were already exchanged.",
+                "voucher_exchange_already_exchanged");
         }
 
         var singleBlended = blendedByFuel.Count == 1 ? blendedByFuel[0].BlendedCostPerLiter : null;
@@ -486,7 +491,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             // The exchange was rolled back on purpose - the activation failed, or the database
             // refused a second exchange for a voucher that is already retired into one. The
             // operator gets the same answer either way, and nothing half-exchanged survives.
-            return Fail(aborted.Message);
+            return Fail(aborted.Message, aborted.Code);
         }
     }
 
@@ -496,11 +501,15 @@ public sealed class ConfirmVoucherExchangeCommandHandler
     /// </summary>
     private sealed class ExchangeAborted : Exception
     {
-        public ExchangeAborted(string error) : base(error)
+        public ExchangeAborted(string error, string? code = null) : base(error)
         {
+            Code = code;
         }
+
+        /// <summary>The stable code when the refusal has one — the activation gate's own codes do.</summary>
+        public string? Code { get; }
     }
 
-    private static ConfirmVoucherExchangeResult Fail(string error)
-        => new(false, error, null, 0, 0, 0, 0, 0, null, Array.Empty<ExchangeFuelBlended>());
+    private static ConfirmVoucherExchangeResult Fail(string error, string? code = null)
+        => new(false, error, null, 0, 0, 0, 0, 0, null, Array.Empty<ExchangeFuelBlended>(), code);
 }

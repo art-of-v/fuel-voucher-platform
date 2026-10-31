@@ -24,7 +24,21 @@ import {
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api-client";
+import {
+  codedErrorMessage,
+  type CodedSentence,
+} from "@/lib/coded-error-message";
 import { formatDateTime, cn } from "@/lib/utils";
+
+/**
+ * The sentences for a refused feedback action, in the panel's language. The codes come from
+ * `AdminFeedbackController`; an unknown code keeps the server's English sentence.
+ */
+const FEEDBACK_REFUSALS: Record<string, CodedSentence> = {
+  feedback_no_ids: (_error, t) => t("feedback.error.noIds"),
+  feedback_unknown_status: (_error, t) => t("feedback.error.unknownStatus"),
+  feedback_delete_refused: (_error, t) => t("feedback.error.deleteRefused"),
+};
 
 interface FeedbackItem {
   id: string;
@@ -156,7 +170,8 @@ export default function FeedbackTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/feedback"] });
       toast.success(t("feedback.stateChanged"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, FEEDBACK_REFUSALS)),
   });
 
   const deleteJunkMutation = useMutation({
@@ -166,7 +181,8 @@ export default function FeedbackTab() {
       setConfirmDeleteJunk(false);
       toast.success(t("feedback.junkCleared"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, FEEDBACK_REFUSALS)),
   });
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;

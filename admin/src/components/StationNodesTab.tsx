@@ -24,6 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
+import {
+  codedErrorMessage,
+  type CodedSentence,
+} from "@/lib/coded-error-message";
 import { toast } from "sonner";
 import {
   StationNode,
@@ -39,6 +43,22 @@ interface Brand {
   logoText?: string;
   color?: string;
 }
+
+/**
+ * The sentences for a refused station write, in the panel's language. The codes come from
+ * `CreateStationNodeCommandHandler` and `UpdateStationNodeCommandHandler`; an unknown code keeps
+ * the server's English sentence.
+ */
+const STATION_REFUSALS: Record<string, CodedSentence> = {
+  station_brand_and_name_required: (_error, t) =>
+    t("stationNodes.error.brandAndNameRequired"),
+  station_coordinates_invalid: (_error, t) =>
+    t("stationNodes.error.coordinatesInvalid"),
+  station_brand_missing: (_error, t) => t("stationNodes.error.brandMissing"),
+  station_external_id_conflict: (_error, t) =>
+    t("stationNodes.error.externalIdConflict"),
+  station_not_found: (_error, t) => t("stationNodes.error.notFound"),
+};
 
 interface ImportResult {
   added: number;
@@ -155,7 +175,8 @@ export default function StationNodesTab() {
       setForm(EMPTY_FORM);
       toast.success(t("common.created"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, STATION_REFUSALS)),
   });
 
   const updateMutation = useMutation({
@@ -171,7 +192,8 @@ export default function StationNodesTab() {
       setForm(EMPTY_FORM);
       toast.success(t("common.saved"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, STATION_REFUSALS)),
   });
 
   const deleteMutation = useMutation({
@@ -184,7 +206,8 @@ export default function StationNodesTab() {
       invalidate();
       toast.success(t("common.deleted"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, STATION_REFUSALS)),
   });
 
   // Coordinate + required-field validation, mirrors the backend contract.

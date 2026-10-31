@@ -16,10 +16,24 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api-client";
+import {
+  codedErrorMessage,
+  type CodedSentence,
+} from "@/lib/coded-error-message";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { DecimalSettingInput } from "@/components/DecimalSettingInput";
+
+/**
+ * The sentences for a refused settings write, in the panel's language. The codes come from
+ * `AdminSettingsController` and `QaTestAccessController`; an unknown one keeps the server's
+ * English sentence.
+ */
+const SETTINGS_REFUSALS: Record<string, CodedSentence> = {
+  settings_none_supplied: (_error, t) => t("settings.error.noneSupplied"),
+  qa_test_access_no_value: (_error, t) => t("settings.error.qaNoValue"),
+};
 import {
   marginWarningFor,
   type VoucherTermFuelDto,
@@ -261,7 +275,8 @@ export default function SettingsTab() {
       });
       toast.success(t("settings.saved"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, SETTINGS_REFUSALS)),
   });
 
   if (isLoading || !data) {
@@ -1269,7 +1284,8 @@ function QaTestAccessCard() {
       });
       toast.success(t("settings.qaSaved"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, SETTINGS_REFUSALS)),
   });
 
   if (isLoading || !data) {
