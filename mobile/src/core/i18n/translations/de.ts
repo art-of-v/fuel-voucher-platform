@@ -283,7 +283,8 @@ export const de: Record<string, string> = {
   'profile.companySection': 'FIRMA',
   'profile.personalSection': 'PERSÖNLICHE DATEN',
   'profile.registerCompany': 'GESCHÄFTSKUNDE WERDEN',
-  'profile.registerCompanySubtitle': 'Registrieren Sie Ihr Unternehmen für Kraftstoff-Codes per Vertrag',
+  'profile.registerCompanySubtitle':
+    'Registrieren Sie Ihr Unternehmen für Kraftstoff-Codes per Vertrag',
   'profile.language': 'SPRACHE',
   'profile.theme': 'THEMA',
   'profile.themeLemberg': 'Lemberg (Neon)',
