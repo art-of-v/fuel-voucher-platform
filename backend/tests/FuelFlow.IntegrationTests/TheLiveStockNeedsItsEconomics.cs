@@ -213,6 +213,10 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse("the stock on the shelf would have had no price");
         result.Error.Should().Contain("live stock");
+        result.Code.Should().Be(BrandRefusalCodes.LiveStockNeedsPrice,
+            "the panel builds the sentence from the code, and needs to know which half is missing");
+        result.Field.Should().Be("SupplierPricePerLiter",
+            "the cost is the first half this edit took away");
 
         using var verify = CreateContext();
         var fuel = await verify.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == ToUuid("okko-95"));
@@ -277,6 +281,7 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse();
         result.Field.Should().Be("SupplierPricePerLiter");
+        result.Code.Should().Be(BrandRefusalCodes.CostNotPositive);
         result.Error.Should().Contain("greater than zero");
     }
 
@@ -303,6 +308,7 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse();
         result.Field.Should().Be("MarginUahPerLiter");
+        result.Code.Should().Be(BrandRefusalCodes.MarginNegative);
         result.Error.Should().Contain("negative");
     }
 
@@ -332,6 +338,7 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
 
         result.Success.Should().BeFalse();
         result.Field.Should().Be("AllowBelowCost");
+        result.Code.Should().Be(BrandRefusalCodes.BelowCostNeedsCost);
         result.Error.Should().Contain("cost");
     }
 

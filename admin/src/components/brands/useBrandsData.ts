@@ -5,6 +5,8 @@ import { computeFinal } from "@/lib/finalPrice";
 import { parseNominals } from "@/lib/utils";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { codedErrorMessage } from "@/lib/coded-error-message";
+import { BRAND_REFUSALS } from "./brandRefusals";
 import {
   emptyBrandForm,
   type AuditEventDto,
@@ -104,7 +106,7 @@ export function useBrandsData() {
       setNewBrand(emptyBrandForm());
       toast.success(t("common.created"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const handleCreateBrand = () => {
@@ -148,7 +150,7 @@ export function useBrandsData() {
       setEditingBrandId(null);
       toast.success(t("common.saved"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const startEditBrand = (brand: BrandDto) => {
@@ -187,7 +189,7 @@ export function useBrandsData() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       toast.success(t("common.deleted"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const updateFuelMutation = useMutation({
@@ -209,7 +211,7 @@ export function useBrandsData() {
       setEditingFuel(null);
       toast.success(t("common.saved"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const deleteFuelMutation = useMutation({
@@ -222,7 +224,7 @@ export function useBrandsData() {
       });
       toast.success(t("common.deleted"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const addFuelMutation = useMutation({
@@ -251,7 +253,7 @@ export function useBrandsData() {
       setNewFuelBrandFuelCode("");
       toast.success(t("common.created"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const updateNominalsMutation = useMutation({
@@ -273,7 +275,7 @@ export function useBrandsData() {
       setEditingNominals(null);
       toast.success(t("common.saved"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(codedErrorMessage(e, t, BRAND_REFUSALS)),
   });
 
   const startEditFuel = (fuel: BrandFuelDto) => {

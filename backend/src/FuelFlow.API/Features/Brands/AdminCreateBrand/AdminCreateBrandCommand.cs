@@ -22,11 +22,13 @@ public sealed record AdminCreateBrandCommand(BrandDto Brand, Guid UserId, string
 /// that never had a chance - a 400.
 /// </param>
 /// <param name="Error">The reason, in the words the caller is shown.</param>
+/// <param name="Code">The stable machine code for the refusal, when there is one.</param>
 /// <param name="Brand">The brand that was created, when it was.</param>
 public sealed record AdminCreateBrandResult
 {
     public bool Success { get; init; }
     public bool Conflict { get; init; }
     public string? Error { get; init; }
+    public string? Code { get; init; }
     public Brand? Brand { get; init; }
 }

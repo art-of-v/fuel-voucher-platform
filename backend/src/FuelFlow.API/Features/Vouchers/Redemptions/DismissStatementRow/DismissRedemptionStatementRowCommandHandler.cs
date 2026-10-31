@@ -35,7 +35,8 @@ public sealed class DismissRedemptionStatementRowCommandHandler
 
         if (row is null)
         {
-            return new DismissRedemptionStatementRowResponse(false, "Statement line not found", "NotFound");
+            return new DismissRedemptionStatementRowResponse(
+                false, "Statement line not found", RedemptionRefusalCodes.StatementLineNotFound);
         }
 
         if (row.Status == RedemptionStatementStatus.Dismissed)
@@ -48,7 +49,7 @@ public sealed class DismissRedemptionStatementRowCommandHandler
             return new DismissRedemptionStatementRowResponse(
                 false,
                 $"Statement line is {row.Status}; resolve the voucher instead.",
-                "InvalidState");
+                RedemptionRefusalCodes.StatementLineNotDismissable);
         }
 
         if (row.VoucherRedemptionId is not null
@@ -62,7 +63,7 @@ public sealed class DismissRedemptionStatementRowCommandHandler
             return new DismissRedemptionStatementRowResponse(
                 false,
                 "The line belongs to a pending claim; confirm or reject the claim first.",
-                "InvalidState");
+                RedemptionRefusalCodes.StatementLineHasPendingClaim);
         }
 
         var now = SystemClock.UtcNow;
@@ -91,11 +92,14 @@ public sealed class DismissRedemptionStatementRowCommandHandler
 
         return current switch
         {
-            null => new DismissRedemptionStatementRowResponse(false, "Statement line not found", "NotFound"),
+            null => new DismissRedemptionStatementRowResponse(
+                false, "Statement line not found", RedemptionRefusalCodes.StatementLineNotFound),
             RedemptionStatementStatus.Dismissed => new DismissRedemptionStatementRowResponse(
                 true, "Statement line was already dismissed"),
             _ => new DismissRedemptionStatementRowResponse(
-                false, "Statement line changed before the dismiss landed.", "InvalidState"),
+                false,
+                "Statement line changed before the dismiss landed.",
+                RedemptionRefusalCodes.StatementLineChanged),
         };
     }
 

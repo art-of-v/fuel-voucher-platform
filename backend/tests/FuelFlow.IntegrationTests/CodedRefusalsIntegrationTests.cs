@@ -69,14 +69,66 @@ public sealed class CodedRefusalsIntegrationTests : IClassFixture<TestDatabaseFi
         // the blank name and the missing brand.
         (await PostAsync(staff, "/api/admin/brand-stations", new { externalId = "code-test", name = "" }))
             .Should().Be("station_brand_and_name_required");
+
+        // The catalogue and redemption panels word these themselves, so both doors must hand them a
+        // key. The code travels with the status the refusal deserves: a duplicate is a conflict and a
+        // missing row is a 404, and the panel has to tell them apart to choose what to do next.
+        // The panel's own body shape: the two cosmetic fields it always sends, so MVC's implicit
+        // required does not answer before the handler can.
+        (await CodeOfAsync(await staff.PostAsJsonAsync("/api/admin/brands", new
+        {
+            slug = "",
+            name = "code-test",
+            logoText = "",
+            color = "#00ff80",
+            sortOrder = 999
+        }))).Should().Be("brand_slug_required");
+
+        (await CodeOfAsync(
+            await staff.PostAsJsonAsync("/api/admin/brands", new
+            {
+                slug = "okko",
+                name = "OKKO twin",
+                logoText = "",
+                color = "#00ff80",
+                sortOrder = 999
+            }),
+            HttpStatusCode.Conflict)).Should().Be("brand_slug_taken");
+
+        // The flag is checked before the row is looked up, so an unknown id still answers with the
+        // refusal the operator can act on rather than a bare 404.
+        (await CodeOfAsync(await staff.PutAsJsonAsync(
+            $"/api/admin/brand-fuels/{Guid.NewGuid()}",
+            new { id = Guid.NewGuid().ToString(), name = "A-95" })))
+            .Should().Be("fuel_test_data_required");
+
+        (await CodeOfAsync(
+            await staff.DeleteAsync($"/api/admin/brand-fuels/{Guid.NewGuid()}"),
+            HttpStatusCode.NotFound)).Should().Be("fuel_not_found");
+
+        (await PostAsync(staff, "/api/admin/redemptions/statement", new { lines = Array.Empty<object>() }))
+            .Should().Be("statement_empty");
+
+        (await PostAsync(
+            staff,
+            $"/api/admin/redemptions/{Guid.NewGuid()}/decision",
+            new { action = "Nonsense" })).Should().Be("redemption_action_invalid");
+
+        (await CodeOfAsync(
+            await staff.PostAsJsonAsync(
+                $"/api/admin/redemptions/statement/{Guid.NewGuid()}/dismiss",
+                new { note = "checked" }),
+            HttpStatusCode.NotFound)).Should().Be("statement_line_not_found");
     }
 
     private static async Task<string?> PostAsync(HttpClient client, string route, object body)
         => await CodeOfAsync(await client.PostAsJsonAsync(route, body));
 
-    private static async Task<string?> CodeOfAsync(HttpResponseMessage response)
+    private static async Task<string?> CodeOfAsync(
+        HttpResponseMessage response,
+        HttpStatusCode expected = HttpStatusCode.BadRequest)
     {
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(expected);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         return problem.TryGetProperty("code", out var code) ? code.GetString() : null;
     }

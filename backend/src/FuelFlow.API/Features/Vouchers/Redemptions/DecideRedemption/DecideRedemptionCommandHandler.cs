@@ -49,7 +49,8 @@ public sealed class DecideRedemptionCommandHandler
 
         if (expectedStatus is null)
         {
-            return new DecideRedemptionResponse(false, "Unknown redemption decision", "InvalidState");
+            return new DecideRedemptionResponse(
+                false, "Unknown redemption decision", RedemptionRefusalCodes.RedemptionInvalidState);
         }
 
         var result = await _context.ExecuteReplaySafeAsync<RedemptionDecisionResult>(async ct =>
@@ -90,11 +91,12 @@ public sealed class DecideRedemptionCommandHandler
             RedemptionDecisionOutcome.AlreadyReversed =>
                 new DecideRedemptionResponse(true, "Redemption was already reversed"),
             RedemptionDecisionOutcome.NotFound =>
-                new DecideRedemptionResponse(false, "Voucher not found", "NotFound"),
+                new DecideRedemptionResponse(
+                    false, "Voucher not found", RedemptionRefusalCodes.RedemptionNotFound),
             _ => new DecideRedemptionResponse(
                 false,
                 $"Voucher cannot take this decision (current status: {result.CurrentStatus})",
-                "InvalidState"),
+                RedemptionRefusalCodes.RedemptionInvalidState),
         };
     }
 }

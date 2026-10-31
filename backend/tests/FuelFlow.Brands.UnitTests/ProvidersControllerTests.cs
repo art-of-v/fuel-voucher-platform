@@ -260,7 +260,9 @@ public sealed class BrandFuelControllerTests : IDisposable
             FuelRequest("X", 50m, 1m, 51m),
             CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundObjectResult>();
+        var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        CodeOf(notFound).Should().Be(BrandRefusalCodes.BrandNotFound,
+            "the panel words a missing network itself, so the 404 has to name the reason");
     }
 
     // Regression for #113: the per-liter price and the package total must carry kopecks, not round to
@@ -410,7 +412,8 @@ public sealed class BrandFuelControllerTests : IDisposable
             FuelDto("missing", "X", 50m, 1m, 51m),
             CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundObjectResult>();
+        var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        CodeOf(notFound).Should().Be(BrandRefusalCodes.FuelNotFound);
     }
 
     // --- UpdateNominals ---------------------------------------------------
@@ -481,7 +484,37 @@ public sealed class BrandFuelControllerTests : IDisposable
             new List<int> { 5 },
             CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundObjectResult>();
+        var notFound = result.Should().BeOfType<NotFoundObjectResult>().Subject;
+        CodeOf(notFound).Should().Be(BrandRefusalCodes.BrandNotFound);
+    }
+
+    [Fact]
+    public async Task UpdateNominals_WithNonPositiveSizes_IsRefused_AndNamesThem()
+    {
+        // The body binds a List<int> straight off the wire, so a zero or a negative size reaches the
+        // handler. It is refused there and names the values, so the sentence the panel shows can say
+        // which number is wrong rather than "invalid request".
+        await AddBrandAsync(TestOkko, "okko");
+
+        var result = await _controller.UpdateNominals(
+            TestOkko,
+            new List<int> { 0, -5 },
+            CancellationToken.None);
+
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        CodeOf(bad).Should().Be(BrandRefusalCodes.NominalsInvalid);
+
+        var problem = bad.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Extensions["invalid"].Should().BeEquivalentTo(new[] { -5, 0 });
+    }
+
+    /// <summary>
+    /// The machine code on a refusal body, which is what the admin picks its sentence by.
+    /// </summary>
+    private static object? CodeOf(ObjectResult result)
+    {
+        var problem = result.Value.Should().BeOfType<ProblemDetails>().Subject;
+        return problem.Extensions.TryGetValue("code", out var code) ? code : null;
     }
 
     /// <summary>

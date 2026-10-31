@@ -8,6 +8,11 @@ import BrandsTab from "@/components/BrandsTab";
 import { defaultQueryFn } from "@/lib/query-defaults";
 import { useI18n } from "@/lib/i18n";
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: toastError },
+}));
+
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
@@ -72,6 +77,7 @@ function callsTo(method: string, suffix: string) {
 
 beforeEach(() => {
   fetchMock.mockReset();
+  toastError.mockReset();
   fetchMock.mockImplementation(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -146,6 +152,57 @@ describe("BrandsTab", () => {
       allowBelowCost: false,
       isTestData: false,
     });
+  });
+
+  it("shows a refused save in the panel's language, not the server's English", async () => {
+    const user = userEvent.setup();
+    renderTab();
+
+    await user.click(await screen.findByText("OKKO"));
+    const row = (await screen.findByText("A-95")).closest("tr");
+    expect(row).not.toBeNull();
+    await user.click(within(row!).getAllByRole("button")[1]);
+
+    const margin = screen.getByLabelText(`${t("price.margin")} — A-95`);
+    await user.click(margin);
+    await user.type(margin, "3.5");
+    await user.tab();
+
+    // The server's sentence names the pool in English; the code is what the panel words itself.
+    fetchMock.mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (method === "GET" && url.endsWith("/api/admin/brands"))
+          return jsonResponse(BRANDS);
+        if (
+          method === "PUT" &&
+          url.endsWith(`/api/admin/brand-fuels/${FUEL.id}`)
+        )
+          return jsonResponse(
+            {
+              title: "Conflict",
+              status: 409,
+              detail:
+                "This fuel is sold in the live pool, and its sizes decide that.",
+              code: "fuel_pool_mismatch",
+            },
+            409,
+          );
+        return jsonResponse(undefined, 204);
+      },
+    );
+
+    await user.click(
+      within(row!).getByRole("button", { name: t("common.save") }),
+    );
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(t("fuel.error.poolMismatch")),
+    );
+    expect(toastError).not.toHaveBeenCalledWith(
+      "This fuel is sold in the live pool, and its sizes decide that.",
+    );
   });
 
   it("opens the add-brand panel and creates the brand with a POST", async () => {

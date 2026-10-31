@@ -62,7 +62,9 @@ public sealed class AdminRedemptionController : ControllerBase
 
         if (!response.Success)
         {
-            return ApiError.BadRequest(response.Error ?? "The statement could not be imported.");
+            return ApiError.BadRequest(
+                response.Error ?? "The statement could not be imported.",
+                response.ErrorCode);
         }
 
         return Ok(response);
@@ -107,7 +109,9 @@ public sealed class AdminRedemptionController : ControllerBase
         if (!Enum.TryParse<RedemptionDecisionAction>(request.Action, ignoreCase: true, out var action)
             || !Enum.IsDefined(action))
         {
-            return ApiError.BadRequest("Action must be Confirm, Reject or Reverse.");
+            return ApiError.BadRequest(
+                "Action must be Confirm, Reject or Reverse.",
+                RedemptionRefusalCodes.ActionInvalid);
         }
 
         var response = await _decisionHandler.HandleAsync(
@@ -119,9 +123,9 @@ public sealed class AdminRedemptionController : ControllerBase
             return Ok(response);
         }
 
-        return response.ErrorCode == "NotFound"
-            ? ApiError.NotFound(response.Message)
-            : ApiError.BadRequest(response.Message);
+        return response.ErrorCode == RedemptionRefusalCodes.RedemptionNotFound
+            ? ApiError.NotFound(response.Message, response.ErrorCode)
+            : ApiError.BadRequest(response.Message, response.ErrorCode);
     }
 
     /// <summary>
@@ -151,9 +155,9 @@ public sealed class AdminRedemptionController : ControllerBase
             return Ok(response);
         }
 
-        return response.ErrorCode == "NotFound"
-            ? ApiError.NotFound(response.Message)
-            : ApiError.BadRequest(response.Message);
+        return response.ErrorCode == RedemptionRefusalCodes.StatementLineNotFound
+            ? ApiError.NotFound(response.Message, response.ErrorCode)
+            : ApiError.BadRequest(response.Message, response.ErrorCode);
     }
 
     private Guid? GetUserId()

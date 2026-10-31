@@ -99,17 +99,19 @@ public sealed class BrandFuelController : ControllerBase
             return Created($"/api/admin/brand-fuels/{result.CreatedFuelId}", new { id = result.CreatedFuelId });
 
         if (result.NotFound)
-            return ApiError.NotFound("Not found");
+            return ApiError.NotFound("Not found", BrandRefusalCodes.BrandNotFound);
 
         // The refusal that names the fuel that already holds the name or the code carries its id, so
         // the operator is told which row to reprice. The refusal that names no fuel does not - its
         // body has never had the field, and growing a null one would change the answer.
         if (result.Conflict)
             return result.FuelTypeId is null
-                ? ApiError.Conflict(result.Error, extra: Extensions(("field", result.Field)))
-                : ApiError.Conflict(result.Error, extra: Extensions(("fuelTypeId", result.FuelTypeId), ("field", result.Field)));
+                ? ApiError.Conflict(result.Error, result.Code, extra: Extensions(("field", result.Field)))
+                : ApiError.Conflict(result.Error, result.Code, extra: Extensions(
+                    ("fuelTypeId", result.FuelTypeId), ("field", result.Field), ("twinName", result.TwinName)));
 
-        return ApiError.BadRequest(result.Error, extra: Extensions(("field", result.Field)));
+        return ApiError.BadRequest(result.Error, result.Code, extra: Extensions(
+            ("field", result.Field), ("token", result.Token)));
     }
 
     [HttpPut("{fuelId}")]
@@ -123,17 +125,19 @@ public sealed class BrandFuelController : ControllerBase
             return Ok(new { success = true });
 
         if (result.NotFound)
-            return ApiError.NotFound("Not found");
+            return ApiError.NotFound("Not found", BrandRefusalCodes.FuelNotFound);
 
         // The refusal that names the fuel that already holds the code carries its id. The refusal
         // that names no fuel - the one about the pool - does not, and its body has never had the
         // field, and growing a null one would change the answer.
         if (result.Conflict)
             return result.FuelTypeId is null
-                ? ApiError.Conflict(result.Error, extra: Extensions(("field", result.Field)))
-                : ApiError.Conflict(result.Error, extra: Extensions(("fuelTypeId", result.FuelTypeId), ("field", result.Field)));
+                ? ApiError.Conflict(result.Error, result.Code, extra: Extensions(("field", result.Field)))
+                : ApiError.Conflict(result.Error, result.Code, extra: Extensions(
+                    ("fuelTypeId", result.FuelTypeId), ("field", result.Field)));
 
-        return ApiError.BadRequest(result.Error, extra: Extensions(("field", result.Field)));
+        return ApiError.BadRequest(result.Error, result.Code, extra: Extensions(
+            ("field", result.Field), ("token", result.Token)));
     }
 
     [HttpDelete("{fuelId}")]
@@ -147,12 +151,13 @@ public sealed class BrandFuelController : ControllerBase
             return Ok(new { success = true });
 
         if (result.NotFound)
-            return ApiError.NotFound("Not found");
+            return ApiError.NotFound("Not found", BrandRefusalCodes.FuelNotFound);
 
         // The refusal carries the count of the vouchers that block the archive and a few of them: the
         // operator needs the size of the problem and not only the first rows of it.
         return ApiError.Conflict(
             result.Error,
+            result.Code,
             extra: Extensions(
                 ("activeVoucherCount", result.ActiveVoucherCount),
                 ("examples", result.Examples.Select(v => new { v.VoucherNumber, status = v.Status, v.Liters }))));
@@ -169,9 +174,12 @@ public sealed class BrandFuelController : ControllerBase
             return Ok(new { success = true });
 
         if (result.NotFound)
-            return ApiError.NotFound("Not found");
+            return ApiError.NotFound("Not found", BrandRefusalCodes.BrandNotFound);
 
-        return ApiError.BadRequest(result.Error, extra: Extensions(("invalid", result.Invalid)));
+        return ApiError.BadRequest(
+            result.Error,
+            result.Code,
+            extra: Extensions(("invalid", result.Invalid)));
     }
 
     /// <summary>

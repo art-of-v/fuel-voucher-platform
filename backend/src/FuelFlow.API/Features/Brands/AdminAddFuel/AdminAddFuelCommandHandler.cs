@@ -46,6 +46,7 @@ public sealed class AdminAddFuelCommandHandler
             {
                 Error = "isTestData is required. Set it to true for rehearsal data, or false if this "
                           + "is a real product.",
+                Code = BrandRefusalCodes.TestDataRequired,
                 Field = nameof(request.IsTestData)
             };
 
@@ -81,6 +82,7 @@ public sealed class AdminAddFuelCommandHandler
                           + $"fuels/{duplicate.Id} instead of adding it twice: a second row for the same "
                           + "fuel is a second row in the catalogue, and a voucher can then be priced against whichever "
                           + "of the two the importer happens to pick.",
+                Code = BrandRefusalCodes.NameExists,
                 FuelTypeId = duplicate.Id,
                 Field = nameof(request.Name)
             };
@@ -101,6 +103,8 @@ public sealed class AdminAddFuelCommandHandler
                               + $"{Brand.Name}. Price it with PUT fuels/{twin.Id} instead of adding it twice: "
                               + "one grade is one row, and a second row for it is a second row in the catalogue, "
                               + "which the storefront lists at a second price and a voucher can be priced against.",
+                    Code = BrandRefusalCodes.GradeExists,
+                    TwinName = twin.Name,
                     FuelTypeId = twin.Id,
                     Field = nameof(request.Name)
                 };
@@ -127,6 +131,7 @@ public sealed class AdminAddFuelCommandHandler
                     Error = $"Brand fuel code '{brandFuelCode}' is already taken at {Brand.Name} by fuel "
                               + $"{codeOwner}. A code identifies one fuel per network: two fuels claiming "
                               + "it is what makes a catalogue import pick the wrong row.",
+                    Code = BrandRefusalCodes.CodeTaken,
                     FuelTypeId = codeOwner,
                     Field = nameof(request.BrandFuelCode)
                 };
@@ -143,6 +148,8 @@ public sealed class AdminAddFuelCommandHandler
                     Error = $"The name contains \"{token}\", which reads as rehearsal data, but "
                               + "isTestData is false. Set it to true, or rename the fuel if this is "
                               + "a real product.",
+                    Code = BrandRefusalCodes.RehearsalName,
+                    Token = token,
                     Field = nameof(request.IsTestData)
                 };
             }
@@ -156,7 +163,12 @@ public sealed class AdminAddFuelCommandHandler
         if (FuelEconomics.Fault(request.SupplierPricePerLiter, request.MarginUahPerLiter, request.AllowBelowCost)
             is { } fault)
         {
-            return new AdminAddFuelResult { Error = fault.Error, Field = fault.Field };
+            return new AdminAddFuelResult
+            {
+                Error = fault.Error,
+                Code = BrandRefusalCodes.ForEconomicsFault(fault.Field),
+                Field = fault.Field
+            };
         }
 
         // The price, or null when we cannot know it. A cost that is not stated is not a zero: the

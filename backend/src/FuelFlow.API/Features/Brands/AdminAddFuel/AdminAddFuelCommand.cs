@@ -19,6 +19,15 @@ public sealed record AdminAddFuelCommand(Guid BrandId, CreateFuelRequest Fuel, G
 /// that never had a chance - a 400.
 /// </param>
 /// <param name="Error">The reason, in the words the operator is shown.</param>
+/// <param name="Code">The stable machine code for the refusal, when there is one.</param>
+/// <param name="TwinName">
+/// The fuel of the same grade, spelled another way, that refused this one. Only the near-duplicate
+/// refusal has one: the operator cannot see that row's spelling from the form.
+/// </param>
+/// <param name="Token">
+/// The word in the name that reads as rehearsal data. It is already in the name the operator typed,
+/// but naming it says which part of the name the guard objected to.
+/// </param>
 /// <param name="Field">
 /// The field the refusal is about - the name, the code or the rehearsal flag. It is the field name
 /// the form sent, so the screen can put the message next to the input that caused it.
@@ -34,6 +43,9 @@ public sealed record AdminAddFuelResult
     public bool NotFound { get; init; }
     public bool Conflict { get; init; }
     public string? Error { get; init; }
+    public string? Code { get; init; }
+    public string? TwinName { get; init; }
+    public string? Token { get; init; }
     public string? Field { get; init; }
     public Guid? FuelTypeId { get; init; }
     public Guid CreatedFuelId { get; init; }
