@@ -22,6 +22,9 @@ namespace FuelFlow.UnitTests.Middleware;
 /// <item>UseAuthorization after UseRateLimiter - a rejected request should not have spent
 /// authorization work, and the fallback policy's 401s must still pass through the limiter to
 /// stay cost-bounded.</item>
+/// <item>The update-floor refusal before UseAuthentication - an outdated build must be told to
+/// update. Mounted after authentication, the same request meets a 401 first, and a 401 is exactly
+/// the failure that reads as a wrong password on the client (planning #728).</item>
 /// </list>
 /// </summary>
 public sealed class PipelineOrderConventionTests
@@ -51,6 +54,7 @@ public sealed class PipelineOrderConventionTests
     [InlineData("app.UseAuthentication()", "app.UseRateLimiter()")]
     [InlineData("app.UseAuthentication()", "app.UseAuthorization()")]
     [InlineData("app.UseRateLimiter()", "app.UseAuthorization()")]
+    [InlineData("app.UseMiddleware<AppVersionFloorMiddleware>()", "app.UseAuthentication()")]
     public void Pipeline_MountsSecurityMiddlewares_InLoadBearingOrder(string before, string after)
     {
         var source = ReadPipelineSource();

@@ -22,6 +22,10 @@ internal static class PipelineSetup
         // before it costs anything.
         app.UseMiddleware<RequestSizeLimitMiddleware>();
         app.UseResponseCaching();
+        // Before authentication: an outdated build is told to update, not handed an auth failure
+        // it cannot tell from a wrong password (planning #728). After CORS, so the refusal still
+        // carries the headers a browser needs to read the status.
+        app.UseMiddleware<AppVersionFloorMiddleware>();
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseMiddleware<SessionValidationMiddleware>();
