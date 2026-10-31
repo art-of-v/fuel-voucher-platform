@@ -13,6 +13,7 @@ import type {
   RedemptionExceptionsResponse,
 } from "@/lib/api-types";
 import { toast } from "sonner";
+import { redemptionRefusalMessage } from "@/lib/redemption-refusal-error";
 
 type DecisionAction = "Confirm" | "Reject";
 
@@ -87,7 +88,7 @@ export function RedemptionReconciliationPanel() {
       setStatement("");
       invalidate();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(redemptionRefusalMessage(error, t)),
   });
 
   const decide = useMutation({
@@ -114,7 +115,7 @@ export function RedemptionReconciliationPanel() {
       });
       invalidate();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(redemptionRefusalMessage(error, t)),
   });
 
   const dismiss = useMutation({
@@ -133,7 +134,7 @@ export function RedemptionReconciliationPanel() {
       });
       invalidate();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => toast.error(redemptionRefusalMessage(error, t)),
   });
 
   const statusLabel = (status: string) => {

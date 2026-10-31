@@ -41,6 +41,7 @@ public sealed class AdminUpdateNominalsCommandHandler
             return new AdminUpdateNominalsResult
             {
                 Error = "A nominal volume must be a positive number of litres.",
+                Code = BrandRefusalCodes.NominalsInvalid,
                 Invalid = invalid
             };
         }

@@ -170,7 +170,7 @@ public sealed class RedemptionReconciliationIntegrationTests : IClassFixture<Tes
                 new DismissRedemptionStatementRowCommand(rowId, operatorUserId, "checked"));
 
             response.Success.Should().BeFalse();
-            response.ErrorCode.Should().Be("InvalidState");
+            response.ErrorCode.Should().Be(RedemptionRefusalCodes.StatementLineHasPendingClaim);
             response.Message.Should().Contain("confirm or reject the claim");
         }
 

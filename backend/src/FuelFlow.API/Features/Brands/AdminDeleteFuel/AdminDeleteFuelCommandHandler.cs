@@ -62,6 +62,7 @@ public sealed class AdminDeleteFuelCommandHandler
                 Conflict = true,
                 Error = $"«{fuel.Name}» не можна архівувати: {total} талон(ів) ще активні. " +
                         "Архівувати можна лише пальне, у якого всі талони використані або прострочені.",
+                Code = BrandRefusalCodes.ArchiveBlocked,
                 ActiveVoucherCount = total,
                 Examples = liveVouchers
                     .Select(v => new LiveVoucherExample(v.VoucherNumber, v.Status.ToString(), v.Liters))

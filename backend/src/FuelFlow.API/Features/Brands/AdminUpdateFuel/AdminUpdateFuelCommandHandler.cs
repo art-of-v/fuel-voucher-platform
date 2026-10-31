@@ -50,6 +50,7 @@ public sealed class AdminUpdateFuelCommandHandler
             {
                 Error = "isTestData is required. It names the pool the fuel is sold in, and a fuel "
                           + "with no sizes yet is seeded in that pool - so it cannot be left unstated.",
+                Code = BrandRefusalCodes.TestDataRequired,
                 Field = nameof(request.IsTestData)
             };
 
@@ -78,6 +79,7 @@ public sealed class AdminUpdateFuelCommandHandler
                     Error = $"This fuel is sold in the {(soldAsQa ? "QA" : "live")} pool, and its sizes "
                               + "decide that. A price edit does not move them - change the size list to "
                               + "change the pool.",
+                    Code = BrandRefusalCodes.PoolMismatch,
                     Field = nameof(request.IsTestData)
                 };
             }
@@ -101,6 +103,8 @@ public sealed class AdminUpdateFuelCommandHandler
                     Error = $"The name contains \"{token}\", which reads as rehearsal data, but "
                               + "isTestData is false. Set it to true, or rename the fuel if this is "
                               + "a real product.",
+                    Code = BrandRefusalCodes.RehearsalName,
+                    Token = token,
                     Field = nameof(request.IsTestData)
                 };
             }
@@ -118,7 +122,12 @@ public sealed class AdminUpdateFuelCommandHandler
         if (FuelEconomics.Fault(request.SupplierPricePerLiter, request.MarginUahPerLiter, request.AllowBelowCost)
             is { } fault)
         {
-            return new AdminUpdateFuelResult { Error = fault.Error, Field = fault.Field };
+            return new AdminUpdateFuelResult
+            {
+                Error = fault.Error,
+                Code = BrandRefusalCodes.ForEconomicsFault(fault.Field),
+                Field = fault.Field
+            };
         }
 
         // A fuel that has live stock on the shelf keeps a price of its own. The stock is already on
@@ -140,6 +149,7 @@ public sealed class AdminUpdateFuelCommandHandler
                     Error = $"This fuel has live stock on the shelf, so it must keep a price of its own: "
                               + $"{FuelEconomics.Missing(resulting)}. Set the cost and the margin, or take "
                               + "the stock off the shelf first.",
+                    Code = BrandRefusalCodes.LiveStockNeedsPrice,
                     Field = resulting.HasCost ? nameof(request.MarginUahPerLiter) : nameof(request.SupplierPricePerLiter)
                 };
             }
@@ -239,6 +249,7 @@ public sealed class AdminUpdateFuelCommandHandler
                         Conflict = true,
                         Error = $"Brand fuel code '{wanted}' is already taken at {fuel.BrandId} by fuel "
                                   + $"{codeOwner}. A code identifies one fuel per network.",
+                        Code = BrandRefusalCodes.CodeTaken,
                         FuelTypeId = codeOwner,
                         Field = nameof(request.BrandFuelCode)
                     };

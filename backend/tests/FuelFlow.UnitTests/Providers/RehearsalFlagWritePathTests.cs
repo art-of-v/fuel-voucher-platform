@@ -115,6 +115,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         bad.StatusCode.Should().Be((int)HttpStatusCode.BadRequest);
+        CodeOf(bad).Should().Be(BrandRefusalCodes.TestDataRequired,
+            "the panel picks a sentence by code, and the sentence is in its own language");
 
           var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == ToUuid("qa-a95")).ToListAsync();
         sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Qa,
@@ -136,7 +138,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
+        var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        CodeOf(bad).Should().Be(BrandRefusalCodes.TestDataRequired);
     }
 
     /// <summary>
@@ -169,6 +172,11 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         bad.Value.Should().NotBeNull();
+        var problem = bad.Value.Should().BeOfType<ProblemDetails>().Subject;
+        problem.Extensions["code"].Should().Be(BrandRefusalCodes.RehearsalName,
+            "the panel needs a code to say this in the operator's language");
+        problem.Extensions["token"].Should().NotBeNull(
+            "the sentence names the word in the fuel's name that reads as rehearsal");
     }
 
     [Fact]
@@ -280,6 +288,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         (await _context.FuelNominals.CountAsync(n => n.FuelTypeId == ToUuid("qa-a95")))
             .Should().Be(1, "and it must not have created a second size for the same pool");
         conflict.Value.Should().NotBeNull("the operator is told which fuel to reprice instead");
+        CodeOf(conflict).Should().Be(BrandRefusalCodes.NameExists);
     }
 
     [Fact]
@@ -315,8 +324,11 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         // left open, and a refusal that names nothing is a refusal the operator cannot act on.
         conflict.Value.Should().NotBeNull("the refusal says something");
         var payload = conflict.Value.Should().BeOfType<ProblemDetails>().Subject;
+        payload.Extensions["code"].Should().Be(BrandRefusalCodes.GradeExists);
         payload.Extensions["fuelTypeId"].Should().Be(ToUuid("qa-a95"),
             "the operator is told which fuel already holds the grade");
+        payload.Extensions["twinName"].Should().Be("А95 ЄВРО(QA)",
+            "and the sentence it drives names the row in the operator's language");
         payload.Detail.Should().Contain("А95 ЄВРО(QA)", "the refusal names the row that won");
     }
 
@@ -404,6 +416,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
         conflict.Value.Should().NotBeNull("the operator is told which fuel already holds the code");
+        CodeOf(conflict).Should().Be(BrandRefusalCodes.CodeTaken);
 
         (await _context.FuelTypes.CountAsync(f => f.BrandFuelCode == "9018"))
             .Should().Be(1, "and no second fuel claims it");
@@ -560,8 +573,9 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<ConflictObjectResult>(
-            "the sizes decide the pool, and a price edit does not move them");
+        var conflict = result.Should().BeOfType<ConflictObjectResult>(
+            "the sizes decide the pool, and a price edit does not move them").Subject;
+        CodeOf(conflict).Should().Be(BrandRefusalCodes.PoolMismatch);
 
         var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == ToUuid("live-dp")).ToListAsync();
         sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Real);
@@ -632,5 +646,15 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             FuelTypeId = ToUuid("qa-a95"), Liters = 10m, DataKind = DataKinds.Qa,
             CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
+    }
+
+    /// <summary>
+    /// The machine code on a refusal body. The admin panel's sentence is chosen by this, so a
+    /// refusal that arrives without one reads on screen in the server's English.
+    /// </summary>
+    private static object? CodeOf(ObjectResult result)
+    {
+        var problem = result.Value.Should().BeOfType<ProblemDetails>().Subject;
+        return problem.Extensions.TryGetValue("code", out var code) ? code : null;
     }
 }

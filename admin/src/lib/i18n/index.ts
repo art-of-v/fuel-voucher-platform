@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { brands } from "./locales/brands";
+import { brandRefusals } from "./locales/brandRefusals";
 import { common } from "./locales/common";
 import { contracts } from "./locales/contracts";
 import { imports } from "./locales/imports";
 import { operations } from "./locales/operations";
 import { orders } from "./locales/orders";
 import { reconciliation } from "./locales/reconciliation";
+import { redemptionRefusals } from "./locales/redemptionRefusals";
 import { report } from "./locales/report";
 import { settings } from "./locales/settings";
 import { settingsAutomation } from "./locales/settingsAutomation";
@@ -26,12 +28,14 @@ export const languages: { code: Language; name: string; flag: string }[] = [
 
 const localeModules = [
   brands,
+  brandRefusals,
   common,
   contracts,
   imports,
   operations,
   orders,
   reconciliation,
+  redemptionRefusals,
   report,
   settings,
   settingsAutomation,

@@ -31,7 +31,8 @@ public sealed record ImportRedemptionStatementResponse(
     int Duplicates,
     int AwaitingReview,
     int Exceptions,
-    IReadOnlyList<ImportedStatementRow> Rows);
+    IReadOnlyList<ImportedStatementRow> Rows,
+    string? ErrorCode = null);
 
 public sealed class ImportRedemptionStatementCommandHandler
 {
@@ -54,13 +55,13 @@ public sealed class ImportRedemptionStatementCommandHandler
     {
         if (command.Lines.Count == 0)
         {
-            return Failure("The statement has no lines.");
+            return Failure("The statement has no lines.", RedemptionRefusalCodes.StatementEmpty);
         }
 
         var validationError = Validate(command.Lines);
         if (validationError is not null)
         {
-            return Failure(validationError);
+            return Failure(validationError.Value.Error, validationError.Value.Code);
         }
 
         var externalIds = command.Lines
@@ -287,41 +288,51 @@ public sealed class ImportRedemptionStatementCommandHandler
             .Select(r => (Guid?)r.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
-    private static string? Validate(IReadOnlyList<ImportRedemptionStatementLine> lines)
+    private static (string Code, string Error)? Validate(IReadOnlyList<ImportRedemptionStatementLine> lines)
     {
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line.ExternalId))
             {
-                return "Every statement line needs an external id.";
+                return (
+                    RedemptionRefusalCodes.LineIdRequired,
+                    "Every statement line needs an external id.");
             }
 
             if (line.ExternalId.Trim().Length > 100)
             {
-                return $"Statement line id '{line.ExternalId.Trim()[..20]}...' is longer than 100 characters.";
+                return (
+                    RedemptionRefusalCodes.LineIdTooLong,
+                    $"Statement line id '{line.ExternalId.Trim()[..20]}...' is longer than 100 characters.");
             }
 
             if (string.IsNullOrWhiteSpace(line.VoucherNumber))
             {
-                return $"Statement line {line.ExternalId.Trim()} has no voucher number.";
+                return (
+                    RedemptionRefusalCodes.LineVoucherRequired,
+                    $"Statement line {line.ExternalId.Trim()} has no voucher number.");
             }
 
             if (line.VoucherNumber.Trim().Length > 100)
             {
-                return $"Statement line {line.ExternalId.Trim()} has a voucher number longer than 100 characters.";
+                return (
+                    RedemptionRefusalCodes.LineVoucherTooLong,
+                    $"Statement line {line.ExternalId.Trim()} has a voucher number longer than 100 characters.");
             }
 
             if (line.Liters <= 0m)
             {
-                return $"Statement line {line.ExternalId.Trim()} must state positive litres.";
+                return (
+                    RedemptionRefusalCodes.LineLitresNotPositive,
+                    $"Statement line {line.ExternalId.Trim()} must state positive litres.");
             }
         }
 
         return null;
     }
 
-    private static ImportRedemptionStatementResponse Failure(string error) =>
-        new(false, error, 0, 0, 0, 0, []);
+    private static ImportRedemptionStatementResponse Failure(string error, string code) =>
+        new(false, error, 0, 0, 0, 0, [], code);
 
     private static DateTime? NormalizeUtc(DateTime? value)
     {

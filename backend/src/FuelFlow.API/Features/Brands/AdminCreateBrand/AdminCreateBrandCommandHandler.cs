@@ -31,11 +31,20 @@ public sealed class AdminCreateBrandCommandHandler
 
         var slug = (request.Slug ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(slug))
-            return new AdminCreateBrandResult { Error = "Slug is required" };
+            return new AdminCreateBrandResult
+            {
+                Error = "Slug is required",
+                Code = BrandRefusalCodes.SlugRequired
+            };
 
         var exists = await _context.Brands.AnyAsync(s => s.Slug == slug, ct);
         if (exists)
-            return new AdminCreateBrandResult { Error = "Brand with this slug already exists", Conflict = true };
+            return new AdminCreateBrandResult
+            {
+                Error = "Brand with this slug already exists",
+                Conflict = true,
+                Code = BrandRefusalCodes.SlugTaken
+            };
 
         // The id is the server's to assign. A caller that sent one is ignored rather than rejected:
         // the admin form posts back the row it was editing, and refusing that would break the one

@@ -26,6 +26,7 @@ public sealed record LiveVoucherExample(string VoucherNumber, string Status, dec
 /// Whether the archive was refused because the fuel still has vouchers against it - a 409.
 /// </param>
 /// <param name="Error">The reason, in the words the operator is shown.</param>
+/// <param name="Code">The stable machine code for the refusal, when there is one.</param>
 /// <param name="ActiveVoucherCount">
 /// How many vouchers still hold value against the fuel. The count, not the examples: the operator
 /// needs to know the size of the problem and not only the first few of it.
@@ -37,6 +38,7 @@ public sealed record AdminDeleteFuelResult
     public bool NotFound { get; init; }
     public bool Conflict { get; init; }
     public string? Error { get; init; }
+    public string? Code { get; init; }
     public int ActiveVoucherCount { get; init; }
     public List<LiveVoucherExample> Examples { get; init; } = [];
 }
