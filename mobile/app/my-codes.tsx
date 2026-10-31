@@ -1,29 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  Animated,
-  Alert,
-  RefreshControl,
-} from 'react-native';
-import {
-  QrCode as QrIcon,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  RefreshCw,
-  Fuel,
-  ChevronRight,
-  Eye,
-  EyeOff,
-} from 'lucide-react-native';
+import { View, ScrollView, Animated, Alert, RefreshControl } from 'react-native';
 import type { Order, Voucher } from '../src/core/types/api';
 import { useMyCodes } from '../src/features/vouchers/hooks/useMyCodes';
 import {
-  Chip,
   GridBackground,
   GridPageLayout,
   LoadingState,
@@ -31,11 +10,6 @@ import {
   useContentInsets,
 } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
-import {
-  VoucherCard,
-  VoucherListControlsBar,
-  WalletSummaryBar,
-} from '../src/features/vouchers/components';
 import {
   applyListControls,
   EMPTY_FILTERS,
@@ -45,14 +19,11 @@ import {
   collectWorkerListVouchers,
   narrowIssuanceOrders,
 } from '../src/features/vouchers/lib/workerList';
-import { WorkerFuelHeader, WorkerUsageSection } from '../src/features/company/components';
 import { useWorkerUsage } from '../src/features/company/hooks/useWorkerUsage';
 
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-import { GlowText } from '../src/components/glow-text';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { OrderCard } from '../src/features/vouchers/components/OrderCard';
 import { shareOrderReceipt } from '../src/features/vouchers/api/getOrderReceipt';
 import { paymentHref } from '../src/features/payments/paymentSession';
 import { VoucherDetailModal } from '../src/features/vouchers/components/VoucherDetailModal';
@@ -66,101 +37,20 @@ import {
   countPending,
   type WalletSection,
 } from '../src/features/vouchers/lib/display';
+import { CodesEmptyState } from '../src/features/vouchers/components/CodesEmptyState';
+import { CodesErrorState } from '../src/features/vouchers/components/CodesErrorState';
+import { CodesWalletHeader } from '../src/features/vouchers/components/CodesWalletHeader';
+import { CompanyHubLink } from '../src/features/vouchers/components/CompanyHubLink';
+import { PendingOrdersSection } from '../src/features/vouchers/components/PendingOrdersSection';
+import { ReceiptsSection } from '../src/features/vouchers/components/ReceiptsSection';
+import { RenewalCta } from '../src/features/vouchers/components/RenewalCta';
+import { SpentOrdersFilter } from '../src/features/vouchers/components/SpentOrdersFilter';
+import { WorkerIssuanceSection } from '../src/features/vouchers/components/WorkerIssuanceSection';
 
 const GLOBAL_PADDING = 24;
 
 export default function MyCodesScreen() {
   const tokens = useDesignTokens();
-
-  // Built where `tokens` is in scope rather than at module level. The values below
-  // are all theme-independent, but a themed colour added here later would silently
-  // freeze at the default theme instead of following a switch.
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        sectionHeader: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.spacing.sm,
-        },
-        sectionLabel: {
-          fontFamily: 'Rajdhani-SemiBold',
-          fontSize: tokens.type.caption.fontSize,
-          letterSpacing: 6,
-          textTransform: 'uppercase',
-          marginBottom: tokens.spacing.sm,
-        },
-        diagonalStampContainer: {
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          left: 0,
-          right: 0,
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-        },
-        diagonalStamp: {
-          borderWidth: 1,
-          padding: tokens.spacing.xxs,
-          transform: [{ rotate: '-12deg' }],
-        },
-        diagonalStampInner: {
-          borderWidth: 2,
-          paddingHorizontal: tokens.spacing.xl,
-          paddingVertical: tokens.spacing.fine6,
-        },
-        diagonalStampText: {
-          fontSize: tokens.type.numeric.fontSize,
-          fontFamily: 'Rajdhani-Bold',
-          letterSpacing: 6,
-          textTransform: 'uppercase',
-        },
-        emptyContainer: {
-          marginTop: tokens.spacing.emptyStateClearance,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: tokens.spacing.emptyStateClearance,
-          borderRadius: tokens.radius.lg,
-        },
-        emptyIconBox: {
-          width: 80,
-          height: 80,
-          borderRadius: tokens.radius.full,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: tokens.spacing['2xl'],
-        },
-        emptyTitle: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.numeric.fontSize,
-          letterSpacing: 4,
-          textTransform: 'uppercase',
-        },
-        emptySubtitle: {
-          fontSize: tokens.type.caption.fontSize,
-          fontFamily: 'Inter-Bold',
-          marginTop: tokens.spacing.sm,
-          letterSpacing: 1,
-        },
-        errorContainer: {
-          marginTop: tokens.spacing.emptyStateClearance,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: tokens.spacing.emptyStateClearance,
-          borderRadius: tokens.radius.lg,
-          gap: tokens.spacing.lg,
-        },
-        errorTitle: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.heading.fontSize,
-          letterSpacing: 3,
-          textTransform: 'uppercase',
-          textAlign: 'center',
-        },
-      }),
-    [tokens],
-  );
   const contentInsets = useContentInsets();
   const [refreshing, setRefreshing] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -449,16 +339,11 @@ export default function MyCodesScreen() {
   // A worker's list is not order-filtered the same way and carries its own status filter (#161 H0).
   const spentFilter =
     !isWorkerContext && spentOrderCount > 0 ? (
-      <View style={{ flexDirection: 'row' }}>
-        <Chip
-          testID="spent-orders-toggle"
-          label={t('codes.spentFilter')}
-          count={spentOrderCount}
-          selected={showSpent}
-          icon={showSpent ? <Eye size={16} /> : <EyeOff size={16} />}
-          onPress={() => setShowSpent((value) => !value)}
-        />
-      </View>
+      <SpentOrdersFilter
+        count={spentOrderCount}
+        selected={showSpent}
+        onToggle={() => setShowSpent((value) => !value)}
+      />
     ) : null;
 
   // The filter hides receipts; it does not delete them from the account. Counting the summary
@@ -495,261 +380,51 @@ export default function MyCodesScreen() {
         }
       >
         {!loading && error && vouchers.length === 0 && orders.length === 0 ? (
-          <View style={styles.errorContainer}>
-            <AlertTriangle size={40} color={tokens.colors.error} />
-            <Text
-              allowFontScaling={false}
-              style={[styles.errorTitle, { color: tokens.colors.text.primary }]}
-            >
-              {t('codes.failedToLoad')}
-            </Text>
-            <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                loadData();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.retry')}
-              style={({ pressed }) => [
-                {
-                  marginTop: tokens.spacing['2xl'],
-                  paddingHorizontal: tokens.spacing['2xl'],
-                  paddingVertical: tokens.spacing.md,
-                  borderWidth: 1,
-                  borderColor: tokens.colors.primary,
-                  backgroundColor: pressed ? tokens.colors.primaryDim : 'transparent',
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  color: tokens.colors.primary,
-                  fontSize: tokens.type.caption.fontSize,
-                  letterSpacing: 1.5,
-                }}
-              >
-                {t('codes.retry')}
-              </Text>
-            </Pressable>
-          </View>
+          <CodesErrorState onRetry={loadData} />
         ) : isEmpty ? (
-          <>
-            {/* The counts stay on screen in this state on purpose: they are the proof that the
-                wallet is filtered, not empty, and they are the numbers the customer remembers. */}
-            {onlySpentLeft ? (
-              <WalletSummaryBar
-                ordersCount={orders.length}
-                fulfilledCount={fulfilledWalletCount}
-                pendingCount={pendingOrders.length}
-              />
-            ) : null}
-            {spentFilter}
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBox}>
-                <QrIcon size={40} color={tokens.colors.primary} />
-              </View>
-              <GlowText
-                intensity="low"
-                align="center"
-                animation="pulse"
-                animatedValue={pulseAnim}
-                style={[styles.emptyTitle, { color: tokens.colors.text.primary }]}
-              >
-                {onlySpentLeft
-                  ? t('codes.emptySpentTitle')
-                  : isWorkerContext
-                    ? t('codes.stock.workerEmpty')
-                    : isCompanyContext
-                      ? t('codes.stock.companyEmpty')
-                      : t('codes.noAssets')}
-              </GlowText>
-              <Text
-                allowFontScaling={false}
-                style={[styles.emptySubtitle, { color: tokens.colors.text.muted }]}
-              >
-                {onlySpentLeft
-                  ? t('codes.emptySpentSubtitle')
-                  : isWorkerContext
-                    ? t('codes.stock.workerEmptySub')
-                    : isCompanyContext
-                      ? t('codes.stock.companyEmptySub')
-                      : t('codes.purchaseFuel')}
-              </Text>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  loadData();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.retry')}
-                style={{
-                  marginTop: tokens.spacing['2xl'],
-                  padding: tokens.spacing.md,
-                  borderWidth: 1,
-                  borderColor: tokens.colors.primary,
-                }}
-              >
-                <Text
-                  style={{ color: tokens.colors.primary, fontSize: tokens.type.caption.fontSize }}
-                >
-                  ⟳ REFRESH
-                </Text>
-              </Pressable>
-            </View>
-          </>
+          <CodesEmptyState
+            onlySpentLeft={onlySpentLeft}
+            isWorkerContext={isWorkerContext}
+            isCompanyContext={isCompanyContext}
+            pulseAnim={pulseAnim}
+            ordersCount={orders.length}
+            fulfilledCount={fulfilledWalletCount}
+            pendingCount={pendingOrders.length}
+            spentFilter={spentFilter}
+            onRefresh={loadData}
+          />
         ) : (
           <View style={{ gap: tokens.spacing['2xl'] }}>
-            {isWorkerContext ? (
-              <>
-                <WorkerFuelHeader
-                  currentCompany={currentCompany}
-                  workerIssued={workerIssued}
-                  workerUsedCount={workerUsedCount}
-                  workerLeftCount={workerLeftCount}
-                  workerPendingCount={workerPendingCount}
-                  workerLitersLeft={workerLitersLeft}
-                />
-                <WorkerUsageSection report={workerUsage.report} isLoading={workerUsage.isLoading} />
-              </>
-            ) : (
-              <>
-                <WalletSummaryBar
-                  ordersCount={orders.length}
-                  fulfilledCount={fulfilledWalletCount}
-                  pendingCount={pendingOrders.length}
-                />
-                {spentFilter}
-              </>
-            )}
+            <CodesWalletHeader
+              isWorkerContext={isWorkerContext}
+              currentCompany={currentCompany}
+              workerIssued={workerIssued}
+              workerUsedCount={workerUsedCount}
+              workerLeftCount={workerLeftCount}
+              workerPendingCount={workerPendingCount}
+              workerLitersLeft={workerLitersLeft}
+              usageReport={workerUsage.report}
+              usageLoading={workerUsage.isLoading}
+              ordersCount={orders.length}
+              fulfilledCount={fulfilledWalletCount}
+              pendingCount={pendingOrders.length}
+              spentFilter={spentFilter}
+            />
 
-            {/* NEAR-EXPIRY RENEWAL CTA — the discoverable entry point.
-                            Shown only when the feature is on and the user actually has
-                            renewable (near-expiry / expired) vouchers. Taps into the
-                            dedicated multi-select screen. Personal context only: renewal is
-                            a self-service checkout, and buying into a company context is S4
-                            (multi-company epic #103). */}
             {!isCompanyContext && renewalConfig?.enabled && renewableCount > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.push('/renew-select');
-                }}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: tokens.spacing.fine14,
-                    padding: tokens.spacing.lg,
-                    borderRadius: tokens.radius.lg,
-                    borderWidth: 1,
-                    borderColor: pressed
-                      ? tokens.colors.warning
-                      : tokens.colors.status.warning.border,
-                    backgroundColor: tokens.colors.status.warning.subtle,
-                    transform: pressed ? [{ scale: 0.98 }] : [],
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: tokens.radius.full,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: `${tokens.colors.warning}22`,
-                  }}
-                >
-                  <RefreshCw size={20} color={tokens.colors.warning} />
-                </View>
-                <View style={{ flex: 1, gap: tokens.spacing.fine3 }}>
-                  <Text
-                    allowFontScaling={false}
-                    style={{
-                      fontSize: tokens.type.numericSmall.fontSize,
-                      fontFamily: 'Rajdhani-Bold',
-                      letterSpacing: 0.5,
-                      color: tokens.colors.text.primary,
-                    }}
-                  >
-                    {t('codes.renewCta.title')}
-                  </Text>
-                  <Text
-                    allowFontScaling={false}
-                    style={{
-                      fontSize: tokens.type.caption.fontSize,
-                      fontFamily: 'Inter',
-                      color: tokens.colors.text.muted,
-                    }}
-                  >
-                    {t('codes.renewCta.subtitle', String(renewableCount))}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    paddingHorizontal: tokens.spacing.fine14,
-                    // A tap target in its own right, and never squeezed: without `flexShrink: 0` a
-                    // long localized label (VERLÄNGERN, ПРОДОВЖИТИ) let the pill compress into the
-                    // text block, which is what read as the CTA touching the subtitle (#179).
-                    minHeight: tokens.control.sm,
-                    flexShrink: 0,
-                    justifyContent: 'center',
-                    borderRadius: tokens.radius.md,
-                    backgroundColor: tokens.colors.warning,
-                  }}
-                >
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    style={{
-                      fontSize: tokens.type.caption.fontSize,
-                      fontFamily: 'Inter-Black',
-                      letterSpacing: 1,
-                      textTransform: 'uppercase',
-                      color: tokens.colors.status.warning.onBase,
-                    }}
-                  >
-                    {t('codes.renewCta.action')}
-                  </Text>
-                </View>
-              </Pressable>
+              <RenewalCta renewableCount={renewableCount} />
             )}
 
             {/* PENDING ORDERS */}
             {pendingOrders.length > 0 && (
-              <View style={{ gap: tokens.spacing.md }}>
-                <View style={styles.sectionHeader}>
-                  <Clock size={14} color={tokens.colors.accent} />
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      backgroundColor: `${tokens.colors.accent}1A`,
-                      marginLeft: tokens.spacing.sm,
-                    }}
-                  />
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sectionLabel, { color: tokens.colors.accent, marginBottom: 0 }]}
-                  >
-                    {t('codes.processingPurchases')}
-                  </Text>
-                </View>
-                {pendingOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    isExpanded={expandedOrders.has(order.id)}
-                    onToggle={toggleOrderExpand}
-                    onVoucherPress={openVoucher}
-
-                    onPay={handlePay}
-                    onDelete={handleDeleteOrder}
-                    brandColor={brandColorFor(order.brand, tokens)}
-                  />
-                ))}
-              </View>
+              <PendingOrdersSection
+                orders={pendingOrders}
+                expandedOrders={expandedOrders}
+                onToggle={toggleOrderExpand}
+                onVoucherPress={openVoucher}
+                onPay={handlePay}
+                onDelete={handleDeleteOrder}
+              />
             )}
 
             {/* RECEIPTS (personal + owner context). The wallet is orders containing vouchers.
@@ -760,40 +435,13 @@ export default function MyCodesScreen() {
                             An owner sees the company's receipts too, and nothing else (#161 H4):
                             the hub owns who holds what, so this list and the hub cannot disagree. */}
             {!isWorkerContext && fulfilledOrders.length > 0 && (
-              <View style={{ gap: tokens.spacing.md }}>
-                <View style={styles.sectionHeader}>
-                  <CheckCircle size={14} color={tokens.colors.primary} />
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      backgroundColor: `${tokens.colors.primary}1A`,
-                      marginLeft: tokens.spacing.sm,
-                    }}
-                  />
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sectionLabel, { color: tokens.colors.primary, marginBottom: 0 }]}
-                  >
-                    {t('codes.fulfilledOrders')}
-                  </Text>
-                </View>
-                {fulfilledOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    isExpanded={expandedOrders.has(order.id)}
-                    onToggle={toggleOrderExpand}
-                    onVoucherPress={openVoucher}
-
-                    // Orders money was actually paid for — the customer's own, or the company's
-                    // when an owner is looking at their company context. An issuance receipt carries
-                    // no money and so has no invoice behind it.
-                    onReceipt={handleGetReceipt}
-                    brandColor={brandColorFor(order.brand, tokens)}
-                  />
-                ))}
-              </View>
+              <ReceiptsSection
+                orders={fulfilledOrders}
+                expandedOrders={expandedOrders}
+                onToggle={toggleOrderExpand}
+                onVoucherPress={openVoucher}
+                onReceipt={handleGetReceipt}
+              />
             )}
 
             {/* WORKER CONTEXT — the fuel this company issued to me (epic #103 S5). Each
@@ -802,86 +450,19 @@ export default function MyCodesScreen() {
                             fulfilled orders. Only fuel predating issuance orders (or arriving
                             another way) stays a flat list below. */}
             {isWorkerContext && (
-              <View style={{ gap: tokens.spacing.md }}>
-                <VoucherListControlsBar
-                  vouchers={workerListVouchers}
-                  controls={workerListControls}
-                  onChange={setWorkerListControls}
-                  countLabel={t('codes.stock.issuedToYou')}
-                />
-
-                {filteredIssuanceOrders.length > 0 && (
-                  <>
-                    <View style={styles.sectionHeader}>
-                      <Fuel size={14} color={tokens.colors.accent} />
-                      <View
-                        style={{
-                          flex: 1,
-                          height: 1,
-                          backgroundColor: `${tokens.colors.accent}1A`,
-                          marginHorizontal: tokens.spacing.sm,
-                        }}
-                      />
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          styles.sectionLabel,
-                          { color: tokens.colors.accent, marginBottom: 0 },
-                        ]}
-                      >
-                        {t('codes.stock.issuedReceipts')} · {filteredIssuanceOrders.length}
-                      </Text>
-                    </View>
-                    {filteredIssuanceOrders.map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        isExpanded={expandedOrders.has(order.id)}
-                        onToggle={toggleOrderExpand}
-                        onVoucherPress={openVoucher}
-
-                        brandColor={brandColorFor(order.brand, tokens)}
-                      />
-                    ))}
-                  </>
-                )}
-
-                {filteredLooseIssued.length > 0 && (
-                  <>
-                    {filteredIssuanceOrders.length > 0 && (
-                      <View style={styles.sectionHeader}>
-                        <Fuel size={14} color={tokens.colors.accent} />
-                        <View
-                          style={{
-                            flex: 1,
-                            height: 1,
-                            backgroundColor: `${tokens.colors.accent}1A`,
-                            marginHorizontal: tokens.spacing.sm,
-                          }}
-                        />
-                        <Text
-                          allowFontScaling={false}
-                          style={[
-                            styles.sectionLabel,
-                            { color: tokens.colors.accent, marginBottom: 0 },
-                          ]}
-                        >
-                          {t('codes.stock.issuedToYou')} · {filteredLooseIssued.length}
-                        </Text>
-                      </View>
-                    )}
-                    {filteredLooseIssued.map((voucher) => (
-                      <VoucherCard
-                        key={voucher.id}
-                        voucher={voucher}
-                        userId={user?.id}
-                        pulseAnim={pulseAnim}
-                        onSelect={setSelectedVoucher}
-                      />
-                    ))}
-                  </>
-                )}
-              </View>
+              <WorkerIssuanceSection
+                vouchers={workerListVouchers}
+                controls={workerListControls}
+                onControlsChange={setWorkerListControls}
+                issuanceOrders={filteredIssuanceOrders}
+                looseIssued={filteredLooseIssued}
+                expandedOrders={expandedOrders}
+                onToggle={toggleOrderExpand}
+                onVoucherPress={openVoucher}
+                userId={user?.id}
+                pulseAnim={pulseAnim}
+                onSelectVoucher={setSelectedVoucher}
+              />
             )}
           </View>
         )}
@@ -890,39 +471,7 @@ export default function MyCodesScreen() {
             receipts only, so the same fuel is never listed in two places that can disagree.
             Rendered outside the empty-state branch on purpose - a company whose fuel is all used
             up has no receipts left, and that is exactly when it most needs the way into the hub. */}
-        {isCompanyContext && !error && (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/company');
-            }}
-            style={{
-              marginTop: isEmpty ? tokens.spacing.md : tokens.spacing['2xl'],
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingVertical: tokens.spacing.fine14,
-              paddingHorizontal: tokens.spacing.lg,
-              borderRadius: tokens.radius.lg,
-              borderWidth: 1,
-              borderColor: `${tokens.colors.primary}33`,
-              backgroundColor: `${tokens.colors.primary}0F`,
-            }}
-          >
-            <Text
-              allowFontScaling={false}
-              style={{
-                fontSize: tokens.type.sectionTitle.fontSize,
-                fontFamily: 'Inter',
-                color: tokens.colors.text.muted,
-              }}
-            >
-              {t('company.managementTitle')}
-            </Text>
-            <ChevronRight size={18} color={tokens.colors.primary} />
-          </Pressable>
-        )}
+        {isCompanyContext && !error && <CompanyHubLink isEmpty={isEmpty} />}
       </ScrollView>
 
       <VoucherDetailModal
