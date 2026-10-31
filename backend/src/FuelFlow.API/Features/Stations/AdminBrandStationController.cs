@@ -62,9 +62,9 @@ public sealed class AdminBrandStationController : ControllerBase
     {
         var result = await _create.HandleAsync(new CreateBrandStationCommand(request), ct);
         if (result.Error != null && !result.Conflict)
-            return ApiError.BadRequest(result.Error);
+            return ApiError.BadRequest(result.Error, result.Code);
         if (result.Conflict)
-            return ApiError.Conflict(result.Error);
+            return ApiError.Conflict(result.Error, result.Code);
         return CreatedAtAction(nameof(GetById), new { id = result.Node!.Id }, result.Node);
     }
 
@@ -73,8 +73,8 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] BrandStation request, CancellationToken ct)
     {
         var result = await _update.HandleAsync(new UpdateBrandStationCommand(id, request), ct);
-        if (result.NotFound) return ApiError.NotFound("Not found");
-        if (result.Error != null) return ApiError.BadRequest(result.Error);
+        if (result.NotFound) return ApiError.NotFound("Not found", result.Code);
+        if (result.Error != null) return ApiError.BadRequest(result.Error, result.Code);
         return Ok(new { success = true });
     }
 
@@ -83,7 +83,9 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeleteBrandStationCommand(id), ct);
-        return success ? Ok(new { success = true }) : ApiError.NotFound("Not found");
+        return success
+            ? Ok(new { success = true })
+            : ApiError.NotFound("Not found", BrandStationRefusalCodes.NotFound);
     }
 
     [HttpPost("import")]

@@ -72,6 +72,21 @@ export const contracts: Record<Language, Record<string, string>> = {
     "suppliers.error.rnkrr": "RNKR must be 5 digits.",
     "suppliers.empty":
       "No suppliers yet. Add the first one - the brand on a voucher does not say who issued it.",
+    "contracts.error.brandRequired":
+      "Choose a provider first - the text belongs to one.",
+    "contracts.error.textRequired":
+      "The text is required: a contract with no text is not a document.",
+    "contracts.error.termRequired": "The term must be at least one day.",
+    "contracts.error.providerNotFound":
+      "This provider no longer exists. Refresh the list and try again.",
+    "contracts.error.documentRequired":
+      "Choose a document to publish - a Word or PDF file.",
+    "contracts.error.documentUnsupported":
+      "Only Word (.docx) and PDF documents are read.",
+    "contracts.error.documentNoText":
+      "The document has no text in it - a scanned page is a picture of a contract, not a contract.",
+    "contracts.error.documentTooLarge":
+      "The document expands to {0} MB, and this reader opens up to {1} MB. Ask the provider for a shorter document.",
   },
   uk: {
     "contracts.availableTitle": "Договори",
@@ -144,6 +159,21 @@ export const contracts: Record<Language, Record<string, string>> = {
     "suppliers.error.rnkrr": "РНОКР має складатися з 5 цифр.",
     "suppliers.empty":
       "Постачальників ще немає. Додайте першого — бренд на талоні не каже, хто його видав.",
+    "contracts.error.brandRequired":
+      "Спочатку виберіть провайдера — текст належить одному з них.",
+    "contracts.error.textRequired":
+      "Текст обов'язковий: договір без тексту — не документ.",
+    "contracts.error.termRequired": "Термін має бути щонайменше один день.",
+    "contracts.error.providerNotFound":
+      "Цього провайдера більше не існує. Оновіть список і спробуйте ще раз.",
+    "contracts.error.documentRequired":
+      "Виберіть документ для публікації — файл Word або PDF.",
+    "contracts.error.documentUnsupported":
+      "Читаються лише документи Word (.docx) і PDF.",
+    "contracts.error.documentNoText":
+      "У документі немає тексту — сканована сторінка це зображення договору, а не договір.",
+    "contracts.error.documentTooLarge":
+      "Документ розгортається до {0} МБ, а цей читач відкриває до {1} МБ. Попросіть у провайдера коротший документ.",
   },
   de: {
     "suppliers.title": "Lieferanten",
@@ -219,6 +249,22 @@ export const contracts: Record<Language, Record<string, string>> = {
     "contracts.signatureUnreadable":
       "Die Unterschrift konnte nicht gelesen werden.",
     "contracts.selectDocument": "Wählen Sie ein Dokument zum Veröffentlichen.",
+    "contracts.error.brandRequired":
+      "Wählen Sie zuerst einen Anbieter - der Text gehört zu genau einem.",
+    "contracts.error.textRequired":
+      "Der Text ist erforderlich: ein Vertrag ohne Text ist kein Dokument.",
+    "contracts.error.termRequired":
+      "Die Laufzeit muss mindestens einen Tag betragen.",
+    "contracts.error.providerNotFound":
+      "Diesen Anbieter gibt es nicht mehr. Aktualisieren Sie die Liste und versuchen Sie es erneut.",
+    "contracts.error.documentRequired":
+      "Wählen Sie ein Dokument zum Veröffentlichen - eine Word- oder PDF-Datei.",
+    "contracts.error.documentUnsupported":
+      "Es werden nur Word- (.docx) und PDF-Dokumente gelesen.",
+    "contracts.error.documentNoText":
+      "Das Dokument enthält keinen Text - eine gescannte Seite ist ein Bild eines Vertrags, kein Vertrag.",
+    "contracts.error.documentTooLarge":
+      "Das Dokument entfaltet sich auf {0} MB, dieser Leser öffnet bis zu {1} MB. Bitten Sie den Anbieter um ein kürzeres Dokument.",
   },
   es: {
     "suppliers.title": "Proveedores",
@@ -291,5 +337,20 @@ export const contracts: Record<Language, Record<string, string>> = {
     "contracts.signatureInvalid": "Datos de firma no válidos",
     "contracts.signatureUnreadable": "No se ha podido leer la firma.",
     "contracts.selectDocument": "Elija un documento para publicar.",
+    "contracts.error.brandRequired":
+      "Elija primero un proveedor: el texto pertenece a uno solo.",
+    "contracts.error.textRequired":
+      "El texto es obligatorio: un contrato sin texto no es un documento.",
+    "contracts.error.termRequired": "El plazo debe ser de al menos un día.",
+    "contracts.error.providerNotFound":
+      "Este proveedor ya no existe. Actualice la lista e inténtelo de nuevo.",
+    "contracts.error.documentRequired":
+      "Elija un documento para publicar: un archivo Word o PDF.",
+    "contracts.error.documentUnsupported":
+      "Solo se leen documentos Word (.docx) y PDF.",
+    "contracts.error.documentNoText":
+      "El documento no contiene texto: una página escaneada es una imagen de un contrato, no un contrato.",
+    "contracts.error.documentTooLarge":
+      "El documento se expande a {0} MB y este lector abre hasta {1} MB. Pida al proveedor un documento más corto.",
   },
 };

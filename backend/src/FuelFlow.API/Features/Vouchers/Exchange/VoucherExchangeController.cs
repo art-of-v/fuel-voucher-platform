@@ -105,7 +105,7 @@ public sealed class VoucherExchangeController : ControllerBase
             GetUserName());
 
         var result = await _confirmHandler.HandleAsync(command, cancellationToken);
-        return result.Success ? Ok(result) : ApiError.BadRequest(result.Error);
+        return result.Success ? Ok(result) : ApiError.BadRequest(result.Error, result.Code);
     }
 
     /// <summary>

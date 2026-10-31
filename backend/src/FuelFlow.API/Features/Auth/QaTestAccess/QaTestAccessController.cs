@@ -61,7 +61,7 @@ public sealed class QaTestAccessController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (request is null)
-            return ApiError.BadRequest("No value supplied");
+            return ApiError.BadRequest("No value supplied", "qa_test_access_no_value");
 
         var result = await _setHandler.HandleAsync(
             new SetQaTestAccessCommand(request.Enabled, GetUserId(), GetUserName(), GetRole()),

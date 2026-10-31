@@ -28,8 +28,20 @@ import {
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api-client";
+import {
+  codedErrorMessage,
+  type CodedSentence,
+} from "@/lib/coded-error-message";
 import { cn, csvCell, formatDateTime } from "@/lib/utils";
 import DateInput from "@/components/DateInput";
+
+/**
+ * The sentences for a refused error-log action, in the panel's language. The code comes from
+ * `ErrorLogsController`; an unknown one keeps the server's English sentence.
+ */
+const ERRORLOG_REFUSALS: Record<string, CodedSentence> = {
+  errorlogs_no_ids: (_error, t) => t("errorlogs.error.noIds"),
+};
 
 interface ErrorLogItem {
   id: string;
@@ -120,7 +132,8 @@ export default function ErrorLogsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/errors"] });
       toast.success(t("errorlogs.stateChanged"));
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(codedErrorMessage(e, t, ERRORLOG_REFUSALS)),
   });
 
   const clearMutation = useMutation({

@@ -21,9 +21,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, ApiError } from "@/lib/api-client";
+import {
+  codedErrorMessage,
+  type CodedSentence,
+} from "@/lib/coded-error-message";
+import { voucherRefusalMessage } from "@/lib/voucher-refusal-error";
 import { toast } from "sonner";
 import { ExchangeHistory } from "@/components/ExchangeHistory";
+
+/**
+ * The sentence for an exchange the settlement itself refused. The activation gate's codes
+ * (`fuel_not_priced`, `voucher_cost_missing`, …) come back through the same problem document and
+ * are already worded by `voucherRefusalMessage`; this map covers the one code only the exchange
+ * produces.
+ */
+const EXCHANGE_REFUSALS: Record<string, CodedSentence> = {
+  voucher_exchange_already_exchanged: (_error, t) =>
+    t("voucherExchange.error.alreadyExchanged"),
+};
 
 // --- API shapes (operator→brand stock exchange, #104) --------------------------------------
 interface AttentionItem {
@@ -252,7 +268,12 @@ export default function VoucherExchangeTab() {
       setStep(4);
       invalidate();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) =>
+      toast.error(
+        e instanceof ApiError && e.code && EXCHANGE_REFUSALS[e.code]
+          ? codedErrorMessage(e, t, EXCHANGE_REFUSALS)
+          : voucherRefusalMessage(e, t),
+      ),
   });
 
   const costsValid =

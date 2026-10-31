@@ -114,8 +114,8 @@ public sealed class AdminFeedbackController : ControllerBase
 
         return result.Status switch
         {
-            "NoIds" => ApiError.BadRequest(result.Error),
-            "UnknownStatus" => ApiError.BadRequest(result.Error),
+            "NoIds" => ApiError.BadRequest(result.Error, FeedbackRefusalCodes.NoIds),
+            "UnknownStatus" => ApiError.BadRequest(result.Error, FeedbackRefusalCodes.UnknownStatus),
             "Unauthenticated" => ApiError.Unauthorized("Unauthorized"),
             _ => Ok(new FeedbackMutationResponse(true, result.Affected))
         };
@@ -136,7 +136,7 @@ public sealed class AdminFeedbackController : ControllerBase
 
         return result.Status switch
         {
-            "Refused" => ApiError.BadRequest(result.Error),
+            "Refused" => ApiError.BadRequest(result.Error, FeedbackRefusalCodes.DeleteRefused),
             _ => Ok(new FeedbackMutationResponse(true, result.Affected))
         };
     }

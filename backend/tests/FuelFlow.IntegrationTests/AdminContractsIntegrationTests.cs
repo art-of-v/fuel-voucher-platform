@@ -218,6 +218,39 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
         row.GetProperty("termsText").GetString().Should().Be("Terms of OKKO, version 1.");
     }
 
+    /// <summary>
+    /// A refused publish names its reason as a code, so the panel can word it in the operator's
+    /// language instead of printing the English sentence (planning #763).
+    /// </summary>
+    [Fact]
+    public async Task A_Refused_Publish_Names_The_Reason_As_A_Code()
+    {
+        await ResetAsync();
+        var staff = await StaffClientAsync("+380000000309");
+        var brandId = await BrandIdAsync("okko");
+
+        var noText = await staff.PostAsJsonAsync("/api/admin/contract-versions", new
+        {
+            brandId,
+            body = "   ",
+            termDays = 30
+        });
+        noText.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await noText.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("code").GetString().Should().Be("contract_text_required");
+
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent(brandId.ToString()), "brandId" },
+            { new StringContent("30"), "termDays" },
+            { new ByteArrayContent([0x89, 0x50, 0x4E, 0x47]), "file", "terms.png" }
+        };
+        var badDocument = await staff.PostAsync("/api/admin/contract-versions/upload", form);
+        badDocument.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await badDocument.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("code").GetString().Should().Be("contract_document_unsupported");
+    }
+
     private async Task<Guid> BrandIdAsync(string slug)
     {
         using var scope = _fixture.Services.CreateScope();

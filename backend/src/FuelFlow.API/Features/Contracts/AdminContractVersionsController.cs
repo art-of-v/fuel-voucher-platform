@@ -78,19 +78,23 @@ public sealed class AdminContractVersionsController : ControllerBase
     public async Task<IActionResult> Publish([FromBody] PublishContractVersionRequest request, CancellationToken cancellationToken)
     {
         if (request.BrandId == Guid.Empty)
-            return ApiError.BadRequest("BrandId is required");
+            return ApiError.BadRequest("BrandId is required", ContractRefusalCodes.BrandRequired);
 
         if (string.IsNullOrWhiteSpace(request.Body))
-            return ApiError.BadRequest("The text is required - a contract with no text is not a document");
+            return ApiError.BadRequest(
+                "The text is required - a contract with no text is not a document",
+                ContractRefusalCodes.TextRequired);
 
         if (request.TermDays <= 0)
-            return ApiError.BadRequest("The term must be at least one day - a contract that expires the moment it is made is not a contract");
+            return ApiError.BadRequest(
+                "The term must be at least one day - a contract that expires the moment it is made is not a contract",
+                ContractRefusalCodes.TermRequired);
 
         var brand = await _getProviderHandler.HandleAsync(
             new GetContractProviderQuery(request.BrandId), cancellationToken);
 
         if (brand is null)
-            return ApiError.NotFound("Provider not found");
+            return ApiError.NotFound("Provider not found", ContractRefusalCodes.ProviderNotFound);
 
         var published = await _publishHandler.HandleAsync(
             new PublishContractVersionCommand(request.BrandId, request.Body, request.TermDays), cancellationToken);
@@ -136,17 +140,23 @@ public sealed class AdminContractVersionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (brandId == Guid.Empty)
-            return ApiError.BadRequest("BrandId is required");
+            return ApiError.BadRequest("BrandId is required", ContractRefusalCodes.BrandRequired);
 
         if (termDays <= 0)
-            return ApiError.BadRequest("The term must be at least one day - a contract that expires the moment it is made is not a contract");
+            return ApiError.BadRequest(
+                "The term must be at least one day - a contract that expires the moment it is made is not a contract",
+                ContractRefusalCodes.TermRequired);
 
         if (file is null || file.Length == 0)
-            return ApiError.BadRequest("A document is required - the contract text is a Word or PDF file");
+            return ApiError.BadRequest(
+                "A document is required - the contract text is a Word or PDF file",
+                ContractRefusalCodes.DocumentRequired);
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!ContractTextExtractor.SupportedExtensions.Contains(extension))
-            return ApiError.BadRequest($"Only {string.Join(" and ", ContractTextExtractor.SupportedExtensions)} documents are read");
+            return ApiError.BadRequest(
+                $"Only {string.Join(" and ", ContractTextExtractor.SupportedExtensions)} documents are read",
+                ContractRefusalCodes.DocumentUnsupported);
 
         // The provider is looked up before the document is read: an upload for a provider that is
         // not there is a mistake in the form, and reading a document for it would be work for
@@ -155,7 +165,7 @@ public sealed class AdminContractVersionsController : ControllerBase
             new GetContractProviderQuery(brandId), cancellationToken);
 
         if (brand is null)
-            return ApiError.NotFound("Provider not found");
+            return ApiError.NotFound("Provider not found", ContractRefusalCodes.ProviderNotFound);
 
         string? body;
         try
@@ -172,13 +182,20 @@ public sealed class AdminContractVersionsController : ControllerBase
             return ApiError.BadRequest(
                 $"The document is too large to read: it expands to {ex.SizeBytes} bytes, and this "
                 + $"reader opens up to {ContractTextExtractor.MaxDocumentBytes}. If it is a real "
-                + "document, ask the provider for a shorter one.");
+                + "document, ask the provider for a shorter one.",
+                ContractRefusalCodes.DocumentTooLarge,
+                new Dictionary<string, object?>
+                {
+                    ["sizeBytes"] = ex.SizeBytes,
+                    ["limitBytes"] = ContractTextExtractor.MaxDocumentBytes
+                });
         }
 
         if (string.IsNullOrWhiteSpace(body))
             return ApiError.BadRequest(
                 "The document has no text in it. A scanned document is a picture of a contract, "
-                + "and a contract the customer cannot read is not a contract.");
+                + "and a contract the customer cannot read is not a contract.",
+                ContractRefusalCodes.DocumentNoText);
 
         var published = await _publishHandler.HandleAsync(
             new PublishContractVersionCommand(brandId, body, termDays), cancellationToken);
