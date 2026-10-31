@@ -26,7 +26,7 @@ export const uk: Record<string, string> = {
   // (the fuel is priced below what we pay), which the customer can do nothing about and should not
   // be shown: all they can act on is that this fuel cannot be bought right now.
   'purchase.error.belowCost':
-    'Це пальне зараз недоступне для купівлі. Спробуйте обрати інше або зачекайте.',
+    'Цей код на пальне зараз недоступний. Спробуйте обрати інший або зачекайте.',
   // The shelf emptied after the basket was filled. Unlike belowCost this one resolves on its own, so
   // it is stated as a stock fact rather than as "this fuel cannot be bought" — the customer can check
   // back, and the package reappears on its own once stock is activated.
@@ -126,7 +126,7 @@ export const uk: Record<string, string> = {
   // Shown on the card itself and on its disabled button, so the customer learns the shelf is empty
   // from the offer rather than from a rejected payment.
   'packages.outOfStock': 'Недоступно на складі',
-  'packages.browseOnly': 'Тут лише перегляд. Щоб купити пально, перейдіть в особистий контекст.',
+  'packages.browseOnly': 'Тут лише перегляд. Щоб придбати код на пальне, перейдіть в особистий контекст.',
   'packages.addedToCart': 'ДОДАНО В КОШИК',
   'packages.added': 'ДОДАНО',
   'packages.selectCards': 'ОБЕРІТЬ ТАЛОНИ',
@@ -159,7 +159,7 @@ export const uk: Record<string, string> = {
 
   'codes.title': 'МОЇ ТАЛОНИ',
   'codes.noAssets': 'ТАЛОНІВ НЕ ЗНАЙДЕНО',
-  'codes.purchaseFuel': 'Придбайте пальне, щоб почати',
+  'codes.purchaseFuel': 'Придбайте код на пальне, щоб почати',
   'codes.availablePayloads': 'ДОСТУПНІ ПАЛИВНІ НАБОРИ',
   'codes.processingPurchases': 'ОБРОБКА ЗАМОВЛЕНЬ',
   'codes.fulfilledOrders': 'ВИКОНАНІ ЗАМОВЛЕННЯ',
@@ -229,7 +229,7 @@ export const uk: Record<string, string> = {
 
   // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
   'codes.stock.companyEmpty': 'ПОКУПОК ЩЕ НЕМАЄ',
-  'codes.stock.companyEmptySub': 'Придбане для компанії пальне з’явиться тут як чек',
+  'codes.stock.companyEmptySub': 'Придбані для компанії коди на пальне з’являться тут як чек',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'ВИДАНО ВАМ',
@@ -241,7 +241,7 @@ export const uk: Record<string, string> = {
   'codes.stock.pendingShort': 'ОЧІКУЄ',
   'codes.stock.workerEmpty': 'ТАЛОНІВ НЕМАЄ',
   'codes.stock.workerEmptySub': 'Компанія ще не видала вам пального',
-  'codes.stock.workerNoBuying': 'Щоб придбати пально, перейдіть в особистий контекст',
+  'codes.stock.workerNoBuying': 'Щоб придбати код на пальне, перейдіть в особистий контекст',
 
   'company.usage.title': 'МОЄ ВИКОРИСТАННЯ',
   'company.usage.received': 'отримано',
@@ -276,7 +276,7 @@ export const uk: Record<string, string> = {
   'profile.companySection': 'КОМПАНІЯ',
   'profile.personalSection': 'ОСОБИСТА ІНФОРМАЦІЯ',
   'profile.registerCompany': 'СТАТИ БІЗНЕС-КЛІЄНТОМ',
-  'profile.registerCompanySubtitle': 'Зареєструйте компанію для покупки пального за договором',
+  'profile.registerCompanySubtitle': 'Зареєструйте компанію, щоб отримувати коди на пальне за договором',
   'profile.language': 'МОВА',
   'profile.theme': 'ТЕМА',
   'profile.themeLemberg': 'Лемберг (Неон)',
@@ -290,7 +290,7 @@ export const uk: Record<string, string> = {
   'profile.legalEntityTitle': 'ЮРИДИЧНА ОСОБА',
   'profile.legalToggle': 'Я ПРЕДСТАВНИК ЮРИДИЧНОЇ ОСОБИ',
   'profile.legalDescription':
-    'Увімкніть цей режим, щоб отримати можливість купувати пальне як юридична особа та отримувати необхідні документи.',
+    'Увімкніть цей режим, щоб як юридична особа отримувати коди на пальне для співробітників та необхідні документи.',
   'profile.companyName': 'НАЗВА КОМПАНІЇ',
   'profile.edrpou': 'ЄДРПОУ',
   'profile.vatNumber': 'ІПН (ЗА НАЯВНОСТІ)',
@@ -646,10 +646,10 @@ export const uk: Record<string, string> = {
   'onboarding.start': 'Почати',
   'onboarding.slide1.title': 'Пальне вже у твоєму телефоні.',
   'onboarding.slide1.body':
-    'Купуй літри наперед — вони зберігаються в застосунку як цифровий паливний гаманець.',
+    'Отримуй літри наперед — вони зберігаються в застосунку як цифровий паливний гаманець.',
   'onboarding.slide2.title': 'Фіксуй ціну назавжди.',
   'onboarding.slide2.body':
-    'Ціна зафіксована в момент оплати. Скільки б пальне не коштувало потім — твої літри вже оплачені.',
+    'Ціна фіксується в момент оплати. Скільки б пальне не коштувало потім — код на твої літри вже твій.',
   'onboarding.slide3.title': 'Показав QR — заправився.',
   'onboarding.slide3.body': 'Один код на колонці. Готівка, картки й паперові талони не потрібні.',
   'onboarding.slide4.title': 'Твій номер телефону.',

@@ -25,7 +25,7 @@ export const en: Record<string, string> = {
   // Purchase-side rejection. Our reason is a margin decision the customer cannot act on, so they are
   // told only what they can: this fuel cannot be bought right now.
   'purchase.error.belowCost':
-    'This fuel is currently unavailable for purchase. Try another one or check back later.',
+    'This fuel code is currently unavailable. Try another one or check back later.',
   // The shelf emptied after the basket was filled. Unlike belowCost this one resolves on its own, so
   // it is stated as a stock fact rather than as "this fuel cannot be bought".
   'purchase.error.outOfStock':
@@ -125,7 +125,7 @@ export const en: Record<string, string> = {
   // Shown on the card itself and on its disabled button, so the customer learns the shelf is empty
   // from the offer rather than from a rejected payment.
   'packages.outOfStock': 'Out of stock',
-  'packages.browseOnly': 'Browsing only here. Switch to your personal context to buy fuel.',
+  'packages.browseOnly': 'Browsing only here. Switch to your personal context to buy a fuel code.',
   'packages.addedToCart': 'ADDED TO CART',
   'packages.quantity': 'Quantity',
   'packages.total': 'TOTAL',
@@ -158,7 +158,7 @@ export const en: Record<string, string> = {
 
   'codes.title': 'MY FUEL CODES',
   'codes.noAssets': 'NO CODES FOUND',
-  'codes.purchaseFuel': 'Purchase fuel to get started',
+  'codes.purchaseFuel': 'Get a fuel code to get started',
   'codes.availablePayloads': 'AVAILABLE FUEL PAYLOADS',
   'codes.processingPurchases': 'PROCESSING PURCHASES',
   'codes.fulfilledOrders': 'FULFILLED ORDERS',
@@ -226,7 +226,7 @@ export const en: Record<string, string> = {
 
   // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
   'codes.stock.companyEmpty': 'NO PURCHASES YET',
-  'codes.stock.companyEmptySub': 'Fuel you buy for the company appears here as a receipt',
+  'codes.stock.companyEmptySub': 'Fuel codes you buy for the company appear here as a receipt',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'ISSUED TO YOU',
@@ -238,7 +238,7 @@ export const en: Record<string, string> = {
   'codes.stock.pendingShort': 'PENDING',
   'codes.stock.workerEmpty': 'NO FUEL ISSUED',
   'codes.stock.workerEmptySub': 'The company has not issued you any fuel yet',
-  'codes.stock.workerNoBuying': 'To buy fuel, switch to your personal context',
+  'codes.stock.workerNoBuying': 'To buy a fuel code, switch to your personal context',
 
   'company.usage.title': 'MY USAGE',
   'company.usage.received': 'received',
@@ -273,7 +273,7 @@ export const en: Record<string, string> = {
   'profile.companySection': 'COMPANY',
   'profile.personalSection': 'PERSONAL INFO',
   'profile.registerCompany': 'BECOME A BUSINESS CLIENT',
-  'profile.registerCompanySubtitle': 'Register your company to purchase fuel under contract',
+  'profile.registerCompanySubtitle': 'Register your company to get fuel codes under contract',
   'profile.language': 'LANGUAGE',
   'profile.theme': 'THEME',
   'profile.themeLemberg': 'Lemberg (Neon)',
@@ -287,7 +287,7 @@ export const en: Record<string, string> = {
   'profile.legalEntityTitle': 'LEGAL ENTITY',
   'profile.legalToggle': 'I AM A LEGAL ENTITY REPRESENTATIVE',
   'profile.legalDescription':
-    'Enable this mode to purchase fuel as a legal entity and receive the necessary documents.',
+    'Enable this mode to receive fuel codes for your staff as a legal entity and get the necessary documents.',
   'profile.companyName': 'COMPANY NAME',
   'profile.edrpou': 'EDRPOU',
   'profile.vatNumber': 'VAT NUMBER (IF APPLICABLE)',
@@ -639,10 +639,10 @@ export const en: Record<string, string> = {
   'onboarding.start': 'Get started',
   'onboarding.slide1.title': 'Fuel is already in your phone.',
   'onboarding.slide1.body':
-    'Buy liters in advance — they are stored in the app as a digital fuel wallet.',
+    'Get liters in advance — they are stored in the app as a digital fuel wallet.',
   'onboarding.slide2.title': 'Lock the price for good.',
   'onboarding.slide2.body':
-    'The price is fixed at the moment of payment. Whatever fuel costs later — your liters are already paid for.',
+    'The price is fixed at the moment of payment. Whatever fuel costs later — the code for your liters is already yours.',
   'onboarding.slide3.title': 'Show the QR — and fuel up.',
   'onboarding.slide3.body': 'One code at the pump. No cash, no cards, no paper vouchers.',
   'onboarding.slide4.title': 'Your phone number.',
