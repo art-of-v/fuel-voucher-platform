@@ -241,7 +241,8 @@ export const es: Record<string, string> = {
   'codes.stock.pendingShort': 'PENDIENTES',
   'codes.stock.workerEmpty': 'SIN COMBUSTIBLE',
   'codes.stock.workerEmptySub': 'La empresa todavía no te ha entregado combustible',
-  'codes.stock.workerNoBuying': 'Para comprar un código de combustible, cambia a tu contexto personal',
+  'codes.stock.workerNoBuying':
+    'Para comprar un código de combustible, cambia a tu contexto personal',
 
   'company.usage.title': 'MI CONSUMO',
   'company.usage.received': 'recibido',

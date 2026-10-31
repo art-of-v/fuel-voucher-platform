@@ -126,7 +126,8 @@ export const uk: Record<string, string> = {
   // Shown on the card itself and on its disabled button, so the customer learns the shelf is empty
   // from the offer rather than from a rejected payment.
   'packages.outOfStock': 'Недоступно на складі',
-  'packages.browseOnly': 'Тут лише перегляд. Щоб придбати код на пальне, перейдіть в особистий контекст.',
+  'packages.browseOnly':
+    'Тут лише перегляд. Щоб придбати код на пальне, перейдіть в особистий контекст.',
   'packages.addedToCart': 'ДОДАНО В КОШИК',
   'packages.added': 'ДОДАНО',
   'packages.selectCards': 'ОБЕРІТЬ ТАЛОНИ',
@@ -276,7 +277,8 @@ export const uk: Record<string, string> = {
   'profile.companySection': 'КОМПАНІЯ',
   'profile.personalSection': 'ОСОБИСТА ІНФОРМАЦІЯ',
   'profile.registerCompany': 'СТАТИ БІЗНЕС-КЛІЄНТОМ',
-  'profile.registerCompanySubtitle': 'Зареєструйте компанію, щоб отримувати коди на пальне за договором',
+  'profile.registerCompanySubtitle':
+    'Зареєструйте компанію, щоб отримувати коди на пальне за договором',
   'profile.language': 'МОВА',
   'profile.theme': 'ТЕМА',
   'profile.themeLemberg': 'Лемберг (Неон)',
