@@ -26,7 +26,7 @@ export const de: Record<string, string> = {
   // Kaufseitige Ablehnung: Der Grund auf unserer Seite ist eine Margenentscheidung, auf die der Kunde
   // keinen Einfluss hat. Er erfährt nur, was ihn betrifft — dieser Kraftstoff ist gerade nicht kaufbar.
   'purchase.error.belowCost':
-    'Dieser Kraftstoff ist derzeit nicht erhältlich. Wählen Sie einen anderen oder versuchen Sie es später.',
+    'Dieser Kraftstoff-Code ist derzeit nicht erhältlich. Wählen Sie einen anderen oder versuchen Sie es später.',
   // Das Regal war zum Zeitpunkt der Zahlung leer — anders als beim unter Kosten liegenden Preis behebt
   // sich das von selbst, sobald Bestand aktiviert wird.
   'purchase.error.outOfStock':
@@ -130,7 +130,7 @@ export const de: Record<string, string> = {
   // Angebot erkennt und nicht erst an einer abgelehnten Zahlung.
   'packages.outOfStock': 'Nicht auf Lager',
   'packages.browseOnly':
-    'Hier nur Ansicht. Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext.',
+    'Hier nur Ansicht. Zum Kauf eines Kraftstoff-Codes wechseln Sie in Ihren persönlichen Kontext.',
   'packages.addedToCart': 'ZUM WARENKORB HINZUGEFÜGT',
   'packages.selectCards': 'KARTEN WÄHLEN',
   'packages.payTitle': 'BEZAHLEN',
@@ -163,7 +163,7 @@ export const de: Record<string, string> = {
 
   'codes.title': 'MEINE KRAFTSTOFF-CODES',
   'codes.noAssets': 'KEINE CODES GEFUNDEN',
-  'codes.purchaseFuel': 'Kaufen Sie Kraftstoff, um zu beginnen',
+  'codes.purchaseFuel': 'Kaufen Sie einen Kraftstoff-Code, um zu beginnen',
   'codes.availablePayloads': 'VERFÜGBARE KRAFTSTOFFPAKETE',
   'codes.processingPurchases': 'KÄUFE WERDEN VERARBEITET',
   'codes.fulfilledOrders': 'ERFÜLLTE BESTELLUNGEN',
@@ -235,7 +235,7 @@ export const de: Record<string, string> = {
   // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
   'codes.stock.companyEmpty': 'NOCH KEINE KÄUFE',
   'codes.stock.companyEmptySub':
-    'Für das Unternehmen gekaufter Kraftstoff erscheint hier als Beleg',
+    'Für das Unternehmen gekaufte Kraftstoff-Codes erscheinen hier als Beleg',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'AN SIE AUSGEGEBEN',
@@ -248,7 +248,7 @@ export const de: Record<string, string> = {
   'codes.stock.workerEmpty': 'KEIN KRAFTSTOFF',
   'codes.stock.workerEmptySub': 'Das Unternehmen hat Ihnen noch keinen Kraftstoff ausgegeben',
   'codes.stock.workerNoBuying':
-    'Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext',
+    'Zum Kauf eines Kraftstoff-Codes wechseln Sie in Ihren persönlichen Kontext',
 
   'company.usage.title': 'MEIN VERBRAUCH',
   'company.usage.received': 'erhalten',
@@ -283,7 +283,7 @@ export const de: Record<string, string> = {
   'profile.companySection': 'FIRMA',
   'profile.personalSection': 'PERSÖNLICHE DATEN',
   'profile.registerCompany': 'GESCHÄFTSKUNDE WERDEN',
-  'profile.registerCompanySubtitle': 'Registrieren Sie Ihr Unternehmen für Kraftstoff per Vertrag',
+  'profile.registerCompanySubtitle': 'Registrieren Sie Ihr Unternehmen für Kraftstoff-Codes per Vertrag',
   'profile.language': 'SPRACHE',
   'profile.theme': 'THEMA',
   'profile.themeLemberg': 'Lemberg (Neon)',
@@ -297,7 +297,7 @@ export const de: Record<string, string> = {
   'profile.legalEntityTitle': 'JURISTISCHE PERSON',
   'profile.legalToggle': 'ICH BIN EIN VERTRETER EINER JURISTISCHEN PERSON',
   'profile.legalDescription':
-    'Aktivieren Sie diesen Modus, um Kraftstoff als juristische Person zu kaufen und die erforderlichen Dokumente zu erhalten.',
+    'Aktivieren Sie diesen Modus, um als juristische Person Kraftstoff-Codes für Ihre Mitarbeiter und die erforderlichen Dokumente zu erhalten.',
   'profile.companyName': 'FIRMENNAME',
   'profile.edrpou': 'EDRPOU',
   'profile.vatNumber': 'UMSATZSTEUER-ID (FALLS VORHANDEN)',
@@ -656,10 +656,10 @@ export const de: Record<string, string> = {
   'onboarding.start': 'Loslegen',
   'onboarding.slide1.title': 'Der Kraftstoff ist bereits in deinem Handy.',
   'onboarding.slide1.body':
-    'Kaufe Liter im Voraus — sie werden in der App als digitales Kraftstoff-Wallet gespeichert.',
+    'Erhalte Liter im Voraus — sie werden in der App als digitales Kraftstoff-Wallet gespeichert.',
   'onboarding.slide2.title': 'Preis für immer fixieren.',
   'onboarding.slide2.body':
-    'Der Preis wird im Moment der Zahlung fixiert. Wie teuer der Kraftstoff später auch ist — deine Liter sind bereits bezahlt.',
+    'Der Preis wird im Moment der Zahlung fixiert. Wie teuer der Kraftstoff später auch ist — der Code für deine Liter gehört bereits dir.',
   'onboarding.slide3.title': 'QR zeigen — und tanken.',
   'onboarding.slide3.body':
     'Ein Code an der Säule. Kein Bargeld, keine Karten, keine Papiergutscheine.',
