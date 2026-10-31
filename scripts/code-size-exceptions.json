@@ -86,22 +86,22 @@
     },
     {
       "path": "mobile/src/core/i18n/translations/de.ts",
-      "lines": 676,
+      "lines": 679,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/uk.ts",
-      "lines": 665,
+      "lines": 668,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/es.ts",
-      "lines": 663,
+      "lines": 666,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/en.ts",
-      "lines": 657,
+      "lines": 660,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
