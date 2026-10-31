@@ -1,13 +1,13 @@
 import React from 'react';
-import { View, Image, Text, StyleSheet, type ImageSourcePropType } from 'react-native';
+import { View, Image, StyleSheet, type ImageSourcePropType } from 'react-native';
 import { Marker, Callout } from 'react-native-maps';
-import { BlurView } from 'expo-blur';
 
 import { useDesignTokens } from '../../../core/hooks/useTheme';
+import { useI18n } from '../../../core/i18n';
+import { Text } from '../../../core/ui';
+import { formatMoney } from '../../../core/utils/currency';
 import { formatShortAddress, type StationPrice } from '../lib/radar';
-import type { Station, StationNode } from '../../../core/types/api';
-
-type Tokens = ReturnType<typeof useDesignTokens>;
+import type { StationNode } from '../../../core/types/api';
 
 /**
  * The round brand badge used in the ranking list and the station sheet. Pure
@@ -35,6 +35,15 @@ export function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size:
  * can freeze blank before it has painted. Tracking stays on until the logo reports
  * `onLoad` (colour-only pins are ready at mount), then freezes -- otherwise 700+ live
  * markers re-raster every frame.
+ *
+ * A selected pin keeps tracking while it is selected: the ring and the scale change
+ * after the raster would otherwise have frozen, and only one pin is ever selected.
+ *
+ * The pin is a white disc with the brand's ring, so a logo reads on dark tiles and
+ * light ones alike. The callout is the same `Card` language as the rest of the app —
+ * opaque `surfaceElevated`, sheet radius, a shadow — where it used to be a blurred
+ * pane with a hairline border, which was unreadable against the tiles it floated
+ * over.
  */
 export function StationMarker({
   point,
@@ -42,20 +51,21 @@ export function StationMarker({
   brandColor,
   logo,
   price,
-  tokens,
-  t,
+  selected = false,
   onPress,
 }: {
-  point: Station | StationNode;
+  point: StationNode;
   coordinate: { latitude: number; longitude: number };
   brandColor: string;
   logo?: ImageSourcePropType;
   price: StationPrice | null;
-  tokens: Tokens;
-  t: (key: string, ...params: string[]) => string;
+  selected?: boolean;
   onPress: () => void;
 }) {
+  const tokens = useDesignTokens();
+  const t = useI18n((s) => s.t);
   const [tracks, setTracks] = React.useState(true);
+
   React.useEffect(() => {
     if (!logo) {
       const id = setTimeout(() => setTracks(false), 0);
@@ -63,62 +73,103 @@ export function StationMarker({
     }
   }, [logo]);
 
+  const saving =
+    price && price.savingsPerLiter > 0
+      ? formatMoney(price.savingsPerLiter, { decimals: 2, hideSymbol: true })
+      : null;
+
   return (
-    <Marker coordinate={coordinate} onPress={onPress} tracksViewChanges={tracks}>
+    <Marker
+      coordinate={coordinate}
+      onPress={onPress}
+      tracksViewChanges={tracks || selected}
+      accessibilityLabel={`${point.name}, ${formatShortAddress(point) || t('map.noAddress')}`}
+    >
       <View style={styles.markerContainer}>
-        {logo ? (
-          <View style={[styles.markerLogo, { borderColor: brandColor }]}>
+        <View
+          style={[
+            styles.pin,
+            tokens.elevation.low,
+            {
+              borderRadius: tokens.radius.full,
+              borderColor: brandColor,
+              borderWidth: selected ? 3 : 2,
+              transform: [{ scale: selected ? 1.12 : 1 }],
+            },
+          ]}
+        >
+          {logo ? (
             <Image
               source={logo}
               style={styles.markerLogoImg}
               resizeMode="contain"
               onLoad={() => setTracks(false)}
             />
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.marker,
-              { borderColor: brandColor, backgroundColor: tokens.colors.background },
-            ]}
-          >
+          ) : (
             <View
-              style={[
-                styles.markerInner,
-                {
-                  backgroundColor: brandColor,
-                  shadowColor: brandColor,
-                  shadowRadius: 5,
-                  shadowOpacity: 0.5,
-                },
-              ]}
+              style={{
+                width: selected ? 14 : 12,
+                height: selected ? 14 : 12,
+                borderRadius: tokens.radius.full,
+                backgroundColor: brandColor,
+              }}
             />
-          </View>
-        )}
-        <View style={[styles.markerStem, { backgroundColor: brandColor }]} />
+          )}
+        </View>
+        <View
+          style={{
+            width: 3,
+            height: selected ? 7 : 5,
+            borderBottomLeftRadius: 2,
+            borderBottomRightRadius: 2,
+            backgroundColor: brandColor,
+          }}
+        />
       </View>
 
       <Callout tooltip>
-        <BlurView
-          intensity={tokens.colors.isDark ? 80 : 90}
-          tint={tokens.colors.isDark ? 'dark' : 'light'}
-          style={[styles.calloutContainer, { borderColor: tokens.colors.borderLight }]}
+        <View
+          style={[
+            {
+              width: 232,
+              padding: tokens.spacing.fine14,
+              borderRadius: tokens.radius.lg,
+              gap: tokens.spacing.xxs,
+              backgroundColor: tokens.colors.surfaceElevated,
+            },
+            tokens.elevation.medium,
+          ]}
         >
-          <Text style={[styles.calloutTitle, { color: tokens.colors.text.primary }]}>
+          <Text role="bodyStrong" numberOfLines={1}>
             {point.name}
           </Text>
-          <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>
-            {formatShortAddress(point as StationNode) || t('map.noAddress')}
+          <Text role="caption" tone="muted" numberOfLines={2}>
+            {formatShortAddress(point) || t('map.noAddress')}
           </Text>
-          {price && (
-            <Text style={[styles.calloutPrice, { color: tokens.colors.primary }]}>
-              {price.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
-              {price.savingsPerLiter > 0
-                ? `  -${price.savingsPerLiter.toFixed(2)} ${t('map.vsPump')}`
-                : ''}
-            </Text>
-          )}
-        </BlurView>
+          {price ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                flexWrap: 'wrap',
+                gap: tokens.spacing.xs,
+                marginTop: tokens.spacing.xs,
+              }}
+            >
+              <Text role="numericSmall" tone="accent">
+                {formatMoney(price.voucherPerLiter, { decimals: 2, hideSymbol: true })}
+              </Text>
+              <Text role="caption" tone="muted">
+                {t('map.perLiter')}
+              </Text>
+              {saving ? (
+                <Text role="caption" tone="success">
+                  −{saving} {t('map.vsPump')}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </Callout>
     </Marker>
   );
@@ -128,75 +179,24 @@ const styles = StyleSheet.create({
   markerContainer: {
     alignItems: 'center',
   },
-  marker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // A map pin needs to lift off the tiles regardless of theme, so this drop
-    // shadow is deliberately a neutral black rather than a themed colour.
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-  },
-  markerInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  markerStem: {
-    width: 2,
-    height: 4,
-    marginTop: -1,
-  },
-  markerLogo: {
+  pin: {
     width: 34,
     height: 34,
-    borderRadius: 17,
-    borderWidth: 2,
-    backgroundColor: '#fff',
+    // White backing is identity, not theme: every brand logo was drawn for a light
+    // background, and it is what keeps them legible on the dark basemap.
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    // Lift the pin off the tiles regardless of theme (neutral black, like `marker`).
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
   },
   markerLogoImg: {
     width: 24,
     height: 24,
   },
   brandLogoChip: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  calloutContainer: {
-    width: 220,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  calloutTitle: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 18,
-    marginBottom: 4,
-  },
-  calloutText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  calloutPrice: {
-    fontFamily: 'Rajdhani-Bold',
-    fontSize: 14,
-    marginTop: 6,
   },
 });

@@ -1,47 +1,53 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
-import { InlineFeedback, LoadingState, PageLayout, ScreenHeader } from '../src/core/ui';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import MapView, { UrlTile } from 'react-native-maps';
+import { Navigation, TrendingDown } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
+
+import {
+  Button,
+  Card,
+  IconButton,
+  InlineFeedback,
+  LoadingState,
+  PageLayout,
+  ScreenHeader,
+} from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import { Haptics } from '../src/core/utils/haptics';
-import {
-  Search,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  MapPin,
-  Navigation,
-  Fuel,
-  TrendingDown,
-} from 'lucide-react-native';
-import MapView, { UrlTile } from 'react-native-maps';
+import { useTabBarOverride } from '../src/core/navigation/tabBarOverride';
+import { BRAND_COLORS, BRAND_LOGOS, BRAND_SYMBOLS } from '../src/core/design/tokens';
 import { useStationNodes } from '../src/features/stations/hooks/useStationNodes';
 import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
 import {
   availableFuels,
   bestPriceByBrand,
-  formatShortAddress,
+  haversineKm,
   radarWithinRadius,
   rankBrands,
   rankStations,
 } from '../src/features/stations/lib/radar';
+import { DEFAULT_FUEL } from '../src/features/stations/lib/fuelLabels';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
 import { pointsInRegion, type MapRegion } from '../src/features/stations/lib/viewport';
-import { useTabBarOverride } from '../src/core/navigation/tabBarOverride';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
-import { BrandLogoChip, StationMarker } from '../src/features/stations/components/StationMarker';
+import { MapSearchDeck } from '../src/features/stations/components/MapSearchDeck';
+import {
+  NetworkRankingHeader,
+  NetworkRankingList,
+} from '../src/features/stations/components/NetworkRanking';
+import { StationDetailSheet } from '../src/features/stations/components/StationDetailSheet';
+import { StationMarker } from '../src/features/stations/components/StationMarker';
 import {
   BottomSheet,
   type BottomSheetHandle,
 } from '../src/features/stations/components/BottomSheet';
-import { BRAND_COLORS, BRAND_LOGOS, BRAND_SYMBOLS } from '../src/core/design/tokens';
-import { useQueryClient } from '@tanstack/react-query';
-import type { Station, StationNode } from '../src/core/types/api';
-import { BlurView } from 'expo-blur';
+import type { StationNode } from '../src/core/types/api';
 
 const KYIV_REGION: MapRegion = {
   latitude: 50.4501,
@@ -50,383 +56,52 @@ const KYIV_REGION: MapRegion = {
   longitudeDelta: 0.15,
 };
 
-/*
- * Fuel names are API/brand values, not UI copy (see normalizeFuelName in
- * core/utils/formatters) — they read the same in every locale, so the selector labels
- * live here rather than in i18n. Keys are the canonical ids normalizeFuelName emits.
- */
-const FUEL_LABELS: Record<string, string> = {
-  'a-92': 'А92',
-  'a-95': 'А95',
-  'a-95 premium': 'А95 преміум',
-  'a-98': 'А98',
-  '100': '100',
-  '100 premium': '100 преміум',
-  diesel: 'ДП',
-  'diesel premium': 'ДП преміум',
-  gas: 'Газ',
-  'gas premium': 'Газ преміум',
-};
-const DEFAULT_FUEL = 'a-95';
-const fuelLabel = (canonical: string): string => FUEL_LABELS[canonical] ?? canonical.toUpperCase();
-
 /**
- * A network logo on a white chip — the primary brand mark now that the brand
- * accents (three greens + a yellow) no longer tell OKKO / WOG / UPG apart at a
- * glance. White backing keeps every logo legible on dark and light tiles alike.
+ * The network map and its price radar.
+ *
+ * The screen owns the data and the three decisions worth failing on — which fuel,
+ * which stations are in view, and what the radar ranks — and hands the drawing to
+ * `features/stations/components`: the search deck, the ranking sheet, the station
+ * sheet and the pin. Everything visible here reads from the design system, so the
+ * screen follows all eight themes instead of the two it used to be tuned for.
+ *
+ * Two surfaces own the bottom of the display: the ranking sheet and a station's
+ * card. While either is open the tab bar is hidden (`useTabBarOverride`) and
+ * `useContentInsets` gives the bar's clearance back — the sheet reaches the home
+ * indicator instead of leaving a strip of empty map under the bar.
  */
 export default function MapScreen() {
   const tokens = useDesignTokens();
-
-  // Built where `tokens` is in scope rather than at module level. The values below
-  // are all theme-independent, but a themed colour added here later would silently
-  // freeze at the default theme instead of following a switch.
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        container: {
-          flex: 1,
-        },
-        mapWrapper: {
-          flex: 1,
-          position: 'relative',
-        },
-        topGradient: {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 100,
-          zIndex: tokens.zIndex.sticky,
-        },
-        searchOverlay: {
-          position: 'absolute',
-          top: 20,
-          left: 0,
-          right: 0,
-          zIndex: MAP_Z.searchOverlay,
-        },
-        searchBox: {
-          height: 54,
-          borderRadius: tokens.radius.fine12,
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: tokens.spacing.xl,
-          gap: tokens.spacing.lg,
-          overflow: 'hidden',
-        },
-        loadingOverlay: {
-          position: 'absolute',
-          top: 90,
-          alignSelf: 'center',
-          paddingHorizontal: tokens.spacing.xl,
-          paddingVertical: tokens.spacing.fine10,
-          borderRadius: tokens.radius.xl,
-          borderWidth: 1,
-          zIndex: MAP_Z.loadingOverlay,
-        },
-        errorOverlay: {
-          position: 'absolute',
-          top: 90,
-          left: 16,
-          right: 16,
-          zIndex: MAP_Z.errorOverlay,
-        },
-        searchInput: {
-          flex: 1,
-          fontFamily: 'Inter-Medium',
-          fontSize: tokens.type.numericSmall.fontSize,
-        },
-        // A network with no АЗК inside the radar radius keeps its row but recedes: the price is
-        // real, the pumps just aren't reachable, and the mark should not compete with the ones that
-        // are. Kept visible rather than hidden — the customer still needs to see it exists.
-        brandOutOfRange: {
-          opacity: 0.45,
-        },
-        detailPanel: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          borderTopWidth: 2,
-          padding: tokens.spacing['2xl'],
-          zIndex: MAP_Z.detailPanel,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          overflow: 'hidden',
-        },
-        detailHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-        },
-        detailName: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.title.fontSize,
-          letterSpacing: 0.5,
-        },
-        closeBtn: {
-          // A 44pt box around a 22–24pt glyph: the chevrons close panels, and at
-          // `padding: 4` they were a 30pt target.
-          width: 44,
-          height: 44,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        divider: {
-          height: 1,
-          marginVertical: tokens.spacing.xl,
-        },
-        detailText: {
-          fontFamily: 'Inter-Medium',
-          fontSize: tokens.type.body.fontSize,
-          lineHeight: 22,
-          marginBottom: tokens.spacing['2xl'],
-        },
-        brandBadge: {
-          paddingHorizontal: tokens.spacing.sm,
-          paddingVertical: tokens.spacing.xxs,
-          borderRadius: tokens.radius.sm,
-        },
-        brandBadgeText: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.caption.fontSize,
-          letterSpacing: 0.5,
-        },
-        infoRow: {
-          marginBottom: tokens.spacing.lg,
-        },
-        infoLabel: {
-          fontFamily: 'Inter-Bold',
-          fontSize: tokens.type.caption.fontSize,
-          letterSpacing: 1,
-          marginBottom: tokens.spacing.xs,
-          opacity: 0.8,
-        },
-        actionBtn: {
-          flex: 1,
-          height: 48,
-          borderRadius: tokens.radius.fine8,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        actionBtnText: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.numericSmall.fontSize,
-          letterSpacing: 1,
-        },
-        fuelRow: {
-          position: 'absolute',
-          top: 84,
-          left: 0,
-          right: 0,
-          zIndex: MAP_Z.fuelRow,
-        },
-        fuelRowContent: {
-          alignItems: 'center',
-          paddingRight: tokens.spacing.xl,
-        },
-        fuelChip: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.spacing.fine6,
-          paddingHorizontal: tokens.spacing.fine14,
-          paddingVertical: tokens.spacing.sm,
-          borderRadius: tokens.radius.xl,
-          borderWidth: 1,
-          marginRight: tokens.spacing.sm,
-        },
-        fuelChipText: {
-          fontFamily: 'Rajdhani-SemiBold',
-          fontSize: tokens.type.sectionTitle.fontSize,
-          letterSpacing: 0.5,
-        },
-        fabColumn: {
-          position: 'absolute',
-          right: 16,
-          bottom: 24,
-          alignItems: 'flex-end',
-          gap: tokens.spacing.md,
-          zIndex: MAP_Z.fabColumn,
-        },
-        nearbyToggle: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.spacing.sm,
-          paddingHorizontal: tokens.spacing.lg,
-          paddingVertical: tokens.spacing.md,
-          borderRadius: tokens.radius.xl,
-          // Neutral lift off the map tiles, theme-independent (matches the marker shadow).
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 6,
-          elevation: 4,
-        },
-        nearbyToggleText: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.sectionTitle.fontSize,
-          letterSpacing: 0.5,
-        },
-        locateFab: {
-          width: 52,
-          height: 52,
-          borderRadius: tokens.radius.full,
-          borderWidth: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 6,
-          elevation: 4,
-        },
-        listHeader: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: tokens.spacing.sm,
-        },
-        listTitle: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.numericSmall.fontSize,
-          letterSpacing: 0.5,
-        },
-        listHint: {
-          fontFamily: 'Inter-Medium',
-          fontSize: tokens.type.caption.fontSize,
-          marginBottom: tokens.spacing.sm,
-        },
-        listRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.spacing.md,
-          paddingVertical: tokens.spacing.md,
-          borderBottomWidth: 1,
-        },
-        rankNum: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.numericSmall.fontSize,
-          width: 20,
-          textAlign: 'center',
-        },
-        brandDot: {
-          width: 14,
-          height: 14,
-          borderRadius: tokens.radius.full,
-        },
-        listName: {
-          fontFamily: 'Inter-Medium',
-          fontSize: tokens.type.body.fontSize,
-        },
-        listSub: {
-          fontFamily: 'Inter',
-          fontSize: tokens.type.caption.fontSize,
-          marginTop: tokens.spacing.xxs,
-        },
-        listPrice: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.numericSmall.fontSize,
-        },
-        cheapestBadge: {
-          paddingHorizontal: tokens.spacing.fine6,
-          paddingVertical: tokens.spacing.xxs,
-          borderRadius: tokens.radius.sm,
-        },
-        cheapestBadgeText: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.caption.fontSize,
-          letterSpacing: 0.5,
-        },
-        savingsChip: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.spacing.fine3,
-          paddingHorizontal: tokens.spacing.fine6,
-          paddingVertical: tokens.spacing.xxs,
-          borderRadius: tokens.radius.sm,
-          borderWidth: 1,
-        },
-        savingsChipText: {
-          fontFamily: 'Inter-Medium',
-          fontSize: tokens.type.caption.fontSize,
-        },
-        priceDelta: {
-          fontFamily: 'Rajdhani-Medium',
-          fontSize: tokens.type.caption.fontSize,
-        },
-        priceBlock: {
-          marginBottom: tokens.spacing.lg,
-        },
-        priceValueRow: {
-          flexDirection: 'row',
-          alignItems: 'baseline',
-          flexWrap: 'wrap',
-          gap: tokens.spacing.fine10,
-          marginTop: tokens.spacing.xs,
-        },
-        priceValue: {
-          fontFamily: 'Rajdhani-Bold',
-          fontSize: tokens.type.title.fontSize,
-          letterSpacing: 0.5,
-        },
-        savingsBadge: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens.spacing.xs,
-          paddingHorizontal: tokens.spacing.sm,
-          paddingVertical: tokens.spacing.xs,
-          borderRadius: tokens.radius.fine8,
-          borderWidth: 1,
-        },
-        savingsText: {
-          fontFamily: 'Rajdhani-SemiBold',
-          fontSize: tokens.type.caption.fontSize,
-          letterSpacing: 0.5,
-        },
-      }),
-    [tokens],
-  );
-  const { t } = useI18n();
+  const t = useI18n((s) => s.t);
   const queryClient = useQueryClient();
+
   const { data: nodes, isLoading, error } = useStationNodes();
+  const { data: packages } = useAllPackages();
+  const { location, status: locationStatus, request: requestLocation } = useUserLocation();
+
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedStation, setSelectedStation] = React.useState<Station | StationNode | null>(null);
+  const [selectedStation, setSelectedStation] = React.useState<StationNode | null>(null);
   const [selectedFuel, setSelectedFuel] = React.useState<string>(DEFAULT_FUEL);
   const [showList, setShowList] = React.useState(false);
   const [showNavigatorPicker, setShowNavigatorPicker] = React.useState(false);
   const [selectedBrand, setSelectedBrand] = React.useState<string | null>(null);
-  const { data: packages } = useAllPackages();
-  const { location, status: locationStatus, request: requestLocation } = useUserLocation();
+
   // The tap that opens a station also reaches the map's press handler on iOS - see
   // isMarkerPressEcho.
   const lastMarkerPressAt = React.useRef<number | null>(null);
   const mapRef = React.useRef<MapView | null>(null);
-  // The leaderboard sheet is drawn inside this scene while the tab bar is a sibling
-  // of the scene, so the bar paints over it whatever z-index the sheet carries.
-  // RN only compares z-index between siblings. Hand the bar over instead.
-  const setTabBarHidden = useTabBarOverride((s) => s.setHidden);
-  React.useEffect(() => {
-    setTabBarHidden(showList);
-    return () => setTabBarHidden(false);
-  }, [showList, setTabBarHidden]);
-
   const sheetRef = React.useRef<BottomSheetHandle>(null);
 
-  const GLOBAL_PADDING = tokens.spacing.containerPadding;
+  // The tab bar is a sibling of this scene inside the navigator, so it paints over
+  // anything the screen draws at the bottom whatever z-index the sheet carries.
+  // RN only compares z-index between siblings. Hand the bar over instead.
+  const setTabBarHidden = useTabBarOverride((s) => s.setHidden);
+  const bottomOwned = showList || selectedStation != null;
+  React.useEffect(() => {
+    setTabBarHidden(bottomOwned);
+    return () => setTabBarHidden(false);
+  }, [bottomOwned, setTabBarHidden]);
 
-  // A route needs a real position: a node without coordinates used to deep-link to 0,0 — Null
-  // Island in the Atlantic — so the button reports that instead of routing nowhere.
-  const routeDestination = React.useMemo(
-    () =>
-      selectedStation
-        ? routeTarget((selectedStation as StationNode).lat, (selectedStation as StationNode).lng)
-        : null,
-    [selectedStation],
-  );
-
-  // Only ever station nodes; the wider `Station | StationNode` union this used to
-  // claim was a leftover, and it forced a cast further down.
   const allPoints = React.useMemo<StationNode[]>(() => nodes ?? [], [nodes]);
 
   const filteredPoints = React.useMemo(
@@ -434,10 +109,10 @@ export default function MapScreen() {
     [allPoints, searchQuery],
   );
 
-  // Mount only what the viewport can show. Every station node is fetched once, but rendering
-  // all of them means one native marker view each — the whole network is ~1300, which the OS
-  // answers under memory pressure by killing the app outright. `onRegionChangeComplete` fires
-  // when a gesture settles, not per frame, so this stays cheap while panning.
+  // Mount only what the viewport can show. Every station node is fetched once, but
+  // rendering all of them means one native marker view each — the whole network is
+  // ~1300, which the OS answers under memory pressure by killing the app outright.
+  // `onRegionChangeComplete` fires when a gesture settles, not per frame.
   const [viewport, setViewport] = React.useState<MapRegion>(KYIV_REGION);
   const visiblePoints = React.useMemo(
     () => pointsInRegion(filteredPoints, viewport),
@@ -457,30 +132,22 @@ export default function MapScreen() {
     [packages, selectedFuel],
   );
 
-  // `filteredPoints` is already `StationNode[]`, so the cast this needed is gone.
-  // Ranking respects the current search filter.
   const rankedNearby = React.useMemo(
     () => rankStations(filteredPoints, priceByBrand, location),
     [filteredPoints, priceByBrand, location],
   );
 
-  // The price radar: the nearby list widens its radius 5→10→20→50→100 km until it holds
-  // enough priced АЗК, so a cheaper station on the far side of the country can't outrank
-  // the pumps actually near the user. Falls back to all priced stations (no radius) when
-  // location is unknown or nothing sits within the widest ring.
+  // The price radar widens its radius 5→10→20→50→100 km until it holds enough
+  // priced АЗК, so a cheaper station on the far side of the country can't outrank
+  // the pumps actually near the user.
   const radar = React.useMemo(
     () => radarWithinRadius(rankedNearby, location),
     [rankedNearby, location],
   );
 
-  // Network leaderboard: collapse the АЗК into one row per brand, cheapest voucher грн/л
-  // first — the customer compares networks, then drills into a brand to see how far its
-  // nearest pumps are. (Prices are per-brand, so a flat node list hid this.)
-  //
-  // The whole priced list goes in, not just `radar.stations`: a network with nothing inside
-  // the ring would otherwise drop out of the leaderboard completely and look like it does not
-  // exist, rather than like it is simply too far to be useful. `radiusKm` is what separates
-  // the two, and rankBrands sorts the unreachable ones to the bottom.
+  // Network leaderboard: one row per brand, cheapest voucher грн/л first. The whole
+  // priced list goes in, not just `radar.stations`: a network with nothing inside
+  // the ring would otherwise vanish and look like it does not exist.
   const brandRanks = React.useMemo(
     () =>
       rankBrands(
@@ -523,41 +190,27 @@ export default function MapScreen() {
   }, []);
 
   const handleLocate = React.useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     void requestLocation();
   }, [requestLocation]);
 
-  /*
-   * Was a hand-rolled header: a `GlowText` title at a bespoke 24pt/3-letter-spacing
-   * inside a `View` that applied `paddingTop: insets.top + 10`. Two problems, both
-   * fixed by moving to the shared header:
-   *
-   * 1. `PageLayout` already wraps the screen in `SafeAreaView edges={['top', …]}`,
-   *    so reading `useSafeAreaInsets()` here added the notch a second time. This
-   *    was the only screen in the app still reading insets directly.
-   * 2. It was the last header not on `ScreenHeader`, so the map's title sat at a
-   *    size and alignment nothing else in the product used.
-   *
-   * The hairline stays: the map is the one edge-to-edge canvas in the app, so the
-   * title needs a boundary that the other screens' whitespace gives them for free.
-   */
-  const headerComponent = (
-    <ScreenHeader
-      title={t('map.title')}
-      subtitle={`${filteredPoints.length} ${t('map.stations_nearby')}`}
-      hideBack
-      style={{ borderBottomWidth: 1, borderBottomColor: tokens.colors.borderLight }}
-    />
+  // A route needs a real position: a node without coordinates used to deep-link to
+  // 0,0 — Null Island in the Atlantic — so the button reports that instead.
+  const routeDestination = React.useMemo(
+    () => (selectedStation ? routeTarget(selectedStation.lat, selectedStation.lng) : null),
+    [selectedStation],
   );
 
-  // CARTO's public basemap CDN now watermarks unauthenticated tiles with
-  // "API KEY REQUIRED" (policy change, 2025). A free key (no account, 5M tiles/mo)
-  // is passed as ?key= on every tile URL. resolveCartoApiKey() reads it from the
-  // EXPO_PUBLIC_CARTO_API_KEY env var (EAS builds) and falls back to the committed
-  // app.json copy (expo.extra.cartoApiKey), so a raw Xcode Archive — which never sees
-  // that env — still gets the key. When absent we render NO raster overlay and fall
-  // back to the native basemap, so the map degrades to a plain-but-clean map instead
-  // of showing the watermark. See planning #102.
+  const selectedDistanceKm = React.useMemo(() => {
+    if (!selectedStation || !location) return null;
+    const { lat, lng } = selectedStation;
+    if (lat == null || lng == null || (lat === 0 && lng === 0)) return null;
+    return haversineKm(location, { lat, lng });
+  }, [selectedStation, location]);
+
+  // CARTO's public basemap CDN watermarks unauthenticated tiles with
+  // "API KEY REQUIRED" (policy change, 2025). Without a key we render NO raster
+  // overlay and fall back to the native basemap, so the map degrades to a plain but
+  // clean map instead of showing the watermark. See planning #102.
   const cartoKey = resolveCartoApiKey();
   const tileUrl = cartoKey
     ? tokens.colors.isDark
@@ -565,9 +218,23 @@ export default function MapScreen() {
       : `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png?key=${cartoKey}`
     : null;
 
+  /*
+   * The background is load-bearing. The header slot reserves the 28pt band its
+   * corner targets answer in by pulling the content up under it, and without an
+   * opaque fill the map's pins painted straight through the title and subtitle.
+   */
+  const header = (
+    <ScreenHeader
+      title={t('map.title')}
+      subtitle={`${filteredPoints.length} ${t('map.stationsShort')}`}
+      hideBack
+      style={{ backgroundColor: tokens.colors.background }}
+    />
+  );
+
   return (
-    <PageLayout header={headerComponent} padding="none" scroll={false}>
-      <View style={styles.container}>
+    <View style={styles.screen}>
+      <PageLayout header={header} padding="none" scroll={false}>
         <View style={styles.mapWrapper}>
           <MapView
             ref={mapRef}
@@ -585,32 +252,17 @@ export default function MapScreen() {
             {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
 
             {visiblePoints.map((point) => {
-              const isNode = 'brandId' in point;
-              const coordinate = {
-                latitude: point.lat!,
-                longitude: point.lng!,
-              };
-              const node = isNode ? (point as StationNode) : undefined;
-              // The palette is keyed by the network's code; the price map is keyed by its uuid.
-              const brandSlug = node?.brandSlug;
-              // Pins carry each network's own logo (and colour as the border /
-              // fallback — data, not theme, see BRAND_LOGOS / BRAND_COLORS).
-              const brandColor = (brandSlug && BRAND_COLORS[brandSlug]) || tokens.colors.primary;
-              const logo = brandSlug
-                ? (BRAND_SYMBOLS[brandSlug] ?? BRAND_LOGOS[brandSlug])
-                : undefined;
-              const price = node ? (priceByBrand.get(node.brandId) ?? null) : null;
-
+              const brandColor = BRAND_COLORS[point.brandSlug] || tokens.colors.primary;
+              const logo = BRAND_SYMBOLS[point.brandSlug] ?? BRAND_LOGOS[point.brandSlug];
               return (
                 <StationMarker
-                  key={`${isNode ? 'node' : 'brand'}-${point.id}`}
+                  key={point.id}
                   point={point}
-                  coordinate={coordinate}
+                  coordinate={{ latitude: point.lat!, longitude: point.lng! }}
                   brandColor={brandColor}
                   logo={logo}
-                  price={price}
-                  tokens={tokens}
-                  t={t}
+                  price={priceByBrand.get(point.brandId) ?? null}
+                  selected={selectedStation?.id === point.id}
                   onPress={() => {
                     lastMarkerPressAt.current = Date.now();
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -621,406 +273,101 @@ export default function MapScreen() {
             })}
           </MapView>
 
-          {/* Scrim behind the floating search field so it stays legible over tiles.
-              `pointerEvents="none"` is load-bearing: a 100pt band across the top of
-              the map that answers touches would eat every tap on a marker under it. */}
           <View
-            pointerEvents="none"
-            style={[
-              styles.topGradient,
-              { backgroundColor: tokens.colors.background, opacity: 0.3 },
-            ]}
-          />
-
-          {/* Search Bar Overlay - Glassmorphism */}
-          <View style={[styles.searchOverlay, { paddingHorizontal: GLOBAL_PADDING }]}>
-            <BlurView
-              intensity={tokens.colors.isDark ? 30 : 60}
-              tint={tokens.colors.isDark ? 'dark' : 'light'}
-              style={[styles.searchBox, { borderColor: tokens.colors.border, borderWidth: 1 }]}
-            >
-              <Search size={20} color={tokens.colors.primary} />
-              <TextInput
-                style={[styles.searchInput, { color: tokens.colors.text.primary }]}
-                placeholder={t('map.searchPlaceholder')}
-                placeholderTextColor={tokens.colors.text.dim}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-              />
-            </BlurView>
+            style={{
+              position: 'absolute',
+              // Below the header row, not under it: the content box starts one corner
+              // drop above the row's bottom edge.
+              top: tokens.chrome.headerCornerDrop + tokens.spacing.md,
+              left: tokens.spacing.containerPadding,
+              right: tokens.spacing.containerPadding,
+              zIndex: tokens.zIndex.sticky,
+            }}
+          >
+            <MapSearchDeck
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              fuels={fuelOptions}
+              selectedFuel={selectedFuel}
+              onSelectFuel={setSelectedFuel}
+            />
           </View>
 
-          {/* Fuel-type selector — voucher грн/л is per brand and per fuel. */}
-          {fuelOptions.length > 0 && (
+          {!showList && !selectedStation ? (
             <View
-              style={[styles.fuelRow, { paddingHorizontal: GLOBAL_PADDING }]}
               pointerEvents="box-none"
+              style={[
+                styles.fabColumn,
+                {
+                  right: tokens.spacing.containerPadding,
+                  bottom: tokens.spacing.lg,
+                  gap: tokens.spacing.md,
+                  zIndex: tokens.zIndex.sticky,
+                },
+              ]}
             >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.fuelRowContent}
+              {/* A floating fill needs a layer of its own to cast the shadow: the
+                  button's own fill lives on a view inside its pressable. */}
+              <View
+                style={[
+                  { borderRadius: tokens.radius.md, backgroundColor: tokens.colors.primary },
+                  tokens.elevation.low,
+                ]}
               >
-                {fuelOptions.map((fuel) => {
-                  const active = fuel === selectedFuel;
-                  return (
-                    <Pressable
-                      key={fuel}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedFuel(fuel);
-                      }}
-                      // 36pt chip; the slop takes the target to 44 without
-                      // reaching into its neighbour's (8pt) gap.
-                      hitSlop={4}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      style={[
-                        styles.fuelChip,
-                        {
-                          backgroundColor: active ? tokens.colors.primary : tokens.colors.card,
-                          borderColor: active ? tokens.colors.primary : tokens.colors.border,
-                        },
-                      ]}
-                    >
-                      <Fuel
-                        size={14}
-                        color={active ? tokens.colors.text.onPrimary : tokens.colors.text.dim}
-                      />
-                      <Text
-                        style={[
-                          styles.fuelChipText,
-                          {
-                            color: active
-                              ? tokens.colors.text.onPrimary
-                              : tokens.colors.text.secondary,
-                          },
-                        ]}
-                      >
-                        {fuelLabel(fuel)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Locate-me + cheapest-nearby controls; the list replaces them when open. */}
-          {!selectedStation && !showList && (
-            <View style={styles.fabColumn} pointerEvents="box-none">
-              {radar.stations.length > 0 && (
-                <Pressable
+                <Button
+                  label={t('map.networkRanking')}
+                  icon={<TrendingDown />}
+                  size="md"
+                  fullWidth={false}
                   onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setSelectedBrand(null);
                     setShowList(true);
                   }}
-                  hitSlop={4}
-                  accessibilityRole="button"
-                  style={[styles.nearbyToggle, { backgroundColor: tokens.colors.primary }]}
-                >
-                  <TrendingDown size={18} color={tokens.colors.text.onPrimary} />
-                  <Text style={[styles.nearbyToggleText, { color: tokens.colors.text.onPrimary }]}>
-                    {t('map.networkRanking')}
-                  </Text>
-                </Pressable>
-              )}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('map.locateMe')}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  handleLocate();
-                }}
+                />
+              </View>
+
+              <View
                 style={[
-                  styles.locateFab,
                   {
-                    backgroundColor: tokens.colors.card,
-                    borderColor:
-                      locationStatus === 'granted' ? tokens.colors.primary : tokens.colors.border,
+                    borderRadius: tokens.radius.full,
+                    backgroundColor: tokens.colors.surfaceElevated,
                   },
+                  tokens.elevation.low,
                 ]}
               >
-                <Navigation
-                  size={22}
-                  color={
-                    locationStatus === 'granted'
-                      ? tokens.colors.primary
-                      : tokens.colors.text.secondary
-                  }
+                <IconButton
+                  icon={<Navigation />}
+                  onPress={handleLocate}
+                  accessibilityLabel={t('map.locateMe')}
+                  variant={locationStatus === 'granted' ? 'filled' : 'plain'}
+                  size="lg"
+                  round
                 />
-              </Pressable>
+              </View>
             </View>
-          )}
+          ) : null}
 
-          {/* Network leaderboard (brands cheapest-first), then a brand's nearest АЗК —
-                        in a gesture-driven bottom sheet (peek / half / full). */}
-          {!selectedStation && showList && (
-            <BottomSheet
-              ref={sheetRef}
-              onClose={() => {
-                setShowList(false);
-                setSelectedBrand(null);
-              }}
-              isDark={tokens.colors.isDark}
-              borderColor={tokens.colors.primary}
-              header={
-                <>
-                  <View style={styles.listHeader}>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: tokens.spacing.sm,
-                        flex: 1,
-                      }}
-                    >
-                      {activeBrand && (
-                        <Pressable
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setSelectedBrand(null);
-                          }}
-                          style={styles.closeBtn}
-                          accessibilityLabel={t('map.back')}
-                        >
-                          <ChevronLeft size={22} color={tokens.colors.text.dim} />
-                        </Pressable>
-                      )}
-                      <Text
-                        style={[styles.listTitle, { color: tokens.colors.text.primary }]}
-                        numberOfLines={1}
-                      >
-                        {activeBrand
-                          ? `${activeBrand.brandId.toUpperCase()} · ${fuelLabel(selectedFuel)}`
-                          : `${t('map.networkRanking')} · ${fuelLabel(selectedFuel)}`}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        sheetRef.current?.close();
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('common.close')}
-                      style={styles.closeBtn}
-                    >
-                      <ChevronDown size={22} color={tokens.colors.text.dim} />
-                    </Pressable>
-                  </View>
-                  {radar.radiusKm != null && (
-                    <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>
-                      {t('map.withinKm', String(radar.radiusKm))}
-                    </Text>
-                  )}
-                  {locationStatus === 'denied' && (
-                    <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>
-                      {t('map.locationDenied')}
-                    </Text>
-                  )}
-                  {!activeBrand && (
-                    <Text style={[styles.listHint, { color: tokens.colors.text.dim }]}>
-                      {t('map.tapBrandHint')}
-                    </Text>
-                  )}
-                </>
-              }
+          {isLoading ? (
+            <View
+              pointerEvents="none"
+              style={[styles.centerOverlay, { zIndex: tokens.zIndex.sticky }]}
             >
-              {/* Level 1 — brand leaderboard; the cheapest reachable network is
-                                emphasised and a network with no АЗК in range is dimmed. */}
-              {!activeBrand &&
-                brandRanks.map((b, i) => {
-                  const brandColor = BRAND_COLORS[b.brandSlug] || tokens.colors.primary;
-                  // Only a brand the customer can actually reach may be "cheapest".
-                  const isLeader = i === 0 && b.inRange;
-                  const delta = b.price.voucherPerLiter - brandRanks[0].price.voucherPerLiter;
-                  return (
-                    <Pressable
-                      key={b.brandId}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedBrand(b.brandId);
-                        sheetRef.current?.expand();
-                      }}
-                      style={[
-                        styles.listRow,
-                        { borderBottomColor: tokens.colors.borderLight },
-                        isLeader && {
-                          backgroundColor: tokens.colors.primaryDim,
-                          borderRadius: tokens.radius.fine12,
-                          borderBottomWidth: 0,
-                          paddingHorizontal: tokens.spacing.fine10,
-                          marginBottom: tokens.spacing.xxs,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.rankNum,
-                          { color: isLeader ? tokens.colors.primary : tokens.colors.text.dim },
-                        ]}
-                      >
-                        {i + 1}
-                      </Text>
-                      <View style={b.inRange ? undefined : styles.brandOutOfRange}>
-                        {BRAND_LOGOS[b.brandSlug] ? (
-                          <BrandLogoChip logo={BRAND_LOGOS[b.brandSlug]} size={30} />
-                        ) : (
-                          <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: tokens.spacing.fine6,
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.listName,
-                              {
-                                color: b.inRange
-                                  ? tokens.colors.text.primary
-                                  : tokens.colors.text.dim,
-                              },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {b.brandSlug.toUpperCase()}
-                          </Text>
-                          {isLeader && (
-                            <View
-                              style={[
-                                styles.cheapestBadge,
-                                { backgroundColor: tokens.colors.primary },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.cheapestBadgeText,
-                                  { color: tokens.colors.text.onPrimary },
-                                ]}
-                              >
-                                {t('map.cheapest')}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text
-                          style={[styles.listSub, { color: tokens.colors.text.dim }]}
-                          numberOfLines={1}
-                        >
-                          {b.nearestDistanceKm != null
-                            ? `${t('map.nearest')} ${b.nearestDistanceKm.toFixed(1)} ${t('map.km')}`
-                            : `${b.nodes.length} ${t('map.stations_nearby')}`}
-                          {!b.inRange && ` · ${t('map.outOfRange')}`}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', gap: tokens.spacing.fine3 }}>
-                        <Text
-                          style={[
-                            styles.listPrice,
-                            { color: b.inRange ? tokens.colors.primary : tokens.colors.text.dim },
-                          ]}
-                        >
-                          {b.price.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
-                        </Text>
-                        {b.price.savingsPerLiter > 0 && (
-                          <View
-                            style={[
-                              styles.savingsChip,
-                              {
-                                backgroundColor: tokens.colors.status.success.subtle,
-                                borderColor: tokens.colors.status.success.border,
-                              },
-                            ]}
-                          >
-                            <TrendingDown size={11} color={tokens.colors.status.success.base} />
-                            <Text
-                              style={[
-                                styles.savingsChipText,
-                                { color: tokens.colors.status.success.base },
-                              ]}
-                            >
-                              −{b.price.savingsPerLiter.toFixed(2)} {t('map.vsPump')}
-                            </Text>
-                          </View>
-                        )}
-                        {!isLeader && delta > 0 && (
-                          <Text style={[styles.priceDelta, { color: tokens.colors.text.dim }]}>
-                            +{delta.toFixed(2)}
-                          </Text>
-                        )}
-                      </View>
-                      <ChevronRight
-                        size={18}
-                        color={tokens.colors.text.dim}
-                        style={{ marginLeft: tokens.spacing.xs }}
-                      />
-                    </Pressable>
-                  );
-                })}
+              <Card tone="elevated" padding="md">
+                <LoadingState variant="inline" message={t('map.loadingStations')} />
+              </Card>
+            </View>
+          ) : null}
 
-              {/* Level 2 — the selected brand's nearest АЗК. */}
-              {activeBrand &&
-                activeBrand.nodes.slice(0, 30).map((r) => (
-                  <Pressable
-                    key={r.node.id}
-                    accessibilityRole="button"
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      focusStation(r.node);
-                    }}
-                    style={[styles.listRow, { borderBottomColor: tokens.colors.borderLight }]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.listName, { color: tokens.colors.text.primary }]}
-                        numberOfLines={1}
-                      >
-                        {r.node.name}
-                      </Text>
-                      <Text
-                        style={[styles.listSub, { color: tokens.colors.text.dim }]}
-                        numberOfLines={1}
-                      >
-                        {formatShortAddress(r.node) || t('map.noAddress')}
-                      </Text>
-                    </View>
-                    {r.distanceKm != null && (
-                      <Text style={[styles.listPrice, { color: tokens.colors.primary }]}>
-                        {r.distanceKm.toFixed(1)} {t('map.km')}
-                      </Text>
-                    )}
-                  </Pressable>
-                ))}
-            </BottomSheet>
-          )}
-
-          {isLoading && (
+          {error && !isLoading ? (
             <View
               style={[
-                styles.loadingOverlay,
-                { backgroundColor: tokens.colors.card, borderColor: tokens.colors.border },
+                styles.centerOverlay,
+                {
+                  paddingHorizontal: tokens.spacing.containerPadding,
+                  zIndex: tokens.zIndex.sticky,
+                },
               ]}
             >
-              {/*
-                              Was a `GlowText` reading "SECURING DATA STREAM..." — a
-                              hardcoded English string in a four-language app, and a
-                              fifth hand-rolled loading treatment. `LoadingState`
-                              inline is the shared one.
-                            */}
-              <LoadingState variant="inline" message={t('map.loadingStations')} />
-            </View>
-          )}
-
-          {error && !isLoading && (
-            <View style={styles.errorOverlay}>
               <InlineFeedback
                 kind="danger"
                 message={error instanceof Error ? error.message : t('state.errorDescription')}
@@ -1030,230 +377,87 @@ export default function MapScreen() {
                 }}
               />
             </View>
-          )}
-
-          {selectedStation && (
-            /*
-             * No bottom inset here. This panel is `bottom: 0` inside
-             * `PageLayout`'s content box, and that box is already padded
-             * clear of the tab bar and the home indicator — the previous
-             * `paddingBottom: insets.bottom + 20` counted the inset twice.
-             */
-            <BlurView
-              intensity={tokens.colors.isDark ? 80 : 95}
-              tint={tokens.colors.isDark ? 'dark' : 'light'}
-              style={[
-                styles.detailPanel,
-                { borderTopColor: tokens.colors.primary, borderTopWidth: 2 },
-              ]}
-            >
-              <View style={styles.detailHeader}>
-                <View style={{ flex: 1 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginBottom: tokens.spacing.fine6,
-                      gap: tokens.spacing.sm,
-                    }}
-                  >
-                    {'brandId' in selectedStation &&
-                    BRAND_LOGOS[(selectedStation as StationNode).brandSlug] ? (
-                      <BrandLogoChip
-                        logo={BRAND_LOGOS[(selectedStation as StationNode).brandSlug]}
-                        size={32}
-                      />
-                    ) : (
-                      <View
-                        style={[
-                          styles.brandBadge,
-                          {
-                            backgroundColor:
-                              ('brandId' in selectedStation &&
-                                BRAND_COLORS[(selectedStation as StationNode).brandSlug]) ||
-                              tokens.colors.primary,
-                          },
-                        ]}
-                      >
-                        {/*
-                                                  This label had no inline colour, so it took
-                                                  the stylesheet's static `#000` on a
-                                                  `primary` fill — unreadable on the five
-                                                  themes whose primary is dark.
-                                                */}
-                        <Text
-                          style={[styles.brandBadgeText, { color: tokens.colors.text.onPrimary }]}
-                        >
-                          {'brandId' in selectedStation
-                            ? (selectedStation as StationNode).brandId.toUpperCase()
-                            : t('map.stationFallback')}
-                        </Text>
-                      </View>
-                    )}
-                    <Text style={[styles.detailName, { color: tokens.colors.text.primary }]}>
-                      {selectedStation.name}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <MapPin
-                      size={14}
-                      color={tokens.colors.primary}
-                      style={{ marginRight: tokens.spacing.xs }}
-                    />
-                    <Text
-                      style={{
-                        color: tokens.colors.text.dim,
-                        fontFamily: 'Inter',
-                        fontSize: tokens.type.sectionTitle.fontSize,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {formatShortAddress(selectedStation as StationNode) || t('map.country')}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedStation(null);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('common.close')}
-                  style={styles.closeBtn}
-                >
-                  <ChevronDown size={24} color={tokens.colors.text.dim} />
-                </Pressable>
-              </View>
-
-              <View style={[styles.divider, { backgroundColor: tokens.colors.borderLight }]} />
-
-              {'brandId' in selectedStation &&
-                (() => {
-                  const p = priceByBrand.get((selectedStation as StationNode).brandId);
-                  return (
-                    <View style={styles.priceBlock}>
-                      <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>
-                        {t('map.voucherPrice')} · {fuelLabel(selectedFuel)}
-                      </Text>
-                      {p ? (
-                        <View style={styles.priceValueRow}>
-                          <Text style={[styles.priceValue, { color: tokens.colors.primary }]}>
-                            {p.voucherPerLiter.toFixed(2)} {t('map.perLiter')}
-                          </Text>
-                          {p.savingsPerLiter > 0 && (
-                            <View
-                              style={[
-                                styles.savingsBadge,
-                                {
-                                  backgroundColor: tokens.colors.primaryDim,
-                                  borderColor: tokens.colors.primary,
-                                },
-                              ]}
-                            >
-                              <TrendingDown size={13} color={tokens.colors.primary} />
-                              <Text style={[styles.savingsText, { color: tokens.colors.primary }]}>
-                                −{p.savingsPerLiter.toFixed(2)} {t('map.vsPump')}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      ) : (
-                        <Text
-                          style={[
-                            styles.detailText,
-                            {
-                              color: tokens.colors.text.dim,
-                              marginTop: tokens.spacing.xs,
-                              marginBottom: 0,
-                            },
-                          ]}
-                        >
-                          {t('map.noPriceForFuel')}
-                        </Text>
-                      )}
-                    </View>
-                  );
-                })()}
-
-              <View style={styles.infoRow}>
-                <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>
-                  {t('map.address')}
-                </Text>
-                <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>
-                  {formatShortAddress(selectedStation as StationNode) || t('map.noAddress')}
-                </Text>
-              </View>
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  gap: tokens.spacing.fine10,
-                  marginTop: tokens.spacing.fine10,
-                }}
-              >
-                <Pressable
-                  style={[
-                    styles.actionBtn,
-                    { backgroundColor: tokens.colors.primary },
-                    !routeDestination && { opacity: 0.5 },
-                  ]}
-                  disabled={!routeDestination}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !routeDestination }}
-                  accessibilityLabel={
-                    routeDestination ? t('map.buildRoute') : t('map.routeUnavailable')
-                  }
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setShowNavigatorPicker(true);
-                  }}
-                >
-                  <Text style={[styles.actionBtnText, { color: tokens.colors.text.onPrimary }]}>
-                    {routeDestination ? t('map.buildRoute') : t('map.routeUnavailable')}
-                  </Text>
-                </Pressable>
-              </View>
-            </BlurView>
-          )}
-
-          {/* Which navigator to hand the route to — the platform's choice is the user's.
-                        Mounted only with a real destination, so its probe has a stable target. */}
-          {routeDestination && (
-            <NavigatorPickerSheet
-              visible={showNavigatorPicker}
-              target={routeDestination}
-              destinationName={selectedStation?.name ?? ''}
-              onClose={() => setShowNavigatorPicker(false)}
-            />
-          )}
+          ) : null}
         </View>
-      </View>
-    </PageLayout>
+      </PageLayout>
+
+      {showList && !selectedStation ? (
+        <BottomSheet
+          ref={sheetRef}
+          onClose={() => {
+            setShowList(false);
+            setSelectedBrand(null);
+          }}
+          header={
+            <NetworkRankingHeader
+              activeBrand={activeBrand}
+              fuel={selectedFuel}
+              radiusKm={radar.radiusKm}
+              locationDenied={locationStatus === 'denied'}
+              onBack={() => setSelectedBrand(null)}
+              onClose={() => sheetRef.current?.close()}
+            />
+          }
+        >
+          <NetworkRankingList
+            brands={brandRanks}
+            activeBrand={activeBrand}
+            onSelectBrand={(brandId) => {
+              setSelectedBrand(brandId);
+              sheetRef.current?.expand();
+            }}
+            onSelectStation={focusStation}
+          />
+        </BottomSheet>
+      ) : null}
+
+      {selectedStation ? (
+        <StationDetailSheet
+          station={selectedStation}
+          logo={BRAND_LOGOS[selectedStation.brandSlug]}
+          brandColor={BRAND_COLORS[selectedStation.brandSlug] || tokens.colors.primary}
+          price={priceByBrand.get(selectedStation.brandId) ?? null}
+          fuel={selectedFuel}
+          distanceKm={selectedDistanceKm}
+          routeAvailable={routeDestination != null}
+          onClose={() => setSelectedStation(null)}
+          onBuildRoute={() => setShowNavigatorPicker(true)}
+        />
+      ) : null}
+
+      {/* Which navigator to hand the route to — the platform's choice is the user's.
+          Mounted only with a real destination, so its probe has a stable target. */}
+      {routeDestination ? (
+        <NavigatorPickerSheet
+          visible={showNavigatorPicker}
+          target={routeDestination}
+          destinationName={selectedStation?.name ?? ''}
+          onClose={() => setShowNavigatorPicker(false)}
+        />
+      ) : null}
+    </View>
   );
 }
 
-/**
- * The map's own stacking order, lowest to highest. These were five bare numbers
- * scattered through the styles below; they are a hierarchy, so they are named once
- * and read top-down rather than being compared by eye.
- */
-const MAP_Z = {
-  fuelRow: 90,
-  searchOverlay: 100,
-  fabColumn: 120,
-  loadingOverlay: 150,
-  errorOverlay: 150,
-  detailPanel: 200,
-} as const;
-
-/*
- * Removed in Phase 2 (Step 9), all unreferenced:
- *
- * - `styles.header` / `styles.title` / `styles.subtitle` — replaced by `ScreenHeader`.
- * - `styles.locationBtn`, `styles.attribution`, `styles.attributionText` — styles for
- *   a "locate me" button and an OSM attribution chip that this screen never rendered.
- * - the `brandName` local inside the marker loop, computed on every point and used
- *   by nothing.
- * - the `background={<View backgroundColor: background />}` prop: `PageLayout`'s
- *   own `SafeAreaView` already paints `tokens.colors.background`.
- */
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  mapWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  fabColumn: {
+    position: 'absolute',
+    alignItems: 'flex-end',
+  },
+  centerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

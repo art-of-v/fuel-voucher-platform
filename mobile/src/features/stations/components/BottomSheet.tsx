@@ -7,7 +7,8 @@ import Animated, {
   withSpring,
   runOnJS,
 } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { resolveSheetRelease } from '../lib/bottomSheet';
 
 const SPRING = { damping: 22, stiffness: 220, mass: 0.7 } as const;
@@ -21,13 +22,11 @@ export interface BottomSheetHandle {
 
 interface Props {
   onClose: () => void;
-  isDark: boolean;
-  /** Hairline accent along the sheet's top edge (the radar's primary colour). */
-  borderColor: string;
   /** Non-scrolling, drag-handle region: the title row, back control and hints. */
   header: React.ReactNode;
   /** Scrolling body: the leaderboard rows or a brand's АЗК list. */
   children: React.ReactNode;
+  testID?: string;
 }
 
 /**
@@ -39,18 +38,27 @@ interface Props {
  * native rebuild). The pan lives on the handle/header region only, leaving the body a normal
  * `ScrollView` — this sidesteps the scroll-vs-drag gesture arbitration entirely, which is the
  * fragile part of a sheet, in exchange for "grab the handle to resize" rather than drag-anywhere.
+ *
+ * Presentation: a floating surface, so it carries the design system's sheet shadow and no
+ * border; the fill is `surfaceElevated`, which separates it from the map on every theme. The
+ * previous version was a blurred pane with a 2px primary border along its top edge, which read
+ * as a neon seam over the tiles. The bottom padding is the home-indicator inset only — the
+ * caller hides the tab bar while the sheet owns the bottom, and `useContentInsets` gives the
+ * bar's clearance back, so this really is the bottom of the display.
  */
 export const BottomSheet = React.forwardRef<BottomSheetHandle, Props>(function BottomSheet(
-  { onClose, isDark, borderColor, header, children },
+  { onClose, header, children, testID },
   ref,
 ) {
+  const tokens = useDesignTokens();
+  const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
 
   // The sheet is a fixed-height surface anchored to the bottom; `translateY` slides it down to
-  // reveal less. Offsets are measured from fully-open (0). Peek shows ~a header + one row.
-  const FULL = Math.round(screenH * 0.86);
-  const PEEK = 236;
-  const HALF = Math.round(screenH * 0.5);
+  // reveal less. Offsets are measured from fully-open (0). Peek shows the header and one row.
+  const FULL = Math.round(screenH * 0.88);
+  const PEEK = 252;
+  const HALF = Math.round(screenH * 0.54);
   const HIDDEN = FULL + 48; // fully below the screen edge
 
   const offFull = 0;
@@ -110,19 +118,41 @@ export const BottomSheet = React.forwardRef<BottomSheetHandle, Props>(function B
 
   return (
     <Animated.View
-      style={[styles.sheet, { height: FULL, borderTopColor: borderColor }, sheetStyle]}
+      testID={testID}
+      accessibilityViewIsModal
+      style={[
+        styles.sheet,
+        {
+          height: FULL,
+          backgroundColor: tokens.colors.surfaceElevated,
+          borderTopLeftRadius: tokens.radius.xl,
+          borderTopRightRadius: tokens.radius.xl,
+          zIndex: tokens.zIndex.sheet,
+        },
+        tokens.elevation.medium,
+        sheetStyle,
+      ]}
     >
-      <BlurView
-        intensity={isDark ? 80 : 95}
-        tint={isDark ? 'dark' : 'light'}
-        style={StyleSheet.absoluteFill}
-      />
       <GestureDetector gesture={pan}>
-        <View style={styles.dragZone}>
+        <View
+          style={[
+            styles.dragZone,
+            {
+              paddingTop: tokens.spacing.sm,
+              paddingHorizontal: tokens.spacing['2xl'],
+            },
+          ]}
+        >
           <View
             style={[
               styles.grabber,
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)' },
+              {
+                width: tokens.chrome.sheetGrabberWidth,
+                height: 4,
+                borderRadius: tokens.radius.full,
+                marginBottom: tokens.spacing.md,
+                backgroundColor: tokens.colors.borderStrong,
+              },
             ]}
           />
           {header}
@@ -130,7 +160,10 @@ export const BottomSheet = React.forwardRef<BottomSheetHandle, Props>(function B
       </GestureDetector>
       <ScrollView
         style={styles.body}
-        contentContainerStyle={styles.bodyContent}
+        contentContainerStyle={{
+          paddingHorizontal: tokens.spacing['2xl'],
+          paddingBottom: insets.bottom + tokens.spacing['2xl'],
+        }}
         showsVerticalScrollIndicator={false}
       >
         {children}
@@ -145,28 +178,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopWidth: 2,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    overflow: 'hidden',
-    zIndex: 200,
   },
   dragZone: {
-    paddingTop: 10,
-    paddingHorizontal: 20,
+    paddingBottom: 0,
   },
   grabber: {
     alignSelf: 'center',
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    marginBottom: 10,
   },
   body: {
     flex: 1,
-    paddingHorizontal: 20,
-  },
-  bodyContent: {
-    paddingBottom: 28,
   },
 });

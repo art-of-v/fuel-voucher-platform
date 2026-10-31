@@ -1,6 +1,7 @@
 import {
   availableFuels,
   bestPriceByBrand,
+  formatKm,
   formatShortAddress,
   haversineKm,
   packageVoucherPerLiter,
@@ -428,5 +429,27 @@ describe('formatShortAddress', () => {
 
   it('returns an empty string when nothing is usable', () => {
     expect(formatShortAddress({ city: undefined, address: undefined })).toBe('');
+  });
+});
+
+describe('formatKm', () => {
+  it('keeps one decimal with a comma below 10 km', () => {
+    // The comma matters: every other number on the screen (money, percent) uses
+    // one, and a dot here read as a different number in Ukrainian.
+    expect(formatKm(1.24)).toBe('1,2');
+    expect(formatKm(9.94)).toBe('9,9');
+  });
+
+  it('drops the decimal beyond 10 km, where a tenth changes nothing', () => {
+    expect(formatKm(9.96)).toBe('10');
+    expect(formatKm(12.4)).toBe('12');
+    expect(formatKm(100)).toBe('100');
+  });
+
+  it('never shows a negative or a NaN distance', () => {
+    // Distance comes from a device fix; a jittered or missing value must not put
+    // "−0,4 км" or "NaN" under a network.
+    expect(formatKm(-3)).toBe('0,0');
+    expect(formatKm(Number.NaN)).toBe('0,0');
   });
 });

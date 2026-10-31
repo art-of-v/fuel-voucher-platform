@@ -399,8 +399,8 @@ export const en: Record<string, string> = {
     'Savings are measured against the pump price at the moment you bought, and shown only for purchases made after this feature launched. Earlier orders count toward what you paid but show no saving.',
   'savings.noData': 'No purchases yet',
 
-  'map.title': 'NETWORK MAP',
-  'map.stations_nearby': 'Stations Found',
+  'map.title': 'Network map',
+  'map.stationsShort': 'stations',
   // Appended to the nearest-distance line of a network with no АЗК inside the radar radius,
   // so "none nearby" reads differently from "the network doesn't exist".
   'map.outOfRange': 'out of range',
@@ -430,10 +430,17 @@ export const en: Record<string, string> = {
   'map.voucherPrice': 'Voucher price',
   'map.withinKm': 'Within {0} km',
   'map.networkRanking': 'Network ranking',
-  'map.cheapest': 'CHEAPEST',
+  'map.cheapest': 'Cheapest',
   'map.tapBrandHint': 'Tap a network → nearest stations',
   'map.nearest': 'nearest',
   'map.back': 'Back',
+  /* Map redesign: the search deck, the station sheet and the ranking's empty state. */
+  'map.clearSearch': 'Clear search',
+  'map.litre': 'litre',
+  'map.pumpPrice': 'Pump',
+  'map.yourDistance': 'From you',
+  'map.noOffersTitle': 'No offers nearby',
+  'map.noOffersDescription': 'Pick another fuel or clear the search to see network prices.',
 
   'contracts.title': 'CONTRACTS',
   'contracts.available': 'AVAILABLE',

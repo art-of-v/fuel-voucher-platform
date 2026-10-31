@@ -412,8 +412,8 @@ export const de: Record<string, string> = {
     'Die Ersparnis wird gegen den Zapfsäulenpreis zum Kaufzeitpunkt gemessen und nur für Käufe nach dem Start dieser Funktion angezeigt. Frühere Bestellungen zählen zum bezahlten Betrag, zeigen aber keine Ersparnis.',
   'savings.noData': 'Noch keine Käufe',
 
-  'map.title': 'NETZWERKKARTE',
-  'map.stations_nearby': 'Stationen gefunden',
+  'map.title': 'Netzwerkkarte',
+  'map.stationsShort': 'Tankstellen',
   // Appended to the nearest-distance line of a network with no АЗК inside the radar radius,
   // so "none nearby" reads differently from "the network doesn't exist".
   'map.outOfRange': 'außerhalb des Radius',
@@ -443,10 +443,18 @@ export const de: Record<string, string> = {
   'map.voucherPrice': 'Gutscheinpreis',
   'map.withinKm': 'Im Umkreis von {0} km',
   'map.networkRanking': 'Netz-Ranking',
-  'map.cheapest': 'AM GÜNSTIGSTEN',
+  'map.cheapest': 'Am günstigsten',
   'map.tapBrandHint': 'Netz antippen → nächste Tankstellen',
   'map.nearest': 'nächste',
   'map.back': 'Zurück',
+  /* Map redesign: the search deck, the station sheet and the ranking's empty state. */
+  'map.clearSearch': 'Suche löschen',
+  'map.litre': 'Liter',
+  'map.pumpPrice': 'Säule',
+  'map.yourDistance': 'Von Ihnen',
+  'map.noOffersTitle': 'Keine Angebote in der Nähe',
+  'map.noOffersDescription':
+    'Wählen Sie einen anderen Kraftstoff oder löschen Sie die Suche, um Netzpreise zu sehen.',
 
   'contracts.title': 'VERTRÄGE',
   'contracts.available': 'VERFÜGBAR',
