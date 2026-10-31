@@ -23,9 +23,10 @@ const getLastResponse = Notifications.getLastNotificationResponseAsync as jest.M
 const addResponseListener = Notifications.addNotificationResponseReceivedListener as jest.Mock;
 
 // Only the shape the hook touches: the tap handler reads
-// `notification.request.content.data` to decide where to route.
-function fakeResponse(data: Record<string, unknown> = {}) {
-  return { notification: { request: { content: { data } } } };
+// `notification.request.content.data` to decide where to route, and the notification's own
+// `date` when a sign-in code needs its age measured.
+function fakeResponse(data: Record<string, unknown> = {}, date?: number) {
+  return { notification: { date, request: { content: { data } } } };
 }
 
 describe('useNotificationTapRouting', () => {
@@ -158,6 +159,71 @@ describe('useNotificationTapRouting', () => {
 
     act(() => {
       captured?.(fakeResponse({ type: 'auth_otp', code: '123456', phone: '+380991234567' }));
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/landing',
+      params: { otpPhone: '+380991234567', otpCode: '123456' },
+    });
+  });
+
+  /*
+   * A banner can sit in Notification Center for an hour, and the digits it carries live five
+   * minutes. The push publishes that lifetime and the notification knows when it was delivered,
+   * so the tap can hand the form a deadline instead of letting it submit a code that is
+   * already dead. Both values come from this device, so the clock skew between phone and
+   * server never enters the subtraction.
+   */
+  it('hands the form a deadline that a late tap will find already passed', async () => {
+    let captured: ((response: unknown) => void) | undefined;
+    addResponseListener.mockImplementation((listener: (r: unknown) => void) => {
+      captured = listener;
+      return { remove: jest.fn() };
+    });
+
+    const deliveredAt = 1_700_000_000_000;
+    renderHook(() => useNotificationTapRouting());
+    await waitFor(() => expect(getLastResponse).toHaveBeenCalled());
+
+    act(() => {
+      captured?.(
+        fakeResponse(
+          { type: 'auth_otp', code: '123456', phone: '+380991234567', ttlSeconds: 300 },
+          deliveredAt,
+        ),
+      );
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/landing',
+      params: {
+        otpPhone: '+380991234567',
+        otpCode: '123456',
+        otpExpiresAt: String(deliveredAt + 300_000),
+      },
+    });
+  });
+
+  it('still opens the form when the push carries no lifetime, as an older server sends', async () => {
+    // A server older than the deadline publishes no ttlSeconds. The tap must still sign in -
+    // without a deadline the form simply shows no countdown, which is what every client did
+    // before this change.
+    let captured: ((response: unknown) => void) | undefined;
+    addResponseListener.mockImplementation((listener: (r: unknown) => void) => {
+      captured = listener;
+      return { remove: jest.fn() };
+    });
+
+    renderHook(() => useNotificationTapRouting());
+    await waitFor(() => expect(getLastResponse).toHaveBeenCalled());
+
+    act(() => {
+      captured?.(
+        fakeResponse(
+          { type: 'auth_otp', code: '123456', phone: '+380991234567' },
+          1_700_000_000_000,
+        ),
+      );
     });
 
     expect(mockPush).toHaveBeenCalledWith({

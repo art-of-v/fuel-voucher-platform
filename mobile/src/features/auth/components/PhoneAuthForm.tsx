@@ -24,6 +24,8 @@ interface PhoneAuthFormProps {
   initialPhone?: string;
   /** The code itself, when it arrived by push instead of over SMS. */
   initialCode?: string;
+  /** When that pushed code dies, in epoch milliseconds (see useLogin). */
+  initialCodeExpiresAt?: number;
 }
 
 /**
@@ -40,6 +42,7 @@ export function PhoneAuthForm({
   onBack,
   initialPhone,
   initialCode,
+  initialCodeExpiresAt,
 }: PhoneAuthFormProps) {
   const tokens = useDesignTokens();
   const t = useI18n((s) => s.t);
@@ -51,14 +54,17 @@ export function PhoneAuthForm({
     twoFactor,
     loading,
     error,
+    codeExpired,
+    secondsLeft,
     setPhone,
     setCode,
     setTwoFactorCode,
     handleSendCode,
+    handleResendCode,
     handleVerifyCode,
     handleVerifyTwoFactor,
     resetToPhone,
-  } = useLogin(onSuccess, { initialPhone, initialCode });
+  } = useLogin(onSuccess, { initialPhone, initialCode, initialCodeExpiresAt });
 
   // Explicit consent before an account is ever created (the first successful
   // code verification registers the user). The send button stays disabled
@@ -249,13 +255,44 @@ export function PhoneAuthForm({
               error={error ?? undefined}
             />
 
+            {/*
+              The code's own clock. While it runs, the step shows how long the digits have -
+              the same lifetime the server published, so the two can never disagree. When it
+              runs out, the step stops pretending the six digits are usable and offers the
+              one action that helps: a new code, to the same number, without the trip back to
+              the phone step that used to be the only way out.
+            */}
+            {step === 'code' && codeExpired ? (
+              <InlineFeedback kind="warning" message={t('phoneAuth.codeExpired')} />
+            ) : null}
+
+            {step === 'code' && secondsLeft !== null && !codeExpired ? (
+              <Text role="caption" tone="muted" center>
+                {t('phoneAuth.codeValidFor', formatCountdown(secondsLeft))}
+              </Text>
+            ) : null}
+
             <Button
               label={t('phoneAuth.verify')}
               onPress={step === 'code' ? handleVerifyCode : handleVerifyTwoFactor}
               loading={loading}
-              disabled={(step === 'code' ? code : twoFactorCode).length !== 6}
+              // A dead code cannot be accepted, so the button says so by being off rather
+              // than by spending one of the five verify attempts to find out.
+              disabled={
+                (step === 'code' ? code : twoFactorCode).length !== 6 ||
+                (step === 'code' && codeExpired)
+              }
               icon={<ArrowRight />}
             />
+
+            {step === 'code' && codeExpired ? (
+              <Button
+                label={t('phoneAuth.sendNewCode')}
+                onPress={handleResendCode}
+                loading={loading}
+                icon={<ArrowRight />}
+              />
+            ) : null}
 
             <Button
               // On the code step this changes the number; on the second factor it takes
@@ -289,6 +326,13 @@ export function PhoneAuthForm({
       )}
     </View>
   );
+}
+
+/** `m:ss` for a countdown; the code's lifetime fits in one minute digits, but minutes stay padded. */
+function formatCountdown(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
