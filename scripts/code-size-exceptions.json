@@ -55,11 +55,6 @@
       "reason": "Composition root: one place for the registrations is the point, recorded when the target was adopted (planning #688)."
     },
     {
-      "path": "mobile/app/contracts.tsx",
-      "lines": 757,
-      "reason": "Was already 729 lines when the target was adopted and the table, which lists mobile/src but not mobile/app, never named it. The split is tracked in planning #807."
-    },
-    {
       "path": "mobile/src/features/vouchers/components/VoucherDetailModal.tsx",
       "lines": 781,
       "reason": "Existing mobile component, recorded when the target was adopted (planning #688); split when next materially changed."
