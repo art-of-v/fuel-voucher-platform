@@ -3,7 +3,7 @@
     "name": "FuelFlow",
     "slug": "mobile-app-native",
     "scheme": "fuelflow",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "platforms": [
       "ios",
       "android"
@@ -20,7 +20,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fuelflowmarketplace.www",
-      "buildNumber": "236",
+      "buildNumber": "237",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Дозвіл на використання Face ID для безпечного доступу до ваших замовлень та проведення транзакцій.",
