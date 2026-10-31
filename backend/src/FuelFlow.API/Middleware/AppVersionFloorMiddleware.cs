@@ -78,6 +78,10 @@ public sealed class AppVersionFloorMiddleware
             appVersion,
             minimumVersion);
 
+        // RFC 9110 requires a 426 to name what to upgrade to. Here the "protocol" is the app build
+        // itself, so the header carries the version the body also states.
+        context.Response.Headers.Upgrade = $"FuelFlow-App/{minimumVersion}";
+
         await ApiErrorResponse.WriteAsync(
             context,
             StatusCodes.Status426UpgradeRequired,

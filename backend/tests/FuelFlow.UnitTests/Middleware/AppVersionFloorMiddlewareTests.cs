@@ -28,6 +28,7 @@ public class AppVersionFloorMiddlewareTests
 
         _nextCalled.Should().BeFalse();
         context.Response.StatusCode.Should().Be(StatusCodes.Status426UpgradeRequired);
+        context.Response.Headers.Upgrade.ToString().Should().Be("FuelFlow-App/1.2.0");
         Body(context).GetProperty("code").GetString().Should().Be("APP_UPDATE_REQUIRED");
         Body(context).GetProperty("data").GetProperty("minimumVersion").GetString().Should().Be("1.2.0");
     }
