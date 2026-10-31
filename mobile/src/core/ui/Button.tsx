@@ -98,14 +98,12 @@ export function Button({
     }
     switch (variant) {
       case 'primary':
-        // Use an explicit hex string (not the design token reference) so React
-        // Native's view layer can resolve the colour at render time. The previous
-        // `c.primary` reference (which evaluated to `'#00E85F'`) was being
-        // discarded by iOS's compositing pass in some builds, leaving the button
-        // looking like plain text.
+        // The fill follows the active theme's primary. It was pinned to the
+        // default theme's green hex in September 2026, which painted a green
+        // button on the four themes whose primary is not green.
         return {
-          background: pressed ? '#00C351' : '#00E85F',
-          border: pressed ? '#00C351' : '#00E85F',
+          background: pressed ? c.primaryPressed : c.primary,
+          border: pressed ? c.primaryPressed : c.primary,
           borderWidth: 2,
           content: c.text.onPrimary,
         };

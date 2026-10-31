@@ -12,6 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname } from 'expo-router';
 import { useDesignTokens } from '../hooks/useTheme';
 import { useIsTabBarVisible } from '../navigation/tabBar';
+import { useTabBarOverride } from '../navigation/tabBarOverride';
 
 export interface PageLayoutProps {
   children: React.ReactNode;
@@ -71,8 +72,12 @@ export function useContentInsets(options?: {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const tabBarVisible = useIsTabBarVisible(pathname);
+  // A screen that holds the bottom of the display (the map) hides the bar and
+  // gets its clearance back: otherwise the sheet would stop short and leave a
+  // strip of empty map under it, where the bar used to be.
+  const tabBarOverridden = useTabBarOverride((state) => state.hidden);
 
-  const hasTabBar = options?.hasTabBar ?? tabBarVisible;
+  const hasTabBar = options?.hasTabBar ?? (tabBarVisible && !tabBarOverridden);
 
   return {
     hasTabBar,

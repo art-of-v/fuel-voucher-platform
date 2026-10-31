@@ -30,15 +30,6 @@ jest.mock('react-native-maps', () => {
   };
 });
 
-jest.mock('expo-blur', () => {
-  const R = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  return {
-    __esModule: true,
-    BlurView: ({ children }: any) => R.createElement(View, null, children),
-  };
-});
-
 jest.mock('../../../core/hooks/useTheme', () => {
   const { getTokens } = jest.requireActual<typeof import('../../../core/design/tokens')>(
     '../../../core/design/tokens',
@@ -46,16 +37,17 @@ jest.mock('../../../core/hooks/useTheme', () => {
   return { useDesignTokens: () => getTokens() };
 });
 
+// Keys are echoed back, so the assertions below name the copy rather than its
+// Ukrainian value.
+jest.mock('../../../core/i18n', () => ({
+  useI18n: (selector: (s: any) => unknown) => selector({ t: (key: string) => key }),
+}));
+
 jest.mock('../lib/radar', () => ({
   formatShortAddress: (s: any) => s.address ?? '',
 }));
 
 const { Image, View } = jest.requireActual<typeof import('react-native')>('react-native');
-const tokens = jest
-  .requireActual<typeof import('../../../core/design/tokens')>('../../../core/design/tokens')
-  .getTokens();
-
-const t = (key: string) => key;
 
 function renderMarker(over: Record<string, unknown> = {}) {
   const onPress = jest.fn();
@@ -65,8 +57,6 @@ function renderMarker(over: Record<string, unknown> = {}) {
       coordinate={{ latitude: 50, longitude: 30 }}
       brandColor="#ff0000"
       price={null}
-      tokens={tokens as any}
-      t={t}
       onPress={onPress}
       {...over}
     />,
@@ -119,6 +109,19 @@ describe('StationMarker - the tracksViewChanges lifecycle', () => {
     // A colour pin is ready at mount, so it stops re-rastering immediately.
     expect(markerProps[markerProps.length - 1].tracksViewChanges).toBe(false);
   });
+
+  it('keeps tracking the selected pin, whose ring and scale change after the image loads', () => {
+    // The raster freezes on load; a selected pin is redrawn afterwards (3px ring,
+    // 1.12 scale) and would otherwise keep the unselected drawing. Only one pin is
+    // ever selected, so the extra rasters cost nothing.
+    renderMarker({ logo: 1, selected: true });
+
+    act(() => {
+      screen.UNSAFE_getAllByType(Image)[0].props.onLoad();
+    });
+
+    expect(markerProps[markerProps.length - 1].tracksViewChanges).toBe(true);
+  });
 });
 
 describe('StationMarker - the callout', () => {
@@ -138,28 +141,29 @@ describe('StationMarker - the callout', () => {
   it('shows the voucher price and the saving when there is one', () => {
     renderMarker({
       logo: undefined,
-      price: { voucherPerLiter: 52.3, savingsPerLiter: 3.7 } as any,
+      price: { voucherPerLiter: 52.3, pumpPerLiter: 56, savingsPerLiter: 3.7 } as any,
     });
 
-    // The whole point of the map is the price per litre and what it saves vs the pump.
-    expect(screen.getByText(/52\.30/)).toBeTruthy();
-    expect(screen.getByText(/-3\.70/)).toBeTruthy();
+    // Money uses a decimal comma everywhere else in the app, so a dot here would
+    // read as a different number to the customer.
+    expect(screen.getByText('52,30')).toBeTruthy();
+    expect(screen.getByText(/3,70/)).toBeTruthy();
   });
 
   it('omits the saving when there is none', () => {
     renderMarker({
       logo: undefined,
-      price: { voucherPerLiter: 52.3, savingsPerLiter: 0 } as any,
+      price: { voucherPerLiter: 52.3, pumpPerLiter: 52.3, savingsPerLiter: 0 } as any,
     });
 
-    expect(screen.getByText(/52\.30/)).toBeTruthy();
-    expect(screen.queryByText(/vsPump/)).toBeNull();
+    expect(screen.getByText('52,30')).toBeTruthy();
+    expect(screen.queryByText(/map.vsPump/)).toBeNull();
   });
 
   it('shows no price block when the station has no price', () => {
     renderMarker({ logo: undefined, price: null });
 
-    expect(screen.queryByText(/perLiter/)).toBeNull();
+    expect(screen.queryByText(/map.perLiter/)).toBeNull();
   });
 });
 

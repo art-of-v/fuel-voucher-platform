@@ -32,6 +32,18 @@ export function haversineKm(a: LatLng, b: LatLng): number {
 }
 
 /**
+ * A distance in kilometres as the map shows it, without the unit: one decimal
+ * inside 10 km, where a tenth changes the answer, and a whole number beyond it,
+ * where it does not. The comma is the Ukrainian decimal separator, and every
+ * distance on the screen has to read the same way.
+ */
+export function formatKm(km: number): string {
+  const safe = Number.isFinite(km) ? Math.max(0, km) : 0;
+  const tenths = Math.round(safe * 10) / 10;
+  return tenths < 10 ? tenths.toFixed(1).replace('.', ',') : String(Math.round(safe));
+}
+
+/**
  * Per-package voucher price per litre. `finalPricePerLiter` (грн/л) is authoritative;
  * legacy rows that predate the pricing model carry no such value, so we fall back to
  * the package total ÷ litres. Returns null when neither can be computed.

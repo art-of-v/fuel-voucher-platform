@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 import { getTokens } from '../core/design/tokens';
+import { useTabBarOverride } from '../core/navigation/tabBarOverride';
 import { Haptics } from '../core/utils/haptics';
 import { BottomTabs } from './bottom-tabs';
 
@@ -203,6 +204,7 @@ beforeEach(() => {
   mockHookAuth = true;
   mockContextKind = 'personal';
   mockFeedbackAvailable = true;
+  useTabBarOverride.setState({ hidden: false });
   jest.spyOn(Haptics, 'impactAsync').mockResolvedValue(undefined as any);
   // The file's whole subject is the press feedback, and the press feedback is driven by
   // `Pressability`, which holds `onPressOut` back by `minPressDuration` (130 ms). Fake
@@ -478,5 +480,37 @@ describe('BottomTabs — rendering', () => {
     render(<BottomTabs />);
 
     expect(screen.queryByTestId('bottom-tab-bar')).toBeNull();
+  });
+});
+
+describe('BottomTabs — a screen that owns the bottom', () => {
+  /**
+   * The map's ranking sheet lives inside the map's scene while the bar is a sibling
+   * of the scene, so no z-index on the sheet can put it above the bar — RN only
+   * compares siblings, and the bar's icons painted straight over the list. The bar
+   * therefore has to step aside, and the whole mechanism is this store: it used to
+   * expose a no-op setter that nothing read, so "hide the bar" did nothing at all.
+   */
+  it('steps aside while a screen holds the bottom of the display', () => {
+    render(<BottomTabs />);
+    expect(screen.getByTestId('bottom-tab-bar')).toBeTruthy();
+
+    act(() => {
+      useTabBarOverride.getState().setHidden(true);
+    });
+
+    expect(screen.queryByTestId('bottom-tab-bar')).toBeNull();
+  });
+
+  it('comes back when the screen lets go', () => {
+    useTabBarOverride.setState({ hidden: true });
+    render(<BottomTabs />);
+    expect(screen.queryByTestId('bottom-tab-bar')).toBeNull();
+
+    act(() => {
+      useTabBarOverride.getState().setHidden(false);
+    });
+
+    expect(screen.getByTestId('bottom-tab-bar')).toBeTruthy();
   });
 });

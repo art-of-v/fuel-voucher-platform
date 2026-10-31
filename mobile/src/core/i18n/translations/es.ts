@@ -405,8 +405,8 @@ export const es: Record<string, string> = {
     'El ahorro se mide frente al precio del surtidor en el momento de la compra y solo se muestra para compras posteriores al lanzamiento de esta función. Los pedidos anteriores cuentan para lo pagado pero no muestran ahorro.',
   'savings.noData': 'Aún no hay compras',
 
-  'map.title': 'MAPA DE RED',
-  'map.stations_nearby': 'Estaciones encontradas',
+  'map.title': 'Mapa de red',
+  'map.stationsShort': 'gasolineras',
   // Appended to the nearest-distance line of a network with no АЗК inside the radar radius,
   // so "none nearby" reads differently from "the network doesn't exist".
   'map.outOfRange': 'fuera de radio',
@@ -436,10 +436,18 @@ export const es: Record<string, string> = {
   'map.voucherPrice': 'Precio del vale',
   'map.withinKm': 'En un radio de {0} km',
   'map.networkRanking': 'Ranking de redes',
-  'map.cheapest': 'MÁS BARATO',
+  'map.cheapest': 'Más barato',
   'map.tapBrandHint': 'Toca una red → gasolineras más cercanas',
   'map.nearest': 'más cercana',
   'map.back': 'Atrás',
+  /* Map redesign: the search deck, the station sheet and the ranking's empty state. */
+  'map.clearSearch': 'Borrar búsqueda',
+  'map.litre': 'litro',
+  'map.pumpPrice': 'Surtidor',
+  'map.yourDistance': 'Desde ti',
+  'map.noOffersTitle': 'No hay ofertas cerca',
+  'map.noOffersDescription':
+    'Elige otro combustible o borra la búsqueda para ver los precios de las redes.',
 
   'contracts.title': 'CONTRATOS',
   'contracts.available': 'DISPONIBLES',

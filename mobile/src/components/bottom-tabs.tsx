@@ -18,6 +18,7 @@ import { useUnreadNotificationCount } from '../features/notifications/hooks/useN
 import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
 import { useIsTabBarVisible } from '../core/navigation/tabBar';
+import { useTabBarOverride } from '../core/navigation/tabBarOverride';
 import { useAccountContext } from '../features/company/hooks/useAccountContext';
 import { useFeedbackChannel } from '../features/feedback/hooks/useFeedbackChannel';
 import { Haptics } from '../core/utils/haptics';
@@ -119,6 +120,9 @@ import { Text } from '../core/ui';
 export function BottomTabs() {
   const pathname = usePathname();
   const tabBarVisible = useIsTabBarVisible(pathname);
+  // A screen can take the bottom of the display for itself (the map's ranking
+  // sheet does). This is a real subscription, not a flag: the bar unmounts.
+  const tabBarOverridden = useTabBarOverride((state) => state.hidden);
   const tokens = useDesignTokens();
   const insets = useSafeAreaInsets();
   const t = useI18n((s) => s.t);
@@ -138,7 +142,7 @@ export function BottomTabs() {
   const feedbackChannel = useFeedbackChannel();
 
   if (!isAuthenticated) return null;
-  if (!tabBarVisible) return null;
+  if (!tabBarVisible || tabBarOverridden) return null;
 
   const tabs = [
     { name: 'index', icon: Home, path: '/', label: t('nav.stations') },
