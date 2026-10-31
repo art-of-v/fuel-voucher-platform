@@ -52,7 +52,22 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         // The provider's modified date is the best available approximation of when the money moved
         // and is what the order already trusts for replay ordering. The statement import replaces it
         // with the acquirer's financial operation time when one arrives, which is the authority.
-        PaymentFactory.ApplyStatus(payment, status.Value, command.ModifiedDate, SystemClock.UtcNow);
+        var moved = PaymentFactory.ApplyStatus(
+            payment, status.Value, command.ModifiedDate, SystemClock.UtcNow);
+
+        if (!moved && PaymentFactory.WouldUndoACapture(payment, status.Value))
+        {
+            // A late "failure" or "expired" for an invoice the acquirer already reported as paid.
+            // The order refused the same transition and recorded the brand's word
+            // (RecordUnappliedPaymentTruthAsync); the payment keeps its capture so the row and the
+            // journal entry still agree that the money came in. Said out loud, because a failure
+            // webhook with no matching failure anywhere else is exactly what someone reads next.
+            _logger.LogWarning(
+                "Monobank reports invoice {InvoiceId} as {ProviderStatus} after the capture {PaymentId} "
+                + "was already {PaymentStatus}; the payment row was kept and the order records the "
+                + "acquirer's word",
+                command.InvoiceId, command.Status, payment.Id, payment.Status);
+        }
 
         // The acquirer's own figure, kept beside ours rather than only in the delivery. This is what
         // makes an amount mismatch answerable from the money row: two numbers on one row, and a

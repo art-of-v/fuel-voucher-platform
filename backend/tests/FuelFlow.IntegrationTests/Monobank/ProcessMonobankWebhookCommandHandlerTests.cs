@@ -354,6 +354,50 @@ LineItems =
         RefundOrderCommandHandler.ComputeRefundAmountKopecks(updated).Should().BeGreaterThan(0);
     }
 
+    [Theory]
+    [InlineData("failure", MonobankStatus.Failure)]
+    [InlineData("expired", MonobankStatus.Expired)]
+    public async Task ALaterFailure_AfterASuccess_KeepsTheCaptureSucceededAndRecordsTheAcquirer(
+        string providerStatus,
+        MonobankStatus recorded)
+    {
+        // #823. A `failure` (or `expired`) for an invoice that was already paid used to move the
+        // capture row from Succeeded to Failed with no line of its own: the order refused the
+        // transition, the journal entry for the money stayed, and only the row an operator reads
+        // said nobody had paid.
+        var order = BuildOrder("INV-LATE-FAIL", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        await SeedPaymentAsync(order);
+
+        await _handler.HandleAsync(WebhookCommand("INV-LATE-FAIL", "success"));
+        var paidAt = (await _context.Payments.AsNoTracking().SingleAsync()).PaidAtUtc;
+        paidAt.Should().NotBeNull();
+
+        // A later delivery than the one that settled the order, so it is not a stale replay.
+        var lateWord = WebhookCommand("INV-LATE-FAIL", providerStatus);
+        lateWord.ModifiedDate = TestClock.UtcNow.AddMinutes(5);
+
+        var response = await _handler.HandleAsync(lateWord);
+
+        response.Success.Should().BeTrue("the delivery is acknowledged rather than retried forever");
+        response.Message.Should().Contain("Illegal transition");
+
+        var updated = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+        updated.Status.Should().Be(
+            OrderStatus.PendingFulfillment,
+            "the money put the order here, and a later word does not un-pay it");
+        updated.MonobankStatus.Should().Be(
+            recorded,
+            "the order still records what the acquirer last said");
+
+        var payment = await _context.Payments.AsNoTracking().SingleAsync();
+        payment.Status.Should().Be(
+            PaymentStatus.Succeeded,
+            "a capture the acquirer reported as paid is not downgraded by a later failure or expiry");
+        payment.PaidAtUtc.Should().Be(paidAt, "and it keeps the moment the money moved");
+    }
+
     [Fact]
     public async Task ProcessWebhook_RepeatedSuccess_OnCancelledOrder_ShouldNotChurnTimestamps()
     {

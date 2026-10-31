@@ -146,6 +146,30 @@ public static Payment CreateRefund(
     };
 
     /// <summary>
+    /// Whether moving this payment would contradict a capture the acquirer already reported as paid.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A succeeded capture does not become failed or expired. Money that was taken cannot un-be taken
+    /// by a later status word: only a refund returns it, and that is a row of its own.
+    /// </para>
+    /// <para>
+    /// The case this exists for is a late <c>failure</c> webhook for an invoice that was already paid.
+    /// The order refuses that transition and records the acquirer's word instead
+    /// (<c>RecordUnappliedPaymentTruthAsync</c>); the payment used to follow it anyway, ending up
+    /// saying nobody had paid while the journal entry for the money stayed.
+    /// </para>
+    /// <para>
+    /// <c>reversed</c> is deliberately not covered: it means money that was taken and returned, so
+    /// <see cref="PaymentStatus.Cancelled"/> is the truthful end state rather than a contradiction.
+    /// </para>
+    /// </remarks>
+    public static bool WouldUndoACapture(Payment payment, PaymentStatus status) =>
+        payment.Kind == PaymentKind.Capture
+        && payment.Status == PaymentStatus.Succeeded
+        && status is PaymentStatus.Failed or PaymentStatus.Expired;
+
+    /// <summary>
     /// Moves a payment to a new status and stamps the time the money moved.
     /// </summary>
     /// <remarks>
@@ -156,15 +180,19 @@ public static Payment CreateRefund(
     /// <see cref="Order.LastWebhookModifiedDateUtc"/> is the provider's date and not
     /// <c>UtcNow</c>.
     /// </remarks>
-    public static void ApplyStatus(
+    /// <returns>
+    /// Whether the row moved. <see langword="false"/> when it already had that status or the move is
+    /// refused by <see cref="WouldUndoACapture"/>, so the caller can say why in its own log.
+    /// </returns>
+    public static bool ApplyStatus(
         Payment payment,
         PaymentStatus status,
         DateTime? observedAtUtc,
         DateTime nowUtc)
     {
-        if (payment.Status == status)
+        if (payment.Status == status || WouldUndoACapture(payment, status))
         {
-            return;
+            return false;
         }
 
         payment.Status = status;
@@ -174,5 +202,7 @@ public static Payment CreateRefund(
         {
             payment.PaidAtUtc = observedAtUtc;
         }
+
+        return true;
     }
 }
