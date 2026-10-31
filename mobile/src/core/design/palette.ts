@@ -156,7 +156,8 @@ export const BRAND_COLORS: Record<string, string> = {
  *
  * All four assets are opaque PNGs with a white plate rather than an alpha channel. That is
  * safe as they stand: every consumer draws them inside a white circle (`markerLogo` /
- * `brandLogoChip` in app/map.tsx), so the plate merges into the chip.
+ * `brandLogoChip` in `features/stations/components/StationMarker.tsx`), so the plate
+ * merges into the chip.
  */
 export const BRAND_LOGOS: Record<string, ImageSourcePropType> = {
   okko: require('../../../assets/brands/okko.png'),
