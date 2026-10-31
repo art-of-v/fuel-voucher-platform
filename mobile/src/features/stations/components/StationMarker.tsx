@@ -13,8 +13,8 @@ import type { StationNode } from '../../../core/types/api';
  * The round brand badge used in the ranking list and the station sheet. Pure
  * presentation; sized by the caller.
  *
- * Extracted from `app/map.tsx` so the 1300-line screen is not also the home of its
- * two map-pin components. Behaviour is unchanged -- the markers keep their own
+ * Extracted from `app/map.tsx` so the screen is not also the home of its two
+ * map-pin components. Behaviour is unchanged -- the markers keep their own
  * `tracksViewChanges` lifecycle (see StationMarker).
  */
 export function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size: number }) {
