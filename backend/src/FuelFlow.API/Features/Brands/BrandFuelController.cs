@@ -137,7 +137,7 @@ public sealed class BrandFuelController : ControllerBase
                     ("fuelTypeId", result.FuelTypeId), ("field", result.Field)));
 
         return ApiError.BadRequest(result.Error, result.Code, extra: Extensions(
-            ("field", result.Field), ("token", result.Token)));
+            ("field", result.Field), ("token", result.Token), ("gap", result.Gap)));
     }
 
     [HttpDelete("{fuelId}")]

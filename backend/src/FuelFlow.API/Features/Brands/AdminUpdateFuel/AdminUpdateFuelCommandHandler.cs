@@ -150,6 +150,7 @@ public sealed class AdminUpdateFuelCommandHandler
                               + $"{FuelEconomics.Missing(resulting)}. Set the cost and the margin, or take "
                               + "the stock off the shelf first.",
                     Code = BrandRefusalCodes.LiveStockNeedsPrice,
+                    Gap = resulting.Gap,
                     Field = resulting.HasCost ? nameof(request.MarginUahPerLiter) : nameof(request.SupplierPricePerLiter)
                 };
             }

@@ -30,6 +30,8 @@ export const brandRefusals: Record<Language, Record<string, string>> = {
       "This fuel has live stock on the shelf, so it must keep a cost.",
     "fuel.error.liveStockNeedsMargin":
       "This fuel has live stock on the shelf, so it must keep a margin.",
+    "fuel.error.liveStockNeedsBoth":
+      "This fuel has live stock on the shelf, so it must keep both a cost and a margin.",
     "fuel.error.archiveBlocked":
       "This fuel still has {0} active voucher(s) - it can be archived only once they are used or expired.",
     "fuel.error.nominalsInvalid": "These sizes are not positive litres: {0}.",
@@ -61,6 +63,8 @@ export const brandRefusals: Record<Language, Record<string, string>> = {
       "Це пальне має залишок на полиці, тому мусить мати собівартість.",
     "fuel.error.liveStockNeedsMargin":
       "Це пальне має залишок на полиці, тому мусить мати маржу.",
+    "fuel.error.liveStockNeedsBoth":
+      "Це пальне має залишок на полиці, тому мусить мати і собівартість, і маржу.",
     "fuel.error.archiveBlocked":
       "Для цього пального ще активні талони: {0}. Архівувати можна лише після використання або прострочення.",
     "fuel.error.nominalsInvalid": "Ці об'єми не є додатними літрами: {0}.",
@@ -93,6 +97,8 @@ export const brandRefusals: Record<Language, Record<string, string>> = {
       "Dieser Kraftstoff hat Ware im Regal und muss daher einen Einkaufspreis behalten.",
     "fuel.error.liveStockNeedsMargin":
       "Dieser Kraftstoff hat Ware im Regal und muss daher eine Marge behalten.",
+    "fuel.error.liveStockNeedsBoth":
+      "Dieser Kraftstoff hat Ware im Regal und muss daher Einkaufspreis und Marge behalten.",
     "fuel.error.archiveBlocked":
       "Für diesen Kraftstoff sind noch {0} Gutschein(e) aktiv - archivierbar erst, wenn sie verbraucht oder abgelaufen sind.",
     "fuel.error.nominalsInvalid":
@@ -126,6 +132,8 @@ export const brandRefusals: Record<Language, Record<string, string>> = {
       "Este combustible tiene existencias en el surtidor, así que debe mantener un coste.",
     "fuel.error.liveStockNeedsMargin":
       "Este combustible tiene existencias en el surtidor, así que debe mantener un margen.",
+    "fuel.error.liveStockNeedsBoth":
+      "Este combustible tiene existencias en el surtidor, así que debe mantener tanto el coste como el margen.",
     "fuel.error.archiveBlocked":
       "Este combustible aún tiene {0} vale(s) activos: solo puede archivarse cuando se usen o caduquen.",
     "fuel.error.nominalsInvalid": "Estos tamaños no son litros positivos: {0}.",

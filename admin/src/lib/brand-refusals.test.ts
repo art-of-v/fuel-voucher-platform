@@ -42,24 +42,50 @@ describe("brand refusals", () => {
     expect(say(error)).toBe("fuel.error.rehearsalName[QA]");
   });
 
-  it("points at the half of the price live stock must keep", () => {
-    const missingCost = new ApiError(
-      "This fuel has live stock and must keep a price",
-      "fuel_live_stock_needs_price",
-      undefined,
-      undefined,
-      { field: "SupplierPricePerLiter" },
-    );
-    const missingMargin = new ApiError(
-      "This fuel has live stock and must keep a price",
-      "fuel_live_stock_needs_price",
-      undefined,
-      undefined,
-      { field: "MarginUahPerLiter" },
-    );
+  it("points at whichever half of the price live stock must keep", () => {
+    const needs = (extra: Record<string, unknown>) =>
+      say(
+        new ApiError(
+          "This fuel has live stock and must keep a price",
+          "fuel_live_stock_needs_price",
+          undefined,
+          undefined,
+          extra,
+        ),
+      );
 
-    expect(say(missingCost)).toBe("fuel.error.liveStockNeedsCost");
-    expect(say(missingMargin)).toBe("fuel.error.liveStockNeedsMargin");
+    expect(needs({ gap: "cost" })).toBe("fuel.error.liveStockNeedsCost");
+    expect(needs({ gap: "margin" })).toBe("fuel.error.liveStockNeedsMargin");
+    expect(needs({ gap: "cost_and_margin" })).toBe(
+      "fuel.error.liveStockNeedsBoth",
+    );
+  });
+
+  it("falls back to the named field when the refusal carries no gap token", () => {
+    const needs = (extra: Record<string, unknown>) =>
+      say(
+        new ApiError(
+          "This fuel has live stock and must keep a price",
+          "fuel_live_stock_needs_price",
+          undefined,
+          undefined,
+          extra,
+        ),
+      );
+
+    expect(needs({ field: "SupplierPricePerLiter" })).toBe(
+      "fuel.error.liveStockNeedsCost",
+    );
+    expect(needs({ field: "MarginUahPerLiter" })).toBe(
+      "fuel.error.liveStockNeedsMargin",
+    );
+    // A gap token wins over the field, so a backend that names both cannot downgrade "both"
+    // to whichever box it happens to point at.
+    expect(
+      needs({ gap: "cost_and_margin", field: "SupplierPricePerLiter" }),
+    ).toBe("fuel.error.liveStockNeedsBoth");
+    // Neither travelled: the server's whole sentence beats half a localised one.
+    expect(needs({})).toBe("This fuel has live stock and must keep a price");
   });
 
   it("carries the count of vouchers that block an archive", () => {

@@ -68,13 +68,12 @@ export const brands: Record<Language, Record<string, string>> = {
       "The catalogue check is running for OKKO, UPG, WOG and KLO. What it found is in the backend log, and what it changed is on this screen.",
     "brands.syncCatalogueFailed":
       "The catalogue check could not be started. See the backend log.",
-    "brands.addProvider": "Add Brand",
     "brands.namePlaceholder": "Brand Name (e.g. OKKO)",
     "brands.logoText": "Logo Text",
     "brands.logoTextPlaceholder": "Logo Text",
     "brands.color": "Color",
-    "brands.editProvider": "Edit Brand",
-    "brands.noProviders": "No brands found",
+    "brands.editBrand": "Edit Brand",
+    "brands.noBrands": "No brands found",
     "brands.priority": "Priority",
     "brands.priorityHint":
       "Display order in the mobile app. Lower = higher. 999 = end of the list.",
@@ -155,13 +154,12 @@ export const brands: Record<Language, Record<string, string>> = {
       "Перевірка каталогу йде для OKKO, UPG, WOG і KLO. Що вона знайшла - у логі бекенда, а що змінила - на цьому екрані.",
     "brands.syncCatalogueFailed":
       "Перевірку каталогу не вдалося запустити. Дивись лог бекенда.",
-    "brands.addProvider": "Додати Постачальника",
     "brands.namePlaceholder": "Назва (напр. OKKO)",
     "brands.logoText": "Текст Логотипу",
     "brands.logoTextPlaceholder": "Текст Логотипу",
     "brands.color": "Колір",
-    "brands.editProvider": "Редагувати Постачальника",
-    "brands.noProviders": "Постачальників не знайдено",
+    "brands.editBrand": "Редагувати бренд",
+    "brands.noBrands": "Брендів не знайдено",
     "brands.priority": "Пріоритет",
     "brands.priorityHint":
       "Порядок показу в мобільному застосунку. Менше = вище. 999 = кінець списку.",
@@ -245,13 +243,12 @@ export const brands: Record<Language, Record<string, string>> = {
       "Die Katalogprüfung läuft für OKKO, UPG, WOG und KLO. Was sie gefunden hat, steht im Backend-Protokoll, was sie geändert hat, auf diesem Bildschirm.",
     "brands.syncCatalogueFailed":
       "Die Katalogprüfung konnte nicht gestartet werden. Sieh im Backend-Protokoll nach.",
-    "brands.addProvider": "Marke Hinzufügen",
     "brands.namePlaceholder": "Name (z.B. OKKO)",
     "brands.logoText": "Logo-Text",
     "brands.logoTextPlaceholder": "Logo-Text",
     "brands.color": "Farbe",
-    "brands.editProvider": "Marke Bearbeiten",
-    "brands.noProviders": "Keine Marke gefunden",
+    "brands.editBrand": "Marke bearbeiten",
+    "brands.noBrands": "Keine Marken gefunden",
     "brands.priority": "Priorität",
     "brands.priorityHint":
       "Anzeigereihenfolge in der mobilen App. Niedriger = höher. 999 = Ende der Liste.",
@@ -333,13 +330,12 @@ export const brands: Record<Language, Record<string, string>> = {
       "La revisión del catálogo está en marcha para OKKO, UPG, WOG y KLO. Lo que encontró está en el registro del backend, y lo que cambió, en esta pantalla.",
     "brands.syncCatalogueFailed":
       "No se pudo iniciar la revisión del catálogo. Mira el registro del backend.",
-    "brands.addProvider": "Agregar Marca",
     "brands.namePlaceholder": "Nombre (ej. OKKO)",
     "brands.logoText": "Texto del Logo",
     "brands.logoTextPlaceholder": "Texto del Logo",
     "brands.color": "Color",
-    "brands.editProvider": "Editar Marca",
-    "brands.noProviders": "No se encontraron Marcaes",
+    "brands.editBrand": "Editar marca",
+    "brands.noBrands": "No se encontraron marcas",
     "brands.priority": "Prioridad",
     "brands.priorityHint":
       "Orden de visualización en la app móvil. Menor = más alto. 999 = final de la lista.",

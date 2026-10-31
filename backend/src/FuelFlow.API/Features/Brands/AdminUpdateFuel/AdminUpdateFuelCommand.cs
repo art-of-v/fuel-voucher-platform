@@ -24,6 +24,12 @@ public sealed record AdminUpdateFuelCommand(Guid FuelId, BrandFuelDto Fuel, Guid
 /// The word in the name that reads as rehearsal data. It is already in the name the operator typed,
 /// but naming it says which part of the name the guard objected to.
 /// </param>
+/// <param name="Gap">
+/// Which half of the price a live-stock refusal says is missing, as the shared machine token
+/// (<c>cost</c>, <c>margin</c>, <c>cost_and_margin</c>) - the same vocabulary the activation
+/// refusal names its fuels with. A client words one sentence per token instead of guessing from
+/// the field a sentence that would be half true when both halves are gone.
+/// </param>
 /// <param name="Field">
 /// The field the refusal is about - the code or the rehearsal flag. It is the field name the form
 /// sent, so the screen can put the message next to the input that caused it.
@@ -40,6 +46,7 @@ public sealed record AdminUpdateFuelResult
     public string? Error { get; init; }
     public string? Code { get; init; }
     public string? Token { get; init; }
+    public string? Gap { get; init; }
     public string? Field { get; init; }
     public Guid? FuelTypeId { get; init; }
 }

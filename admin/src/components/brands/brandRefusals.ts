@@ -28,6 +28,14 @@ export const BRAND_REFUSALS: Record<string, CodedSentence> = {
   // Which half of the price is missing is the field the refusal names, so the operator is pointed
   // at the box that has to change rather than at both of them.
   fuel_live_stock_needs_price: (error, t) => {
+    // Which half of the price is missing travels as the same token the activation refusal names
+    // its fuels with, so "both" gets a sentence of its own rather than the first half only. The
+    // field is the fallback for a backend that predates the token.
+    const gap = text(error.extra?.gap);
+    if (gap === "cost_and_margin") return t("fuel.error.liveStockNeedsBoth");
+    if (gap === "margin") return t("fuel.error.liveStockNeedsMargin");
+    if (gap === "cost") return t("fuel.error.liveStockNeedsCost");
+
     const field = text(error.extra?.field);
     if (field === "MarginUahPerLiter")
       return t("fuel.error.liveStockNeedsMargin");
