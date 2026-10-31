@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.AdminDeleteFuel;
 using FuelFlow.Features.Brands.AdminUpdateFuel;
 using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Vouchers;
@@ -215,8 +216,10 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
         result.Error.Should().Contain("live stock");
         result.Code.Should().Be(BrandRefusalCodes.LiveStockNeedsPrice,
             "the panel builds the sentence from the code, and needs to know which half is missing");
+        result.Gap.Should().Be("cost_and_margin",
+            "both halves went, and the sentence has to say both rather than the first one only");
         result.Field.Should().Be("SupplierPricePerLiter",
-            "the cost is the first half this edit took away");
+            "the cost is the first box the operator has to fill");
 
         using var verify = CreateContext();
         var fuel = await verify.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == ToUuid("okko-95"));
@@ -254,6 +257,57 @@ public sealed class TheLiveStockNeedsItsEconomics : IClassFixture<TestDatabaseFi
         var fuel = await verify.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == ToUuid("okko-95"));
         fuel.SupplierPricePerLiter.Should().BeNull();
         fuel.MarginUahPerLiter.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task The_admin_is_told_which_half_of_the_price_live_stock_is_missing()
+    {
+        // The cost stays and only the margin goes, so the sentence - and the box it points at -
+        // have to name the margin. A refusal that said "keep a cost" here would send the operator
+        // to the one field that is already right.
+        await SetFuelEconomicsAsync(50m, 5m);
+        var voucherId = Guid.NewGuid();
+        await SeedStockAsync(voucherId, DataKinds.Real, costPerLiter: 50m, status: VoucherStatus.Available);
+
+        using var ctx = CreateContext();
+        var result = await UpdateHandler(ctx)
+            .HandleAsync(new AdminUpdateFuelCommand(
+                ToUuid("okko-95"),
+                new BrandFuelDto
+                {
+                    Id = ToUuid("okko-95").ToString(),
+                    Name = "A-95",
+                    SupplierPricePerLiter = 50m,
+                    MarginUahPerLiter = null,
+                    IsTestData = false,
+                    AllowBelowCost = false
+                },
+                SeededUserId,
+                "Admin"));
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(BrandRefusalCodes.LiveStockNeedsPrice);
+        result.Gap.Should().Be("margin");
+        result.Field.Should().Be("MarginUahPerLiter");
+    }
+
+    [Fact]
+    public async Task The_admin_cannot_archive_a_fuel_whose_stock_is_on_the_shelf()
+    {
+        await SetFuelEconomicsAsync(50m, 5m);
+        var voucherId = Guid.NewGuid();
+        await SeedStockAsync(voucherId, DataKinds.Real, costPerLiter: 50m, status: VoucherStatus.Available);
+
+        using var ctx = CreateContext();
+        var result = await new AdminDeleteFuelCommandHandler(ctx, new AuditEventService(ctx))
+            .HandleAsync(new AdminDeleteFuelCommand(ToUuid("okko-95"), SeededUserId, "Admin"));
+
+        result.Success.Should().BeFalse();
+        result.Code.Should().Be(BrandRefusalCodes.ArchiveBlocked,
+            "the panel words the archive refusal from the code");
+        result.ActiveVoucherCount.Should().Be(1,
+            "the sentence says how many vouchers stand in the way");
+        result.Examples.Should().ContainSingle(v => v.Liters == 10m);
     }
 
     [Fact]

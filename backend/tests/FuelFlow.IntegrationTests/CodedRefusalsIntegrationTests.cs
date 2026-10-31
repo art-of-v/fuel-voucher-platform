@@ -114,6 +114,15 @@ public sealed class CodedRefusalsIntegrationTests : IClassFixture<TestDatabaseFi
             $"/api/admin/redemptions/{Guid.NewGuid()}/decision",
             new { action = "Nonsense" })).Should().Be("redemption_action_invalid");
 
+        // A decision on a voucher that is gone answers 404, and the panel words that itself: the
+        // queue is rebuilt from the server, so "the claim is not there" reads differently from a
+        // claim it can no longer change.
+        (await CodeOfAsync(
+            await staff.PostAsJsonAsync(
+                $"/api/admin/redemptions/{Guid.NewGuid()}/decision",
+                new { action = "Confirm" }),
+            HttpStatusCode.NotFound)).Should().Be("redemption_not_found");
+
         (await CodeOfAsync(
             await staff.PostAsJsonAsync(
                 $"/api/admin/redemptions/statement/{Guid.NewGuid()}/dismiss",
