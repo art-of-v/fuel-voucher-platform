@@ -49,8 +49,14 @@ public sealed class FuelFlowMetrics : IDisposable
     private readonly Histogram<double> _monobankInvoiceDuration;
     private readonly Counter<long> _monobankWebhookReceived;
     private readonly Counter<long> _monobankWebhookFailed;
+    private readonly Counter<long> _monobankWebhookDuplicate;
     private readonly Histogram<double> _monobankWebhookLag;
     private readonly Counter<long> _monobankReconciliation;
+
+    // Payments
+    // -1 is "the statement pass has not reported yet": an observable gauge that emits nothing sits
+    // in NoData, which is honest for the first hour after a start and wrong once a pass has run.
+    private int _unbookedCaptures = -1;
 
     // Hangfire
     private readonly Counter<long> _jobSucceeded;
@@ -138,6 +144,10 @@ public sealed class FuelFlowMetrics : IDisposable
             "fuelflow.monobank.webhook.failed", "webhooks",
             "Monobank webhooks that failed validation or processing.");
 
+        _monobankWebhookDuplicate = _meter.CreateCounter<long>(
+            "fuelflow.monobank.webhook.duplicate", "webhooks",
+            "Monobank webhook deliveries acknowledged as duplicates. A steady trickle is by design; a burst is a redelivery storm.");
+
         _monobankWebhookLag = _meter.CreateHistogram<double>(
             "fuelflow.monobank.webhook.lag", "s",
             "Delay between invoice creation and webhook receipt.");
@@ -145,6 +155,12 @@ public sealed class FuelFlowMetrics : IDisposable
         _monobankReconciliation = _meter.CreateCounter<long>(
             "fuelflow.monobank.reconciliation", "orders",
             "Aged awaiting-payment orders resolved by polling Monobank when a webhook was lost or late. outcome=recovered is a direct signal of dropped webhooks and is an alerting target.");
+
+        // No unit: "captures" here would yield fuelflow_payments_unbooked_captures_captures.
+        _meter.CreateObservableGauge(
+            "fuelflow.payments.unbooked_captures",
+            ObserveUnbookedCaptures,
+            description: "Received LIVE-merchant statement captures that no payment row holds, as of the last statement pass.");
 
         _jobSucceeded = _meter.CreateCounter<long>(
             "fuelflow.jobs.succeeded", "jobs",
@@ -300,6 +316,36 @@ public sealed class FuelFlowMetrics : IDisposable
 
     public void MonobankWebhookFailed(string reason) =>
         _monobankWebhookFailed.Add(1, new KeyValuePair<string, object?>("reason", reason));
+
+    /// <summary>
+    /// A delivery acknowledged as a duplicate: a redelivery of a settled event, a delivery while
+    /// another attempt still holds the lease, or an order already in the status it asks for.
+    /// </summary>
+    /// <remarks>
+    /// Normal by design - Monobank retries, and a retry that finds the work done is the system
+    /// working - so only a burst is worth an alert. The outcome label is what separates "the same
+    /// event was redelivered" from "someone's client keeps polling the same state".
+    /// </remarks>
+    public void MonobankWebhookDuplicate(string outcome) =>
+        _monobankWebhookDuplicate.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+
+    /// <summary>
+    /// The count of received statement captures with no payment row, as the statement pass found it.
+    /// </summary>
+    /// <remarks>
+    /// Set rather than queried on the scrape path: "unbooked" is one definition over the acquirer's
+    /// rows (<c>UnappliedReceipts</c>), and a second predicate in the exporter would eventually
+    /// disagree with the one the close-time command books against. The value is therefore as fresh
+    /// as the last hourly pass - which is why the alert waits two hours before calling it a fault.
+    /// </remarks>
+    public void UnbookedCaptures(int count) =>
+        Volatile.Write(ref _unbookedCaptures, Math.Max(0, count));
+
+    private IEnumerable<Measurement<int>> ObserveUnbookedCaptures()
+    {
+        var count = Volatile.Read(ref _unbookedCaptures);
+        return count >= 0 ? [new Measurement<int>(count)] : [];
+    }
 
     public void RecordWebhookLag(double lagSeconds) => _monobankWebhookLag.Record(lagSeconds);
 
