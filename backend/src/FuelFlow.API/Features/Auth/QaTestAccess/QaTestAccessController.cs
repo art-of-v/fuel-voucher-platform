@@ -57,7 +57,9 @@ public sealed class QaTestAccessController : ControllerBase
     [ProducesResponseType(typeof(QaTestAccessStatusDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(
-        [FromBody] UpdateQaTestAccessRequest request,
+        // Nullable so an empty body reaches this refusal: on a non-nullable body parameter the
+        // framework's own 400 answers first, and that one carries no code for the panel.
+        [FromBody] UpdateQaTestAccessRequest? request,
         CancellationToken cancellationToken)
     {
         if (request is null)

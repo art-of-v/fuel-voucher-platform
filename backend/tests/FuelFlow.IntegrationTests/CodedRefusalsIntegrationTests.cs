@@ -65,8 +65,10 @@ public sealed class CodedRefusalsIntegrationTests : IClassFixture<TestDatabaseFi
             new StringContent("null", System.Text.Encoding.UTF8, "application/json")))).Should()
             .Be("qa_test_access_no_value");
 
-        (await PostAsync(staff, "/api/admin/brand-stations", new { name = "X" })).Should()
-            .Be("station_brand_and_name_required");
+        // The binder requires ExternalId and Name to be present at all; the handler is what refuses
+        // the blank name and the missing brand.
+        (await PostAsync(staff, "/api/admin/brand-stations", new { externalId = "code-test", name = "" }))
+            .Should().Be("station_brand_and_name_required");
     }
 
     private static async Task<string?> PostAsync(HttpClient client, string route, object body)
