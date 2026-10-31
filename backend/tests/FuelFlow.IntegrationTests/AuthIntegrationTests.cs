@@ -53,6 +53,9 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         var result = await response.Content.ReadFromJsonAsync<SendCodeResponse>();
         result.Should().NotBeNull();
         result!.Success.Should().BeTrue();
+        // The response tells the client how long the digits live; the code step needs it to
+        // offer a resend instead of a dead end once the deadline passes.
+        result.ExpiresInSeconds.Should().Be(SendCodeCommandHandler.CodeTtlSeconds);
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

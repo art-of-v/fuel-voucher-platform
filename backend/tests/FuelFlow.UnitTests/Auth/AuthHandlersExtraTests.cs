@@ -230,6 +230,73 @@ public sealed class AuthHandlersExtraTests : IDisposable
             .WithMessage("Invalid or expired verification code");
     }
 
+    /// <summary>
+    /// The client learns that a code died from the clock it keeps, never from the wire. A wrong,
+    /// a spent and an expired code must stay indistinguishable - otherwise the endpoint turns
+    /// into an oracle for probing which numbers hold live codes - so the three answers are
+    /// pinned here as one and the same refusal.
+    /// </summary>
+    [Fact]
+    public async Task VerifyCode_ShouldRefuseWrongSpentAndExpiredCodesAlike()
+    {
+        _context.VerificationCodes.AddRange(
+            new VerificationCode
+            {
+                Id = Guid.NewGuid(),
+                PhoneNumber = "+380991000001",
+                Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
+                ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+                CreatedAtUtc = TestClock.UtcNow,
+                IsUsed = false
+            },
+            new VerificationCode
+            {
+                Id = Guid.NewGuid(),
+                PhoneNumber = "+380991000002",
+                Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
+                ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+                CreatedAtUtc = TestClock.UtcNow,
+                IsUsed = true,
+                UsedAtUtc = TestClock.UtcNow.AddMinutes(-1)
+            },
+            new VerificationCode
+            {
+                Id = Guid.NewGuid(),
+                PhoneNumber = "+380991000003",
+                Code = OtpCodeHasher.Hash("123456", AuthOptions.DevelopmentOtpPepper),
+                ExpiresAtUtc = TestClock.UtcNow.AddMinutes(-5),
+                CreatedAtUtc = TestClock.UtcNow.AddHours(-1),
+                IsUsed = false
+            });
+        await _context.SaveChangesAsync();
+
+        var handler = BuildVerifyCodeHandler();
+        var attempts = new[]
+        {
+            new VerifyCodeCommand("+380991000001", "999999"), // wrong digits
+            new VerifyCodeCommand("+380991000002", "123456"), // already spent
+            new VerifyCodeCommand("+380991000003", "123456"), // past its deadline
+        };
+
+        var refusals = new List<Exception>();
+        foreach (var attempt in attempts)
+        {
+            try
+            {
+                await handler.HandleAsync(attempt, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                refusals.Add(ex);
+            }
+        }
+
+        refusals.Should().HaveCount(attempts.Length, "every one of the three codes must be refused");
+        refusals.Should().AllBeOfType<UnauthorizedAccessException>();
+        refusals.Select(refusal => refusal.Message).Distinct().Should().ContainSingle()
+            .Which.Should().Be("Invalid or expired verification code");
+    }
+
     [Fact]
     public async Task VerifyCode_ShouldCountFailedAttempt_WhenCodeWrong()
     {

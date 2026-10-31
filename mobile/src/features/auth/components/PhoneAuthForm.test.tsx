@@ -1,6 +1,6 @@
 import React from 'react';
 import { TextInput } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { PhoneAuthForm } from './PhoneAuthForm';
 import type { AuthStep } from '../types';
@@ -39,7 +39,7 @@ jest.mock('../../../core/utils/haptics', () => ({
   },
 }));
 
-function mockLoginAt(step: AuthStep) {
+function mockLoginAt(step: AuthStep, overrides: Record<string, unknown> = {}) {
   mockUseLogin.mockReturnValue({
     step,
     phone: '+380991234567',
@@ -49,13 +49,17 @@ function mockLoginAt(step: AuthStep) {
     loading: false,
     error: '',
     diagResult: '',
+    codeExpired: false,
+    secondsLeft: null,
     setPhone: jest.fn(),
     setCode: jest.fn(),
     setTwoFactorCode: jest.fn(),
     handleSendCode: jest.fn(),
+    handleResendCode: jest.fn(),
     handleVerifyCode: jest.fn(),
     handleVerifyTwoFactor: jest.fn(),
     resetToPhone: jest.fn(),
+    ...overrides,
   });
 }
 
@@ -138,5 +142,51 @@ describe('PhoneAuthForm - the code field', () => {
     expect(screen.queryByText('phoneAuth.twoFactorCodeLabel')).toBeNull();
     expect(screen.getByText('phoneAuth.changePhone')).toBeTruthy();
     expect(screen.queryByText('phoneAuth.startOver')).toBeNull();
+  });
+});
+
+/*
+ * The code dies on a clock. While it lives the step counts it down; once it is gone the step
+ * stops pretending and offers the one action that helps, without a trip back to the phone
+ * step. Both states are copy, so they are pinned here.
+ */
+describe('PhoneAuthForm - the code clock', () => {
+  beforeEach(() => {
+    mockUseLogin.mockReset();
+  });
+
+  it('counts the code down while it is still alive', () => {
+    mockLoginAt('code', { secondsLeft: 300 });
+
+    render(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.getByText('phoneAuth.codeValidFor')).toBeTruthy();
+    expect(screen.queryByText('phoneAuth.codeExpired')).toBeNull();
+    expect(screen.queryByText('phoneAuth.sendNewCode')).toBeNull();
+  });
+
+  it('says the code is gone and offers a new one from the same screen', () => {
+    const handleResendCode = jest.fn();
+    mockLoginAt('code', { codeExpired: true, secondsLeft: 0, handleResendCode });
+
+    render(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.getByText('phoneAuth.codeExpired')).toBeTruthy();
+    // The countdown is about a code that no longer exists.
+    expect(screen.queryByText('phoneAuth.codeValidFor')).toBeNull();
+
+    fireEvent.press(screen.getByText('phoneAuth.sendNewCode'));
+    expect(handleResendCode).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no clock and no expiry on the second factor', () => {
+    // The authenticator code has its own lifetime and its own app; the SMS clock has no
+    // business on that step, even if a stale deadline is still in state.
+    mockLoginAt('two_factor', { secondsLeft: 300 });
+
+    render(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.queryByText('phoneAuth.codeValidFor')).toBeNull();
+    expect(screen.queryByText('phoneAuth.codeExpired')).toBeNull();
   });
 });

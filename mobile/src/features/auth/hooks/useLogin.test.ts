@@ -91,7 +91,11 @@ async function waitForHydration() {
   });
 }
 
-function renderLogin(options?: { initialPhone?: string; initialCode?: string }) {
+function renderLogin(options?: {
+  initialPhone?: string;
+  initialCode?: string;
+  initialCodeExpiresAt?: number;
+}) {
   const queryClient = new QueryClient();
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
@@ -102,7 +106,7 @@ function renderLogin(options?: { initialPhone?: string; initialCode?: string }) 
 describe('useLogin', () => {
   beforeEach(async () => {
     sendVerificationCodeMock.mockReset();
-    sendVerificationCodeMock.mockResolvedValue(undefined);
+    sendVerificationCodeMock.mockResolvedValue({});
     await waitForHydration();
     await act(async () => {
       useStore.setState({ lastPhone: null });
@@ -179,6 +183,170 @@ describe('useLogin', () => {
     });
 
     expect(useStore.getState().lastPhone).toBeNull();
+  });
+
+  /*
+   * The code dies on a clock the person cannot see. The server publishes the lifetime with
+   * every send and the tap path derives a deadline from the push itself, so the screen can
+   * count the digits down, refuse a dead code without spending a verify attempt, and say
+   * "expired" instead of "wrong" when the refusal comes from the clock.
+   */
+  describe('the code clock', () => {
+    const devFlag = (global as any).__DEV__;
+
+    beforeEach(() => {
+      (global as any).__DEV__ = false;
+      verifyPhoneCodeMock.mockReset();
+    });
+
+    afterEach(() => {
+      (global as any).__DEV__ = devFlag;
+      jest.restoreAllMocks();
+    });
+
+    it('counts down from the lifetime the server published', async () => {
+      sendVerificationCodeMock.mockResolvedValue({ expiresInSeconds: 300 });
+
+      const { result } = renderLogin();
+
+      act(() => {
+        result.current.setPhone(REMEMBERED);
+      });
+      await act(async () => {
+        await result.current.handleSendCode();
+      });
+
+      expect(result.current.secondsLeft).toBe(300);
+      expect(result.current.codeExpired).toBe(false);
+    });
+
+    it('shows no clock when the answer published no lifetime', async () => {
+      const { result } = renderLogin();
+
+      act(() => {
+        result.current.setPhone(REMEMBERED);
+      });
+      await act(async () => {
+        await result.current.handleSendCode();
+      });
+
+      expect(result.current.secondsLeft).toBeNull();
+      expect(result.current.codeExpired).toBe(false);
+    });
+
+    it('opens the pushed code as already dead when its deadline has passed', () => {
+      // A banner tapped an hour after delivery. The form must not invite a submit that the
+      // server can only refuse.
+      const { result } = renderLogin({
+        initialPhone: REMEMBERED,
+        initialCode: '123456',
+        initialCodeExpiresAt: Date.now() - 1_000,
+      });
+
+      expect(result.current.step).toBe('code');
+      expect(result.current.codeExpired).toBe(true);
+      expect(result.current.secondsLeft).toBe(0);
+    });
+
+    it('does not spend a verify attempt on a code it already knows is dead', async () => {
+      const { result } = renderLogin({
+        initialPhone: REMEMBERED,
+        initialCode: '123456',
+        initialCodeExpiresAt: Date.now() - 1_000,
+      });
+
+      await act(async () => {
+        await result.current.handleVerifyCode();
+      });
+
+      expect(verifyPhoneCodeMock).not.toHaveBeenCalled();
+      expect(result.current.error).toBe('phoneAuth.codeExpired');
+    });
+
+    it('calls a code that died in flight expired rather than wrong', async () => {
+      // The deadline comes from the push, whose delivery can lag the moment the server
+      // started the clock - so a verify can still be in flight when the digits die. The
+      // server refuses that with its usual 401; the message must blame the clock.
+      let clock = Date.now();
+      const deadline = clock + 500;
+      jest.spyOn(Date, 'now').mockImplementation(() => clock);
+      verifyPhoneCodeMock.mockRejectedValue(
+        Object.assign(new Error('Invalid or expired verification code'), { status: 401 }),
+      );
+
+      const { result } = renderLogin({
+        initialPhone: REMEMBERED,
+        initialCode: '123456',
+        initialCodeExpiresAt: deadline,
+      });
+
+      // The screen still believes the code is alive here; the server does not.
+      expect(result.current.codeExpired).toBe(false);
+      clock = deadline + 1_000;
+
+      await act(async () => {
+        await result.current.handleVerifyCode();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.codeExpired');
+    });
+
+    it('sends a new code from the expired step and starts the clock again', async () => {
+      sendVerificationCodeMock.mockResolvedValue({ expiresInSeconds: 300 });
+
+      const { result } = renderLogin({
+        initialPhone: REMEMBERED,
+        initialCode: '123456',
+        initialCodeExpiresAt: Date.now() - 1_000,
+      });
+
+      await act(async () => {
+        await result.current.handleResendCode();
+      });
+
+      // The old digits are dead server-side, so leaving them on screen would be the same
+      // trap in another place.
+      expect(result.current.code).toBe('');
+      expect(result.current.codeExpired).toBe(false);
+      expect(result.current.secondsLeft).toBe(300);
+      expect(sendVerificationCodeMock).toHaveBeenCalledWith(REMEMBERED);
+    });
+
+    it('surfaces the rate limit on a resend exactly as the first send does', async () => {
+      sendVerificationCodeMock.mockRejectedValue(
+        Object.assign(new Error('RATE_LIMITED'), { status: 429 }),
+      );
+
+      const { result } = renderLogin({
+        initialPhone: REMEMBERED,
+        initialCode: '123456',
+        initialCodeExpiresAt: Date.now() - 1_000,
+      });
+
+      await act(async () => {
+        await result.current.handleResendCode();
+      });
+
+      expect(result.current.error).toBe('phoneAuth.tooManyAttempts');
+      // Still on the code step: the person waits out the limit and taps again, without
+      // retyping a number the form already knows.
+      expect(result.current.step).toBe('code');
+    });
+
+    it('drops the deadline when the person goes back to change the number', () => {
+      const { result } = renderLogin({
+        initialPhone: REMEMBERED,
+        initialCode: '123456',
+        initialCodeExpiresAt: Date.now() - 1_000,
+      });
+
+      act(() => {
+        result.current.resetToPhone();
+      });
+
+      expect(result.current.secondsLeft).toBeNull();
+      expect(result.current.codeExpired).toBe(false);
+    });
   });
 
   /*
