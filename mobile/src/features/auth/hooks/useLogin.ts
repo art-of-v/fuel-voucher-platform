@@ -31,10 +31,15 @@ interface UseLoginReturn {
   loading: boolean;
   error: string;
   diagResult: string;
+  /** True once the deadline the server published for the code has passed. */
+  codeExpired: boolean;
+  /** Whole seconds until the code dies, or null when the deadline is unknown. */
+  secondsLeft: number | null;
   setPhone: (value: string) => void;
   setCode: (value: string) => void;
   setTwoFactorCode: (value: string) => void;
   handleSendCode: () => Promise<void>;
+  handleResendCode: () => Promise<void>;
   handleVerifyCode: () => Promise<void>;
   handleVerifyTwoFactor: () => Promise<void>;
   resetToPhone: () => void;
@@ -44,6 +49,12 @@ interface UseLoginReturn {
 interface UseLoginOptions {
   initialPhone?: string;
   initialCode?: string;
+  /**
+   * When the pushed code dies, in epoch milliseconds. The tap path derives it from the
+   * notification's own delivery time plus the lifetime the push carried, so both ends of the
+   * subtraction come from the same device clock.
+   */
+  initialCodeExpiresAt?: number;
 }
 
 export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseLoginReturn {
@@ -55,6 +66,17 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [diagResult, setDiagResult] = useState('');
+  /*
+   * When the current code dies. Every path that produces a code - the send on this screen, the
+   * resend, and a tap on a push - sets it from the lifetime the server published, never from a
+   * copy hardcoded here: the app and the server must not be able to disagree about when the six
+   * digits stopped being accepted.
+   */
+  const [codeDeadline, setCodeDeadline] = useState<number | null>(
+    options?.initialCodeExpiresAt ?? null,
+  );
+  // A one-second clock for the countdown. It only runs while there is a deadline to count down.
+  const [now, setNow] = useState(() => Date.now());
   const unlockApp = useStore((state) => state.unlockApp);
   const lastPhone = useStore((state) => state.lastPhone);
   const setLastPhone = useStore((state) => state.setLastPhone);
@@ -80,6 +102,24 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
       setPhoneState(lastPhone);
     }
   }, [lastPhone, options?.initialPhone, phone]);
+
+  // The clock behind the countdown. It runs only while a code step is showing a code whose
+  // deadline is known, so a form nobody is looking at does not tick forever.
+  useEffect(() => {
+    if (step !== 'code' || codeDeadline === null) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [step, codeDeadline]);
+
+  const codeExpired = codeDeadline !== null && now >= codeDeadline;
+  const secondsLeft =
+    codeDeadline === null ? null : Math.max(0, Math.ceil((codeDeadline - now) / 1000));
+
+  /** Starts the countdown from the lifetime the server just published. */
+  const startCodeClock = (expiresInSeconds?: number) => {
+    setCodeDeadline(expiresInSeconds ? Date.now() + expiresInSeconds * 1000 : null);
+    setNow(Date.now());
+  };
 
   const setPhone = (value: string) => {
     phoneTouched.current = true;
@@ -117,10 +157,11 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     Keyboard.dismiss();
 
     try {
-      await sendVerificationCode(phone);
+      const sent = await sendVerificationCode(phone);
       // The number worked: remember it, so the next sign-in on this device starts from the
       // number instead of asking for it again. It survives the logout on purpose.
       setLastPhone(phone);
+      startCodeClock(sent?.expiresInSeconds);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setStep('code');
     } catch (err: any) {
@@ -138,9 +179,52 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     }
   };
 
+  /**
+   * Sends a new code to the number already on the form, without leaving the code step.
+   *
+   * <p>
+   * An expired code used to force the person back to the phone step and through «Надіслати
+   * код» again, with the number they had just typed. The number is already known here, and the
+   * old digits are dead server-side (a second send marks the first code used), so the field is
+   * cleared as well - showing six digits that can no longer work would be the same trap in
+   * another place.
+   * </p>
+   */
+  const handleResendCode = async () => {
+    setLoading(true);
+    setError('');
+    Keyboard.dismiss();
+
+    try {
+      const sent = await sendVerificationCode(phone);
+      setCodeState('');
+      startCodeClock(sent?.expiresInSeconds);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setStep('code');
+    } catch (err: any) {
+      if (err?.status === 429) {
+        setError(t('phoneAuth.tooManyAttempts'));
+      } else {
+        reportError(err);
+        setError(t('phoneAuth.networkError'));
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVerifyCode = async () => {
     if (!code.trim() || code.length !== 6) {
       setError(t('phoneAuth.codeRequired'));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+
+    // A code whose deadline has passed cannot be accepted, and asking the server would only
+    // spend one of the five verify attempts to learn what this screen already knows.
+    if (codeExpired) {
+      setError(t('phoneAuth.codeExpired'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -161,7 +245,9 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
       response = await verifyPhoneCode(phone, code);
       logs.push('OK phone verified');
     } catch (err: any) {
-      setError(describeCodeFailure(err, t, logs));
+      setError(
+        describeCodeFailure(err, t, logs, codeDeadline !== null && Date.now() >= codeDeadline),
+      );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setStep('code');
       setLoading(false);
@@ -349,6 +435,9 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     setError('');
     setTwoFactor(null);
     setTwoFactorCodeState('');
+    // The deadline belongs to the code that was on the step being left, not to the next one.
+    setCodeDeadline(null);
+    setNow(Date.now());
   };
 
   return {
@@ -360,10 +449,13 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     loading,
     error,
     diagResult,
+    codeExpired,
+    secondsLeft,
     setPhone,
     setCode,
     setTwoFactorCode,
     handleSendCode,
+    handleResendCode,
     handleVerifyCode,
     handleVerifyTwoFactor,
     resetToPhone,
@@ -414,8 +506,20 @@ function describeTwoFactorFailure(err: any, t: (key: string) => string, logs: st
  * "could not confirm the device", which names the device instead of the six digits the person
  * typed.
  * </p>
+ *
+ * <p>
+ * The server keeps one indistinguishable 401 for a wrong, spent and expired code on purpose, so
+ * the message cannot come from the wire. It comes from the clock the screen already keeps: when
+ * the deadline the server published has passed, the digits were not mistyped - they were late -
+ * and the message says that instead of blaming the person.
+ * </p>
  */
-function describeCodeFailure(err: any, t: (key: string) => string, logs: string[]): string {
+function describeCodeFailure(
+  err: any,
+  t: (key: string) => string,
+  logs: string[],
+  expired: boolean,
+): string {
   logs.push(`ERROR: ${err?.message}`);
   if (__DEV__) {
     // The diagnostic trail is the developer's window into the failure - and it is the only
@@ -426,10 +530,7 @@ function describeCodeFailure(err: any, t: (key: string) => string, logs: string[
     return t('phoneAuth.tooManyAttempts');
   }
   if (err?.status === 401 || err?.status === 400) {
-    // The server refuses a wrong code and an expired one with the same 401 - on purpose, so
-    // the endpoint cannot be used to tell them apart. To the person at the screen the outcome
-    // is the same anyway: the code they entered was not accepted.
-    return t('phoneAuth.verifyFailed');
+    return expired ? t('phoneAuth.codeExpired') : t('phoneAuth.verifyFailed');
   }
   // Anything else is the network's or the server's fault - never the person's code.
   reportError(err);

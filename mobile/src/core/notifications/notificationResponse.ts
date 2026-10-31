@@ -8,13 +8,18 @@ import { useStore } from '../state/appStore';
  * the backend) lives in ./push; this hook wires up what happens when a push is
  * tapped, and how a push is presented while the app is foregrounded.
  *
- * Destination: an "order fulfilled" push carries `type: "order_fulfilled"` and an
- * `orderId` in `data` (see the backend NotificationService), so a tap deep-links to
- * that order in the wallet — `/my-codes?orderId=…`, which expands that order's card.
- * A "fuel was issued to you" push (#150 W3) carries `type: "voucher_issued"` and a
- * `legalEntityId`, and switches the app into that company's worker context before
- * opening the wallet — a worker belongs to several companies now, so the context has
- * to come from the push rather than from whatever was open.
+ * Destinations, one per payload contract:
+ *  - `type: "order_fulfilled"` + `orderId` (see the backend NotificationService) deep-links to
+ *    that order in the wallet — `/my-codes?orderId=…`, which expands that order's card.
+ *  - `type: "voucher_issued"` + `legalEntityId` (#150 W3) switches the app into that company's
+ *    worker context before opening the wallet — a worker belongs to several companies now, so
+ *    the context has to come from the push rather than from whatever was open.
+ *  - `type: "auth_otp"` + `code` + `phone` + `ttlSeconds` opens the sign-in form with the code
+ *    filled (`/landing?otpPhone=…&otpCode=…&otpExpiresAt=…`). The deadline is derived on this
+ *    device — the notification's own delivery time plus the lifetime the push carried — so a
+ *    banner tapped after the code died opens the form already in its expired state instead of
+ *    failing on submit; a push without `ttlSeconds` (an older server) simply opens it without
+ *    a countdown.
  * Any other push, or a malformed payload, falls back to the in-app notifications
  * list `/notifications` (the list from #28a / PR #653). The branch lives in
  * `openTarget`, which reads the tapped response's `notification.request.content.data`.
@@ -65,6 +70,7 @@ export function useNotificationTapRouting(): void {
             legalEntityId?: unknown;
             code?: unknown;
             phone?: unknown;
+            ttlSeconds?: unknown;
           }
         | undefined;
 
@@ -72,6 +78,11 @@ export function useNotificationTapRouting(): void {
       // issued for, so the push carries both and the tap lands on the sign-in form with the
       // code already filled in. A push without a code falls through to the list - a sign-in
       // screen with a half-filled code is worse than the bell.
+      //
+      // The code also dies on a clock, and a banner can sit in Notification Center for hours.
+      // The push carries that lifetime, the notification carries its own delivery time, and
+      // both ends of the subtraction are this device's clock - so the form opens already
+      // knowing a stale code is stale, instead of failing on submit.
       if (
         data?.type === 'auth_otp' &&
         typeof data.code === 'string' &&
@@ -79,9 +90,19 @@ export function useNotificationTapRouting(): void {
         typeof data.phone === 'string' &&
         data.phone
       ) {
+        const deliveredAt = (response?.notification as { date?: unknown } | undefined)?.date;
+        const ttlSeconds =
+          typeof data.ttlSeconds === 'number' && data.ttlSeconds > 0 ? data.ttlSeconds : undefined;
+
         router.push({
           pathname: '/landing',
-          params: { otpPhone: data.phone, otpCode: data.code },
+          params: {
+            otpPhone: data.phone,
+            otpCode: data.code,
+            ...(ttlSeconds !== undefined && typeof deliveredAt === 'number'
+              ? { otpExpiresAt: String(deliveredAt + ttlSeconds * 1000) }
+              : {}),
+          },
         });
         return;
       }

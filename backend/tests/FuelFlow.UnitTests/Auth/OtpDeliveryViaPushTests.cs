@@ -66,12 +66,16 @@ public sealed class OtpDeliveryViaPushTests : IDisposable
         var response = await handler.HandleAsync(new SendCodeCommand(Phone), CancellationToken.None);
 
         response.Success.Should().BeTrue();
+        // The client measures the code's age itself; the number it measures against is the one
+        // the server publishes, never a copy hardcoded in the app.
+        response.ExpiresInSeconds.Should().Be(SendCodeCommandHandler.CodeTtlSeconds);
 
         sent.Should().NotBeNull();
         sent!.Token.Should().Be(DeviceToken);
         sent.Data.Should().NotBeNull();
         sent.Data!["type"].Should().Be("auth_otp");
         sent.Data["phone"].Should().Be(Phone);
+        sent.Data["ttlSeconds"].Should().Be(SendCodeCommandHandler.CodeTtlSeconds);
 
         var deliveredCode = sent.Data["code"].Should().BeOfType<string>().Subject;
         deliveredCode.Should().MatchRegex("^[0-9]{6}$");

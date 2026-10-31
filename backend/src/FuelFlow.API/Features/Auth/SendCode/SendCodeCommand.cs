@@ -20,10 +20,27 @@ namespace FuelFlow.Features.Auth.SendCode;
 
 public sealed record SendCodeCommand(string PhoneNumber);
 
-public sealed record SendCodeResponse(bool Success);
+/// <summary>
+/// The answer to a send-code call. <paramref name="ExpiresInSeconds"/> is the code's lifetime,
+/// the same public constant for every account - it tells the client when the digits it is about
+/// to show stop being accepted (the code step measures that locally and offers a resend instead
+/// of a dead end), and it reveals nothing about the account itself.
+/// </summary>
+public sealed record SendCodeResponse(
+    bool Success,
+    int ExpiresInSeconds = SendCodeCommandHandler.CodeTtlSeconds);
 
 public sealed class SendCodeCommandHandler
 {
+    /// <summary>
+    /// How long a sign-in code stays valid (spec §2). The DB row's deadline, the response field
+    /// and the push payload all read this one value, so the client can never disagree with the
+    /// server about when a code died.
+    /// </summary>
+    public const int CodeTtlSeconds = 5 * 60;
+
+    private static readonly TimeSpan CodeTtl = TimeSpan.FromSeconds(CodeTtlSeconds);
+
     private readonly ApplicationDbContext _context;
     private readonly ISmsService _smsService;
     private readonly IPhoneNumberService _phoneNumberService;
@@ -90,7 +107,7 @@ public sealed class SendCodeCommandHandler
                 Id = Guid.CreateVersion7(),
                 PhoneNumber = phoneNumber,
                 Code = _qaTestAccess.CodeHash!, // already a peppered hash of the configured QA code
-                ExpiresAtUtc = SystemClock.UtcNow.AddMinutes(5),
+                ExpiresAtUtc = SystemClock.UtcNow.Add(CodeTtl),
                 CreatedAtUtc = SystemClock.UtcNow,
                 IsUsed = false
             });
@@ -100,7 +117,7 @@ public sealed class SendCodeCommandHandler
             _logger.LogInformation("QA test-access code issued for the QA account; no SMS sent");
             _metrics?.QaTestAccessSendCode();
 
-            return new SendCodeResponse(true);
+            return new SendCodeResponse(true, CodeTtlSeconds);
         }
 
         var code = ResolveCode();
@@ -109,7 +126,7 @@ public sealed class SendCodeCommandHandler
             Id = Guid.CreateVersion7(),
             PhoneNumber = phoneNumber,
             Code = OtpCodeHasher.Hash(code, _authOptions.Value.OtpPepper),
-            ExpiresAtUtc = SystemClock.UtcNow.AddMinutes(5), // spec §2: verification codes valid for 5 minutes
+            ExpiresAtUtc = SystemClock.UtcNow.Add(CodeTtl), // spec §2: verification codes valid for 5 minutes
             CreatedAtUtc = SystemClock.UtcNow,
             IsUsed = false
         };
@@ -119,7 +136,7 @@ public sealed class SendCodeCommandHandler
 
         await DeliverCodeAsync(phoneNumber, code, cancellationToken);
 
-        return new SendCodeResponse(true);
+        return new SendCodeResponse(true, CodeTtlSeconds);
     }
 
     /// <summary>
@@ -210,6 +227,13 @@ public sealed class SendCodeCommandHandler
     /// rejects on every device, still gets its code over SMS. That is what keeps a device that
     /// never registered - or one whose token went stale - from being locked out.
     /// </para>
+    /// <para>
+    /// The payload is the sign-in contract: <c>type: "auth_otp"</c>, the six-digit <c>code</c>,
+    /// the <c>phone</c> it was issued for and the <c>ttlSeconds</c> it stays valid. Together they
+    /// take a tap to <c>/landing?otpPhone=…&amp;otpCode=…&amp;otpExpiresAt=…</c>, where the last
+    /// value is measured on the device (the notification's own delivery time plus the lifetime);
+    /// see <c>mobile/src/core/notifications/notificationResponse.ts</c>.
+    /// </para>
     /// </remarks>
     /// <returns>True when the code went out over push; false when SMS has to carry it.</returns>
     private async Task<bool> TryDeliverViaPushAsync(string phoneNumber, string code, CancellationToken cancellationToken)
@@ -237,7 +261,11 @@ public sealed class SendCodeCommandHandler
         {
             ["type"] = "auth_otp",
             ["code"] = code,
-            ["phone"] = phoneNumber
+            ["phone"] = phoneNumber,
+            // How long the digits live. The tap path measures the age of the notification itself
+            // (same device clock on both ends), so a banner left in Notification Center past the
+            // deadline opens the form knowing the code is dead instead of failing on submit.
+            ["ttlSeconds"] = CodeTtlSeconds
         };
 
         // Ukrainian, like the SMS copy and the other pushes the platform sends.

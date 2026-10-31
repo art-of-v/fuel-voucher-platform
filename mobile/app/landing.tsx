@@ -17,8 +17,15 @@ export default function LandingScreen() {
 
   // A sign-in code that arrived by push lands here through the tap routing (see
   // src/core/notifications/notificationResponse): the phone and the code come with the
-  // navigation, so the form starts on the code step instead of asking for both again.
-  const { otpPhone, otpCode } = useLocalSearchParams<{ otpPhone?: string; otpCode?: string }>();
+  // navigation, so the form starts on the code step instead of asking for both again. The
+  // deadline comes with them when the push carried the code's lifetime - a banner tapped an
+  // hour later opens the form already knowing the digits are dead.
+  const { otpPhone, otpCode, otpExpiresAt } = useLocalSearchParams<{
+    otpPhone?: string;
+    otpCode?: string;
+    otpExpiresAt?: string;
+  }>();
+  const codeExpiresAt = otpExpiresAt ? Number(otpExpiresAt) : undefined;
 
   if (isAuthenticated && !isLoading) {
     return <Redirect href="/" />;
@@ -40,6 +47,11 @@ export default function LandingScreen() {
           <PhoneAuthForm
             initialPhone={otpPhone}
             initialCode={otpCode}
+            initialCodeExpiresAt={
+              typeof codeExpiresAt === 'number' && Number.isFinite(codeExpiresAt)
+                ? codeExpiresAt
+                : undefined
+            }
             onSuccess={() => {
               login();
               router.replace('/');

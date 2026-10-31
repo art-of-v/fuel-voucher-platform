@@ -31,9 +31,31 @@ describe('sendVerificationCode', () => {
     await expect(sendVerificationCode('')).rejects.not.toMatchObject({ status: 429 });
   });
 
-  it('resolves on success', async () => {
+  it('passes on the lifetime the server published for the code', async () => {
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, expiresInSeconds: 300 }),
+    });
+
+    await expect(sendVerificationCode('+380991110001')).resolves.toEqual({ expiresInSeconds: 300 });
+  });
+
+  it('resolves without a lifetime when the answer does not publish one', async () => {
+    // The code has been sent either way; a body that cannot be read (or predates the
+    // deadline) must not turn a successful send into a failure.
     mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
 
-    await expect(sendVerificationCode('+380991110001')).resolves.toBeUndefined();
+    await expect(sendVerificationCode('+380991110001')).resolves.toEqual({});
+  });
+
+  it('ignores a lifetime that is not a positive number', async () => {
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ expiresInSeconds: -1 }),
+    });
+
+    await expect(sendVerificationCode('+380991110001')).resolves.toEqual({});
   });
 });
