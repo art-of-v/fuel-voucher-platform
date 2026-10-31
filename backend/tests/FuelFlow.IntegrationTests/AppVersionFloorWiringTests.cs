@@ -60,6 +60,21 @@ public class AppVersionFloorWiringTests : WebApplicationFactory<Program>, IClass
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    /// <summary>
+    /// The public reads are cached for 300s, and the cache key does not know which build asked.
+    /// The refusal must run before it - a cached 200 replayed to a stale client is the refusal
+    /// never being sent at all.
+    /// </summary>
+    [Fact]
+    public async Task A_Cached_Reading_Does_Not_Replace_The_Refusal()
+    {
+        (await Send("/api/brands", "mobile", "99.0.0")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var response = await Send("/api/brands", "mobile", "0.0.1");
+
+        response.StatusCode.Should().Be(HttpStatusCode.UpgradeRequired);
+    }
+
     private async Task<HttpResponseMessage> Send(string path, string platform, string version)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);

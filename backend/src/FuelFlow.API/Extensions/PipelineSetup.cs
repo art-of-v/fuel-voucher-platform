@@ -21,11 +21,12 @@ internal static class PipelineSetup
         // needs to read the status; before the rate limiter, so an oversized body is refused
         // before it costs anything.
         app.UseMiddleware<RequestSizeLimitMiddleware>();
-        app.UseResponseCaching();
-        // Before authentication: an outdated build is told to update, not handed an auth failure
-        // it cannot tell from a wrong password (planning #728). After CORS, so the refusal still
-        // carries the headers a browser needs to read the status.
+        // The update floor. Before the response cache, so a cached 200 for a public endpoint
+        // cannot be replayed to a stale client instead of the 426 that tells it to update - the
+        // public reads are exactly the ones cached for 300s. Before authentication, so the
+        // refusal is not pre-empted by a 401 the client reads as a wrong password (planning #728).
         app.UseMiddleware<AppVersionFloorMiddleware>();
+        app.UseResponseCaching();
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseMiddleware<SessionValidationMiddleware>();
