@@ -240,25 +240,8 @@ public sealed class AttestationMiddleware
 
         var appVersion = Header(context, AppVersionHeader);
 
-        return VersionAtLeast(appVersion, settings.MinimumEnforcedAppVersion);
+        return AppVersionOptions.Compare(appVersion, settings.MinimumEnforcedAppVersion) >= 0;
     }
-
-    private static bool VersionAtLeast(string? actual, string minimum)
-    {
-        if (!Version.TryParse(actual, out var actualVersion)
-            || !Version.TryParse(minimum, out var minimumVersion))
-        {
-            return false;
-        }
-
-        return Normalize(actualVersion) >= Normalize(minimumVersion);
-    }
-
-    private static Version Normalize(Version version) => new(
-        version.Major,
-        version.Minor,
-        Math.Max(version.Build, 0),
-        Math.Max(version.Revision, 0));
 
     private static async Task<string> ReadBodyAsync(HttpContext context)
     {

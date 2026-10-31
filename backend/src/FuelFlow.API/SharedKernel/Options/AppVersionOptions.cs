@@ -51,4 +51,28 @@ public sealed class AppVersionOptions
 
     public string IosStoreUrl { get; set; } = string.Empty;
     public string AndroidStoreUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Compares two marketing versions the way the release rules read them: <c>1.1</c> and
+    /// <c>1.1.0</c> are the same version, because the header a client sends and the floor a
+    /// deployment configures may spell the same number differently. Returns <c>null</c> when either
+    /// side does not parse, so each caller decides what an unknown version means - the attestation
+    /// rollout does not enforce it, and the update floor does not refuse it.
+    /// </summary>
+    public static int? Compare(string? left, string? right)
+    {
+        if (!Version.TryParse(left, out var leftVersion)
+            || !Version.TryParse(right, out var rightVersion))
+        {
+            return null;
+        }
+
+        return Normalize(leftVersion).CompareTo(Normalize(rightVersion));
+    }
+
+    private static Version Normalize(Version version) => new(
+        version.Major,
+        version.Minor,
+        Math.Max(version.Build, 0),
+        Math.Max(version.Revision, 0));
 }
