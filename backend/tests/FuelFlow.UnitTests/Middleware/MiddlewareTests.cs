@@ -172,6 +172,51 @@ public sealed class MiddlewareTests : IDisposable
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
 
+    /// <summary>
+    /// The revocation path a token without a version takes. A ban, a delete, a role change and a
+    /// logout-everywhere all work by moving <c>users.token_version</c>, so a request whose token
+    /// names no version cannot be compared against it - and used to be let through anyway, because
+    /// the mismatch check only ran when the parse succeeded.
+    /// </summary>
+    [Fact]
+    public async Task InvokeAsync_ShouldReturn401_WhenTokenCarriesNoVersionClaim()
+    {
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(userId, isActive: true, tokenVersion: 3);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, userId.ToString())],
+            "TestAuth"));
+        var context = CreateHttpContext(principal);
+
+        var nextCalled = false;
+        var middleware = new SessionValidationMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<SessionValidationMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context, _context);
+
+        nextCalled.Should().BeFalse();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldReturn401_WhenTokenVersionClaimIsNotANumber()
+    {
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(userId, isActive: true, tokenVersion: 3);
+        var context = CreateHttpContext(AuthenticatedPrincipal(userId, "not-a-version"));
+
+        var nextCalled = false;
+        var middleware = new SessionValidationMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<SessionValidationMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context, _context);
+
+        nextCalled.Should().BeFalse();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
     [Fact]
     public async Task InvokeAsync_ShouldAllowSession_WhenUserInactive()
     {
