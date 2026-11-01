@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.SharedKernel.Output;
 
 namespace FuelFlow.Features.Ledger.GetTrialBalance;
 
@@ -124,6 +125,16 @@ public static class TrialBalanceCsv
 
     private static string N(decimal value) => value.ToString("0.00", CultureInfo.InvariantCulture);
 
-    private static string Q(string? value)
-        => value is null ? string.Empty : "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+    /// <summary>
+    /// One cell of TEXT. The guard is <see cref="CsvCell.Text"/>, the same one the reconciliation act
+    /// and the panel's exporter use, because this file is opened in a spreadsheet by the same
+    /// accountant: a cell that starts with <c>=</c> is a formula there, whatever put it there.
+    /// </summary>
+    /// <remarks>
+    /// Nothing a payer types reaches these columns today - they are our chart of accounts plus the
+    /// acquirer's own <c>InvoiceId</c> and <c>Rrn</c> - so this closes the rule, not a live path. An
+    /// absent value now writes <code>""</code> where it used to write nothing between the commas; a
+    /// spreadsheet reads the two identically.
+    /// </remarks>
+    private static string Q(string? value) => CsvCell.Text(value);
 }

