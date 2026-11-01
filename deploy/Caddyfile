@@ -49,6 +49,21 @@
 	respond @hangfire 404
 }
 
+# RFC 9116 security.txt, served by the edge instead of by three containers: one copy, so a
+# researcher who reads it on the API domain reads exactly what the panel serves.
+#
+# `Contact` is the public support form because the zone carries no MX record (docs/DNS.md) -
+# a mailto: would name a mailbox that cannot receive the report.
+#
+# `Expires` is mandatory and must be less than a year away. SecurityTxtGuardTests fails once it
+# is past, which is the renewal reminder rather than a silently expired promise.
+(security_txt) {
+	respond /.well-known/security.txt `Contact: https://palne.shop/support
+Expires: 2027-05-01T00:00:00.000Z
+Preferred-Languages: uk, en
+`
+}
+
 # --- Admin dashboard (React SPA) ---
 # The nginx inside admin-frontend also proxies /api to the backend, so the dashboard
 # talks to the API on its own origin.
@@ -102,6 +117,7 @@
 	# registered on no other network, so it resolves to exactly one container - and if it is ever
 	# wrong, it fails loudly with a 502 instead of silently serving the other stack.
 	route {
+		import security_txt
 		import internal_only
 		reverse_proxy @admin_api fuelflow-admin:5000
 		respond @any_api 404
@@ -137,6 +153,7 @@
 	header @email_confirm Content-Security-Policy "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	header @api_default Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
+	import security_txt
 	import internal_only
 
 	reverse_proxy fuelflow-backend:8080
@@ -177,6 +194,7 @@ palne.shop, www.palne.shop {
 	@any_api path /api /api/*
 
 	route {
+		import security_txt
 		reverse_proxy @support_api fuelflow-backend:8080
 		respond @any_api 404
 		reverse_proxy fuelflow-website:5001
