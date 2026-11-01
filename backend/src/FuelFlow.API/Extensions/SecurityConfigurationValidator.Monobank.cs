@@ -16,6 +16,33 @@ internal static partial class SecurityConfigurationValidator
         var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false;
         var monobankPublicKey = configuration["Monobank:PublicKey"] ?? "";
 
+        // A Production host that is not taking money is not the payment system it was deployed as:
+        // checkout runs against the in-process mock, and the webhook endpoint refuses every
+        // delivery because there is no acquirer here that could have signed one. That used to be a
+        // state the host could enter silently - Monobank:Enabled is a plain flag, and an env file
+        // that lost it produced a host that looked healthy while accepting unsigned "paid"
+        // callbacks from anyone. Like the reconciliation guard, this is acknowledge-to-disable
+        // rather than a hard refusal: stopping payments on purpose (maintenance, an acquirer
+        // migration) is a legitimate state, and it is the state that has to be stated.
+        if (!monobankEnabled)
+        {
+            var acknowledged = configuration.GetValue<bool>("Monobank:AcknowledgeDisabledInProduction");
+            if (!acknowledged)
+            {
+                throw new InvalidOperationException(
+                    "Refusing to start: Monobank:Enabled is false in Production, so no customer can "
+                    + "pay and the payment webhook refuses every delivery. Either set "
+                    + "Monobank__Enabled=true with the live merchant credentials, or set "
+                    + "Monobank__AcknowledgeDisabledInProduction=true to run without payments as a "
+                    + "deliberate, recorded decision.");
+            }
+
+            Log.Warning(
+                "PAYMENTS: Monobank is disabled in Production by explicit acknowledgement. Checkout "
+                + "runs against the in-process mock and the webhook endpoint refuses every delivery; "
+                + "no money is taken and no paid order can be fulfilled through it.");
+        }
+
         if (monobankEnabled &&
             (string.IsNullOrWhiteSpace(monobankPublicKey)
              || monobankPublicKey.Contains("PRODUCTION_PUBLIC_KEY_HERE", StringComparison.OrdinalIgnoreCase)

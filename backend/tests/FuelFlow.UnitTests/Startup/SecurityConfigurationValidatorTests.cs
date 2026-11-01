@@ -98,11 +98,54 @@ public sealed class SecurityConfigurationValidatorTests
     public void Validate_DoesNotThrow_WhenMonobankDisabled_EvenIfReconciliationOff()
     {
         // Reconciliation only matters while payments are enabled; with Monobank off the net is moot.
+        // The off state itself is acknowledged here so the payments guard is not what this asserts.
         var settings = ValidProductionBaseline();
         settings["Monobank:Enabled"] = "false";
+        settings["Monobank:AcknowledgeDisabledInProduction"] = "true";
         settings["Monobank:ReconciliationEnabled"] = "false";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenMonobankIsDisabled_AndNotAcknowledged()
+    {
+        // The finding: an env file that lost the flag used to produce a host that looked healthy
+        // while the webhook accepted unsigned "paid" callbacks from anyone, and checkout ran
+        // against the mock. A host that is not taking money must say so.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Enabled"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Monobank:Enabled is false in Production*")
+            .WithMessage("*AcknowledgeDisabledInProduction*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenMonobankIsDisabled_ButAcknowledged()
+    {
+        // Maintenance or an acquirer migration is a real reason to stop taking money; it just has
+        // to be a decision written down rather than a default nobody re-reads.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Enabled"] = "false";
+        settings["Monobank:AcknowledgeDisabledInProduction"] = "true";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenStagingRunsWithoutPayments()
+    {
+        // Staging's compose ships payments off by default and has no customer money to protect.
+        // The refusal is a Production rule, like every other guard in this validator.
+        var settings = ValidProductionBaseline();
+        settings["Monobank:Enabled"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Staging"));
         act.Should().NotThrow();
     }
 
@@ -230,6 +273,7 @@ public sealed class SecurityConfigurationValidatorTests
         // The gate only endangers a paying customer while payments are live.
         var settings = ValidProductionBaseline();
         settings["Monobank:Enabled"] = "false";
+        settings["Monobank:AcknowledgeDisabledInProduction"] = "true";
         settings["VoucherExpiration:Enabled"] = "false";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
@@ -317,8 +361,11 @@ public sealed class SecurityConfigurationValidatorTests
     [Fact]
     public void Validate_DoesNotThrow_WhenMonobankDisabled_EvenOnATestToken()
     {
+        // No payments are being taken at all, so a test token changes nothing - and the off state
+        // is acknowledged, which is the guard that owns the "payments are off" question.
         var settings = ValidProductionBaseline();
         settings["Monobank:Enabled"] = "false";
+        settings["Monobank:AcknowledgeDisabledInProduction"] = "true";
         settings["Monobank:Token"] = "test_abc123";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());

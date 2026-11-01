@@ -37,7 +37,8 @@ public sealed class MonobankWebhookController : ControllerBase
 
     /// <remarks>
     /// Monobank signs the raw request body with its private key; X-Sign carries the base64 signature.
-    /// When Monobank is enabled we fail closed: missing or invalid signatures are rejected with 401.
+    /// Missing or invalid signatures are rejected with 401, and a host with payments off refuses
+    /// the delivery outright (503) rather than processing an unsigned body.
     /// <para>
     /// [AllowAnonymous] is explicit, not incidental: the caller is Monobank, which authenticates by
     /// signature rather than by bearer token, and AuthSetup installs a RequireAuthenticatedUser
@@ -50,6 +51,18 @@ public sealed class MonobankWebhookController : ControllerBase
     [EnableRateLimiting(MonobankWebhookPolicy)]
     public async Task<IActionResult> ProcessWebhook(CancellationToken cancellationToken)
     {
+        // A host with payments off has no acquirer that could have signed a delivery, so an
+        // unsigned body here can only be someone else's. Processing it - which this used to do,
+        // with a warning - lets any caller name an invoice and declare it paid. Production cannot
+        // enter this state without Monobank__AcknowledgeDisabledInProduction (see
+        // SecurityConfigurationValidator), and even then the endpoint stays closed.
+        if (!_options.Enabled)
+        {
+            _logger.LogError(
+                "Monobank webhook refused: Monobank:Enabled is false on this host, so no delivery can be verified");
+            return ApiError.ServiceUnavailable("Monobank payments are not enabled on this host.");
+        }
+
         try
         {
             Request.EnableBuffering();
@@ -65,18 +78,10 @@ public sealed class MonobankWebhookController : ControllerBase
             var signature = Request.Headers["X-Sign"].FirstOrDefault();
             var keyId = Request.Headers["X-Key-Id"].FirstOrDefault();
 
-            if (_options.Enabled)
+            var verification = VerifySignature(signature, keyId, rawBody);
+            if (verification != null)
             {
-                var verification = VerifySignature(signature, keyId, rawBody);
-                if (verification != null)
-                {
-                    return verification;
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Monobank webhook processed WITHOUT signature verification (Monobank:Enabled is false)");
+                return verification;
             }
 
             var webhookData = JsonSerializer.Deserialize<MonobankWebhookPayload>(rawBody, new JsonSerializerOptions

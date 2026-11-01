@@ -117,6 +117,8 @@ services:
       # Payments OFF by default: staging must never take a real charge. Flip Enabled=true and
       # supply Monobank SANDBOX credentials in .env.staging to exercise the payment flow.
       Monobank__Enabled: ${MONOBANK_ENABLED:-false}
+      # Staging is exempt from the Production boot guard; kept here so the two files match.
+      Monobank__AcknowledgeDisabledInProduction: ${MONOBANK_ACKNOWLEDGE_DISABLED_IN_PRODUCTION:-false}
       Monobank__BaseUrl: ${MONOBANK_BASE_URL:-https://api.monobank.ua}
       Monobank__Token: ${MONOBANK_TOKEN:-}
       Monobank__PublicKey: ${MONOBANK_PUBLIC_KEY:-}
