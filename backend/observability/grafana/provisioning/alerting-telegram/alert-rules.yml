@@ -763,3 +763,47 @@ groups:
               expression: B
               conditions:
                 - evaluator: { type: gt, params: [0] }
+
+  - orgId: 1
+    name: fuelflow-updates
+    folder: FuelFlow
+    interval: 5m
+    rules:
+      # An OTA channel holds one manifest per platform and runtime version, and the publisher signs
+      # the commit it was built from into it. The API compares that commit time with the last one it
+      # served for the same pair (ServedManifestTracker, F-13). A rise here means every install
+      # asking for that runtime was handed older JavaScript than it already had: a publish from a
+      # stale checkout, a hand-repaired object, or a deliberate --allow-downgrade. The script refuses
+      # the first case, so what reaches this counter is the fleet actually moving backward - which is
+      # worth a person looking at the channel, not a trend line.
+      - uid: fuelflow-ota-manifest-rollback
+        title: OtaManifestRollback
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "An OTA channel is serving an older manifest"
+          description: "The OTA manifest for one platform and runtime version is older than the one served before it. Every install asking for that runtime is receiving older JavaScript than it already had."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: sum by (service, environment) (increase(fuelflow_updates_manifest_rollback_events_total[15m])) or vector(0)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

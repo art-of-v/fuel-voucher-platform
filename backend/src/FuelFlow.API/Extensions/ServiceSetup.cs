@@ -601,6 +601,10 @@ var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
         services.AddOutboundHttpClient<UpdateManifestSource>(
             OutboundHttpClient.TimeoutOrDefault(updates?.TimeoutSeconds ?? UpdatesOptions.DefaultTimeoutSeconds),
             OutboundCallKind.Read);
+
+        // Serving side of the OTA rollback guard (F-13): records the manifest each channel serves and
+        // warns when it goes backward. Scoped because it reads app_settings through the DbContext.
+        services.AddScoped<ServedManifestTracker>();
     }
 
     internal static IServiceCollection AddCorsPolicy(this IServiceCollection services, IConfiguration configuration)
