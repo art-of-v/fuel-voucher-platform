@@ -60,6 +60,11 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .IsRequired()
             .HasComment(                "When the token stops being valid.");
 
+        builder.Property(e => e.AbsoluteExpiresAtUtc)
+            .HasColumnName("absolute_expires_at_utc")
+            .HasComment(                "The hard stop for a staff panel session, whatever its sliding window says. NULL for " +
+                    "every other token and for panel sessions issued before the ceiling existed.");
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired()

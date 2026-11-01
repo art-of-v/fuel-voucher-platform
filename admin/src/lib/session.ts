@@ -199,3 +199,23 @@ export async function signOut(): Promise<void> {
     store.signOut();
   }
 }
+
+/**
+ * Sign out because nobody has touched the panel for {@link IDLE_LOCK_MINUTES} minutes.
+ *
+ * <p>
+ * The difference from a deliberate sign-out is only what the login screen says afterwards; the
+ * server-side effect has to be the same. Hiding the dashboard while leaving the refresh cookie
+ * alive would let a reload - or an idle-timeout that never fires because the script is broken -
+ * walk straight back into the session, which is the failure this exists to prevent.
+ * </p>
+ */
+export async function signOutForInactivity(): Promise<void> {
+  const store = useSession.getState();
+  try {
+    await revokeSessionOnServer();
+  } finally {
+    clearTokens();
+    store.signOutForInactivity();
+  }
+}

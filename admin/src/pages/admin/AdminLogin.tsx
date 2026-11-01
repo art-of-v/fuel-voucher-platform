@@ -10,6 +10,7 @@ import { type CurrentUser } from "@/lib/admin-auth";
 import { useTheme } from "@/lib/theme-store";
 import { themes } from "@/lib/themes";
 import { errorMessage } from "@/lib/error-message";
+import { IDLE_LOCK_MINUTES } from "@/lib/idle-lock";
 
 // The app is Ukrainian-only for now, so every admin's phone starts with the same country code.
 // Prefill it so the operator types only the subscriber digits instead of re-entering "+380" on
@@ -44,6 +45,7 @@ export default function AdminLogin() {
   const theme = useTheme((s) => s.theme);
   const status = useSession((s) => s.status);
   const blocker = useSession((s) => s.blocker);
+  const lastExit = useSession((s) => s.lastExit);
 
   const [loginPhone, setLoginPhone] = useState(UA_DIAL_PREFIX);
   const [loginCode, setLoginCode] = useState("");
@@ -173,6 +175,16 @@ export default function AdminLogin() {
         <h1 className="text-2xl font-bold mb-6 text-center">
           <span className="glass-text-gradient">Admin Login</span>
         </h1>
+
+        {lastExit === "idle" && (
+          <p
+            role="status"
+            className="text-center text-sm mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-200"
+          >
+            You were signed out after {IDLE_LOCK_MINUTES} minutes without
+            activity. Sign in again to continue.
+          </p>
+        )}
 
         {unauthorized ? (
           <>

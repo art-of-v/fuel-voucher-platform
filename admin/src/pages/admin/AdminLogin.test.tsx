@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AdminLogin from "./AdminLogin";
 import { sendCode, signInWithCode } from "@/lib/session";
+import { useSession } from "@/lib/session-store";
 
 vi.mock("@/lib/session", () => ({
   sendCode: vi.fn().mockResolvedValue(undefined),
@@ -65,5 +66,23 @@ describe("AdminLogin", () => {
     expect(screen.getByText("JBSWY3DPEHPK3PXP")).toBeInTheDocument();
     await user.type(field, "654321");
     expect(screen.getByRole("button", { name: "Verify Code" })).toBeEnabled();
+  });
+
+  it("says why the session ended when the idle lock signed the operator out", () => {
+    // A lock that returns the operator to a plain login form reads like a crash. The store knows
+    // the reason, so the screen says it; a deliberate sign-out leaves it blank.
+    useSession.setState({ status: "anonymous", lastExit: "idle" });
+    render(<AdminLogin />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /signed out after 15 minutes without activity/i,
+    );
+  });
+
+  it("does not blame idleness for a deliberate sign-out", () => {
+    useSession.setState({ status: "anonymous", lastExit: null });
+    render(<AdminLogin />);
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

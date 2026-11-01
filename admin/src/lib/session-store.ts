@@ -90,11 +90,19 @@ export interface SessionState {
   user: import("./admin-auth").CurrentUser | null;
   /** Set while the session is unavailable for a reason that is not a sign-out. */
   blocker: SessionBlocker | null;
+  /**
+   * Why the last session ended, when the reason is worth telling the operator. A deliberate
+   * sign-out says nothing; the inactivity lock does, because otherwise the login form looks like
+   * the operator was thrown out for no reason.
+   */
+  lastExit: "idle" | null;
 
   /** Transition to an authenticated session with its user. */
   authenticate: (user: import("./admin-auth").CurrentUser) => void;
   /** Transition to signed-out. Clears the marker so the next load costs nothing. */
   signOut: () => void;
+  /** Signed out by the inactivity lock, rather than by the operator. */
+  signOutForInactivity: () => void;
   /** Transition to a blocked session (rate limit / outage) without losing the token. */
   block: (blocker: SessionBlocker) => void;
   /** Clear a blocker and re-run the boot decision. */
@@ -105,15 +113,21 @@ export const useSession = create<SessionState>((set) => ({
   status: "booting",
   user: null,
   blocker: null,
+  lastExit: null,
 
   authenticate: (user) => {
     setSessionMarker();
-    set({ status: "authenticated", user, blocker: null });
+    set({ status: "authenticated", user, blocker: null, lastExit: null });
   },
 
   signOut: () => {
     clearSessionMarker();
-    set({ status: "anonymous", user: null, blocker: null });
+    set({ status: "anonymous", user: null, blocker: null, lastExit: null });
+  },
+
+  signOutForInactivity: () => {
+    clearSessionMarker();
+    set({ status: "anonymous", user: null, blocker: null, lastExit: "idle" });
   },
 
   block: (blocker) => set({ blocker }),

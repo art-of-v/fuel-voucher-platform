@@ -388,6 +388,16 @@ public sealed class VerifyCodeCommandHandler
             ? issuedAt.Add(RefreshTokenPurposePolicy.DeviceBindingWindow)
             : issuedAt.AddDays(_jwtOptions.RefreshTokenExpirationDays);
 
+        // A staff account signing in from a browser is a panel session, and that kind of session
+        // gets an absolute ceiling on top of its sliding window: it cannot outlive one working
+        // day no matter how often it is refreshed. Native sessions are device-bound and are
+        // minted by the challenge flow instead, so they are deliberately not capped here.
+        var absoluteExpiresAt = purpose == RefreshTokenPurpose.Session
+            && SeedRoles.IsStaff(user.Role?.Name)
+            && _jwtOptions.StaffSessionLifetimeHours > 0
+                ? issuedAt.AddHours(_jwtOptions.StaffSessionLifetimeHours)
+                : (DateTime?)null;
+
         var refreshToken = new RefreshToken
         {
             Id = Guid.CreateVersion7(),
@@ -401,6 +411,7 @@ public sealed class VerifyCodeCommandHandler
             Purpose = purpose,
             Token = SecretsHasher.Hash(refreshTokenValue),
             ExpiresAtUtc = expiresAt,
+            AbsoluteExpiresAtUtc = absoluteExpiresAt,
             CreatedAtUtc = issuedAt,
             IsRevoked = false
         };
