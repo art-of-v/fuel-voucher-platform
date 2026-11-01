@@ -15,6 +15,9 @@
  *      the native build uses (expo-updates fingerprint:generate) so the descriptor is published
  *      under the exact hash the installed build asks for. Pass --runtime-version <hash> to override
  *      it and target a build this checkout cannot reproduce (see LEGACY TARGETS below).
+ *   0b. Stamps the commit this bundle was built from into the SIGNED manifest
+ *      (metadata.commit / metadata.committedAt), then refuses to publish when that commit is an
+ *      ancestor of the one the channel serves right now (see ROLLBACK GUARD below).
  *   1. expo export (iOS) -> dist/
  *   2. Builds an expo-updates protocol-v1 manifest from dist/metadata.json, content-addressing
  *      the JS bundle and every asset by SHA-256.
@@ -40,6 +43,25 @@
  *   as "Manifest request for {Platform}/{RuntimeVersion}" (Information), so an absent fingerprint in
  *   that log means there is nobody to reach and the publish would be theatre.
  *
+ * ROLLBACK GUARD (--allow-downgrade):
+ *   A channel holds exactly ONE descriptor per (platform, runtimeVersion) and publishing overwrites
+ *   it. Nothing between this script and the phone compares the new descriptor with the old one -
+ *   not the API, which relays bytes, and not the client, which checks the signature an old but
+ *   genuinely signed bundle passes - so running the publisher from a stale checkout replaces newer
+ *   JavaScript with older JavaScript on every install of that runtime, silently.
+ *
+ *   Before exporting, this script therefore reads the descriptor it is about to replace, decodes
+ *   the signed manifest and compares commits with `git merge-base --is-ancestor`:
+ *     - the new commit is an ANCESTOR of the served one -> REFUSED. --allow-downgrade publishes
+ *       anyway and prints exactly what is being replaced.
+ *     - the histories are unrelated -> a loud warning, not a refusal: the served code is simply
+ *       not part of this bundle, which is sometimes what rebuilding a channel means.
+ *     - the served descriptor carries no commit (published before this stamp) -> unverifiable,
+ *       warned, published.
+ *   The stamp lives inside the signed manifest on purpose: the API and the bucket relay bytes, so
+ *   it is the one field that cannot be rewritten on the publishing path. The API reads it back and
+ *   alerts if it ever sees a commit older than the last one served (Features/Updates).
+ *
  *
  * REQUIREMENTS (Mac, one-time): rclone configured with a scoped Object-R/W token for the public
  *   OTA bucket, the private key at keys/private-key.pem, and these env vars:
@@ -58,6 +80,8 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { classifyPublish, servedStampFrom, VERDICTS } from './ota-publish-guard.mjs';
 
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = join(mobileRoot, 'dist');
@@ -139,6 +163,9 @@ const forcedRuntimeVersion = readArg('--runtime-version')?.trim();
 if (flagGiven && (!forcedRuntimeVersion || forcedRuntimeVersion.startsWith('--'))) {
   die('--runtime-version needs a fingerprint hash: --runtime-version <hash>');
 }
+// The one way past the rollback guard. A flag rather than a prompt because the publisher is often
+// run non-interactively, and because typing it is the last checkpoint before the fleet moves back.
+const allowDowngrade = argv.includes('--allow-downgrade');
 
 const resolveRuntimeVersion = () => {
   if (forcedRuntimeVersion) {
@@ -202,6 +229,159 @@ const resolveRuntimeVersion = () => {
 const runtimeVersion = resolveRuntimeVersion();
 const legacyTarget = Boolean(forcedRuntimeVersion);
 const { keyid = 'main', alg = 'rsa-v1_5-sha256' } = appConfig.updates?.codeSigningMetadata ?? {};
+
+// --- 0b. stamp the build, and refuse to roll the channel back --------------------------
+// Everything below runs BEFORE `expo export` on purpose: a refused publish should cost seconds,
+// not a full export, and nothing must touch the bucket until the comparison has been made.
+const git = (args) =>
+  execFileSync('git', args, { cwd: mobileRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+const gitSucceeds = (args) => {
+  try {
+    git(args);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const descriptorKey = `${PLATFORM}/${runtimeVersion}/update.json`;
+
+const resolveBuildStamp = () => {
+  try {
+    return {
+      commit: git(['rev-parse', 'HEAD']),
+      committedAt: git(['show', '-s', '--format=%cI', 'HEAD']),
+      dirty: git(['status', '--porcelain']).length > 0,
+    };
+  } catch (error) {
+    die(
+      'Could not read the commit this bundle is built from, so the published manifest could not\n' +
+        'say what it contains and a rollback could not be recognised later. Publish from a git\n' +
+        'checkout of the tree you are shipping.\n\n' +
+        `${error.stderr ?? error.message ?? ''}`
+    );
+  }
+};
+
+// rclone exits 3 (directory not found) or 4 (file not found) when nothing was ever published for
+// this runtime. Any other failure - auth, network - is NOT "no baseline": treating it as one would
+// switch the guard off exactly when it cannot see, which is the state an accident needs.
+const readServedDescriptor = () => {
+  let raw;
+  try {
+    raw = execFileSync('rclone', ['cat', `${remote}/${descriptorKey}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    if (error.status === 3 || error.status === 4) return null;
+    die(
+      `Could not read the descriptor this channel serves (${remote}/${descriptorKey}), and\n` +
+        'publishing without reading it is how a rollback becomes invisible. Fix the rclone access\n' +
+        'and publish again.\n\n' +
+        `${error.stderr ?? error.message ?? ''}`
+    );
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.warn(
+      `\n!! The descriptor at ${remote}/${descriptorKey} is not JSON, so what it was built from\n` +
+        '   cannot be read. Publishing over it repairs the channel; the rollback comparison is\n' +
+        '   skipped for this publish.\n'
+    );
+    return null;
+  }
+};
+
+const describeStamp = (stamp) =>
+  stamp.commit
+    ? `${stamp.commit.slice(0, 12)}${stamp.committedAt ? ` (committed ${stamp.committedAt})` : ''}`
+    : 'no recorded commit';
+
+const guardAgainstRollback = () => {
+  const stamp = resolveBuildStamp();
+  if (stamp.dirty) {
+    console.warn(
+      '\n!! This checkout has uncommitted changes, so the bundle does not exactly match the\n' +
+        `   commit the manifest names (${stamp.commit.slice(0, 12)}). The stamp still drives the\n` +
+        '   rollback guard, but it is not a reproduction of what ships.\n'
+    );
+  }
+
+  const servedDescriptor = readServedDescriptor();
+  const served = servedDescriptor ? servedStampFrom(servedDescriptor) : { present: false };
+  const verdict = classifyPublish({
+    nextCommit: stamp.commit,
+    served,
+    isAncestor: (ancestor, descendant) =>
+      gitSucceeds(['merge-base', '--is-ancestor', ancestor, descendant]),
+    isKnownCommit: (commit) => gitSucceeds(['cat-file', '-e', `${commit}^{commit}`]),
+  });
+
+  const serving = `${describeStamp(served)} in ${PLATFORM}/${runtimeVersion}`;
+  const shipping = describeStamp(stamp);
+
+  switch (verdict) {
+    case VERDICTS.NO_BASELINE:
+      console.log(`> no descriptor is served for ${PLATFORM}/${runtimeVersion} yet - first publish`);
+      break;
+    case VERDICTS.UNVERIFIABLE:
+      console.warn(
+        `\n!! The descriptor served for ${PLATFORM}/${runtimeVersion} names no commit (it predates\n` +
+          '   the build stamp), so this publish cannot be checked for a rollback.\n'
+      );
+      break;
+    case VERDICTS.UNKNOWN_COMMIT:
+      console.warn(
+        `\n!! The descriptor served for ${PLATFORM}/${runtimeVersion} names commit ${served.commit},\n` +
+          '   which is not in this checkout, so ancestry cannot be decided here. Publishing anyway.\n'
+      );
+      break;
+    case VERDICTS.REPUBLISH:
+      console.log(`> re-publishing commit ${stamp.commit.slice(0, 12)} over itself`);
+      break;
+    case VERDICTS.FORWARD:
+      console.log(`> publishing forward: ${serving} -> ${shipping}`);
+      break;
+    case VERDICTS.DIVERGED:
+      console.warn(
+        `\n!! DIVERGED: the channel serves ${serving}, which is not an ancestor of what is being\n` +
+          `   published (${shipping}). Anything that landed on the served commit is NOT in this\n` +
+          '   bundle and will disappear from every install that takes the update. Stop and re-run\n' +
+          '   from a descendant of the served commit if that was not intended.\n'
+      );
+      break;
+    case VERDICTS.ROLLBACK:
+      if (!allowDowngrade) {
+        die(
+          `REFUSED: this publish would roll ${PLATFORM}/${runtimeVersion} BACKWARD.\n\n` +
+            `   serving now  : ${serving}\n` +
+            `   about to ship: ${shipping}\n\n` +
+            'Every install asking for this runtime receives whatever descriptor is there: nothing\n' +
+            'compares update ids, enforces a minimum version or checks monotonicity on the client,\n' +
+            'so this would replace newer JavaScript with older JavaScript on every phone, under a\n' +
+            'valid signature.\n\n' +
+            'If that is exactly what you mean - retiring a bad release by restoring the last\n' +
+            'known-good tree - say so explicitly:\n' +
+            '  node scripts/publish-ota.mjs --allow-downgrade\n'
+        );
+      }
+      console.warn(
+        `\n!! ALLOWED rollback (--allow-downgrade): ${serving} -> ${shipping}.\n` +
+          '   Every install on this runtime is being moved to older JavaScript on purpose.\n'
+      );
+      break;
+    default:
+      die(`The rollback guard returned an unknown verdict (${verdict}). Refusing to publish.`);
+  }
+
+  return stamp;
+};
+
+const buildStamp = guardAgainstRollback();
 
 // --- 1. export the JS bundle + assets --------------------------------------------------
 console.log(`> expo export (${PLATFORM})`);
@@ -267,7 +447,14 @@ const manifest = {
   runtimeVersion,
   launchAsset,
   assets,
-  metadata: {},
+  // Inside the signed bytes, so the API and anyone else on the publishing path can read which
+  // commit this JavaScript came from but nobody can rewrite it after signing. `dirty` is only
+  // present when the tree disagreed with the commit; the guard warns about that above.
+  metadata: {
+    commit: buildStamp.commit,
+    committedAt: buildStamp.committedAt,
+    ...(buildStamp.dirty ? { dirty: true } : {}),
+  },
   // expoClient is the config the app reads via Constants.expoConfig after an update. app.json's
   // expo block is the no-dependency source; it carries extra.apiUrl, version, scheme, etc.
   extra: { expoClient: appConfig },
@@ -284,13 +471,14 @@ const signature = `sig="${signatureB64}", keyid="${keyid}", alg="${alg}"`;
 const descriptor = { manifestBase64: manifestBytes.toString('base64'), signature };
 const tmpFile = join(mkdtempSync(join(tmpdir(), 'ff-ota-')), 'update.json');
 writeFileSync(tmpFile, JSON.stringify(descriptor));
-const descriptorKey = `${PLATFORM}/${runtimeVersion}/update.json`;
 uploadFile(tmpFile, descriptorKey, 'application/json');
 
 console.log(
   `\npublish-ota OK\n` +
     `  runtimeVersion : ${runtimeVersion}${usesFingerprint ? '  (fingerprint)' : ''}` +
     `${legacyTarget ? '  <- FORCED, not this checkout\'s fingerprint' : ''}\n` +
+    `  commit         : ${buildStamp.commit}${buildStamp.dirty ? '  (dirty tree - see the warning above)' : ''}\n` +
+    `  committedAt    : ${buildStamp.committedAt}\n` +
     `  update id      : ${id}\n` +
     `  assets         : ${assets.length}\n` +
     `  descriptor     : ${publicBaseUrl}/${descriptorKey}\n\n` +

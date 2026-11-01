@@ -441,6 +441,13 @@ jobs:
       - name: OTA update signing gate (FF-03)
         run: npm run check:ota-signing
 
+      # The publisher's rollback guard (F-13, planning #681). The signing gate above proves an
+      # update is authentic; this one proves it is not OLDER than what the channel already serves.
+      # The module is pure and its fake commit graph is built in the test, so this is seconds of
+      # node:test and needs nothing beyond the checkout `npm ci` already produced.
+      - name: OTA publish guard tests (F-13)
+        run: npm run check:ota-publish-guard
+
       - name: Typecheck
         run: npm run typecheck
 
