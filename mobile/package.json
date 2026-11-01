@@ -16,6 +16,7 @@
     "format": "prettier --write \"{app,src}/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"{app,src}/**/*.{ts,tsx,js,jsx,json}\"",
     "check:ota-signing": "node scripts/check-update-signing.mjs",
+    "check:ota-publish-guard": "node --test scripts/ota-publish-guard.test.mjs",
     "check:api-config": "node scripts/check-api-config.mjs",
     "publish:ota": "node scripts/publish-ota.mjs"
   },
