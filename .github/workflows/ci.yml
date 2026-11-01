@@ -448,6 +448,12 @@ jobs:
       - name: OTA publish guard tests (F-13)
         run: npm run check:ota-publish-guard
 
+      # The manifest's expoClient payload (F-14, planning #681). It is anonymous, so it carries
+      # only the config fields the app reads through Constants.expoConfig; the test also scans the
+      # app for new reads and fails until the allowlist follows them.
+      - name: OTA client-config allowlist (F-14)
+        run: npm run check:ota-client-config
+
       - name: Typecheck
         run: npm run typecheck
 

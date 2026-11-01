@@ -81,6 +81,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { clientConfigForManifest } from './ota-client-config.mjs';
 import { classifyPublish, servedStampFrom, VERDICTS } from './ota-publish-guard.mjs';
 
 const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -455,9 +456,11 @@ const manifest = {
     committedAt: buildStamp.committedAt,
     ...(buildStamp.dirty ? { dirty: true } : {}),
   },
-  // expoClient is the config the app reads via Constants.expoConfig after an update. app.json's
-  // expo block is the no-dependency source; it carries extra.apiUrl, version, scheme, etc.
-  extra: { expoClient: appConfig },
+  // expoClient is the config the app reads via Constants.expoConfig after an update. Only the
+  // fields the JS actually reads go in: the manifest is anonymous, so carrying the whole app
+  // block made every published build a mirror of it. The allowlist lives in ota-client-config.mjs,
+  // and its test fails when the app starts reading something new.
+  extra: { expoClient: clientConfigForManifest(appConfig) },
 };
 
 // The signature is over these EXACT bytes; the API relays them verbatim and the client verifies
