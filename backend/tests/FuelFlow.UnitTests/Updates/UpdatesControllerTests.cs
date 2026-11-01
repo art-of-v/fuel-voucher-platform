@@ -2,11 +2,17 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using FuelFlow.Features.Settings;
 using FuelFlow.Features.Updates;
+using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace FuelFlow.UnitTests.Updates;
@@ -15,6 +21,10 @@ public class UpdatesControllerTests
 {
     private const string BaseUrl = "https://ota.example";
     private const string Signature = "sig=\"abc123\", keyid=\"main\", alg=\"rsa-v1_5-sha256\"";
+
+    // The controller now also records what it served (F-13); a fresh in-memory database per
+    // controller keeps that record readable from the test that asserts it.
+    private ApplicationDbContext? _context;
 
     [Fact]
     public async Task GetManifest_WithPublishedUpdate_ReturnsSignedMultipartBody()
@@ -169,13 +179,33 @@ public class UpdatesControllerTests
         entry.Fields.Should().Contain("HasRuntimeVersion", expectRuntimeVersion);
     }
 
+    /// <summary>
+    /// The serving side cannot notice a rollback for a channel it never recorded, so the recording
+    /// has to happen on the request that delivers the update - not in a background job the endpoint
+    /// does not wait for, and not only when something looks unusual.
+    /// </summary>
+    [Fact]
+    public async Task GetManifest_RecordsTheManifestItServes()
+    {
+        const string manifestJson =
+            "{\"id\":\"update-9\",\"metadata\":{\"commit\":\"abc123\",\"committedAt\":\"2026-10-30T10:00:00+00:00\"}}";
+        var (controller, _, _) = CreateController(HttpStatusCode.OK, DescriptorJson(manifestJson, Signature), BaseUrl);
+
+        await controller.GetManifest(CancellationToken.None);
+
+        var key = ServedManifestTracker.SettingKeyPrefix + "ios/1.0.0";
+        var row = await _context!.AppSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == key);
+        row.Should().NotBeNull();
+        row!.Value.Should().Contain("abc123").And.Contain("2026-10-30");
+    }
+
     private static string DescriptorJson(string manifestJson, string signature)
     {
         var manifestBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(manifestJson));
         return JsonSerializer.Serialize(new { manifestBase64, signature });
     }
 
-    private static (UpdatesController Controller, RecordingHttpMessageHandler Handler, CapturingLogger Logger)
+    private (UpdatesController Controller, RecordingHttpMessageHandler Handler, CapturingLogger Logger)
         CreateController(
             HttpStatusCode statusCode,
             string responseBody,
@@ -194,7 +224,18 @@ public class UpdatesControllerTests
         var options = Options.Create(new UpdatesOptions { PublicBaseUrl = publicBaseUrl });
         var logger = new CapturingLogger();
 
-        var controller = new UpdatesController(new UpdateManifestSource(httpClient, options), logger)
+        _context = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                .Options,
+            TestQrCipher.Instance);
+
+        var tracker = new ServedManifestTracker(
+            new RuntimeSettingsService(_context), new FuelFlowMetrics(),
+            NullLogger<ServedManifestTracker>.Instance);
+
+        var controller = new UpdatesController(
+            new UpdateManifestSource(httpClient, options), tracker, logger)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

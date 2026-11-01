@@ -16,17 +16,26 @@ namespace FuelFlow.Features.Updates;
 // [AllowAnonymous] is explicit and mandatory: AuthSetup installs a RequireAuthenticatedUser fallback
 // policy, and an update client carries no bearer token. The route is pinned in
 // AnonymousEndpointSurfaceTests so this public-surface decision stays reviewed rather than incidental.
+//
+// Serving is also where a rollback becomes visible: every manifest the publisher signs names the
+// commit it came from, and ServedManifestTracker remembers the last one per channel and warns when
+// the channel starts serving an older one (F-13). That check never changes the response.
 [ApiController]
 [Route("api/updates")]
 [AllowAnonymous]
 public sealed class UpdatesController : ControllerBase
 {
     private readonly UpdateManifestSource _source;
+    private readonly ServedManifestTracker _servedManifests;
     private readonly ILogger<UpdatesController> _logger;
 
-    public UpdatesController(UpdateManifestSource source, ILogger<UpdatesController> logger)
+    public UpdatesController(
+        UpdateManifestSource source,
+        ServedManifestTracker servedManifests,
+        ILogger<UpdatesController> logger)
     {
         _source = source;
+        _servedManifests = servedManifests;
         _logger = logger;
     }
 
@@ -95,6 +104,10 @@ public sealed class UpdatesController : ControllerBase
                 platform, runtimeVersion);
             return StatusCode(StatusCodes.Status502BadGateway);
         }
+
+        // Serving side of the rollback guard (F-13): the publisher refuses to write an older
+        // manifest, this notices if one is being served anyway. It never changes the response.
+        await _servedManifests.ObserveAsync(platform, runtimeVersion, manifestBytes, cancellationToken);
 
         return BuildManifestResponse(manifestBytes, signature);
     }

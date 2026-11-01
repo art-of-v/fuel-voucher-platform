@@ -72,6 +72,9 @@ public sealed class FuelFlowMetrics : IDisposable
     // Auth / refresh tokens
     private readonly Counter<long> _authRefresh;
 
+    // OTA updates
+    private readonly Counter<long> _updateManifestRollback;
+
     public FuelFlowMetrics()
     {
         _meter = new Meter(ObservabilityConstants.MeterName);
@@ -195,6 +198,12 @@ public sealed class FuelFlowMetrics : IDisposable
             "Refresh-token exchange outcomes, tagged outcome=rotated|grace_recovered|reuse_revoked. "
             + "grace_recovered = a benign lost-rotation replay re-rotated within RefreshReuseGraceSeconds (#26); "
             + "a sustained rise in reuse_revoked is a possible stolen-token replay. Alerting target.");
+
+        _updateManifestRollback = _meter.CreateCounter<long>(
+            "fuelflow.updates.manifest_rollback", "events",
+            "OTA manifests whose signed commit is older than the one last served for the same "
+            + "platform and runtime version. Every increment is a whole channel moving backward, so "
+            + "this is an alerting target, not a trend.");
     }
 
     /// <summary>
@@ -384,6 +393,14 @@ public sealed class FuelFlowMetrics : IDisposable
     /// </summary>
     public void AuthRefresh(string outcome) =>
         _authRefresh.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
+
+    /// <summary>
+    /// Records that the manifest now served for <paramref name="platform"/> is older than the one
+    /// served before it. Tagged by platform, which is low cardinality: only a platform the publisher
+    /// actually publishes for ever reaches this call.
+    /// </summary>
+    public void UpdateManifestRollback(string platform) =>
+        _updateManifestRollback.Add(1, new KeyValuePair<string, object?>("platform", platform));
 
     public void Dispose() => _meter.Dispose();
 }
