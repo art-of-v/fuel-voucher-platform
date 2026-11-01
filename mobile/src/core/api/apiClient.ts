@@ -10,6 +10,7 @@ import {
   isAttestationProtected,
 } from '../security/appAttestation';
 import { ensureSslPinningInitialized } from '../security/sslPinning';
+import { requiresDeviceSignature } from '../security/signatureEndpoints';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
@@ -122,31 +123,8 @@ const PUBLIC_ENDPOINTS = [
   '/api/logs',
 ];
 
-// Must stay in sync with the backend's DeviceAuth:RequireSignatureForEndpoints
-// list. Checkout goes through /api/purchases, /api/purchases/bulk and
-// /api/purchases/renew — the backend rejects unsigned requests on those routes.
-// Matching is EXACT (see requiresSignature), mirroring the backend middleware:
-// this is why the read-only /api/purchases/renew/quote and /renew/config
-// previews are NOT signed and never prompt for biometrics before payment.
-const SIGNATURE_REQUIRED_ENDPOINTS = [
-  '/api/purchases',
-  '/api/purchases/bulk',
-  '/api/purchases/renew',
-];
-
 function matchesAny(endpoint: string, patterns: string[]): boolean {
   return patterns.some((p) => endpoint.includes(p));
-}
-
-// A request needs a device signature only when its path is EXACTLY one of the
-// protected routes (query string and any trailing slash stripped first). A
-// substring test would wrongly sign every nested read — e.g. the renewal quote
-// lives under /api/purchases/renew/… but must stay signature-free.
-function requiresSignature(endpoint: string): boolean {
-  const queryStart = endpoint.indexOf('?');
-  let path = queryStart >= 0 ? endpoint.slice(0, queryStart) : endpoint;
-  if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-  return SIGNATURE_REQUIRED_ENDPOINTS.includes(path);
 }
 
 function isPublicEndpoint(endpoint: string): boolean {
@@ -201,7 +179,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       : JSON.stringify(options.body)
     : '';
 
-  const needsSignature = forceSignature === 'true' || requiresSignature(endpoint);
+  const needsSignature = forceSignature === 'true' || requiresDeviceSignature(method, endpoint);
   const needsAttestation = isAttestationProtected(path);
 
   await ensureSslPinningInitialized(BASE_URL);

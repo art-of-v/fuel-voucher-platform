@@ -2,6 +2,7 @@ using System.Text;
 using FuelFlow.Features.Attestation;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Security.Attestation;
 using Microsoft.Extensions.Options;
 
@@ -62,7 +63,7 @@ public sealed class AttestationMiddleware
             return;
         }
 
-        if (!AttestationPathMatcher.IsProtected(context.Request.Path, settings.ProtectedEndpoints))
+        if (!RequestPathMatcher.IsProtected(context.Request.Path, settings.ProtectedEndpoints))
         {
             await _next(context);
             return;

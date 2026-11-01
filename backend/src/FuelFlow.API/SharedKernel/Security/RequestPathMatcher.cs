@@ -1,10 +1,10 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
 
-namespace FuelFlow.SharedKernel.Security.Attestation;
+namespace FuelFlow.SharedKernel.Security;
 
 /// <summary>
-/// Decides whether a request path is one of the attestation-protected endpoints.
+/// Decides whether a request path is one of a configured set of protected endpoints.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,11 +18,12 @@ namespace FuelFlow.SharedKernel.Security.Attestation;
 /// <c>*</c> wildcard (for example <c>/api/vouchers/*/mark-used</c>). A trailing <c>/*</c> is
 /// treated as a prefix, matching the endpoint and everything beneath it, which is how the device
 /// signature list already reads. Over-matching is deliberately safe: a path variant routing would
-/// not have dispatched answers 401 instead of 404. Under-matching silently disables attestation
-/// on a money endpoint, which is the failure this class exists to prevent.
+/// not have dispatched answers 401 instead of 404. Under-matching silently disables the check
+/// (attestation, or the device proof) on a money endpoint, which is the failure this class
+/// exists to prevent.
 /// </para>
 /// </remarks>
-public static class AttestationPathMatcher
+public static class RequestPathMatcher
 {
     public static bool IsProtected(PathString path, IReadOnlyCollection<string> patterns)
     {

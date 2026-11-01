@@ -3,12 +3,12 @@ using FuelFlow.Features.Auth.SharedServices;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
-using System.Text;
 
 namespace FuelFlow.Middleware;
 
@@ -51,8 +51,10 @@ public sealed class DeviceSignatureMiddleware
         }
 
         var requiresSignature = ShouldRequireSignature(
+            context.Request.Method,
             context.Request.Path,
-            deviceAuthOptions.RequireSignatureForEndpoints);
+            deviceAuthOptions,
+            context.Request.Headers[AttestationMiddleware.AppVersionHeader].FirstOrDefault());
 
         if (!requiresSignature)
         {
@@ -247,79 +249,69 @@ public sealed class DeviceSignatureMiddleware
     }
 
     /// <summary>
-    /// Decides whether this request path is one of the signature-protected endpoints.
+    /// Decides whether this request has to carry a device signature: either its route is in the
+    /// unconditional list, or it is in the version-gated one and the caller's app version has reached
+    /// the version that signs it.
     /// <para>
-    /// This comparison is a security boundary, so it has to be at least as permissive as
-    /// ASP.NET Core routing. Routing matches <c>/api/purchases/</c> against the template
-    /// <c>api/purchases</c>, but <see cref="PathString.Equals(PathString, StringComparison)"/>
-    /// is exact and did not — so a single appended slash reached the checkout handler with no
-    /// device signature at all. Trailing separators and repeated separators are therefore
-    /// normalised away before comparing.
+    /// The two lists exist because a signed set can only grow on the server once the client signs.
+    /// A route moved into the unconditional list while shipped bundles do not sign it answers 401 to
+    /// every phone that has not updated, so the new routes are gated by app version instead and only
+    /// start being enforced once the build that signs them is what the stores serve.
     /// </para>
     /// <para>
-    /// Over-matching is deliberately safe here: a path variant that routing would not have
-    /// dispatched simply answers 401 instead of 404. Under-matching silently disables device
-    /// binding on a money endpoint, which is the failure this method exists to prevent.
+    /// The path comparison itself lives in <see cref="RequestPathMatcher"/>, which is the same
+    /// normalisation-and-wildcard rule the attestation middleware uses - one boundary, one
+    /// implementation. Over-matching is deliberately safe: a path variant that routing would not
+    /// have dispatched answers 401 instead of 404, whereas under-matching silently drops the device
+    /// binding from a money endpoint.
     /// </para>
     /// </summary>
-    private static bool ShouldRequireSignature(PathString path, List<string> patterns)
+    private static bool ShouldRequireSignature(
+        string method,
+        PathString path,
+        DeviceAuthOptions options,
+        string? appVersion)
     {
-        var normalizedPath = NormalizePath(path.Value);
+        if (RequestPathMatcher.IsProtected(path, options.RequireSignatureForEndpoints))
+            return true;
 
-        foreach (var pattern in patterns)
+        if (options.RequireSignatureForEndpointsFrom.Count == 0)
+            return false;
+
+        var enforced = new List<string>(options.RequireSignatureForEndpointsFrom.Count);
+
+        foreach (var (pattern, minimumVersion) in options.RequireSignatureForEndpointsFrom)
         {
-            var normalizedPattern = NormalizePath(pattern);
+            if (!PatternMatchesMethod(pattern, method))
+                continue;
 
-            if (normalizedPattern.EndsWith('*'))
-            {
-                // "/api/devices/*" covers "/api/devices" and everything beneath it.
-                var prefix = NormalizePath(normalizedPattern.TrimEnd('*'));
+            // Compare returns null for anything unparseable, which must not enforce: an app without
+            // the header predates the signed route, and refusing it here would lock it out.
+            if (AppVersionOptions.Compare(appVersion, minimumVersion) is not >= 0)
+                continue;
 
-                if (prefix.Length == 0
-                    || normalizedPath.Equals(prefix, StringComparison.OrdinalIgnoreCase)
-                    || normalizedPath.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            else if (normalizedPath.Equals(normalizedPattern, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            enforced.Add(StripMethod(pattern));
         }
 
-        return false;
+        return enforced.Count > 0 && RequestPathMatcher.IsProtected(path, enforced);
     }
 
     /// <summary>
-    /// Collapses repeated '/' and strips any trailing '/', so "/api/purchases",
-    /// "/api/purchases/" and "//api//purchases//" all compare equal. A bare "/" is preserved.
+    /// A pattern may start with a verb (<c>"DELETE /api/purchases/*"</c>) when only that method needs
+    /// the proof; without one it applies to every method.
     /// </summary>
-    private static string NormalizePath(string? value)
+    private static bool PatternMatchesMethod(string pattern, string method)
     {
-        if (string.IsNullOrEmpty(value))
-            return string.Empty;
+        var separator = pattern.IndexOf(' ');
 
-        var builder = new StringBuilder(value.Length);
-        var previousWasSlash = false;
+        return separator < 0
+            || pattern.AsSpan(0, separator).Equals(method, StringComparison.OrdinalIgnoreCase);
+    }
 
-        foreach (var c in value)
-        {
-            if (c == '/')
-            {
-                if (!previousWasSlash)
-                    builder.Append(c);
+    private static string StripMethod(string pattern)
+    {
+        var separator = pattern.IndexOf(' ');
 
-                previousWasSlash = true;
-            }
-            else
-            {
-                builder.Append(c);
-                previousWasSlash = false;
-            }
-        }
-
-        if (builder.Length > 1 && builder[^1] == '/')
-            builder.Length--;
-
-        return builder.ToString();
+        return separator < 0 ? pattern : pattern[(separator + 1)..];
     }
 }

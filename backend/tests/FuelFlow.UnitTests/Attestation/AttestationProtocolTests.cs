@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using FluentAssertions;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Security.Attestation;
 using Microsoft.AspNetCore.Http;
 
@@ -65,7 +66,7 @@ public sealed class AttestationProtocolTests
     [InlineData("/api/vouchers/ABC/restore")]
     public void IsProtected_MatchesTheMoneyAndAuthEndpoints(string path)
     {
-        AttestationPathMatcher.IsProtected(new PathString(path), ProtectedEndpoints).Should().BeTrue();
+        RequestPathMatcher.IsProtected(new PathString(path), ProtectedEndpoints).Should().BeTrue();
     }
 
     [Theory]
@@ -76,7 +77,7 @@ public sealed class AttestationProtocolTests
     [InlineData("/api/attestation/challenge")]
     public void IsProtected_DoesNotMatchUnrelatedPaths(string path)
     {
-        AttestationPathMatcher.IsProtected(new PathString(path), ProtectedEndpoints).Should().BeFalse();
+        RequestPathMatcher.IsProtected(new PathString(path), ProtectedEndpoints).Should().BeFalse();
     }
 
     [Theory]
@@ -86,7 +87,7 @@ public sealed class AttestationProtocolTests
     [InlineData("/api/devices/abc/rotate")]
     public void IsProtected_TrailingWildcardMatchesThePrefixAndItsChildren(string path)
     {
-        AttestationPathMatcher.IsProtected(new PathString(path), ["/api/devices/*"]).Should().BeTrue();
+        RequestPathMatcher.IsProtected(new PathString(path), ["/api/devices/*"]).Should().BeTrue();
     }
 
     private static readonly string[] ProtectedEndpoints =
