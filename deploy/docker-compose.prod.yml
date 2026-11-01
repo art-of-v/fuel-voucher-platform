@@ -241,6 +241,9 @@ services:
 
       # --- Monobank (LIVE payments) — app refuses to start if PublicKey is missing/placeholder ---
       Monobank__Enabled: "true"
+      # Payments off is a state the API refuses to boot Production in unless this says so.
+      # The webhook endpoint stays closed while payments are off, acknowledged or not.
+      Monobank__AcknowledgeDisabledInProduction: ${MONOBANK_ACKNOWLEDGE_DISABLED_IN_PRODUCTION:-false}
       Monobank__BaseUrl: "https://api.monobank.ua"
       Monobank__Token: ${MONOBANK_TOKEN:?set MONOBANK_TOKEN in .env.production}
       Monobank__PublicKey: ${MONOBANK_PUBLIC_KEY:?set MONOBANK_PUBLIC_KEY in .env.production}

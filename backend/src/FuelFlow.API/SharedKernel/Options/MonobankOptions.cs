@@ -87,6 +87,19 @@ public sealed class MonobankOptions
     /// </summary>
     public bool AcknowledgeReconciliationDisabled { get; set; } = false;
 
+    /// <summary>
+    /// Explicit acknowledgement that Production is running with <see cref="Enabled"/> off.
+    /// </summary>
+    /// <remarks>
+    /// Checked only by the startup guard (SecurityConfigurationValidator), which refuses to boot in
+    /// Production when payments are off unless this is set. A host with payments off is not taking
+    /// money at all: checkout runs against the in-process mock and the webhook endpoint refuses
+    /// every delivery, because a host with no acquirer has nothing that could legitimately sign
+    /// one. That can be a real state - maintenance, an acquirer migration - but it must be a
+    /// decision someone wrote down, not a flag an env file lost.
+    /// </remarks>
+    public bool AcknowledgeDisabledInProduction { get; set; } = false;
+
     /// <summary>Grace period before an unpaid order is polled, so the webhook is given time to arrive first.</summary>
     public int ReconciliationMinAgeMinutes { get; set; } = 3;
 
