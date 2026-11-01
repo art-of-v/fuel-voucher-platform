@@ -64,10 +64,21 @@ internal static class PipelineSetup
 
         // Combined liveness + readiness for backwards compatibility with existing
         // probes (UptimeRobot). Probes both DB and Redis.
-        app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], async (ApplicationDbContext db, IConnectionMultiplexer redis, HttpContext http, CancellationToken ct) =>
+        //
+        // The body answers the one question a probe asks - is this instance up - and names nothing
+        // else. Which dependency is down is an operator's question, and this endpoint is anonymous
+        // because an uptime monitor has to reach it without a credential: the anonymous reachability
+        // is the reviewed decision, the dependency names beside it never were. The reason goes to
+        // the log with the trace id instead, so the operator still gets the answer the monitor
+        // cannot carry. /health/ready remains for a dependency-shaped check.
+        app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], async (
+            ApplicationDbContext db,
+            IConnectionMultiplexer redis,
+            HttpContext http,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
         {
-            var dbStatus = "connected";
-            var redisStatus = "connected";
+            var logger = loggerFactory.CreateLogger("HealthProbe");
             var healthy = true;
 
             try
@@ -79,9 +90,9 @@ internal static class PipelineSetup
                 // SELECT 1 is the same question with one cheap round trip.
                 await db.Database.ExecuteSqlRawAsync("SELECT 1", ct);
             }
-            catch
+            catch (Exception exception)
             {
-                dbStatus = "unreachable";
+                logger.LogWarning(exception, "Health probe: the database is unreachable");
                 healthy = false;
             }
 
@@ -89,24 +100,24 @@ internal static class PipelineSetup
             {
                 await redis.GetDatabase().PingAsync();
             }
-            catch
+            catch (Exception exception)
             {
-                redisStatus = "unreachable";
+                logger.LogWarning(exception, "Health probe: Redis is unreachable");
                 healthy = false;
             }
 
             return healthy
-                ? Results.Ok(new { status = "healthy", database = dbStatus, redis = redisStatus })
+                ? Results.Ok(new { status = "healthy" })
                 // The one error envelope, like every other failure: the status in `title`, the
-                // sentence in `detail`, the correlation id beside them.
+                // sentence in `detail`, the correlation id beside them - and the correlation id is
+                // the whole point, because it is what leads from a monitor's page to the log line
+                // that says which dependency failed.
                 : Results.Problem(
                     "One or more dependencies unreachable",
                     instance: http.Request.Path.Value,
                     statusCode: 503,
                     extensions: new Dictionary<string, object?>
                     {
-                        ["database"] = dbStatus,
-                        ["redis"] = redisStatus,
                         ["traceId"] = http.TraceIdentifier
                     });
         }).AllowAnonymous();
