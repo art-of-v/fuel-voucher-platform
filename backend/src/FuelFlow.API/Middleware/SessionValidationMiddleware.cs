@@ -53,9 +53,23 @@ public sealed class SessionValidationMiddleware
                 return;
             }
 
+            // Fail closed on a token that carries no readable version. The check below used to run
+            // only when TryParse succeeded, so a token with the claim absent or unparsable skipped
+            // the comparison entirely and was treated as current - which is every revocation
+            // (ban, delete, role change, logout-everywhere) missed for exactly that token. Every
+            // access token this API mints carries it (JwtTokenService.GenerateAccessToken), so
+            // refusing without one costs no real session.
             var tokenVersionClaim = user.FindFirst("token_version")?.Value
                                  ?? user.FindFirst("tv")?.Value;
-            if (int.TryParse(tokenVersionClaim, out var tokenVersion) && tokenVersion != account.TokenVersion)
+            if (!int.TryParse(tokenVersionClaim, out var tokenVersion))
+            {
+                _logger.LogWarning(
+                    "Session rejected: no parsable token_version claim for user {UserId}", userId);
+                await Reject(context);
+                return;
+            }
+
+            if (tokenVersion != account.TokenVersion)
             {
                 _logger.LogWarning("Session rejected: token version mismatch for user {UserId}", userId);
                 await Reject(context);
