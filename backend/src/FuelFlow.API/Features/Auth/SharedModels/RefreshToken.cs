@@ -37,6 +37,13 @@ public sealed class RefreshToken
     /// </summary>
     public RefreshTokenPurpose Purpose { get; set; } = RefreshTokenPurpose.Session;
 
+    /// <summary>
+    /// The hard stop for a staff panel session, regardless of how recently it was used. Null for
+    /// every other token. Rotation copies it forward unchanged, so a session cannot push its own
+    /// end date out by refreshing.
+    /// </summary>
+    public DateTime? AbsoluteExpiresAtUtc { get; set; }
+
     public string Token { get; set; } = string.Empty;
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; }

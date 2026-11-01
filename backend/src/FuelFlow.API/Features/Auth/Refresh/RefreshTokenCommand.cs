@@ -73,6 +73,24 @@ public sealed class RefreshTokenCommandHandler
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
         }
 
+        // A staff panel session has a hard stop that rotation does not move: the sliding window
+        // says how long an idle session survives, this says how long a session survives at all.
+        // Refreshing past it ends the session for good, and the row is revoked so it stops
+        // counting as live anywhere else.
+        if (refreshToken.AbsoluteExpiresAtUtc is { } absoluteExpiresAt
+            && absoluteExpiresAt <= SystemClock.UtcNow)
+        {
+            refreshToken.IsRevoked = true;
+            refreshToken.RevokedAtUtc = SystemClock.UtcNow;
+            _context.RefreshTokens.Update(refreshToken);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Staff session for user {UserId} reached its absolute lifetime and was ended",
+                refreshToken.UserId);
+            throw new UnauthorizedAccessException("This session has reached its maximum lifetime");
+        }
+
         // A ban already revokes every refresh token and bumps TokenVersion, so a banned user's
         // token would normally fail the reuse or version check anyway. This is defense in depth:
         // refuse outright rather than depend on the revoke having reached every row, and never
@@ -201,6 +219,9 @@ public sealed class RefreshTokenCommandHandler
             ExpiresAtUtc = identityToken.Purpose == RefreshTokenPurpose.DeviceBinding
                 ? now.Add(RefreshTokenPurposePolicy.DeviceBindingWindow)
                 : now.AddDays(_jwtOptions.RefreshTokenExpirationDays),
+            // The hard stop belongs to the session, not to the token it currently sits on: a
+            // refresh must not be able to push it out.
+            AbsoluteExpiresAtUtc = identityToken.AbsoluteExpiresAtUtc,
             CreatedAtUtc = now,
             IsRevoked = false
         };

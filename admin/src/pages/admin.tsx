@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { bootSession } from "@/lib/session";
+import { bootSession, signOutForInactivity } from "@/lib/session";
+import { startIdleLock } from "@/lib/idle-lock";
 import { useSession } from "@/lib/session-store";
 import AdminDashboard from "./admin/AdminDashboard";
 import AdminLogin from "./admin/AdminLogin";
@@ -29,6 +30,15 @@ export default function AdminScreen() {
     // form can always spend its own share of the per-minute refresh budget.
     bootSession();
   }, []);
+
+  useEffect(() => {
+    // An unattended panel is a live staff session until something says otherwise. The lock sits
+    // here, over the authenticated state, so it starts when the dashboard mounts and stops the
+    // moment the session ends for any reason.
+    if (status !== "authenticated") return;
+    const lock = startIdleLock({ onLock: () => void signOutForInactivity() });
+    return () => lock.stop();
+  }, [status]);
 
   if (status === "booting") {
     return <BootingScreen />;
