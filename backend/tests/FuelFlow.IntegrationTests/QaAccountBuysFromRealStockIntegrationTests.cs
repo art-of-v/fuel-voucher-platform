@@ -52,8 +52,8 @@ public sealed class QaAccountBuysFromRealStockIntegrationTests : IClassFixture<T
         var realUserId = Guid.NewGuid();
         var qaOrderId = Guid.NewGuid();
         var realOrderId = Guid.NewGuid();
-        var qaVoucherId = Guid.NewGuid();
-        var realVoucherId = Guid.NewGuid();
+        var firstVoucherId = Guid.NewGuid();
+        var secondVoucherId = Guid.NewGuid();
 
         using (var seed = CreateContext())
         {
@@ -66,8 +66,10 @@ public sealed class QaAccountBuysFromRealStockIntegrationTests : IClassFixture<T
             AddPaidOrder(seed, MakeOrder(qaOrderId, qaUserId));
             AddPaidOrder(seed, MakeOrder(realOrderId, realUserId));
 
-            seed.FuelVouchers.Add(MakeVoucher(qaVoucherId, "real-for-qa", isTestData: false));
-            seed.FuelVouchers.Add(MakeVoucher(realVoucherId, "real-for-customer", isTestData: false));
+            // Two interchangeable real vouchers — same brand, same fuel, same nominal — so neither
+            // order has a row it is entitled to. What is under test is that both are claimable.
+            seed.FuelVouchers.Add(MakeVoucher(firstVoucherId, "real-a", isTestData: false));
+            seed.FuelVouchers.Add(MakeVoucher(secondVoucherId, "real-b", isTestData: false));
 
             await seed.SaveChangesAsync();
         }
@@ -84,11 +86,16 @@ public sealed class QaAccountBuysFromRealStockIntegrationTests : IClassFixture<T
         qaOrder.Status.Should().Be(OrderStatus.Fulfilled);
         realOrder.Status.Should().Be(OrderStatus.Fulfilled);
 
-        // Both got real stock. The flag changes where the money goes, not what is on the shelf.
-        (await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == qaVoucherId))
-            .AssignedToUserId.Should().Be(qaUserId);
-        (await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == realVoucherId))
-            .AssignedToUserId.Should().Be(realUserId);
+        // Both got real stock. The flag changes where the money goes, not what is on the shelf — and
+        // which of the two rows each order won is the fulfilment's choice, not a property under test:
+        // both vouchers carry the same stock key, so the pair is asserted as a pair, not by identity.
+        var claimed = await verify.FuelVouchers.AsNoTracking()
+            .Where(v => v.Id == firstVoucherId || v.Id == secondVoucherId)
+            .ToListAsync();
+
+        claimed.Should().HaveCount(2);
+        claimed.Should().OnlyContain(v => v.Status == VoucherStatus.Assigned);
+        claimed.Select(v => v.AssignedToUserId).Should().BeEquivalentTo(new[] { qaUserId, realUserId });
     }
 
     [Fact]
