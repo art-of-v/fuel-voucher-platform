@@ -58,7 +58,17 @@
  * the launcher trimmed the outermost mane. Now the padded crop is drawn at the
  * safe fraction on a canvas of the sampled backdrop, which puts the lion itself
  * at 55.6% - 21% smaller than before, and back inside every mask shape Google
- * publishes.
+ * publishes. Measured on the committed file: the outermost pixel that differs
+ * from the backdrop sits 292px from the centre, against a 341px mask radius and
+ * a 313px safe zone.
+ *
+ * Nothing will display that until an Android build exists. There is no working
+ * Android build path (planning docs/MOBILE_RELEASE.md §6 - cloud builds die in
+ * "Configure expo-updates" because the OTA signing key stays on the publish
+ * machine, and the local Gradle link fails on this box), so this is the icon
+ * being right before the first build rather than a fix anyone is waiting for.
+ * It is derived and gated anyway: an ungated surface that nobody can look at is
+ * how the admin ended up shipping a JPEG called .png.
  */
 
 import sharp from 'sharp';
