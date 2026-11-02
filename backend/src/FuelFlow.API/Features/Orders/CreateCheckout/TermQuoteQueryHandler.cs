@@ -35,11 +35,9 @@ public sealed class TermQuoteQueryHandler
     }
 
     public async Task<TermQuoteResponse> HandleAsync(
-        bool isTestAccount,
         Guid BrandId, Guid fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
     {
         var config = await _settings.GetVoucherTermConfigAsync(cancellationToken);
-        var pool = DataKinds.ForPool(isTestAccount);
 
         // A missing package is not an error: the catalog can change between browsing and checkout, and the
         // line gets rejected properly at checkout. Returning the bare ladder lets the picker render without
@@ -47,8 +45,9 @@ public sealed class TermQuoteQueryHandler
         // customer's side: the catalogue published its pump price, but nobody has set a cost and a margin,
         // so there is no price to quote - and there is nothing the customer can do about that either.
 var row = await (
-        // The fuel, and whether it sells this size in this pool. There is no offer to join: the
-        // price is the fuel's, so joining one could only ever bring a second opinion about it.
+        // The fuel, and whether it sells this size in the real catalogue. There is no offer to
+        // join: the price is the fuel's, so joining one could only ever bring a second opinion
+        // about it.
 from fuel in _context.FuelTypes.AsNoTracking()
     where fuel.BrandId == BrandId
           && fuel.Id == fuelTypeId
@@ -58,7 +57,7 @@ from fuel in _context.FuelTypes.AsNoTracking()
     from nominal in _context.FuelNominals.AsNoTracking()
     where nominal.FuelTypeId == fuel.Id
           && nominal.Liters == liters
-          && nominal.DataKind == pool
+          && nominal.DataKind == DataKinds.Real
     select new { Fuel = fuel, DataKind = nominal.DataKind, BrandSlug = brand.Slug })
         .FirstOrDefaultAsync(cancellationToken);
 

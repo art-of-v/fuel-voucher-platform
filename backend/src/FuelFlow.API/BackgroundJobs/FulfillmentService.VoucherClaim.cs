@@ -25,7 +25,6 @@ public partial class FulfillmentService
         Order order,
         OrderLineItem lineItem,
         List<Guid> usedVoucherIds,
-        bool isTestAccount,
         int take,
         CancellationToken cancellationToken)
     {
@@ -39,11 +38,9 @@ public partial class FulfillmentService
         // needs to run against expired test stock. Only ever flip it in a disposable/staging
         // environment; turning it off in production hands the most-expired stock to customers.
         var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
-        var pool = DataKinds.ForPool(isTestAccount);
 
-        // A QA account draws only from test stock and a real account only from real stock, so a seeded
-        // test voucher never reaches a paying customer and a QA run never burns real inventory.
-        // Re-asserted atomically at the claim (TryAssignVoucherAsync).
+        // Only real stock is sellable; a rehearsal voucher never reaches a buyer. Re-asserted
+        // atomically at the claim (TryAssignVoucherAsync).
         // AsNoTracking (#246): this is a decision, not a write. The chosen row is claimed by a raw
         // compare-and-swap UPDATE moments later, and tracking it here would put an instance with the
         // pre-claim xmin into the change tracker — where any later save of that row would fail on a
@@ -54,7 +51,7 @@ public partial class FulfillmentService
                      && v.Brand == lineItem.Brand
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
-                     && v.DataKind == pool
+                     && v.DataKind == DataKinds.Real
                      && (!expiryEnabled || v.SupplierExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.SupplierExpirationDate)
@@ -110,16 +107,14 @@ public partial class FulfillmentService
         // term outruns the voucher gets the voucher's full remaining life, which is what it would have
         // got before short terms existed.
         //
-        // The QA/test pools stay separate at the atomic claim too: a QA account can only claim test
-        // stock and a real account only real stock. A correlated subquery on the owning user keeps the
-        // check race-proof, exactly like the expiry predicate above, so a flag edit between the SELECT
-        // and this statement can never hand stock across the pools.
+        // Only real stock is sellable. The claim re-asserts that atomically, so a row that changed
+        // pool between the SELECT and this statement can never be handed over.
         var rowsAffected = customerExpiration is null
             ? await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = {DataKinds.Real}""",
                 cancellationToken)
             : await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = {DataKinds.Real}""",
                 cancellationToken);
 
         return rowsAffected;

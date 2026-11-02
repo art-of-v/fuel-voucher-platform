@@ -1,6 +1,6 @@
 namespace FuelFlow.Features.Brands.GetPublicFuelTypes;
 
 /// <summary>
-/// The public fuel list. The caller's id decides whose stock counts as available.
+/// The public fuel list. Every caller sees availability against the same real stock.
 /// </summary>
-public sealed record GetPublicFuelTypesQuery(Guid? CallerUserId);
+public sealed record GetPublicFuelTypesQuery;

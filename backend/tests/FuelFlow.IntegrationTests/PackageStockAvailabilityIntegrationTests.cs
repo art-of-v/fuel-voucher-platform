@@ -71,7 +71,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         };
 
         var availability = CreateAvailability();
-        var keys = await availability.AvailableKeysAsync(wanted, isTestAccount: false, CancellationToken.None);
+        var keys = await availability.AvailableKeysAsync(wanted, CancellationToken.None);
 
         keys.Should().BeEquivalentTo(
             new[] { StockKey.For("okko", ToUuid("okko-95"), 50m), StockKey.For("wog", ToUuid("wog-95"), 50m) });
@@ -100,7 +100,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         };
 
         var availability = CreateAvailability();
-        var keys = await availability.AvailableKeysAsync(wanted, isTestAccount: false, CancellationToken.None);
+        var keys = await availability.AvailableKeysAsync(wanted, CancellationToken.None);
 
         keys.Should().BeEquivalentTo(new[] { StockKey.For("okko", ToUuid("okko-95"), 50m) });
     }
@@ -115,7 +115,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         var availability = CreateAvailability();
 
         var keys = await availability.AvailableKeysAsync(
-            Array.Empty<StockKey>(), isTestAccount: false, CancellationToken.None);
+            Array.Empty<StockKey>(), CancellationToken.None);
 
         keys.Should().BeEmpty();
     }
@@ -123,17 +123,12 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     // ── FindPackageAsync: a triple is NOT a unique key ─────────────────────────────────────
 
     /// <summary>
-    /// The condition measured on production 2026-10-14: every sellable triple carries two live
-    /// rows, because <c>seed-qa-catalogue.sql</c> mirrors each real package into the QA pool on
-    /// the same Brand, fuel and nominal (13 offers, 58 real rows, 58 QA rows, no duplicates
-    /// inside either pool).
-    ///
-    /// Checkout resolved that key with a bare <c>FirstOrDefaultAsync</c> - no pool filter, no
-    /// ordering - so the customer was charged off whichever row Postgres produced first. Both rows
-    /// carry the same rate, because the fuel's margin is one number and a nominal has no price of its
-    /// own; what separates them is <c>data_kind</c>, and that is what the query has to filter on. The
-    /// test cannot make the two prices differ any more, so it asserts the thing that actually decides
-    /// it: each pool reads back its own row.
+    /// A triple can carry two live rows: the real nominal and a rehearsal one an admin created on
+    /// the same Brand, fuel and size. Checkout used to resolve that key with a bare
+    /// <c>FirstOrDefaultAsync</c> - no pool filter, no ordering - so the customer was charged off
+    /// whichever row Postgres produced first. Both rows carry the same rate, because the fuel's
+    /// margin is one number and a nominal has no price of its own; what separates them is
+    /// <c>data_kind</c>, and a sale always reads the real row regardless of who is buying.
     /// </summary>
     [Fact]
     public async Task FindPackage_IgnoresTheOtherPoolsRow()
@@ -149,10 +144,9 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-(await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("okko-95"), 10m))!.PackageId
-    .Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Real, 10m));
-        (await availability.FindPackageAsync(true, BrandIds.Okko, ToUuid("okko-95"), 10m))!.PackageId
-            .Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Qa, 10m));
+(await availability.FindPackageAsync(BrandIds.Okko, ToUuid("okko-95"), 10m))!.PackageId
+    .Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Real, 10m),
+        "a sale always reads the real row, whoever is buying");
     }
 
     /// <summary>
@@ -207,11 +201,11 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         // And with the duplicate refused, the key resolves to the one row that exists - no ordering
         // involved, because there is nothing to order.
         var availability = CreateAvailability();
-var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("okko-95"), 20m);
+var chosen = await availability.FindPackageAsync(BrandIds.Okko, ToUuid("okko-95"), 20m);
         chosen!.PackageId.Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Real, 20m));
 
         var bulk = await availability.FindPackagesAsync(
-            false, new[] { StockKey.For("okko", ToUuid("okko-95"), 20m) });
+            new[] { StockKey.For("okko", ToUuid("okko-95"), 20m) });
         bulk[StockKey.For("okko", ToUuid("okko-95"), 20m)].PackageId.Should().Be(chosen.PackageId);
     }
 
@@ -233,8 +227,8 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("o
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("okko-95"), 5m)).Should().BeNull(
-            "a real customer must not be priced off a rehearsal package");
+        (await availability.FindPackageAsync(BrandIds.Okko, ToUuid("okko-95"), 5m)).Should().BeNull(
+            "no customer, including the QA account, may be priced off a rehearsal package");
     }
 
     /// <summary>
@@ -260,7 +254,7 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("o
         };
         await seed.SaveChangesAsync();
 
-        var resolved = await CreateAvailability().FindPackagesAsync(false, wanted);
+        var resolved = await CreateAvailability().FindPackagesAsync(wanted);
 
         resolved.Keys.Should().BeEquivalentTo(
             new[] { StockKey.For("okko", ToUuid("okko-95"), 2m), StockKey.For("okko", ToUuid("okko-95"), 5m) });

@@ -30,8 +30,9 @@ namespace FuelFlow.Persistence;
         /// for sale, for one offer's pool.
         /// </summary>
         /// <param name="offers">
-        /// The caller's pool. The offer supplies the price knobs and the identity; it no longer carries
-        /// a list of sizes, so it cannot be the grain on its own.
+        /// The sellable offers, already filtered to the real pool by the caller. The offer supplies the
+        /// price knobs and the identity; it no longer carries a list of sizes, so it cannot be the
+        /// grain on its own.
         /// </param>
 /// <param name="nominals">Every size any fuel is sold in, per pool. Filtered to the fuel below.</param>
     /// <param name="brands">

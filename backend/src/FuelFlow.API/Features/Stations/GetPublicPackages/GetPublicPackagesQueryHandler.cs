@@ -23,26 +23,14 @@ public sealed class GetPublicPackagesQueryHandler
     // selects only store-front columns + pump (a public list number); cost/margin never leave the DB.
     public async Task<List<PublicPackageResponse>> HandleAsync(GetPublicPackagesQuery query, CancellationToken ct = default)
     {
-        // Read the caller's pool before the rows, not after: which packages exist is a question about
-        // who is asking, and asking it afterwards only works if the answer was constant. This is the
-        // same resolution the stock side uses, deliberately - see PackageStockAvailability.
-        //
-        // Resolved from the database rather than the token, and only when a token was actually sent:
-        // an anonymous catalogue read is the common case (marketing site, pre-login browsing) and must
-        // not pay for a users lookup. A missing or soft-deleted row falls back to the real pool, which
-        // is the safe direction - the caller then sees exactly what the public storefront shows.
-var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
-
         // Rehearsal packages are real rows and stay visible to the admin screens, but this endpoint is
-        // what the app and the marketing site read, and a test package reaching a non-QA caller is
+        // what the app and the marketing site read, and a test package reaching a buyer is
         // purchasable - which is exactly how "QA-CHECK-95", 5 L at 1 UAH, ended up on sale in
         // production. Filtered here rather than by a global query filter so the admin can still see and
         // fix the row.
         //
-        // The predicate is pool-aware rather than a flat "data_kind = 'real'" because hiding them from
-        // everyone also hid them from the one caller they exist for. QA fixtures had no choice but to
-        // reuse the live catalogue, which meant a test run exercised real package ids against real
-        // prices. A QA caller now sees the QA pool and nobody else sees it at all.
+        // The filter is the real pool for every caller, including the App Store QA account: it buys
+        // from the same shop as a customer, so there is no per-caller catalogue any more.
         //
 // Query syntax rather than chained `Join` calls: the nominal join keys off the fuel, which is not
     // in scope before the sizes are joined. The joins are explicit because a size carries no
@@ -62,7 +50,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     // public site lists.
     from nominal in _context.FuelNominals.AsNoTracking()
     where nominal.FuelTypeId == fuel.Id
-          && nominal.DataKind == DataKinds.ForPool(isTestAccount)
+          && nominal.DataKind == DataKinds.Real
     orderby fuel.BrandId, fuel.Name, nominal.Liters
     select new
     {
@@ -81,9 +69,9 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
 
     // One grouped query for the whole catalog rather than an existence probe per package: this
     // endpoint feeds the map radar as well as the shop, and the count is small enough to hold in
-    // memory but far too large to ask about N times. Same pool as the row filter above - the two
-    // must agree, or a package would advertise itself with another pool's stock behind it.
-        var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
+    // memory but far too large to ask about N times. Same real pool as the row filter above - the
+    // two must agree, or a package would advertise itself with another pool's stock behind it.
+        var available = await _stock.AvailableKeysAsync(ct);
 
     return rows
     // A fuel nobody has priced yet is NOT skipped. It used to be, on the grounds that "a zero on the

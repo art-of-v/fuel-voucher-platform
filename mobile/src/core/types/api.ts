@@ -107,11 +107,11 @@ export interface FuelPackage {
   finalPricePerLiter?: number;
   /**
    * Whether the shop can sell this exact package right now — true when at least one activated
-   * (Available) voucher of the same brand + fuel + nominal exists for the caller.
+   * (Available), real voucher of the same brand + fuel + nominal exists.
    *
    * The catalog lists every package either way; this is what turns the buy button off rather than
-   * hiding the card. It is scoped to the caller's own stock pool, so a QA account and a regular
-   * customer can legitimately see different answers for the same package.
+   * hiding the card. The answer is the same for every caller: the App Review QA account buys the
+   * same shop a customer does.
    *
    * Optional so a cached or older payload degrades to "buyable" — the server still refuses the sale.
    */

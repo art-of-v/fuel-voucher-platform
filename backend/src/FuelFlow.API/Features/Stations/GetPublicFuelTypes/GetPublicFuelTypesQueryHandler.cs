@@ -35,8 +35,8 @@ public sealed class GetPublicFuelTypesQueryHandler
     /// only honest number to show for a fuel nobody has costed.</description></item>
     /// </list>
     /// <para>
-    /// The availability is the caller's own pool, because a QA account and a customer can legitimately
-    /// see different answers for the same fuel.
+    /// The availability is read from real stock only, and it is the same answer for every caller:
+    /// the App Store QA account browses the same shop a customer does.
     /// </para>
     /// </remarks>
     public async Task<List<PublicFuelTypeResponse>> HandleAsync(GetPublicFuelTypesQuery query, CancellationToken ct = default)
@@ -58,8 +58,7 @@ public sealed class GetPublicFuelTypesQueryHandler
         var slugs = await _context.Brands.AsNoTracking()
             .ToDictionaryAsync(b => b.Id, b => b.Slug, ct);
 
-        var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
-        var available = await _stock.AvailableFuelIdsAsync(isTestAccount, ct);
+        var available = await _stock.AvailableFuelIdsAsync(ct);
 
         return fuels
             .Select(f =>

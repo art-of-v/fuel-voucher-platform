@@ -96,7 +96,7 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
             new RuntimeSettingsService(context),
             new BrandSlugResolver(context));
 
-        var quote = await handler.HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid(fuelId), 10m);
+        var quote = await handler.HandleAsync(BrandIds.Okko, ToUuid(fuelId), 10m);
 
         quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null, "there is no price to show");
         quote.Terms.Should().OnlyContain(t => t.LinePriceUah == 0m, "and no line price to charge");

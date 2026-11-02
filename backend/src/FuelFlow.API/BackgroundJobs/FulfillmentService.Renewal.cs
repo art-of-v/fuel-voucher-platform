@@ -88,15 +88,6 @@ public partial class FulfillmentService
                 return;
             }
 
-            // Which stock pool this renewal draws from: a QA test account is served only test
-            // vouchers, every real account only real stock. Resolved once and re-asserted at the atomic
-            // claim. IncludingSoftDeleted so it matches the raw-SQL claim predicate.
-            var isTestAccount = await _context.Users
-                .IncludingSoftDeleted()
-                .Where(u => u.Id == order.UserId)
-                .Select(u => u.IsQaAccount)
-                .FirstOrDefaultAsync(cancellationToken);
-
             // The work list IS the order's renewal lines. #1180 put the intent there and the contract
             // step dissolved voucher_renewal_items, so a renewal has one home from checkout to expiry
             // rather than two that have to agree. A line is a renewal exactly when it names the voucher
@@ -265,7 +256,7 @@ public partial class FulfillmentService
                     // both hang off this one value. See VoucherRenewalEligibility for why.
                     var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
                         today, source.CustomerExpirationDate, term);
-                    var stock = await FindReplacementVoucherAsync(source, promisedExpiration, usedStockIds, isTestAccount, cancellationToken);
+                    var stock = await FindReplacementVoucherAsync(source, promisedExpiration, usedStockIds, cancellationToken);
 
                     if (stock == null)
                     {

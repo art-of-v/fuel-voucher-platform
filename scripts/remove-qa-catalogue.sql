@@ -1,6 +1,10 @@
--- Removes the QA pool: the `data_kind = 'qa'` mirror of the catalogue that
--- scripts/seed-qa-catalogue.sql and scripts/seed-qa-full-emulation.sql created, together with the
--- stock behind it and the emulation chain that holds it (orders, batches, imports, supplier).
+-- Removes the QA pool: legacy `data_kind = 'qa'` catalogue rows left behind by the retired QA
+-- seeding scripts, together with the stock behind them and the emulation chain that holds them
+-- (orders, batches, imports, supplier).
+--
+-- The app no longer sells from this pool at all: every buyer, including the App Store QA account,
+-- reads `data_kind = 'real'`. Running this is now legacy cleanup rather than a prerequisite for a
+-- review, and nothing can be re-seeded into the pool.
 --
 -- Nothing here can reach a real customer, and nothing here can reach a real voucher: every DELETE is
 -- keyed on the QA pool, either on `data_kind = 'qa'` or on the emulated chain's own markers
@@ -60,12 +64,12 @@
 --   # print what would go, change nothing:
 --   ... -v dry_run=true -f - < scripts/remove-qa-catalogue.sql
 --
---   # one brand only (same filter the seed scripts take):
+--   # one brand only:
 --   ... -v brand=okko -f - < scripts/remove-qa-catalogue.sql
 --
--- Re-seeding afterwards is what puts the QA catalogue back:
--- scripts/seed-qa-full-emulation.sql rebuilds supplier -> import -> batch -> stock -> wallet, and
--- scripts/seed-qa-catalogue.sql is the lighter version (catalogue plus stock, no wallet).
+-- There is no matching seed any more. The QA account is an ordinary customer: the app sells only
+-- from data_kind = real, so a QA pool would never be shown or fulfilled. This exists to clear the
+-- inert rows the retired seeds left behind.
 
 \set ON_ERROR_STOP on
 
@@ -321,7 +325,7 @@ WHERE data_kind = 'qa'
 
 -- ---------------------------------------------------------------------------------------------
 -- After. Each check is a hard question about what the run was supposed to achieve, so a leftover
--- shows up here rather than as an App Review with an empty catalogue.
+-- shows up here rather than as inert rows nobody notices are still there.
 -- ---------------------------------------------------------------------------------------------
 
 \echo '--- after ---'
@@ -343,6 +347,6 @@ UNION ALL SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_ki
 \echo 'Orders that mix pools and were therefore left alone - inspect by hand, not an error:'
 SELECT id, status FROM qa_mixed_orders ORDER BY id;
 
-\echo 'Re-seed with scripts/seed-qa-full-emulation.sql to get the QA catalogue back.'
+\echo 'The QA pool is retired: the app sells only from data_kind = real, so there is nothing to re-seed.'
 
 COMMIT;

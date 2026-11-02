@@ -213,16 +213,6 @@ public partial class FulfillmentService
                 .GroupBy(v => new { Brand = v.Brand.ToLowerInvariant(), v.FuelTypeId, v.Liters })
                 .ToDictionary(g => g.Key, g => g.Count());
 
-            // Which stock pool this order draws from: a QA test account is served only test vouchers,
-            // every real account only real stock. Resolved once per order and re-asserted at the atomic
-            // claim. IncludingSoftDeleted so this matches the raw-SQL claim predicate, which sees the row
-            // regardless of any soft-delete filter.
-            var isTestAccount = await _context.Users
-                .IncludingSoftDeleted()
-                .Where(u => u.Id == order.UserId)
-                .Select(u => u.IsQaAccount)
-                .FirstOrDefaultAsync(cancellationToken);
-
             foreach (var lineItem in lineItems)
             {
                 var key = new { Brand = lineItem.Brand.ToLowerInvariant(), lineItem.FuelTypeId, lineItem.Liters };
@@ -238,7 +228,7 @@ public partial class FulfillmentService
                 // another one still sees the vouchers that one claimed.
                 var candidates = remainingNeeded > 0
                     ? await FindMatchingVouchersAsync(
-                        order, lineItem, usedVoucherIds, isTestAccount, remainingNeeded, cancellationToken)
+                        order, lineItem, usedVoucherIds, remainingNeeded, cancellationToken)
                     : [];
 
                 for (int i = 0; i < remainingNeeded; i++)

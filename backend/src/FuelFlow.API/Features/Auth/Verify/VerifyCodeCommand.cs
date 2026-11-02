@@ -232,9 +232,10 @@ public sealed class VerifyCodeCommandHandler
             // the QA identity came with it: the flag and the active state had only ever been set
             // by the seeding migration. So the QA phone re-registering itself came back as an
             // ordinary dormant account - the QA code still worked and the tester got a valid
-            // token, so the failure was silent and looked like an empty store
-            // (PackageStockAvailability gates the QA catalogue on IsQaAccount) and a checkout that
-            // 403s (is_active=false users can use everything EXCEPT payments). That is precisely
+            // token, so the failure was silent until checkout, which 403s for an inactive account
+            // (is_active=false users can use everything EXCEPT payments). The flag also routes
+            // the account to the sandbox merchant and is what the OFF switch revokes, so a fresh
+            // row without it would pay live money and outlive the kill switch. That is precisely
             // the path App Review is told to perform, so derive both properties from the same
             // switch-gated condition on every registration rather than leaving them to a one-off
             // migration that cannot run again - the old row is soft-deleted, so it matches
@@ -243,10 +244,9 @@ public sealed class VerifyCodeCommandHandler
             // Gated on the same switch the code path above already checked, so QA status can only
             // ever be granted while QA access is actually enabled. A reviewer arriving after the
             // switch was flipped OFF cannot register at all - the gate above rejects the QA phone
-            // before the code is even compared - so a late sign-in can neither mint an ordinary
-            // active customer nor recover the real-stock catalogue. This is unreachable via the
-            // Auth:DevBypass 000000 code: DevBypass only substitutes the SMS code, and it does not
-            // get past that gate either.
+            // before the code is even compared - so a late sign-in cannot mint an active customer.
+            // This is unreachable via the Auth:DevBypass 000000 code: DevBypass only substitutes
+            // the SMS code, and it does not get past that gate either.
             var isQaRegistration = _qaTestAccess is not null
                                    && _qaTestAccess.IsQaPhone(phoneNumber)
                                    && await _qaTestAccess.IsActiveAsync(cancellationToken);
