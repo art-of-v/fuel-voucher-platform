@@ -56,8 +56,8 @@ public sealed record PublicFuelTypeResponse(
     /// </summary>
     decimal? FinalPricePerLiter,
     /// <summary>
-    /// Whether this fuel can be bought right now: at least one of its sizes has live stock behind it
-    /// in the caller's own pool.
+    /// Whether this fuel can be bought right now: at least one of its sizes has live real stock
+    /// behind it. The answer is the same for every caller.
     /// </summary>
     /// <remarks>
     /// A fuel the shop cannot sell is shown at the column price rather than at a price of ours, because

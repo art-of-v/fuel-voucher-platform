@@ -11,18 +11,18 @@ namespace FuelFlow.IntegrationTests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The concrete failure this exists for: <c>scripts/seed-qa-catalogue.sql</c> and
-/// <c>scripts/seed-qa-full-emulation.sql</c> still created a <c>fuel_offers</c> twin and a
-/// <c>fuel_offer_volumes</c> twin under it. Both tables were dropped - <c>fuel_offer_volumes</c> in
-/// <c>20261018224126</c> and <c>fuel_offers</c> in <c>20261019095748</c>, the migration that moved the
-/// price onto the fuel itself - so the two scripts that seed the App Store reviewer's catalogue had
+/// The concrete failure this exists for: the retired QA seed scripts still created a
+/// <c>fuel_offers</c> twin and a <c>fuel_offer_volumes</c> twin under it. Both tables were dropped -
+/// <c>fuel_offer_volumes</c> in <c>20261018224126</c> and <c>fuel_offers</c> in
+/// <c>20261019095748</c>, the migration that moved the price onto the fuel itself - so they had
 /// been failing for a week, and <c>scripts/reset-test-data.sql</c> still deleted from
-/// <c>voucher_renewal_items</c>, a table dropped in <c>20261017073518</c>.
+/// <c>voucher_renewal_items</c>, a table dropped in <c>20261017073518</c>. The QA seeds themselves
+/// are gone now that the QA account buys from the real catalogue; what remains still has to run.
 /// </para>
 /// <para>
 /// A script that cannot run is a script nobody notices is broken: these are run by hand, against
-/// production, by whoever is doing a QA session - so the failure surfaces as "the reviewer sees an
-/// empty shop" rather than as an error naming the table. That is the whole reason this test exists.
+/// production, by whoever is doing an operator task - so the failure surfaces as a wrong shop
+/// rather than as an error naming the table. That is the whole reason this test exists.
 /// </para>
 /// <para>
 /// The scripts are executed rather than parsed, and through a small psql interpreter rather than
@@ -66,9 +66,6 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
     /// </summary>
     private static readonly string[] CheckedScripts =
     [
-        "seed-qa-catalogue.sql",
-        "seed-qa-full-emulation.sql",
-        "seed-test-vouchers.sql",
         "remove-qa-catalogue.sql",
         "reset-test-data.sql",
     ];
@@ -104,7 +101,7 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
     [MemberData(nameof(CheckedScriptFiles))]
     public async Task EverySeedScript_RunsAgainstTheSchemaTheApplicationRuns(string fileName)
     {
-        var qaUserId = await SeedTheFixtureAsync();
+        await SeedTheFixtureAsync();
 
         var path = Path.Combine(RepoRoot(), "scripts", fileName);
         var script = File.ReadAllText(path);
@@ -112,15 +109,9 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
         await using var connection = new NpgsqlConnection(_fixture.ConnectionString);
         await connection.OpenAsync();
 
-        // The variables a script insists on: which QA account it seeds for, and which fuel. The
-        // fuel is the one this fixture creates, so the lookup in seed-test-vouchers.sql resolves it
-        // the way it resolves on a database that carries the catalogue.
-        var runner = new PsqlInterpreter(connection, new Dictionary<string, string>
-        {
-            ["qa_user_id"] = qaUserId,
-            ["fuel_name"] = SeededFuelName,
-            ["fuel_brand"] = SeededBrandSlug,
-        });
+        // None of the remaining scripts require a variable; the branded cleanup uses none unless
+        // a brand is passed, in which case it defaults to every brand.
+        var runner = new PsqlInterpreter(connection, new Dictionary<string, string>());
 
         var failures = await runner.RunAsync(script);
 

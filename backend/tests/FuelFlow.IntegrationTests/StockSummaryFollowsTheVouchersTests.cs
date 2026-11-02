@@ -165,7 +165,7 @@ public sealed class StockSummaryFollowsTheVouchersTests : IClassFixture<TestData
                 ["VoucherExpiration:Enabled"] = "true"
             }).Build());
 
-        var keys = await availability.AvailableKeysAsync(isTestAccount: false);
+        var keys = await availability.AvailableKeysAsync();
 
         // Available, real, and not expired - the same rule the fulfilment path applies.
         keys.Should().ContainSingle();

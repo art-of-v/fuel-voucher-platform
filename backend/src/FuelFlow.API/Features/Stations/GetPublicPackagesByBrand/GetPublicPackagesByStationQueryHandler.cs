@@ -23,15 +23,9 @@ public sealed class GetPublicPackagesByBrandQueryHandler
     // selects only store-front columns + pump (a public list number); cost/margin never leave the DB.
     public async Task<List<PublicPackageResponse>> HandleAsync(GetPublicPackagesByBrandQuery query, CancellationToken ct = default)
     {
-        // Resolved before the rows for the same reason as in GetPublicPackagesQueryHandler: which
-        // packages exist depends on who is asking. The two routes must read the pool identically, or
-        // whichever of them is laxer becomes the way into the other pool's catalogue.
-        var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
-
         // Same rule as GetPublicPackagesQueryHandler, and for the same reason: this is the second anonymous
         // storefront route, so a filter on one of the two would leave the rehearsal package
-        // purchasable through the other. Pool-aware there and here, because a filter that hid the QA
-        // catalogue from everyone also hid it from QA.
+        // purchasable through the other. Both routes read the real pool for every caller.
         //
         // `data_kind` is on the size, so the filter is on the size; the fuel's display name is
         // joined from fuel_types for the same reason as there - the size knows which fuel, not what
@@ -47,7 +41,7 @@ var rows = await (
         // The sizes belong to the fuel AND the pool - see GetPublicPackagesQueryHandler.
         from nominal in _context.FuelNominals.AsNoTracking()
         where nominal.FuelTypeId == fuel.Id
-              && nominal.DataKind == DataKinds.ForPool(isTestAccount)
+              && nominal.DataKind == DataKinds.Real
         orderby fuel.Name, nominal.Liters
         select new
         {
@@ -64,7 +58,7 @@ var rows = await (
         })
         .ToListAsync(ct);
 
-        var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
+        var available = await _stock.AvailableKeysAsync(ct);
 
         // A fuel nobody has priced yet is shown, not skipped: see the same rule and the same reason in
         // GetPublicPackagesQueryHandler - an empty shelf says "we do not sell this", and the column

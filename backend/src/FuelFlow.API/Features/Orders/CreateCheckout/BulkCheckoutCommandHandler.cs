@@ -111,13 +111,6 @@ private readonly RuntimeSettingsService _runtimeSettings;
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
 
-        // Resolved once, through the same helper the storefront uses, and reused for both the package
-        // pick and the stock gate below. This used to read user.IsQaAccount, which is a third
-        // definition of "is this a QA account" alongside the storefront's phone arm and
-        // MonobankMerchantResolver's allowlist - so a QA account deleted and re-signed-up saw the QA
-        // catalogue and was then stock-checked against the real pool. See CreateCheckoutCommandHandler.
-        var isTestAccount = await _stock.IsTestAccountAsync(user.Id, cancellationToken);
-
         // The resolved package rides along so the line can record what priced it. The order line stores the
         // resulting price; pricing_basis stores the inputs behind it, which is the only thing that
         // still answers "why was this 89.06?" once the contract and the fuel's pricing have moved on.
@@ -134,14 +127,14 @@ private readonly RuntimeSettingsService _runtimeSettings;
         var wantedStock = command.Items
             .Select(i => StockKey.For(brandSlugs[i.BrandId!.Value], i.FuelTypeId, i.Liters))
             .ToHashSet();
-        var inStock = await _stock.AvailableKeysAsync(wantedStock, isTestAccount, cancellationToken);
+        var inStock = await _stock.AvailableKeysAsync(wantedStock, cancellationToken);
 
         // Same resolution the single-line path uses, so a cart can never price a line off a different
         // row than that line would have priced off on its own. Previously this read the whole
         // catalogue and picked with a local FirstOrDefault, which is arbitrary when the key has two
-        // rows - and it has two rows for every sellable triple, because seed-qa-catalogue.sql mirrors
-        // each real package into the QA pool. See PackageStockAvailability.FindPackagesAsync.
-        var packages = await _stock.FindPackagesAsync(isTestAccount, wantedStock, cancellationToken);
+        // rows - and it can, because a rehearsal nominal may mirror a real one. See
+        // PackageStockAvailability.FindPackagesAsync.
+        var packages = await _stock.FindPackagesAsync(wantedStock, cancellationToken);
 
         // The same question for the whole cart, answered before the loop: how far does the paper
         // term of the stock reach. It used to be asked per line, inside the loop, so a cart of

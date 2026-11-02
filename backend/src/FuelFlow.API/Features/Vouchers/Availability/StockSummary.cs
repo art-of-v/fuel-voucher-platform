@@ -28,7 +28,7 @@ namespace FuelFlow.Features.Vouchers.Availability;
 /// </para>
 /// <para>
 /// <b>Why the dimensions are the ones they are.</b> They are the columns the two readers filter on:
-/// the storefront sells <c>Available</c> vouchers of the caller's own pool that are not deleted and
+/// the storefront sells <c>Available</c> vouchers of the real pool that are not deleted and
 /// not expired, and the operator's list is the whole inventory including the deleted rows. So the
 /// summary carries a status, a pool, a deleted flag and an expiry date - not as decoration, but
 /// because a reader that cannot filter on them would get a different answer than it gets today.

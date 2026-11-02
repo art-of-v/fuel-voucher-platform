@@ -6,7 +6,6 @@ using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
@@ -183,16 +182,14 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     /// <em>and</em> active.
     ///
     /// The delete is a soft delete - the row survives so the history stays visible to staff -
-    /// and signing up mints a <em>new</em> row for the same phone. The QA code kept working
-    /// there, which is what made this easy to miss: the tester got a token, the token was
-    /// valid, and every screen said the store was simply empty. The catalogue gate in
-    /// <c>PackageStockAvailability</c> reads <c>User.IsQaAccount</c>, and nothing in the
-    /// registration path had ever set it - only the seeding migration did, once.
+    /// and signing up mints a <em>new</em> row for the same phone. Nothing in the registration
+    /// path used to set the flag, only the seeding migration did, once. The flag routes the
+    /// account to the sandbox merchant and is the row the OFF switch revokes, so losing it
+    /// silently sends the reviewer to the live acquirer and leaves the session unrevokable.
     ///
-    /// <c>IsActive</c> failed the same way for the same reason and is the harder half to spot,
-    /// because it has no visible symptom until checkout: an inactive account may browse, renew
-    /// and chat, and is refused only by the payment endpoints. The seeded QA row is
-    /// <c>is_active = true</c> for exactly that reason.
+    /// <c>IsActive</c> failed the same way for the same reason, and has no visible symptom until
+    /// checkout: an inactive account may browse, renew and chat, and is refused only by the
+    /// payment endpoints. The seeded QA row is <c>is_active = true</c> for exactly that reason.
     ///
     /// This is exactly the path App Review is instructed to perform on the demo account, so it
     /// is not an edge case: it is the one guaranteed to run.
@@ -235,11 +232,12 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
             (await context.Orders.CountAsync(o => o.UserId == active.Id)).Should().Be(0,
                 "history stays on the deleted account and is not carried over");
 
-            // ...but QA access has to come back, or the tester sees an empty store.
-            var availability = scope.ServiceProvider
-                .GetRequiredService<PackageStockAvailability>();
-            (await availability.IsTestAccountAsync(active.Id)).Should().BeTrue(
-                "the QA phone re-registering must still see the QA catalogue");
+            // ...and the flag has to come back: it routes the account to the sandbox merchant and
+            // is what flipping the switch OFF revokes, so a fresh row without it would pay live
+            // money and outlive the kill switch.
+            active.IsQaAccount.Should().BeTrue(
+                "the QA phone re-registering must be flagged again, or the sandbox routing and the " +
+                "session revocation attached to the flag are lost");
 
             // ...and active, or the tester sees the catalogue and then cannot buy anything. The
             // seeded account is is_active=true for exactly that reason; the flag alone was not

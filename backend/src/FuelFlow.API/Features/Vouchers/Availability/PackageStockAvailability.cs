@@ -1,4 +1,3 @@
-using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -26,7 +25,7 @@ public readonly record struct StockKey(string Brand, Guid FuelTypeId, decimal Li
 /// <remarks>
 /// This mirrors <c>FulfillmentService.FindMatchingVoucherAsync</c> key for key — <see cref="VoucherStatus.Available"/>
 /// only (imported stock is not sellable until a manager activates it, which in turn requires the batch cost),
-/// the caller's own test-data pool, and the supplier term. Deliberately the same rule on both sides of the
+/// the real stock pool, and the supplier term. Deliberately the same rule on both sides of the
 /// counter: a package the shop advertises as available and then refuses to sell is the bug this class exists
 /// to prevent, and a package it hides while fulfilment would happily hand the voucher over wastes a sale.
 ///
@@ -40,14 +39,6 @@ public sealed class PackageStockAvailability
     private readonly ApplicationDbContext _context;
 
     /// <summary>
-    /// The configured QA phone, already normalized, or <see langword="null"/> when QA test access is
-    /// not wired into this host. Read once per call so the comparison below stays translatable -
-    /// the alternative, calling a helper inside the <c>Where</c>, is a C# delegate the provider
-    /// cannot translate.
-    /// </summary>
-    private readonly QaTestAccessService? _qaTestAccess;
-
-    /// <summary>
     /// Whether the supplier term gates sellability. Read once, because every screen must agree with the
     /// worker: flipping it between the shop and fulfilment would make the shop advertise stock the worker
     /// then refuses, or hide stock the worker would have sold.
@@ -56,50 +47,15 @@ public sealed class PackageStockAvailability
 
     public PackageStockAvailability(
         ApplicationDbContext context,
-        IConfiguration configuration,
-        QaTestAccessService? qaTestAccess = null)
+        IConfiguration configuration)
     {
         _context = context;
-        _qaTestAccess = qaTestAccess;
         _expiryEnabled = configuration.GetValue("VoucherExpiration:Enabled", true);
     }
 
     /// <summary>
-    /// Which stock pool this caller may see: test vouchers for a QA account, real vouchers for everyone
-    /// else, and real ones for an anonymous visitor (who is not a QA account by definition).
-    /// </summary>
-    /// <remarks>
-    /// Read from the database rather than the token, and only when the caller actually sent one: an
-    /// anonymous catalog read is the common case (marketing site, pre-login browsing) and must not pay
-    /// for a users lookup. A missing or soft-deleted row falls back to the real pool, which is the safe
-    /// direction — the caller then sees what the public storefront shows.
-    /// </remarks>
-    public async Task<bool> IsTestAccountAsync(Guid? callerUserId, CancellationToken cancellationToken = default)
-    {
-        if (callerUserId is null || callerUserId.Value == Guid.Empty)
-            return false;
-
-        // QA is an OR, the same shape MonobankMerchantResolver.IsQa uses: flagged, or the
-        // configured QA number.
-        //
-        // The flag alone was not enough. Deleting the QA account and signing up again mints a
-        // fresh row for the same phone, and the flag was only ever set by the seeding migration -
-        // so the re-registered account had none. Its QA code still worked and its token was
-        // valid, and the tester saw an empty store: every screen said the catalogue was simply
-        // empty, which reads as a broken app rather than as a missing flag. That is the exact
-        // path App Review is told to perform on the demo account, so the phone arm has to carry
-        // it on its own.
-        var qaPhone = _qaTestAccess?.QaPhoneNumber;
-
-        return await _context.Users
-            .AsNoTracking()
-            .AnyAsync(u => u.Id == callerUserId.Value
-                       && (u.IsQaAccount || u.PhoneNumber == qaPhone), cancellationToken);
-    }
-
-    /// <summary>
     /// The <see cref="FuelPackage"/> that will actually be charged for one (Brand, fuel, litres)
-    /// line, or <see langword="null"/> when this caller's pool has no package for that triple.
+    /// line, or <see langword="null"/> when the real catalogue has no package for that triple.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -109,34 +65,28 @@ public sealed class PackageStockAvailability
     /// <c>DataKind</c> filter and no <c>OrderBy</c>.
     /// </para>
     /// <para>
-    /// Both omissions matter because a triple is not unique. <c>scripts/seed-qa-catalogue.sql</c> gives
-    /// every real package a QA mirror on the <em>same</em> Brand, fuel and nominal, so as shipped every
-    /// sellable triple has exactly two live rows — measured on production 2026-10-14: 13 brand-fuel
-    /// groups producing 58 rows, 58 flagged real and 58 flagged QA, with no duplicates inside either
-    /// pool. An unordered
-    /// <c>FirstOrDefaultAsync</c> over two rows returns whichever one Postgres happens to produce first.
+    /// Both omissions matter because a triple is not unique. A rehearsal nominal can mirror a real
+    /// one on the <em>same</em> Brand, fuel and size (the admin write path creates them with
+    /// <c>isTestData</c>), so an unordered <c>FirstOrDefaultAsync</c> over two rows returns whichever
+    /// one Postgres happens to produce first. Filtering on the real pool and ordering
+    /// deterministically is what keeps a customer from being charged off a row the shop never
+    /// showed.
     /// </para>
     /// <para>
-    /// The price happens to be identical today only because the seed copies it, which is luck rather
-    /// than a property. The moment a QA mirror is repriced independently, or an admin adds a second
-    /// real package for a nominal, the customer is charged off an arbitrary row while the shop showed
-    /// the other. Filtering on the caller's own pool and ordering deterministically makes that
-    /// impossible instead of merely unlikely.
+    /// The pool is always <see cref="DataKinds.Real"/>: every account buys from the real shop,
+    /// including the App Store QA account. Rehearsal rows remain visible to the admin screens that
+    /// create and clean them up, never to a buyer.
     /// </para>
     /// </remarks>
     public async Task<SellablePackage?> FindPackageAsync(
-        bool isTestAccount,
         Guid brandId,
         Guid fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
-var pool = DataKinds.ForPool(isTestAccount);
-
         // The size is the fuel's, not a row's: the fuel names the price and the nominal says this
         // size is allowed for sale. fuel_nominals is keyed (fuel_type_id, data_kind, liters), so
-        // exactly one package can match - which is what the ordering used to paper over when it
-        // was not.
+        // exactly one package can match.
         var row = await (
             from fuel in _context.FuelTypes.AsNoTracking()
             from nominal in _context.FuelNominals.AsNoTracking()
@@ -148,10 +98,8 @@ var pool = DataKinds.ForPool(isTestAccount);
             where fuel.BrandId == brandId
                   && fuel.Id == fuelTypeId
                   && nominal.Liters == liters
-                  // The caller's pool, on the nominal: the size list is per pool, so a rehearsal size
-                  // resolves only against the caller's own catalogue, and a live one never answers
-                  // for it.
-                  && nominal.DataKind == pool
+                  // The real pool, on the nominal: a rehearsal size is never offered for sale.
+                  && nominal.DataKind == DataKinds.Real
             select new { Fuel = fuel, DataKind = nominal.DataKind, BrandSlug = brand.Slug })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -164,7 +112,6 @@ var pool = DataKinds.ForPool(isTestAccount);
     /// priced off exactly the package its stock was checked against.
     /// </summary>
     public async Task<Dictionary<StockKey, SellablePackage>> FindPackagesAsync(
-        bool isTestAccount,
         IReadOnlyCollection<StockKey> wanted,
         CancellationToken cancellationToken = default)
     {
@@ -179,7 +126,6 @@ var pool = DataKinds.ForPool(isTestAccount);
         var brands = wanted.Select(k => k.Brand).Distinct().ToArray();
         var fuelTypeIds = wanted.Select(k => k.FuelTypeId).Distinct().ToArray();
         var literSizes = wanted.Select(k => k.Liters).Distinct().ToArray();
-        var pool = DataKinds.ForPool(isTestAccount);
 
 var rows = await (
             from fuel in _context.FuelTypes.AsNoTracking()
@@ -188,7 +134,7 @@ var rows = await (
             // The cart names its brands by slug, so the narrowing below compares against the
             // network's own code rather than an id the cart never had.
             join brand in _context.Brands.AsNoTracking() on fuel.BrandId equals brand.Id
-            where nominal.DataKind == pool
+            where nominal.DataKind == DataKinds.Real
                   && brands.Contains(brand.Slug.ToLower())
                   && fuelTypeIds.Contains(fuel.Id)
                   && literSizes.Contains(nominal.Liters)
@@ -218,24 +164,24 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     /// Every <see cref="StockKey"/> the given customer can buy today, as one grouped query. Used to annotate a
     /// whole catalog rather than asking per package.
     /// </summary>
-    public async Task<HashSet<StockKey>> AvailableKeysAsync(bool isTestAccount, CancellationToken cancellationToken = default)
+    public async Task<HashSet<StockKey>> AvailableKeysAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await SellableKeys(isTestAccount).ToListAsync(cancellationToken);
+        var rows = await SellableKeys().ToListAsync(cancellationToken);
         return rows.ToHashSet();
     }
 
     /// <summary>
-    /// The fuels the given customer can buy today, in their own pool: every fuel with at least one
-    /// size that has live stock behind it.
+    /// The fuels the customer can buy today: every fuel with at least one size that has live stock
+    /// behind it.
     /// </summary>
     /// <remarks>
     /// The same stock the packages endpoint counts, asked a different question. This one is for a
     /// screen that lists FUELS rather than packages - a brand's page, where the customer asks "can I
     /// buy this fuel" and not "can I buy this exact size of it".
     /// </remarks>
-    public async Task<HashSet<Guid>> AvailableFuelIdsAsync(bool isTestAccount, CancellationToken cancellationToken = default)
+    public async Task<HashSet<Guid>> AvailableFuelIdsAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await SellableKeys(isTestAccount).ToListAsync(cancellationToken);
+        var rows = await SellableKeys().ToListAsync(cancellationToken);
         return rows.Select(r => r.FuelTypeId).ToHashSet();
     }
 
@@ -245,7 +191,6 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     /// </summary>
     public async Task<HashSet<StockKey>> AvailableKeysAsync(
         IReadOnlyCollection<StockKey> wanted,
-        bool isTestAccount,
         CancellationToken cancellationToken = default)
     {
         if (wanted.Count == 0)
@@ -255,7 +200,6 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         // (brand, fuel_type_id, liters, status) index instead of grouping the whole table - but
         // narrowed inside SellableKeys, on the entity, ahead of the projection. See there for why.
         var rows = await SellableKeys(
-                isTestAccount,
                 wanted.Select(w => w.Brand).ToArray(),
                 wanted.Select(w => w.FuelTypeId).ToArray(),
                 wanted.Select(w => w.Liters).ToArray())
@@ -273,7 +217,6 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     /// through the <c>(brand, fuel_type_id, liters, status)</c> index.
     /// </summary>
     public Task<bool> IsInStockAsync(
-        bool isTestAccount,
         string brandSlug,
         Guid fuelTypeId,
         decimal liters,
@@ -283,7 +226,6 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         // Vouchers still carry the network by text, so this gate - unlike the fuel lookups above -
         // is matched on the slug rather than on a uuid.
         var brand = brandSlug.ToLower();
-        var pool = DataKinds.ForPool(isTestAccount);
 
         return _context.FuelVouchers
             .AsNoTracking()
@@ -292,7 +234,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
                   && v.Brand == brand
                   && v.FuelTypeId == fuelTypeId
                   && v.Liters == liters
-                  && v.DataKind == pool
+                  && v.DataKind == DataKinds.Real
                   && (!_expiryEnabled || v.SupplierExpirationDate >= today),
                 cancellationToken);
     }
@@ -320,18 +262,16 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     /// </para>
     /// </remarks>
     private IQueryable<StockKey> SellableKeys(
-        bool isTestAccount,
         string[]? brands = null,
         Guid[]? fuelTypeIds = null,
         decimal[]? literSizes = null)
     {
         var today = DateOnly.FromDateTime(SystemClock.UtcNow);
-        var pool = DataKinds.ForPool(isTestAccount);
 
         var query = _context.StockSummary
             .AsNoTracking()
             .Where(s => s.Status == VoucherStatus.Available
-                     && s.DataKind == pool
+                     && s.DataKind == DataKinds.Real
                      && !s.IsDeleted
                      && (!_expiryEnabled || s.SupplierExpirationDate >= today)
                      && s.VoucherCount > 0);

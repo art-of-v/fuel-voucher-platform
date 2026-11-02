@@ -38,7 +38,7 @@ public static class DataKinds
     public const string Real = "real";
 
     /// <summary>
-    /// Rehearsal data: emulated, never sold to a real customer, never fulfilled from real stock.
+    /// Rehearsal data: emulated, never shown in the shop or fulfilled, whoever is asking.
     /// </summary>
     public const string Qa = "qa";
 
@@ -46,10 +46,15 @@ public static class DataKinds
     public static readonly string[] All = [Real, Qa];
 
     /// <summary>
-    /// The pool a QA caller reads. The inverse of "is this caller QA" everywhere it is used, so it
-    /// is expressed once here rather than at each call site.
+    /// The kind a write path states for a row it is creating: <see cref="Qa"/> when an operator is
+    /// deliberately creating rehearsal data, <see cref="Real"/> otherwise.
     /// </summary>
-    public static string ForPool(bool isTestAccount) => isTestAccount ? Qa : Real;
+    /// <remarks>
+    /// Not a caller-routing rule. Sales only ever read <see cref="Real"/>; a QA account buys from
+    /// the same catalogue as a customer. This helper remains for the admin write paths that create
+    /// a rehearsal fuel or nominal.
+    /// </remarks>
+    public static string ForPool(bool isTestData) => isTestData ? Qa : Real;
 
     public static bool IsKnown(string? value) => value is Real or Qa;
 }
