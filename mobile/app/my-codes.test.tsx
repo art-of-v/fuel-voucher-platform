@@ -220,6 +220,7 @@ const baseData = {
   pendingOrders: [],
   fulfilledOrders: [],
   spentOrderCount: 0,
+  spentVoucherCount: 0,
   issuanceOrders: [],
   looseIssuanceVouchers: [],
   loadData: jest.fn(),
@@ -501,16 +502,34 @@ describe('MyCodesScreen', () => {
   });
 
   describe('the spent-fuel filter', () => {
-    it('is absent when no order is fully spent', () => {
+    it('is absent when no fuel has been spent', () => {
       renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')] });
 
       expect(screen.queryByTestId('spent-orders-toggle')).toBeNull();
     });
 
+    it('is offered by a receipt that still holds live fuel', () => {
+      // The regression: part of a pack is used, so no order is FULLY spent and the old gate hid the
+      // chip — leaving those spent vouchers on the server, in the payload, and unreachable. The chip
+      // is one switch for both levels, so either level's hidden fuel has to open it.
+      renderScreen({
+        fulfilledOrders: [order('mixed', 'FULFILLED')],
+        spentOrderCount: 0,
+        spentVoucherCount: 3,
+      });
+
+      expect(screen.getByTestId('spent-orders-toggle')).toBeTruthy();
+      expect(screen.getByText('3')).toBeTruthy();
+
+      fireEvent.press(screen.getByTestId('spent-orders-toggle'));
+      const calls = mockUseMyCodes.mock.calls;
+      expect(calls[calls.length - 1][0]).toEqual({ includeSpent: true });
+    });
+
     it('asks the data layer for spent vouchers once it is switched on', () => {
       // One switch covers both levels: the hook hands back the fully spent orders AND the spent
       // vouchers inside every order it already shows.
-      renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')], spentOrderCount: 3 });
+      renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')], spentVoucherCount: 3 });
 
       fireEvent.press(screen.getByTestId('spent-orders-toggle'));
 
@@ -521,7 +540,7 @@ describe('MyCodesScreen', () => {
     it('is offered when every order is spent, so the history is not lost', () => {
       // Nothing live means the empty state, and the empty state is exactly where a toggle hidden
       // behind "not empty" would strand the customer's receipts.
-      renderScreen({ fulfilledOrders: [], spentOrderCount: 2 });
+      renderScreen({ fulfilledOrders: [], spentOrderCount: 2, spentVoucherCount: 2 });
 
       expect(screen.getByTestId('spent-orders-toggle')).toBeTruthy();
     });
@@ -533,6 +552,7 @@ describe('MyCodesScreen', () => {
         orders: [order('spent-1', 'FULFILLED'), order('spent-2', 'FULFILLED')],
         fulfilledOrders: [],
         spentOrderCount: 2,
+        spentVoucherCount: 2,
       });
 
       expect(screen.getByText('codes.emptySpentSubtitle')).toBeTruthy();
@@ -543,7 +563,7 @@ describe('MyCodesScreen', () => {
     });
 
     it('keeps the ordinary empty state when nothing has been spent', () => {
-      renderScreen({ orders: [], fulfilledOrders: [], spentOrderCount: 0 });
+      renderScreen({ orders: [], fulfilledOrders: [], spentOrderCount: 0, spentVoucherCount: 0 });
 
       expect(screen.getByText('codes.purchaseFuel')).toBeTruthy();
       expect(screen.queryByTestId('summary-orders')).toBeNull();
@@ -551,8 +571,13 @@ describe('MyCodesScreen', () => {
 
     it('counts a fully spent receipt in the summary while the list hides it', () => {
       // Filtering the list must not shrink the account: two fulfilled receipts, one live and one
-      // spent, are still two - otherwise the bar contradicts the customer's own history.
-      renderScreen({ fulfilledOrders: [order('live', 'FULFILLED')], spentOrderCount: 1 });
+      // spent, are still two - otherwise the bar contradicts the customer's own history. The bar
+      // counts receipts, so it keeps reading `spentOrderCount` even though the chip counts fuel.
+      renderScreen({
+        fulfilledOrders: [order('live', 'FULFILLED')],
+        spentOrderCount: 1,
+        spentVoucherCount: 1,
+      });
 
       expect(screen.getByTestId('summary-fulfilled')).toHaveTextContent('2');
     });

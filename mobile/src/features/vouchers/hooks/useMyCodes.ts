@@ -240,14 +240,29 @@ export function useMyCodes({ includeSpent = false }: UseMyCodesOptions = {}) {
   );
 
   // How many receipts are fully spent — every voucher in them is used, lapsed, blocked or
-  // deactivated. They are hidden by default; this is what the filter chip counts. An order that
-  // nests no voucher at all is not "spent", it is simply not a wallet card.
+  // deactivated. They are hidden by default; the summary bar still counts them as receipts. An
+  // order that nests no voucher at all is not "spent", it is simply not a wallet card.
   const spentOrderCount = useMemo(
     () =>
       fulfilledPurchaseOrders.filter((order) => {
         const all = vouchersByOrder.get(order.id) ?? [];
         return all.length > 0 && !all.some(isLiveWalletVoucher);
       }).length,
+    [fulfilledPurchaseOrders, vouchersByOrder],
+  );
+
+  // How much spent fuel the switch would reveal, counted as vouchers rather than receipts: a spent
+  // voucher inside a receipt that still holds live fuel is just as hidden as the whole of a fully
+  // spent receipt, and the chip is one switch for both levels. Gating the chip on `spentOrderCount`
+  // alone left the mixed case — the common one after part of a pack is used — with no way in.
+  const spentVoucherCount = useMemo(
+    () =>
+      fulfilledPurchaseOrders.reduce(
+        (total, order) =>
+          total +
+          (vouchersByOrder.get(order.id) ?? []).filter((v) => !isLiveWalletVoucher(v)).length,
+        0,
+      ),
     [fulfilledPurchaseOrders, vouchersByOrder],
   );
 
@@ -309,6 +324,7 @@ export function useMyCodes({ includeSpent = false }: UseMyCodesOptions = {}) {
     pendingOrders,
     fulfilledOrders,
     spentOrderCount,
+    spentVoucherCount,
     issuanceOrders: receipts,
     issuanceVouchers: vouchersInReceipts,
     looseIssuanceVouchers: loose,
