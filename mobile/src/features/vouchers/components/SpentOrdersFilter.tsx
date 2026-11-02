@@ -4,7 +4,7 @@ import { Chip } from '../../../core/ui';
 import { useI18n } from '../../../core/i18n';
 
 type SpentOrdersFilterProps = {
-  /** Fully spent orders, counted before the filter is switched on. */
+  /** Spent vouchers the switch would reveal, counted before it is switched on. */
   count: number;
   selected: boolean;
   onToggle: () => void;

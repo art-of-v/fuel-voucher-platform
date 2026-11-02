@@ -77,6 +77,7 @@ export default function MyCodesScreen() {
     pendingOrders,
     fulfilledOrders,
     spentOrderCount,
+    spentVoucherCount,
     issuanceOrders,
     looseIssuanceVouchers,
     loadData,
@@ -334,13 +335,16 @@ export default function MyCodesScreen() {
 
   // The spent-fuel filter. One switch covers both levels: it reveals the receipts whose every
   // voucher is spent, and the spent vouchers inside any receipt the wallet already shows. Offered
-  // whenever such an order exists - including in the empty state, because "nothing to use" must
-  // not mean "nothing to look at": the history is one tap away rather than gone.
+  // whenever there is spent fuel to reveal at EITHER level — gating it on the fully spent receipts
+  // alone left a mixed receipt (part of a pack used) with its spent vouchers on the server, in the
+  // payload, and unreachable. Including in the empty state, because "nothing to use" must not mean
+  // "nothing to look at": the history is one tap away rather than gone.
+  // The chip counts vouchers, not receipts, because that is what switching it on adds to the screen.
   // A worker's list is not order-filtered the same way and carries its own status filter (#161 H0).
   const spentFilter =
-    !isWorkerContext && spentOrderCount > 0 ? (
+    !isWorkerContext && spentVoucherCount > 0 ? (
       <SpentOrdersFilter
-        count={spentOrderCount}
+        count={spentVoucherCount}
         selected={showSpent}
         onToggle={() => setShowSpent((value) => !value)}
       />
