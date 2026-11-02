@@ -49,7 +49,7 @@
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
-    "expo-updates": "~29.0.16",
+    "expo-updates": "~58.0.19",
     "lucide-react": "^1.46.0",
     "lucide-react-native": "^1.35.0",
     "nativewind": "^4.2.6",
