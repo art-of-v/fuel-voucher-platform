@@ -37,6 +37,11 @@ import { outDir, report, root } from './lib/harness.mjs';
 import { buildBrandAssets } from './lib/brand-assets.mjs';
 
 const SOURCE = resolve(root, '..', 'mobile/assets/icon.png');
+/* `copiedTo` is the file the website export ships, where a committed asset the
+ * build drops out of is still a missing icon. The admin and Android surfaces are
+ * not part of this export, so they carry `referencedBy` instead: the declaration
+ * that makes the byte load. A regenerated icon nothing points at is an icon that
+ * does not exist. */
 const TARGETS = [
   {
     what: 'the tab icon',
@@ -55,6 +60,25 @@ const TARGETS = [
     file: resolve(root, 'public/lion-mask.png'),
     key: 'mask',
     copiedTo: resolve(outDir, 'lion-mask.png'),
+    referencedBy: { file: resolve(root, 'src/components/Header.module.css'), needle: 'lion-mask.png' },
+  },
+  {
+    what: 'the admin UI lion mask',
+    file: resolve(root, '..', 'admin/src/assets/lion-mask.png'),
+    key: 'mask',
+    referencedBy: { file: resolve(root, '..', 'admin/src/index.css'), needle: 'lion-mask.png' },
+  },
+  {
+    what: 'the admin tab icon',
+    file: resolve(root, '..', 'admin/public/favicon.ico'),
+    key: 'favicon',
+    referencedBy: { file: resolve(root, '..', 'admin/index.html'), needle: 'favicon.ico' },
+  },
+  {
+    what: 'the Android launcher foreground',
+    file: resolve(root, '..', 'mobile/assets/adaptive-icon.png'),
+    key: 'adaptiveIcon',
+    referencedBy: { file: resolve(root, '..', 'mobile/app.json'), needle: 'adaptive-icon.png' },
   },
 ];
 
@@ -79,7 +103,7 @@ try {
   process.exit(1);
 }
 
-for (const { what, file, key, copiedTo } of TARGETS) {
+for (const { what, file, key, copiedTo, referencedBy } of TARGETS) {
   if (!existsSync(file)) {
     failures.push(`${what} is not committed (${file}) - run "npm run brand"`);
     continue;
@@ -96,14 +120,30 @@ for (const { what, file, key, copiedTo } of TARGETS) {
 
   /* The build ships out/, not src/. A generator that wrote somewhere the export
    * does not carry would pass this and still ship the old icon. */
-  if (!existsSync(copiedTo)) {
-    failures.push(`${what} is committed but missing from the build output (${copiedTo})`);
-  } else if (!readFileSync(copiedTo).equals(onDisk)) {
-    failures.push(`${what} in the build output differs from the committed file - the export is stale`);
+  if (copiedTo) {
+    if (!existsSync(copiedTo)) {
+      failures.push(`${what} is committed but missing from the build output (${copiedTo})`);
+    } else if (!readFileSync(copiedTo).equals(onDisk)) {
+      failures.push(`${what} in the build output differs from the committed file - the export is stale`);
+    }
+  }
+
+  /* And something has to load it. This is the half the admin missed: its favicon
+   * sat outside this pipeline entirely, so it could be any bytes at all and the
+   * name it shipped under did not even match the format inside. */
+  if (referencedBy) {
+    if (!existsSync(referencedBy.file)) {
+      failures.push(`${what} is committed but nothing declares it (${referencedBy.file})`);
+    } else if (!readFileSync(referencedBy.file, 'utf8').includes(referencedBy.needle)) {
+      failures.push(
+        `${what} is committed but ${referencedBy.file} does not reference "${referencedBy.needle}" - ` +
+        'the surface is derived and gated, and nothing loads it.',
+      );
+    }
   }
 
   rows.push(
-    `  ${what.padEnd(26)} ${String(Math.round((onDisk.length / 1024) * 10) / 10).padStart(6)}KB  ` +
+    `  ${what.padEnd(32)} ${String(Math.round((onDisk.length / 1024) * 10) / 10).padStart(6)}KB  ` +
     (onDisk.equals(fresh) ? 'matches the lion' : 'DRIFTED'),
   );
 }
@@ -117,5 +157,6 @@ if (failures.length) {
 report(
   'brand',
   failures,
-  'the tab icon, the home-screen icon and the UI mask are all the lion, and the build ships them.',
+  'every lion the repository ships - both tab icons, both UI masks, the home-screen icon and the' +
+  ' Android foreground - is derived from the source, and something loads each one.',
 );

@@ -112,6 +112,16 @@ jobs:
             # alerting provisioning down on the box, and the rules go with it. The deploy
             # scripts job loads it, so a change here has to run that job.
             backend/observability/grafana/provisioning/*) deploy=true; other=true ;;
+            # Every lion surface in the repository is derived from one file by
+            # website/scripts/generate-brand-assets.mjs, and scripts/check-brand-assets.mjs rebuilds it
+            # from the source and fails when the committed bytes no longer match. That gate lives in the
+            # website job, so the pipeline's inputs and outputs have to arm the website job - `mobile/*`
+            # and `admin/*` below do not. Without these lines a lion redraw merges with six stale
+            # icons and a green build, which is how the site shipped Next.js placeholder art for
+            # its whole life.
+            mobile/assets/icon.png) mobile=true; website=true ;;
+            mobile/assets/adaptive-icon.png) mobile=true; website=true ;;
+            admin/public/favicon.ico|admin/src/assets/lion-mask.png) admin=true; website=true ;;
             backend/*) backend=true ;;
             admin/*)   admin=true ;;
             mobile/*)  mobile=true ;;

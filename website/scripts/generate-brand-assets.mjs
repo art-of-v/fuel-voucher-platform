@@ -1,7 +1,11 @@
 /**
- * Writes the brand surfaces (favicon, home-screen icon, UI lion mask) derived
- * from mobile/assets/icon.png. Run `npm run brand` after changing the lion; the
- * output is committed.
+ * Writes the brand surfaces derived from mobile/assets/icon.png: the tab icon
+ * and the UI lion mask for the marketing site and the admin, the iOS home-screen
+ * icon, and the Android launcher foreground. Run `npm run brand` after changing
+ * the lion; the output is committed.
+ *
+ * It writes into admin/ and mobile/ as well as website/, which is why the check
+ * that gates these bytes needs a full repository checkout and the whole CI diff.
  *
  * WHY THIS IS NOT IN prebuild
  *
@@ -29,20 +33,26 @@
  * should not be able to break a maintainer's command.
  */
 
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildBrandAssets, APPLE_ICON_SIZE, ICO_SIZES, MASK_SIZE } from './lib/brand-assets.mjs';
+import { buildBrandAssets, APPLE_ICON_SIZE, ICO_SIZES, MASK_SIZE, ADAPTIVE_CANVAS } from './lib/brand-assets.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = resolve(root, '..', 'mobile/assets/icon.png');
-const TARGETS = {
-  favicon: resolve(root, 'src/app/favicon.ico'),
-  appleIcon: resolve(root, 'src/app/apple-icon.png'),
-  mask: resolve(root, 'public/lion-mask.png'),
-};
+/* Where each derived buffer is committed. Several keys, one buffer: the admin gets
+ * the marketing site's tab icon byte for byte, because two renders of one lion are
+ * two chances for one of them to quietly stop being the lion. */
+const TARGETS = [
+  { buf: 'favicon', file: resolve(root, 'src/app/favicon.ico') },
+  { buf: 'favicon', file: resolve(root, '..', 'admin/public/favicon.ico') },
+  { buf: 'appleIcon', file: resolve(root, 'src/app/apple-icon.png') },
+  { buf: 'mask', file: resolve(root, 'public/lion-mask.png') },
+  { buf: 'mask', file: resolve(root, '..', 'admin/src/assets/lion-mask.png') },
+  { buf: 'adaptiveIcon', file: resolve(root, '..', 'mobile/assets/adaptive-icon.png') },
+];
 
 if (!existsSync(SOURCE)) {
   console.error(`[brand] the source lion is missing: ${SOURCE}`);
@@ -53,14 +63,18 @@ if (!existsSync(SOURCE)) {
 }
 
 const built = await buildBrandAssets(SOURCE);
-for (const [key, path] of Object.entries(TARGETS)) {
-  await writeFile(path, built[key]);
+for (const { buf, file } of TARGETS) {
+  /* Creates the directory rather than assuming it: an asset directory that is
+   * empty is absent in git, and this writes into packages other than website/. */
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, built[buf]);
 }
 
 const kb = (b) => `${Math.round((b.length / 1024) * 10) / 10}KB`;
 console.log(
   `[brand] lion at ${built.meta.lion} -> cropped ${built.meta.cropped}px, backdrop ${built.meta.backdrop}; ` +
-  `wrote favicon.ico (${ICO_SIZES.join('/')}, ${kb(built.favicon)}), ` +
+  `wrote favicon.ico x2 (${ICO_SIZES.join('/')}, ${kb(built.favicon)}), ` +
   `apple-icon.png (${APPLE_ICON_SIZE}, ${kb(built.appleIcon)}), ` +
-  `lion-mask.png (${MASK_SIZE}, ${kb(built.mask)})`,
+  `lion-mask.png x2 (${MASK_SIZE}, ${kb(built.mask)}), ` +
+  `adaptive-icon.png (${ADAPTIVE_CANVAS}, ${kb(built.adaptiveIcon)})`,
 );
