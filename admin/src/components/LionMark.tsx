@@ -1,5 +1,6 @@
 interface LionMarkProps {
-  /** Rendered edge length in px. The mask is 320px, so anything up to ~120px stays crisp. */
+  /** Rendered edge length in px. The mask is 256px, so 85 CSS px is still 1:1 at
+   * a 3x display; the two places that use it ask for 56 and 76. */
   size?: number;
   className?: string;
 }
@@ -7,11 +8,14 @@ interface LionMarkProps {
 /**
  * The FuelFlow lion, painted by the active theme.
  *
- * `mobile/assets/icon.png` is the only lion in the repo: a neon-green raster on an
- * opaque black square. Two things follow from that. CSS cannot recolour it, and the
- * black would show as a box on any lighter surface — so the admin ships
- * `src/assets/lion-mask.png` instead: a white silhouette whose *alpha* is the
- * source's own brightness.
+ * `mobile/assets/icon.png` is the source, and every other lion in this repository
+ * is derived from it by `website/scripts/generate-brand-assets.mjs` - including
+ * the `src/assets/lion-mask.png` this component paints, which
+ * `check-brand-assets.mjs` proves is those bytes rather than a hand-made copy.
+ * Two things follow from that source: CSS cannot recolour a raster, and its
+ * opaque black square would show as a box on any lighter theme - so what ships
+ * here is a mask, not a picture: white, whose *alpha* is the source's own
+ * brightness.
  *
  * A mask is the whole trick. Painting a gradient through `mask-image` reproduces
  * the original drawing exactly — every hairline survives, because the alpha

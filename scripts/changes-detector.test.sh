@@ -180,6 +180,34 @@ check "the local-stack script runs the local stack and the scripts job" \
   "scripts/check-local-stack.sh" \
   "false false false false false false true true"
 
+# The brand pipeline. Every lion surface in the repository - both tab icons, both UI masks, the iOS
+# home-screen icon and the Android launcher foreground - is derived from mobile/assets/icon.png, and
+# the gate that rebuilds it and compares the committed bytes runs inside the WEBSITE job. So the
+# source, and the derived assets that live outside website/, have to arm that job: a bare `mobile/*`
+# lets a lion redraw merge with six stale icons and a green build.
+check "the lion source arms mobile AND the website job where the brand gate lives" \
+  "mobile/assets/icon.png" \
+  "false false true true false false false false"
+
+check "the Android foreground, a derived asset inside mobile/, arms the brand gate" \
+  "mobile/assets/adaptive-icon.png" \
+  "false false true true false false false false"
+
+check "the admin tab icon, a derived asset inside admin/, arms the brand gate" \
+  "admin/public/favicon.ico" \
+  "false true false true false false false false"
+
+check "the admin's copy of the UI mask arms the brand gate" \
+  "admin/src/assets/lion-mask.png" \
+  "false true false true false false false false"
+
+# The narrowness is the other half of the case. These arms sit above `mobile/*` and shadow it,
+# so a pattern widened past the exact files would start running the website suite - lint, a Next
+# build and a browser check - for any mobile or admin change at all.
+check "the rest of mobile/ still arms only the mobile job" \
+  "mobile/app.json" \
+  "false false true false false false false false"
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "all $pass detector case(s) pass"

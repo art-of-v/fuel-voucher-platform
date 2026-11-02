@@ -5,9 +5,17 @@
  * the check has to reproduce these bytes exactly, and a second implementation
  * would quietly stop doing that.
  *
- *   favicon.ico     16/32/48/256 PNG frames, rounded corners
- *   apple-icon.png  180px, square - iOS applies its own mask
- *   lion-mask.png   the UI mark: white, alpha = the drawing's own luminance
+ *   favicon.ico        16/32/48/256 PNG frames, rounded corners
+ *   apple-icon.png     180px, square - iOS applies its own mask
+ *   lion-mask.png      the UI mark: white, alpha = the drawing's own luminance
+ *   adaptive-icon.png  the Android launcher foreground, inside the safe zone
+ *
+ * The tab icon and the mask are each rendered once and written to both web
+ * surfaces, because two renders of one lion are two chances for one of them to
+ * quietly stop being the lion. Both had drifted: the admin's tab icon was a
+ * 1024px JPEG named .png, and its copy of the mask was a hand-made 320px render
+ * with a steeper alpha ramp and no glow, so the same mark painted differently in
+ * the admin and on the site. Neither was reachable from any gate.
  *
  * Three details that are easy to get wrong:
  *
@@ -39,7 +47,18 @@
  * compresses badly: the first build of this icon came out at 124KB, five times
  * the placeholder it replaced, for the same tab. Sixteen colours is enough
  * because the mark is two-tone, and it brings the whole file back under the
- * placeholder's 25KB.
+ * placeholder's 25KB. The Android foreground is NOT quantised - it is the full
+ * 1024 canvas, where 16 colours would band the glow, and it is a build-time
+ * resource rather than something a browser downloads.
+ *
+ * The Android foreground is scaled down, not cropped. An adaptive icon is a
+ * 108dp layer that the launcher masks - usually to a circle, after scaling the
+ * layer by 1.5 - so only the central 66dp is guaranteed to survive. The lion is
+ * 719px of its 1024 source, so at 70.2% it sat outside that 61.1% safe zone and
+ * the launcher trimmed the outermost mane. Now the padded crop is drawn at the
+ * safe fraction on a canvas of the sampled backdrop, which puts the lion itself
+ * at 55.6% - 21% smaller than before, and back inside every mask shape Google
+ * publishes.
  */
 
 import sharp from 'sharp';
@@ -47,10 +66,15 @@ import sharp from 'sharp';
 /** Tab strips ask for these; 256 covers high-DPI and the Windows tile. */
 export const ICO_SIZES = [16, 32, 48, 256];
 export const APPLE_ICON_SIZE = 180;
-/** The mask is drawn at this size; CSS scales it. The largest mark the site uses
- * is 56 CSS px, so 256 covers a 4.5x display with room to spare while staying
- * lighter than the admin's own 320px copy of the same mask. */
+/** The mask is drawn at this size; CSS scales it. The largest mark either web
+ * surface uses is 76 CSS px (the admin login), so 256 covers a 3x display with
+ * room to spare while staying lighter than the hand-made 320px copy it replaced. */
 export const MASK_SIZE = 256;
+/** Same canvas as the source, so the foreground is not downscaled relative to
+ * the square iOS icon sitting next to it in mobile/assets. */
+export const ADAPTIVE_CANVAS = 1024;
+/** Google's adaptive-icon safe zone: the inner 66dp of the 108dp layer. */
+export const ADAPTIVE_SAFE_FRACTION = 66 / 108;
 /** Breathing room around the lion, as a fraction of its bounding box. */
 const MARGIN = 0.05;
 
@@ -203,6 +227,31 @@ async function renderMask(source, crop, backdrop) {
 }
 
 /**
+ * The Android launcher foreground: the lion inside the safe zone, on a canvas of
+ * its own backdrop.
+ *
+ * Flattened rather than keyed to transparency. The artwork has no alpha and its
+ * dark interior is the same colour as the background it sits on, so chroma-keying
+ * would eat part of the mane. Covering the whole layer with the sampled backdrop
+ * makes app.json's own background colour unreachable, exactly as the full-bleed
+ * square it replaces does - and the mask the launcher applies now has nothing
+ * left to trim.
+ */
+async function renderAdaptiveIcon(source, crop, backdrop) {
+  const content = Math.round(ADAPTIVE_CANVAS * ADAPTIVE_SAFE_FRACTION);
+  const offset = Math.round((ADAPTIVE_CANVAS - content) / 2);
+  return sharp({
+    create: { width: ADAPTIVE_CANVAS, height: ADAPTIVE_CANVAS, channels: 3, background: backdrop },
+  })
+    .composite([{ input: await renderIcon(source, crop, backdrop, content), left: offset, top: offset }])
+    /* Composite works in RGBA and the result is fully opaque, so the alpha is
+     * dropped to keep the same format the square iOS icon next to it has. */
+    .removeAlpha()
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
+/**
  * Build every brand surface from the lion. Pure: it reads one file and returns
  * buffers, and touches nothing on disk. That is what lets the CI check compare
  * its output against the committed assets byte for byte.
@@ -223,6 +272,7 @@ export async function buildBrandAssets(source) {
     favicon: packIco(frames),
     appleIcon: await renderIcon(source, crop, backdrop, APPLE_ICON_SIZE, { palette: true }),
     mask: await renderMask(source, crop, backdrop),
+    adaptiveIcon: await renderAdaptiveIcon(source, crop, backdrop),
     meta: {
       lion: `${m.box.w}x${m.box.h}`,
       cropped: crop.size,

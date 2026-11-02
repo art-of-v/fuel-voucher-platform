@@ -39,11 +39,15 @@ const height = Number(flag("height", "900"));
 const out = flag("out", path.join(admin, `preview-${theme}.png`));
 
 // Which themes carry the machined treatment, read from the catalogue so this
-// script cannot drift from themes.ts.
+// script cannot drift from themes.ts. Both quote styles: the record writes
+// `mercury:` unquoted and `"lemberg-forge":` quoted, and a pattern that allows
+// only one of the two silently drops the quoted themes - which are exactly the
+// forge ones, so the preview rendered them without the machined treatment and
+// without the lion, and reported no error.
 function forgeThemes() {
     const src = readFileSync(path.join(admin, "src/lib/themes.ts"), "utf8");
     return new Set(
-        [...src.matchAll(/'?([a-z-]+)'?:\s*\{\s*isDark:\s*(?:true|false),\s*forge:\s*true/g)].map((m) => m[1]),
+        [...src.matchAll(/["']?([a-z-]+)["']?:\s*\{\s*isDark:\s*(?:true|false),\s*forge:\s*true/g)].map((m) => m[1]),
     );
 }
 
