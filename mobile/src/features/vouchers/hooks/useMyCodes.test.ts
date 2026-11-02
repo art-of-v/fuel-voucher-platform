@@ -234,6 +234,8 @@ describe('useMyCodes', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.spentOrderCount).toBe(1);
+    // The live order and the voucher-less one hide nothing, so they add nothing to either count.
+    expect(result.current.spentVoucherCount).toBe(1);
   });
 
   it('shows the spent vouchers of a mixed order only when the filter is on, live first', async () => {
@@ -251,8 +253,10 @@ describe('useMyCodes', () => {
     const off = renderHook(() => useMyCodes());
     await waitFor(() => expect(off.result.current.loading).toBe(false));
     expect(off.result.current.fulfilledOrders[0].vouchers.map((v) => v.id)).toEqual(['v-live']);
-    // The order still has live fuel, so the filter has no hidden order to promise.
+    // No whole receipt is hidden here — the order keeps live fuel — but one voucher inside it is,
+    // and that is the case the chip has to open on its own.
     expect(off.result.current.spentOrderCount).toBe(0);
+    expect(off.result.current.spentVoucherCount).toBe(1);
 
     const on = renderHook(() => useMyCodes({ includeSpent: true }));
     await waitFor(() => expect(on.result.current.loading).toBe(false));
@@ -260,6 +264,34 @@ describe('useMyCodes', () => {
       'v-live',
       'v-used',
     ]);
+  });
+
+  it('counts every hidden spent voucher, wherever it sits', async () => {
+    // Part of a pack used and the rest spent weeks ago: `spentOrderCount` sees only the second
+    // receipt, so a chip gated on it stayed invisible over the mixed one and its used vouchers had
+    // no way onto the screen. The chip counts fuel, so the hook has to count vouchers.
+    asMock(getMyOrders).mockResolvedValue([
+      makeOrder({
+        id: 'mixed',
+        status: 'FULFILLED',
+        vouchers: [
+          makeVoucher({ id: 'v-live', status: 'assigned' }),
+          makeVoucher({ id: 'v-used-1', status: 'used' }),
+          makeVoucher({ id: 'v-used-2', status: 'expired' }),
+        ],
+      }),
+      makeOrder({
+        id: 'whole',
+        status: 'FULFILLED',
+        vouchers: [makeVoucher({ id: 'v-old', status: 'used' })],
+      }),
+    ]);
+
+    const { result } = renderHook(() => useMyCodes());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.spentOrderCount).toBe(1);
+    expect(result.current.spentVoucherCount).toBe(3);
   });
 
   it('files a replacement under the original purchase even though a renewal order delivered it', async () => {
