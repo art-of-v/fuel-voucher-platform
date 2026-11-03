@@ -34,7 +34,7 @@ import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
-import { pointsInRegion, type MapRegion } from '../src/features/stations/lib/viewport';
+import { markersForRegion, type MapRegion } from '../src/features/stations/lib/viewport';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { MapSearchDeck } from '../src/features/stations/components/MapSearchDeck';
 import {
@@ -109,13 +109,15 @@ export default function MapScreen() {
     [allPoints, searchQuery],
   );
 
-  // Mount only what the viewport can show. Every station node is fetched once, but
-  // rendering all of them means one native marker view each — the whole network is
-  // ~1300, which the OS answers under memory pressure by killing the app outright.
-  // `onRegionChangeComplete` fires when a gesture settles, not per frame.
+  // Mount only what the viewport can show, and only as much of it as the process survives.
+  // Every station node is fetched once, but each one inside the region becomes a live native
+  // view tree with a shadowed callout of its own, so the count tracks the *area* on screen —
+  // which is exactly what a pan changes. `markersForRegion` keeps a spread of that area rather
+  // than the first `limit` stations the API listed. `onRegionChangeComplete` fires when a
+  // gesture settles, not per frame.
   const [viewport, setViewport] = React.useState<MapRegion>(KYIV_REGION);
   const visiblePoints = React.useMemo(
-    () => pointsInRegion(filteredPoints, viewport),
+    () => markersForRegion(filteredPoints, viewport),
     [filteredPoints, viewport],
   );
 
