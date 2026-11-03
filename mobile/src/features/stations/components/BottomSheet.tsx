@@ -64,10 +64,21 @@ export const BottomSheet = React.forwardRef<BottomSheetHandle, Props>(function B
   const offFull = 0;
   const offHalf = Math.max(0, FULL - HALF);
   const offPeek = Math.max(0, FULL - PEEK);
-  const offsets = [offFull, offHalf, offPeek]; // ascending; last = peek
+  // Ascending; last = peek. Memoised with the gesture so a re-render of the screen — which a
+  // map pan causes — cannot hand `GestureDetector` a new object to dispose and re-install.
+  const offsets = React.useMemo(() => [offFull, offHalf, offPeek], [offFull, offHalf, offPeek]);
 
   const translateY = useSharedValue(HIDDEN);
   const start = useSharedValue(0);
+
+  // The caller passes an inline arrow, so `onClose` is a new function on every render of the
+  // screen. The handlers below are built once per screen size, so they read the live callback
+  // through a ref instead of capturing whichever one happened to be first.
+  const closeRef = React.useRef(onClose);
+  React.useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+  const notifyClose = React.useCallback(() => closeRef.current(), []);
 
   // Rise to peek on mount; the FAB that renders this sheet already fired the open haptic.
   React.useEffect(() => {
@@ -79,38 +90,51 @@ export const BottomSheet = React.forwardRef<BottomSheetHandle, Props>(function B
   const dismiss = React.useCallback(() => {
     translateY.value = withSpring(HIDDEN, SPRING, (finished) => {
       'worklet';
-      if (finished) runOnJS(onClose)();
+      if (finished) runOnJS(notifyClose)();
     });
-    // translateY/HIDDEN are stable refs/derived; onClose is the only real dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose]);
+  }, [HIDDEN, notifyClose, translateY]);
 
-  React.useImperativeHandle(ref, () => ({
-    expand: () => {
-      if (translateY.value > offHalf) translateY.value = withSpring(offHalf, SPRING);
-    },
-    close: dismiss,
-  }));
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      expand: () => {
+        if (translateY.value > offHalf) translateY.value = withSpring(offHalf, SPRING);
+      },
+      close: dismiss,
+    }),
+    [dismiss, offHalf, translateY],
+  );
 
-  const pan = Gesture.Pan()
-    .onStart(() => {
-      start.value = translateY.value;
-    })
-    .onUpdate((e) => {
-      const next = start.value + e.translationY;
-      // Clamp to [full, a little past peek] so an over-drag can arm a dismiss.
-      translateY.value = Math.min(offPeek + 140, Math.max(0, next));
-    })
-    .onEnd((e) => {
-      const res = resolveSheetRelease(translateY.value, e.velocityY, offsets);
-      if (res.dismiss) {
-        translateY.value = withSpring(HIDDEN, SPRING, (finished) => {
-          if (finished) runOnJS(onClose)();
-        });
-      } else {
-        translateY.value = withSpring(res.offset, SPRING);
-      }
-    });
+  // Built in a `useMemo` rather than inline, and this is not a style choice. Each gesture object
+  // gets a `gestureId` from a module counter, and RNGH's `updateHandlers` reads a different id as
+  // "the config was rebuilt": it re-sends the native handler's config and rewrites the Reanimated
+  // shared value that carries the UI-thread callbacks. A gesture made during render therefore does
+  // that on every re-render — and a map pan re-renders the screen this sheet sits in, so it happens
+  // while this very pan is in flight. The library's own comment in `updateHandlers` names a crash
+  // it is guarding against for the same reason.
+  const pan = React.useMemo(
+    () =>
+      Gesture.Pan()
+        .onStart(() => {
+          start.value = translateY.value;
+        })
+        .onUpdate((e) => {
+          const next = start.value + e.translationY;
+          // Clamp to [full, a little past peek] so an over-drag can arm a dismiss.
+          translateY.value = Math.min(offPeek + 140, Math.max(0, next));
+        })
+        .onEnd((e) => {
+          const res = resolveSheetRelease(translateY.value, e.velocityY, offsets);
+          if (res.dismiss) {
+            translateY.value = withSpring(HIDDEN, SPRING, (finished) => {
+              if (finished) runOnJS(notifyClose)();
+            });
+          } else {
+            translateY.value = withSpring(res.offset, SPRING);
+          }
+        }),
+    [HIDDEN, notifyClose, offPeek, offsets, start, translateY],
+  );
 
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],

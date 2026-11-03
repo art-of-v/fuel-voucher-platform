@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { MAX_MOUNTED_MARKERS } from '../src/features/stations/lib/viewport';
 import MapScreen from './map';
 
 /**
@@ -25,6 +26,9 @@ import MapScreen from './map';
 
 const mockRequest = jest.fn();
 const mockResolveCartoApiKey = jest.fn();
+
+/** Every gesture object the sheet handed to `GestureDetector`, in render order. */
+const mockGestures: unknown[] = [];
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) => {
@@ -73,8 +77,10 @@ jest.mock('../src/features/stations/lib/basemap', () => ({
   resolveCartoApiKey: () => mockResolveCartoApiKey(),
 }));
 
+let mockNodes: Record<string, unknown>[] = [];
+
 jest.mock('../src/features/stations/hooks/useStationNodes', () => ({
-  useStationNodes: () => ({ data: [], isLoading: false, error: null }),
+  useStationNodes: () => ({ data: mockNodes, isLoading: false, error: null }),
 }));
 
 /**
@@ -144,6 +150,8 @@ jest.mock('react-native-maps', () => {
 // because that file itself initialises the worklets module and throws the same error.
 jest.mock('react-native-reanimated', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React2 = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View, Text, ScrollView } = require('react-native');
   return {
     __esModule: true,
@@ -152,7 +160,12 @@ jest.mock('react-native-reanimated', () => {
     Text,
     ScrollView,
     createAnimatedComponent: (c: unknown) => c,
-    useSharedValue: (v: unknown) => ({ value: v }),
+    // The real hook hands back the *same* object on every render — components key their memos
+    // on that identity — so a mock returning a fresh one would look like a stale-closure bug.
+    useSharedValue: (initial: unknown) => {
+      const ref = React2.useRef({ value: initial });
+      return ref.current;
+    },
     useDerivedValue: (fn: () => unknown) => ({ value: fn() }),
     useAnimatedStyle: (fn: () => unknown) => fn(),
     useAnimatedRef: () => ({ current: null }),
@@ -183,22 +196,45 @@ jest.mock('react-native-worklets', () => ({
 jest.mock('react-native-gesture-handler', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View: RNView } = require('react-native');
+
+  /**
+   * A stand-in for a gesture builder: every method returns the same object, so a chain like
+   * `Gesture.Pan().onStart(…).onUpdate(…).onEnd(…)` works and the *identity* of the result is
+   * what `GestureDetector` is handed — which is the thing the sheet test below measures.
+   */
+  function mockChainGesture() {
+    const gesture: Record<string, unknown> = {};
+    for (const method of [
+      'onBegin',
+      'onStart',
+      'onUpdate',
+      'onEnd',
+      'onFinalize',
+      'enabled',
+      'minDistance',
+      'hitSlop',
+      'maxPointers',
+    ]) {
+      gesture[method] = () => gesture;
+    }
+    return gesture;
+  }
+
   return {
     GestureHandlerRootView: RNView,
-    GestureDetector: ({ children }: { children?: unknown }) => <RNView>{children}</RNView>,
+    GestureDetector: ({ gesture, children }: { gesture?: unknown; children?: unknown }) => {
+      mockGestures.push(gesture);
+      return <RNView>{children}</RNView>;
+    },
     PanGestureHandler: RNView,
     TapGestureHandler: RNView,
     ScrollView: RNView,
     FlatList: RNView,
     Gesture: {
-      Tap: () => ({ onBegin: () => ({}), onEnd: () => ({}), enabled: () => ({}) }),
-      Pan: () => ({
-        onBegin: () => ({}),
-        onUpdate: () => ({}),
-        onEnd: () => ({}),
-        enabled: () => ({}),
-      }),
-      Native: () => ({ onBegin: () => ({}), onEnd: () => ({}), enabled: () => ({}) }),
+      Tap: mockChainGesture,
+      Pan: mockChainGesture,
+      Native: mockChainGesture,
+      LongPress: mockChainGesture,
     },
     State: {},
     Directions: {},
@@ -371,6 +407,78 @@ describe('MapScreen', () => {
     it('never renders an empty chip for an unknown fuel', () => {
       const labels = chipsFor(['RacingFuel', 'AnotherNewGrade']);
       expect(labels.filter((l) => l.trim() === '')).toHaveLength(0);
+    });
+  });
+
+  describe('panning with the ranking sheet open', () => {
+    /** `count` АЗК on an even lattice, so pulling the map back really does fill the region. */
+    function lattice(count: number) {
+      const side = Math.ceil(Math.sqrt(count));
+      return Array.from({ length: count }, (_, i) => ({
+        id: `n-${i}`,
+        brandId: 'b-klo',
+        brandSlug: 'klo',
+        name: `KLO ${i}`,
+        address: 'вулиця Тестова, 1',
+        lat: 48.2 + Math.floor(i / side) * (3.4 / side),
+        lng: 29.5 + (i % side) * (3.4 / side),
+      }));
+    }
+
+    const WIDE: Record<string, number> = {
+      latitude: 50,
+      longitude: 31,
+      latitudeDelta: 4,
+      longitudeDelta: 4,
+    };
+
+    afterEach(() => {
+      mockNodes = [];
+    });
+
+    it('bounds the pins a pan mounts', () => {
+      // Each pin is a live native view tree carrying a shadowed callout of its own, and the
+      // count grows with the *area* on screen — which is what a pan changes. The OS answers
+      // with a killed process and no JS error to read, so the ceiling is the only defence.
+      mockNodes = lattice(1000);
+      renderScreen();
+
+      const map = screen.getByTestId('map');
+      expect(screen.getAllByTestId('marker').length).toBeLessThan(20);
+
+      act(() => {
+        fireEvent(map, 'regionChangeComplete', WIDE);
+      });
+
+      const pins = screen.getAllByTestId('marker');
+      expect(pins.length).toBeGreaterThan(0);
+      expect(pins.length).toBeLessThanOrEqual(MAX_MOUNTED_MARKERS);
+    });
+
+    it('keeps the ranking sheet standing through a map pan', () => {
+      // `GestureDetector` keys its native handler on the gesture object, so a gesture built
+      // during render is disposed and re-attached on every re-render — and a map pan
+      // re-renders the screen the sheet sits in. RNGH documents the object as stable for
+      // exactly that reason, and the sheet is the only thing on this screen that holds one.
+      mockNodes = lattice(200);
+      renderScreen();
+
+      // The map is taken before the sheet opens: the sheet is `accessibilityViewIsModal`, so
+      // once it is up the map is outside what queries can see — the same thing VoiceOver does.
+      const map = screen.getByTestId('map');
+      fireEvent.press(screen.getByRole('button', { name: 'map.networkRanking' }));
+      mockGestures.length = 0;
+
+      act(() => {
+        fireEvent(map, 'regionChangeComplete', WIDE);
+      });
+      act(() => {
+        fireEvent(map, 'regionChangeComplete', { ...WIDE, latitude: 49.5 });
+      });
+
+      expect(screen.getByText('map.networkRanking')).toBeTruthy();
+      expect(mockGestures.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(mockGestures).size).toBe(1);
     });
   });
 });
