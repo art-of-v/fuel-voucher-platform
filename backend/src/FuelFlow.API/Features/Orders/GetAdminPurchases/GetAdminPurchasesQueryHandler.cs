@@ -23,6 +23,16 @@ public sealed class AdminPurchaseDto
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
     public int VoucherCount { get; set; }
+    /// <summary>
+    /// What the bank has been given back: the order's refund row, or zero when there is none or that
+    /// row <see cref="PaymentStatus.Failed"/> - a failed refund is money that never left, and its
+    /// retry is answered on the same row rather than a second one.
+    /// </summary>
+    public decimal RefundedAmountKopecks { get; set; }
+    /// <summary>
+    /// What is still owed back: the unfulfilled value of the order minus
+    /// <see cref="RefundedAmountKopecks"/>, never below zero.
+    /// </summary>
     public decimal RefundableAmountKopecks { get; set; }
     public string? RefundStatus { get; set; }
     public string? RefundMonobankStatus { get; set; }
@@ -67,16 +77,16 @@ public sealed class GetAdminPurchasesQueryHandler
             .Take(limit)
             .ToListAsync(cancellationToken);
 
-// A refund reverses a capture, and a capture always has an order. The filter says so rather than
-    // casting it away, so an orderless payment cannot reach a dictionary keyed by order id.
-    var refunds = await _context.Payments
-    .AsNoTracking()
-    .Where(p => p.Kind == PaymentKind.Refund
-             && p.OrderId != null
-             && purchases.Select(o => o.Id).Contains(p.OrderId.Value))
-    .ToListAsync(cancellationToken);
-
-    var refundByOrderId = refunds.ToDictionary(p => p.OrderId!.Value);
+        // A refund reverses a capture, and a capture always has an order. The filter says so rather than
+        // casting it away, so an orderless refund cannot reach a dictionary keyed by order id. One row
+        // per order is not an assumption: ux_payments_one_refund_per_order enforces it, and a retry of a
+        // failed refund reuses that row instead of minting a second one.
+        var refunds = await _context.Payments
+            .AsNoTracking()
+            .Where(p => p.Kind == PaymentKind.Refund
+                     && p.OrderId != null
+                     && purchases.Select(o => o.Id).Contains(p.OrderId.Value))
+            .ToDictionaryAsync(p => p.OrderId!.Value, cancellationToken);
 
         var items = purchases.Select(o =>
         {
@@ -84,7 +94,20 @@ public sealed class GetAdminPurchasesQueryHandler
             var firstLi = lineItemsList.FirstOrDefault();
             var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
             var totalQuantity = lineItemsList.Sum(li => li.Quantity);
-            refundByOrderId.TryGetValue(o.Id, out var refund);
+            refunds.TryGetValue(o.Id, out var refund);
+            // A failed refund is money that never left, so it counts as nothing given back - and the
+            // press stays offered, because the retry is answered on that same row.
+            var returned = refund is null || refund.Status == PaymentStatus.Failed
+                ? 0m
+                : refund.AmountKopecks;
+            // The unfulfilled value says what the delivery owes; the bank answer says what has already
+            // been given back. The panel needs the difference, or a refund it has finished paying keeps
+            // offering a press whose only reply is "Completed" (planning #862).
+            //
+            // Clamped at zero, because the two figures move apart in both directions: a delivery that
+            // lands after the bank has returned its value leaves less owed than the row says was given.
+            var stillOwed = Math.Max(
+                0m, RefundOrderCommandHandler.ComputeRefundAmountKopecks(o) - returned);
             return new AdminPurchaseDto
             {
                 Id = o.Id,
@@ -100,7 +123,8 @@ public sealed class GetAdminPurchasesQueryHandler
                 CreatedAtUtc = o.CreatedAtUtc,
                 FulfilledAtUtc = o.FulfilledAtUtc,
                 VoucherCount = o.Fulfillments.Count,
-                RefundableAmountKopecks = RefundOrderCommandHandler.ComputeRefundAmountKopecks(o),
+                RefundedAmountKopecks = returned,
+                RefundableAmountKopecks = stillOwed,
                 RefundStatus = refund is null ? null : RefundStatusWord(refund.Status),
                 RefundMonobankStatus = refund is null ? null : ProviderWordFor(refund.Status),
                 LineItems = lineItemsList.Select(li => new OrderLineItemDto

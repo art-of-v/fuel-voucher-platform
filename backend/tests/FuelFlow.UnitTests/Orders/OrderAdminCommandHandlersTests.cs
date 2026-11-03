@@ -192,6 +192,75 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         _context.SaveChanges();
     }
 
+    /// <summary>
+    /// A paid order of `units` units at 520 UAH, `delivered` of them handed over, so the value still
+    /// owed back is (units - delivered) × 520. The refund figures only mean something against an order
+    /// that has undelivered lines, which is exactly what a paid refund does not change: a voucher never
+    /// handed over does not become handed over because the bank gave the money back.
+    /// </summary>
+    private Order SeedPaidOrder(int units, int delivered)
+    {
+        var order = BuildOrder(Guid.NewGuid(), delivered == units
+            ? OrderStatus.Fulfilled
+            : OrderStatus.PartiallyFulfilled);
+        order.Price = 520 * units;
+        order.MonobankInvoiceId = $"INV-{order.Id:N}";
+        order.MonobankStatus = MonobankStatus.Success;
+
+        var line = order.LineItems.Single();
+        line.Quantity = units;
+        line.UnitPrice = 520;
+        line.LineTotal = 520 * units;
+
+        for (var i = 0; i < delivered; i++)
+        {
+            order.Fulfillments.Add(new Fulfillment
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                FulfilledAtUtc = TestClock.UtcNow,
+                Voucher = new FuelVoucher
+                {
+                    Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
+                    Brand = "okko",
+                    FuelTypeId = ToUuid("okko-95"),
+                    Liters = 50,
+                    VoucherNumber = $"V-{order.Id:N}-{i}",
+                    QrPayload = "q",
+                    SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+                    CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
+                }
+            });
+        }
+
+        _context.Orders.Add(order);
+        _context.SaveChanges();
+        return order;
+    }
+
+    private void SeedRefund(Order order, FuelFlow.Payments.SharedModels.PaymentStatus status,
+        decimal kopecks)
+    {
+        _context.Payments.Add(new FuelFlow.Payments.SharedModels.Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = FuelFlow.Payments.SharedModels.PaymentKind.Refund,
+            Provider = "monobank",
+            ProviderInvoiceId = $"REF-{order.Id:N}",
+            AmountUah = kopecks / 100m,
+            AmountKopecks = kopecks,
+            Currency = "UAH",
+            Status = status,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
+        });
+        _context.SaveChanges();
+    }
+
     // `brandId` rather than a default of `BrandIds.Okko`: a static readonly Guid is not a
     // compile-time constant, so it cannot be a default parameter value. Callers that omit it get
     // the same brand the helper always meant.
@@ -494,6 +563,67 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         result.Items.Should().ContainSingle();
         result.Items[0].Id.Should().Be(order.Id);
         result.Items[0].VoucherCount.Should().Be(1);
+    }
+
+    /// <summary>
+    /// The refund press is offered for what the bank does NOT have back yet, not for whatever the
+    /// undelivered lines still add up to.
+    /// </summary>
+    /// <remarks>
+    /// The read used to hand the admin the undelivered value alone, so an order whose refund the
+    /// acquirer had already paid kept offering the same 1 040,00 - and the freeze on the write side
+    /// answered the second press with "Completed" and the same sum, without a disagreement row to
+    /// say why nothing had happened. Both orders of the 2026-11-03 production check still carried
+    /// refundable 862.00 after their 862.00 had been returned. The money was never at risk; the
+    /// screen described a return that no one had asked for (planning #862).
+    /// </remarks>
+    [Fact]
+    public async Task GetAdminPurchases_OffersOnlyThePartTheBankHasNotReturned()
+    {
+        var notAsked = SeedPaidOrder(3, 1);
+        var inFlight = SeedPaidOrder(3, 1);
+        SeedRefund(inFlight, FuelFlow.Payments.SharedModels.PaymentStatus.Pending, 104000);
+        var returned = SeedPaidOrder(3, 1);
+        SeedRefund(returned, FuelFlow.Payments.SharedModels.PaymentStatus.Succeeded, 104000);
+        var refused = SeedPaidOrder(3, 1);
+        SeedRefund(refused, FuelFlow.Payments.SharedModels.PaymentStatus.Failed, 104000);
+        var halfReturned = SeedPaidOrder(3, 1);
+        SeedRefund(halfReturned, FuelFlow.Payments.SharedModels.PaymentStatus.Succeeded, 52000);
+
+        // Two units' value came back, and the third voucher has since been handed over: nothing is
+        // owed, and the difference must read as zero rather than as a negative ask.
+        var deliveredAfterwards = SeedPaidOrder(3, 3);
+        SeedRefund(deliveredAfterwards, FuelFlow.Payments.SharedModels.PaymentStatus.Succeeded, 104000);
+
+        var result = await _getAdminPurchasesHandler.HandleAsync(new GetAdminPurchasesQuery());
+
+        AdminPurchaseDto Row(Order order) => result.Items.Single(i => i.Id == order.Id);
+
+        Row(notAsked).RefundedAmountKopecks.Should().Be(0);
+        Row(notAsked).RefundableAmountKopecks.Should().Be(104000);
+        Row(notAsked).RefundStatus.Should().BeNull();
+
+        // Asked for, not yet confirmed back: still no second ask, and the word says in flight.
+        Row(inFlight).RefundedAmountKopecks.Should().Be(104000);
+        Row(inFlight).RefundableAmountKopecks.Should().Be(0);
+        Row(inFlight).RefundStatus.Should().Be("Processing");
+
+        Row(returned).RefundedAmountKopecks.Should().Be(104000);
+        Row(returned).RefundableAmountKopecks.Should().Be(0);
+        Row(returned).RefundStatus.Should().Be("Completed");
+
+        // A failed refund is money that never left, so it neither counts as returned nor hides the
+        // press - the retry is answered on that same row.
+        Row(refused).RefundedAmountKopecks.Should().Be(0);
+        Row(refused).RefundableAmountKopecks.Should().Be(104000);
+        Row(refused).RefundStatus.Should().Be("Failed");
+
+        // Subtracting, not zeroing: what the bank kept off is what the panel still offers.
+        Row(halfReturned).RefundedAmountKopecks.Should().Be(52000);
+        Row(halfReturned).RefundableAmountKopecks.Should().Be(52000);
+
+        Row(deliveredAfterwards).RefundedAmountKopecks.Should().Be(104000);
+        Row(deliveredAfterwards).RefundableAmountKopecks.Should().Be(0);
     }
 
     private void SeedDefaultUser()
