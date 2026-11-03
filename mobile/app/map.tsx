@@ -34,7 +34,11 @@ import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
-import { markersForRegion, type MapRegion } from '../src/features/stations/lib/viewport';
+import {
+  isRegionCoveredByBox,
+  markersForRegion,
+  type MapRegion,
+} from '../src/features/stations/lib/viewport';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { MapSearchDeck } from '../src/features/stations/components/MapSearchDeck';
 import {
@@ -111,14 +115,16 @@ export default function MapScreen() {
 
   // Mount only what the viewport can show, and only as much of it as one transaction can carry.
   // Every station node is fetched once, but each one inside the region becomes a live native view
-  // tree, so the count tracks the *area* on screen — which is exactly what a pan changes, and a
-  // pin created in that pan's transaction is what the iOS interop layer trips over.
+  // tree, so the count tracks the *area* on screen — which is exactly what a pan changes, and a pin
+  // created in the frame after a gesture settles is what the iOS interop layer trips over.
   // `markersForRegion` keeps a spread of that area rather than the first `limit` stations the API
-  // listed. `onRegionChangeComplete` fires when a gesture settles, not per frame.
-  const [viewport, setViewport] = React.useState<MapRegion>(KYIV_REGION);
+  // listed, and anchors its grid to the ground so a pan cannot re-shuffle it. The frozen box is the
+  // other half: the set is computed for the region it was last computed for and kept until the
+  // screen genuinely leaves it, so the settles in the middle of a long pan mount nothing.
+  const [markerBox, setMarkerBox] = React.useState<MapRegion>(KYIV_REGION);
   const visiblePoints = React.useMemo(
-    () => markersForRegion(filteredPoints, viewport),
-    [filteredPoints, viewport],
+    () => markersForRegion(filteredPoints, markerBox),
+    [filteredPoints, markerBox],
   );
 
   const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
@@ -246,7 +252,10 @@ export default function MapScreen() {
               if (isMarkerPressEcho(lastMarkerPressAt.current, Date.now())) return;
               setSelectedStation(null);
             }}
-            onRegionChangeComplete={(region) => setViewport(region)}
+            onRegionChangeComplete={(region) => {
+              if (isRegionCoveredByBox(region, markerBox)) return;
+              setMarkerBox(region);
+            }}
             userInterfaceStyle={tokens.colors.isDark ? 'dark' : 'light'}
             showsUserLocation={locationStatus === 'granted'}
             showsMyLocationButton={false}
