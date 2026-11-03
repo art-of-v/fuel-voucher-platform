@@ -1,4 +1,5 @@
 import { normalizeFuelName } from '../../../core/utils/formatters';
+import { fuelRank } from './fuelLabels';
 import type { FuelPackage, StationNode } from '../../../core/types/api';
 
 export interface LatLng {
@@ -88,18 +89,17 @@ export function bestPriceByBrand(
   return byBrand;
 }
 
-/** Distinct canonical fuels present in the packages, in first-seen order. */
+/**
+ * Distinct canonical fuels present in the packages, in pump-column order.
+ *
+ * `Set` preserves first-seen order, and first-seen here is whatever order the packages came
+ * back in — brand by brand — so without the sort the selector's chips are scrambled, and a
+ * grade's premium variant lands three places from the grade it is a premium version of.
+ */
 export function availableFuels(packages: FuelPackage[]): string[] {
   const seen = new Set<string>();
-  const out: string[] = [];
-  for (const pkg of packages) {
-    const fuel = normalizeFuelName(pkg.fuelName);
-    if (!seen.has(fuel)) {
-      seen.add(fuel);
-      out.push(fuel);
-    }
-  }
-  return out;
+  for (const pkg of packages) seen.add(normalizeFuelName(pkg.fuelName));
+  return [...seen].sort((a, b) => fuelRank(a) - fuelRank(b));
 }
 
 export interface RankedStation {

@@ -101,7 +101,7 @@ describe('bestPriceByBrand', () => {
 });
 
 describe('availableFuels', () => {
-  it('returns distinct canonical fuels in first-seen order', () => {
+  it('returns distinct canonical fuels, without repeats', () => {
     const packages = [
       pkg({ fuelName: 'А-95' }),
       pkg({ fuelName: 'A-95' }), // same canonical
@@ -109,6 +109,40 @@ describe('availableFuels', () => {
       pkg({ fuelName: 'Газ' }),
     ];
     expect(availableFuels(packages)).toEqual(['a-95', 'diesel', 'gas']);
+  });
+
+  it('runs petrols before diesel before gas, whatever order the packages arrive in', () => {
+    // The production package list is grouped by brand, so it really does come back
+    // «Газ, А-95, ДП, 100, 100 Mustang, 95 Mustang, ДП Mustang+, AdBlue, А-92» — nine
+    // chips in an order nobody can scan. A premium grade sits next to the grade it is a
+    // step up from, which is how the pump column reads.
+    const packages = [
+      pkg({ fuelName: 'Газ' }),
+      pkg({ fuelName: 'А-95' }),
+      pkg({ fuelName: 'ДП' }),
+      pkg({ fuelName: 'upg100' }),
+      pkg({ fuelName: '100 Mustang Євро5-Е0' }),
+      pkg({ fuelName: '95 Mustang Євро5-Е10' }),
+      pkg({ fuelName: 'ДП Mustang+' }),
+      pkg({ fuelName: 'AdBlue' }),
+      pkg({ fuelName: 'А 92' }),
+    ];
+    expect(availableFuels(packages)).toEqual([
+      'a-92',
+      'a-95',
+      'a-95 premium',
+      '100',
+      '100 premium',
+      'diesel',
+      'diesel premium',
+      'adblue',
+      'gas',
+    ]);
+  });
+
+  it('puts a grade the order table has never heard of last', () => {
+    const packages = [pkg({ fuelName: 'Eco-80' }), pkg({ fuelName: 'А-95' })];
+    expect(availableFuels(packages)).toEqual(['a-95', 'eco-80']);
   });
 });
 
