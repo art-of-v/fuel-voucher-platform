@@ -117,11 +117,13 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             order.Status.Should().Be(OrderStatus.Refunded);
 
-            // And the books moved with it: the advance leaves 681 and the bank account leaves 311,
-            // the exact mirror of the receipt that brought the money in.
+            // And the books moved with it: the advance leaves 681 and the bank account leaves 311, and
+            // the VAT the receipt carved out of that same money goes back to the budget's side. Two
+            // legs, because the receipt that brought the money in was two legs.
             var booked = await BookedRefundLegsAsync(refund.Id);
-            booked.Should().ContainSingle("a confirmed refund is one fact, so it books one entry");
-            booked.Single().Should().Be(("payment.refunded", "681", "311", 2000.00m));
+            booked.Should().HaveCount(2, "a confirmed refund is one fact, and it has the same two legs as the receipt it mirrors");
+            booked.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
+            booked.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
         }
     }
 
@@ -184,12 +186,13 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         }
 
         var booked = await BookedRefundLegsAsync(refundId);
-        booked.Should().ContainSingle();
-        booked.Single().Should().Be(("payment.refunded", "681", "311", 1000.00m));
+        booked.Should().HaveCount(2);
+        booked.Should().Contain(("payment.refunded", "681", "311", 1000.00m));
+        booked.Should().Contain(("payment.refunded.vat", "643", "704", 166.67m));
 
         // The booking call reached a second time for the same refund — what happens when the poller
         // and the webhook both confirm one cancel within the same tick. The idempotency key is the
-        // refund row, so the second call must return the entry that exists rather than add another.
+        // refund row, so the second call must return the entries that exist rather than add another.
         using (var race = CreateContext())
         {
             var refund = await race.Payments.AsNoTracking().SingleAsync(p => p.Id == refundId);
@@ -203,11 +206,11 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
             var entryCount = await race.JournalEntries.AsNoTracking()
                 .CountAsync(e => e.SourceType == JournalSourceType.Refund && e.SourceId == refundId);
-            entryCount.Should().Be(1, "a refund that arrives twice is still one fact about money");
+            entryCount.Should().Be(2, "a refund that arrives twice is still one fact about money, and it has two legs");
         }
 
         (await BookedRefundLegsAsync(refundId))
-            .Should().ContainSingle("the second arrival added nothing to the books");
+            .Should().HaveCount(2, "the second arrival added nothing to the books");
     }
 
     [Fact]
@@ -264,8 +267,9 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 .SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund)).Id;
         }
 
-        (await BookedRefundLegsAsync(refundId))
-            .Single().Should().Be(("payment.refunded", "681", "311", 2000.00m));
+        var bookedBeforeReprice = await BookedRefundLegsAsync(refundId);
+        bookedBeforeReprice.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
+        bookedBeforeReprice.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
 
         // One of the two units is delivered after the money came back, so the refundable value drops
         // to 1 000 UAH and the second request re-prices the refund that is already in the books.
@@ -318,10 +322,15 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             drift.NewValue.Should().Contain("1000");
             drift.NewValue.Should().NotContain("2000");
 
-            // And the entry the bank's confirmation wrote is untouched - the gap is reported, not
+            // The new figure has a VAT share too, and the drift row names it: an accountant who posts
+            // only the gross difference leaves 643 and 704 wrong by the same amount.
+            drift.Summary.Should().Contain("payment.refunded.vat");
+
+            // And the entries the bank's confirmation wrote are untouched - the gap is reported, not
             // papered over by editing an accounting fact that is already posted.
-            (await BookedRefundLegsAsync(refundId))
-                .Single().Should().Be(("payment.refunded", "681", "311", 2000.00m));
+            var bookedAfterReprice = await BookedRefundLegsAsync(refundId);
+            bookedAfterReprice.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
+            bookedAfterReprice.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
         }
     }
 
@@ -686,8 +695,9 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             // A partial refund books what came back, not what was paid. The 2026-11-02 production
             // case returned 862.00 of a 1724.00 order and the book still carried the whole 1724.00.
             var booked = await BookedRefundLegsAsync(refund.Id);
-            booked.Should().ContainSingle();
-            booked.Single().Should().Be(("payment.refunded", "681", "311", 1040.00m));
+            booked.Should().HaveCount(2);
+            booked.Should().Contain(("payment.refunded", "681", "311", 1040.00m));
+            booked.Should().Contain(("payment.refunded.vat", "643", "704", 173.33m));
         }
     }
 

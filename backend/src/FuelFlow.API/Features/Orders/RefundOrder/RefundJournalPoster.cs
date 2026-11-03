@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace FuelFlow.Features.Orders.RefundOrder;
 
 /// <summary>
-/// Books the money that went back: one entry, the mirror of the receipt that brought it in.
+/// Books the money that went back: two entries, the mirror of the two that brought it in.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,16 +26,21 @@ namespace FuelFlow.Features.Orders.RefundOrder;
 /// the money moved - and the engine's idempotency would report that as success.
 /// </para>
 /// <para>
-/// <b>No VAT leg here.</b> <c>payment.received.vat</c> carved the VAT out when the money arrived;
-/// whether a returned advance releases that liability in the same period is a decision the chart has
-/// no event for (there is no <c>payment.refunded.vat</c> mapping), so it is not this code's to make.
-/// Planning #854.
+/// <b>Two entries because the receipt was two entries.</b> The gross leg leaves 311 and 681; the VAT leg
+/// releases the liability the receipt carved onto 643. Whether a returned advance releases that VAT in
+/// the same period was the accountant's question, not this code's, and the business answered it on
+/// 2026-11-03: it does. The answer arrived the way a bookkeeping decision arrives here - as a mapping
+/// row (<c>payment.refunded.vat</c> in <c>ledger_mapping_rules</c>) and not as an account name in a
+/// class. Planning #854, #857.
 /// </para>
 /// </remarks>
 public sealed class RefundJournalPoster
 {
     /// <summary>The event every booked refund carries; it is the key an accountant queries.</summary>
     public const string RefundedEvent = "payment.refunded";
+
+    /// <summary>The VAT half of the same refund, so the pair is queryable as one fact about one row.</summary>
+    public const string RefundedVatEvent = "payment.refunded.vat";
 
     private readonly JournalPostingService _journal;
     private readonly ILogger<RefundJournalPoster> _logger;
@@ -47,10 +52,12 @@ public sealed class RefundJournalPoster
     }
 
     /// <summary>
-    /// Posts the refund's debit-credit pair. Idempotent on
-    /// <c>(payment.refunded, Refund, refund.Id)</c>, so a retried sync or a replayed webhook books it
-    /// once.
+    /// Posts the refund: the gross pair and the VAT release. Idempotent on
+    /// <c>(payment.refunded, Refund, refund.Id)</c> and
+    /// <c>(payment.refunded.vat, Refund, refund.Id)</c>, so a retried sync or a replayed webhook books
+    /// each leg once.
     /// </summary>
+    /// <returns>The gross entry; the VAT leg is keyed on the same refund and queried with it.</returns>
     /// <exception cref="LedgerUnmappedEventException">
     /// The chart has no rule for <see cref="RefundedEvent"/> - which is a hole in the books, not a
     /// reason to let the money stay unrecorded silently. The caller logs it.
@@ -74,6 +81,9 @@ public sealed class RefundJournalPoster
             return null;
         }
 
+        var entryDate = DateOnly.FromDateTime(refund.PaidAtUtc ?? SystemClock.UtcNow);
+        var postedBy = refund.CreatedByUserId ?? refund.UserId ?? order.UserId;
+
         var entry = await _journal.PostAsync(
             new PostJournalEntryRequest
             {
@@ -83,19 +93,72 @@ public sealed class RefundJournalPoster
                 // The day the acquirer returned the money, not the day a sync happened to look. A
                 // refund confirmed days ago belongs in the period the money moved; if that period is
                 // closed the posting says so instead of quietly dating the entry elsewhere.
-                EntryDate = DateOnly.FromDateTime(refund.PaidAtUtc ?? SystemClock.UtcNow),
+                EntryDate = entryDate,
                 AmountUah = refund.AmountUah,
                 Description = $"Повернення за замовленням {order.Id}",
                 // The operator who ordered the refund when there was one; the customer's own order
                 // user otherwise, which is what payment.received already does for the receipt.
-                PostedByUserId = refund.CreatedByUserId ?? refund.UserId ?? order.UserId,
+                PostedByUserId = postedBy,
             },
             cancellationToken);
+
+        await BookVatReleaseAsync(refund, order, entryDate, postedBy, cancellationToken);
 
         _logger.LogInformation(
             "REFUND LEDGER: booked {Amount} UAH for refund {RefundId} (order {OrderId}) as entry {EntryNo}.",
             refund.AmountUah, refund.Id, order.Id, entry.EntryNo);
 
         return entry;
+    }
+
+    /// <summary>
+    /// Releases the VAT the receipt carved out of the part of the advance that came back:
+    /// Dr 643 / Cr 704, the exact mirror of <c>payment.received.vat</c>.
+    /// </summary>
+    /// <remarks>
+    /// The amount is recomputed from the refunded gross with the same formula and the same rate the
+    /// receipt used, never read off the receipt's entry. That is what keeps a refund from disagreeing
+    /// with how its own sale was booked, and it is why the rate is written where the receipt writes it:
+    /// today every sale is standard-rated, and if that stops being true both call sites change together.
+    /// <para>
+    /// The cost of recomputing rather than apportioning: two half-refunds of one sale can round to one
+    /// kopeck more than the single carve-out they release. It lands on 704 and 643 as a kopeck that the
+    /// close check sees; a proportional split with the residual going to the last refund would need the
+    /// receipt's entry here and a rule saying which refund is last.
+    /// </para>
+    /// </remarks>
+    private async Task BookVatReleaseAsync(
+        Payment refund,
+        Order order,
+        DateOnly entryDate,
+        Guid postedByUserId,
+        CancellationToken cancellationToken)
+    {
+        var vatUah = VatCalculator.VatFromGross(refund.AmountUah, VatCalculator.StandardRate);
+        if (vatUah <= 0m)
+        {
+            // A zero is not a posting - the engine refuses it - and an exempt advance carried no VAT
+            // to release.
+            return;
+        }
+
+        await _journal.PostAsync(
+            new PostJournalEntryRequest
+            {
+                SourceEvent = RefundedVatEvent,
+                SourceType = JournalSourceType.Refund,
+                // The same refund id as the gross leg: the key is the event plus the source, so the
+                // two entries of one refund are two facts and not one colliding with the other.
+                SourceId = refund.Id,
+                EntryDate = entryDate,
+                AmountUah = vatUah,
+                Description = $"ПДВ з повернення за замовленням {order.Id}",
+                PostedByUserId = postedByUserId,
+            },
+            cancellationToken);
+
+        _logger.LogInformation(
+            "REFUND LEDGER: released {Vat} UAH of VAT for refund {RefundId}.",
+            vatUah, refund.Id);
     }
 }
