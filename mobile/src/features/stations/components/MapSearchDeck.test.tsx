@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 
 import { MapSearchDeck } from './MapSearchDeck';
 
@@ -81,5 +81,27 @@ describe('MapSearchDeck — the fuel chips', () => {
     renderDeck({ fuels: [] });
 
     expect(screen.queryByRole('button', { name: 'А95' })).toBeNull();
+  });
+
+  it('fades the row only where the grades actually run past the edge', () => {
+    // Nine grades never fit beside a phone's screen, and a row that stops mid-chip was
+    // reported as a broken layout. The fade is drawn only once the measured content turns
+    // out wider than the measured row, so a short row does not pretend to scroll.
+    renderDeck({
+      fuels: ['a-92', 'a-95', 'a-95 premium', 'a-98', '100', '100 premium', 'diesel', 'gas'],
+    });
+    const { onLayout, onContentSizeChange } = screen.getByTestId('fuel-row').props as unknown as {
+      onLayout: (event: { nativeEvent: { layout: { width: number } } }) => void;
+      onContentSizeChange: (width: number, height: number) => void;
+    };
+
+    expect(screen.queryByTestId('fuel-fade')).toBeNull();
+
+    act(() => {
+      onLayout({ nativeEvent: { layout: { width: 320 } } });
+      onContentSizeChange(760, 60);
+    });
+
+    expect(screen.getByTestId('fuel-fade')).toBeTruthy();
   });
 });
