@@ -47,6 +47,35 @@ export function isPointInRegion(
 }
 
 /**
+ * Whether the region on screen is still served by the box the markers were last computed for.
+ *
+ * The mounted set is expensive to replace: every marker that enters or leaves it is a native view
+ * tree created inside the frame right after the gesture settles, and a pin created while `MapView`
+ * is still resolving its own mount is what the iOS interop layer trips over. So the screen keeps
+ * the box it computed for and only recomputes when this says `false` — a small pan changes nothing
+ * at all, which is the point.
+ *
+ * Two ways to outgrow a box, and both are checked against {@link VIEWPORT_PADDING} (the margin the
+ * set really covers, since `markersForRegion` pads the box it is given):
+ *
+ * - **pan out of it** — the visible span slides past the padded edge of the box;
+ * - **zoom out of it** — the box becomes so much wider than the screen that it is thinning pins for
+ *   an area nobody is looking at, and the street the user zoomed into shows three pins.
+ *
+ * A region identical to the box is covered: offset 0, and `delta <= delta * 1.2`.
+ */
+export function isRegionCoveredByBox(viewport: MapRegion, box: MapRegion): boolean {
+  const covered = (vpCentre: number, vpDelta: number, boxCentre: number, boxDelta: number) =>
+    Math.abs(vpCentre - boxCentre) * 2 + vpDelta <= boxDelta * (1 + VIEWPORT_PADDING) &&
+    boxDelta <= vpDelta * (1 + VIEWPORT_PADDING);
+
+  return (
+    covered(viewport.latitude, viewport.latitudeDelta, box.latitude, box.latitudeDelta) &&
+    covered(viewport.longitude, viewport.longitudeDelta, box.longitude, box.longitudeDelta)
+  );
+}
+
+/**
  * The stations worth mounting for the region currently on screen.
  *
  * The map fetches every station node once and re-renders on each pan, so this is the only thing
@@ -66,8 +95,9 @@ export function pointsInRegion<T extends Coords>(points: readonly T[], region: M
  * 120 is not a taste number: it covers a whole city at the default zoom (the Kyiv region at
  * `latitudeDelta` 0.15 holds 72 of the network's 1322 АЗК, and every one of them stays a pin)
  * and only starts thinning once the map is pulled back far enough that the pins overlap anyway.
- * Above it the count grows linearly with the area on screen — which is what a pan changes — and
- * every extra pin is another native tree created in that pan's transaction.
+ * Above it the count grows linearly with the area the screen asks for, and every extra pin is
+ * another native tree created in that request's transaction — which is why the screen only asks
+ * when {@link isRegionCoveredByBox} says the box it has no longer covers what is on screen.
  */
 export const MAX_MOUNTED_MARKERS = 120;
 
@@ -76,10 +106,22 @@ export const MAX_MOUNTED_MARKERS = 120;
  *
  * Thinning is a grid, not a prefix. `inView.slice(0, limit)` would keep whichever АЗК the API
  * happened to list first — all of one brand, all of one city — so a zoomed-out map would show
- * pins clustered in one corner and nothing where the user is looking. Splitting the padded box
- * into cells and keeping the АЗК nearest each cell's centre keeps the spread, keeps the result
- * identical for the same region (a pan never re-shuffles the pins it keeps), and leaves the
- * dense areas to the ranking sheet, which is the part of the screen that is not limited.
+ * pins clustered in one corner and nothing where the user is looking. Splitting the area into
+ * cells and keeping the АЗК nearest each cell's centre keeps the spread and leaves the dense areas
+ * to the ranking sheet, which is the part of the screen that is not limited.
+ *
+ * The grid is anchored to absolute coordinates, not to the region, and that is the reason this
+ * function can be called again after a pan. `floor(lat / cellLat)` puts the same line through the
+ * same place on the ground whoever asks, so the АЗК that won a cell keeps winning it and the pins
+ * already mounted stay mounted. Anchored to the region instead, moving the centre moves every cell
+ * boundary, every cell changes its winner, and a pan that revealed nothing new still re-creates all
+ * `limit` native trees — in the frame right after the gesture settles, which is the exposure the
+ * interop crash needs. A zoom changes `cellLat`, so it does re-shuffle: that is a different scale,
+ * and {@link isRegionCoveredByBox} asks for a recomputation at it anyway.
+ *
+ * `cells²` bounds the picks only while the grid and the area start on the same line. On an absolute
+ * grid the box can straddle `cells + 1` rows, so the search steps down instead of trusting it, and
+ * one cell always fits inside the budget.
  */
 export function markersForRegion<T extends Coords>(
   points: readonly T[],
@@ -91,48 +133,27 @@ export function markersForRegion<T extends Coords>(
 
   const latSpan = region.latitudeDelta * (1 + VIEWPORT_PADDING);
   const lngSpan = region.longitudeDelta * (1 + VIEWPORT_PADDING);
-  const minLat = region.latitude - latSpan / 2;
-  const minLng = region.longitude - lngSpan / 2;
 
-  // Coarse to fine: a cells×cells grid holds at most cells² picks, so the first count worth
-  // trying is the square root of the budget. Stepping down by one is enough because each step
-  // only ever removes picks, and one cell always fits inside the budget.
   for (let cells = Math.ceil(Math.sqrt(limit)); cells > 1; cells--) {
-    const picked = onePerCell(inView, cells, minLat, minLng, latSpan, lngSpan);
+    const picked = onePerCell(inView, latSpan / cells, lngSpan / cells);
     if (picked.length <= limit) return picked;
   }
 
-  return onePerCell(inView, 1, minLat, minLng, latSpan, lngSpan);
+  return onePerCell(inView, latSpan, lngSpan);
 }
 
 /** The station nearest each cell's centre, emitted in the order the stations arrived. */
-function onePerCell<T extends Coords>(
-  points: readonly T[],
-  cells: number,
-  minLat: number,
-  minLng: number,
-  latSpan: number,
-  lngSpan: number,
-): T[] {
-  const cellLat = latSpan / cells;
-  const cellLng = lngSpan / cells;
-  const rowOf = (lat: number) =>
-    Math.min(cells - 1, Math.max(0, Math.floor((lat - minLat) / cellLat)));
-  const colOf = (lng: number) =>
-    Math.min(cells - 1, Math.max(0, Math.floor((lng - minLng) / cellLng)));
-
+function onePerCell<T extends Coords>(points: readonly T[], cellLat: number, cellLng: number): T[] {
   const best = new Map<string, { point: T; away: number }>();
   for (const point of points) {
     // The caller has already run these through `pointsInRegion`, which drops any point without
     // finite coordinates; the grid would put a NaN in cell `0:0` and steal that corner.
     const lat = point.lat as number;
     const lng = point.lng as number;
-    const row = rowOf(lat);
-    const col = colOf(lng);
+    const row = Math.floor(lat / cellLat);
+    const col = Math.floor(lng / cellLng);
     const key = `${row}:${col}`;
-    const centreLat = minLat + (row + 0.5) * cellLat;
-    const centreLng = minLng + (col + 0.5) * cellLng;
-    const away = (lat - centreLat) ** 2 + (lng - centreLng) ** 2;
+    const away = (lat - (row + 0.5) * cellLat) ** 2 + (lng - (col + 0.5) * cellLng) ** 2;
     const held = best.get(key);
     if (!held || away < held.away) best.set(key, { point, away });
   }
