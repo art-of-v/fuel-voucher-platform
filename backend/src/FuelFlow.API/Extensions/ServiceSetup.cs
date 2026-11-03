@@ -255,6 +255,7 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<DeleteOrderCommandHandler>();
         services.AddScoped<DeleteMyOrderCommandHandler>();
         services.AddScoped<RefundOrderCommandHandler>();
+        services.AddScoped<FuelFlow.Features.Orders.RefundOrder.RefundJournalPoster>();
     }
 
     private static void AddAuthServices(IServiceCollection services)

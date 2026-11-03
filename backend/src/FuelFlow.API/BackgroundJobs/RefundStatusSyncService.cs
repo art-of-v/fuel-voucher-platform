@@ -1,5 +1,7 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Ledger;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
@@ -7,6 +9,7 @@ using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FuelFlow.API.BackgroundJobs;
 
@@ -16,6 +19,7 @@ private readonly ApplicationDbContext _context;
        private readonly IMonobankClientFactory _monobankClientFactory;
        private readonly ILogger<RefundStatusSyncService> _logger;
        private readonly NotificationDispatcher _notifications;
+       private readonly RefundJournalPoster _journalPoster;
 
        public RefundStatusSyncService(
            ApplicationDbContext context,
@@ -37,11 +41,29 @@ private readonly ApplicationDbContext _context;
            IMonobankClientFactory monobankClientFactory,
            ILogger<RefundStatusSyncService> logger,
            NotificationDispatcher notifications)
+           : this(
+               context,
+               monobankClientFactory,
+               logger,
+               notifications,
+               new RefundJournalPoster(
+                   new JournalPostingService(context, NullLogger<JournalPostingService>.Instance),
+                   NullLogger<RefundJournalPoster>.Instance))
+       {
+       }
+
+       public RefundStatusSyncService(
+           ApplicationDbContext context,
+           IMonobankClientFactory monobankClientFactory,
+           ILogger<RefundStatusSyncService> logger,
+           NotificationDispatcher notifications,
+           RefundJournalPoster journalPoster)
        {
            _context = context;
            _monobankClientFactory = monobankClientFactory;
            _logger = logger;
            _notifications = notifications;
+           _journalPoster = journalPoster;
        }
 
 
@@ -364,6 +386,27 @@ return refunds
             : OrderStatus.Refunded;
 
         ApplyOrderStatus(order, newStatus);
+
+        // The acquirer has returned the money, so the books have to say so in the same breath. This
+        // runs on the confirmation rather than on the refund request for the reason the capture path
+        // gives: a settled state is a fact, an announcement is not.
+        //
+        // A posting that fails is logged and left to a person. It does not undo the confirmation:
+        // telling the admin that a refund the bank completed is still in flight would trade a hole
+        // in the ledger for a lie about the customer's money, and the retry loop cannot fix an
+        // unmapped event or a closed period by itself. Planning #854.
+        try
+        {
+            await _journalPoster.BookConfirmedRefundAsync(refund, order, cancellationToken);
+        }
+        catch (Exception ex) when (ex is LedgerPostingException
+                                       or LedgerUnmappedEventException
+                                       or LedgerPeriodClosedException)
+        {
+            _logger.LogError(
+                "REFUND LEDGER: refund {RefundId} of {Amount} UAH for order {OrderId} is confirmed by the bank and NOT booked: {Error}. The books are short by this refund until it is posted by hand.",
+                refund.Id, refund.AmountUah, order.Id, ex.Message);
+        }
 
         _logger.LogInformation(
             "Refund {RefundId} for order {OrderId} confirmed by Monobank ({Amount} kopecks). Order status updated to {Status}",
