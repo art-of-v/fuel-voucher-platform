@@ -87,6 +87,8 @@ export const orders: Record<Language, Record<string, string>> = {
     "purchases.total": "Total",
     "purchases.acquirer": "Acquirer",
     "purchases.refund": "Refund",
+    "purchases.refunded": "Returned: {0} UAH",
+    "purchases.refundInFlight": "Refunding: {0} UAH",
     "purchases.refundTitle": "Confirm refund",
     "purchases.refundConfirm":
       "Refund this order? Unfulfilled value of {0} UAH will be returned to the customer.",
@@ -196,6 +198,8 @@ export const orders: Record<Language, Record<string, string>> = {
     "purchases.total": "Всього",
     "purchases.acquirer": "Еквайр",
     "purchases.refund": "Повернення",
+    "purchases.refunded": "Повернено: {0} грн",
+    "purchases.refundInFlight": "Повернення в дорозі: {0} грн",
     "purchases.refundTitle": "Підтвердити повернення",
     "purchases.refundConfirm":
       "Повернути кошти за це замовлення? Невиконану частину на суму {0} грн буде повернено клієнту.",
@@ -306,6 +310,8 @@ export const orders: Record<Language, Record<string, string>> = {
     "purchases.total": "Gesamt",
     "purchases.acquirer": "Acquirer",
     "purchases.refund": "Erstattung",
+    "purchases.refunded": "Erstattet: {0} UAH",
+    "purchases.refundInFlight": "Erstattung ausstehend: {0} UAH",
     "purchases.refundTitle": "Erstattung bestätigen",
     "purchases.refundConfirm":
       "Diese Bestellung erstatten? Nicht erfüllter Wert von {0} UAH wird an den Kunden zurückgezahlt.",
@@ -414,6 +420,8 @@ export const orders: Record<Language, Record<string, string>> = {
     "customerRenewal.error.notFound": "Vale no encontrado.",
     "purchases.total": "Total",
     "purchases.refund": "Reembolso",
+    "purchases.refunded": "Reembolsado: {0} UAH",
+    "purchases.refundInFlight": "Reembolso pendiente: {0} UAH",
     "purchases.acquirer": "Adquirente",
     "purchases.refundTitle": "Confirmar reembolso",
     "purchases.refundConfirm":

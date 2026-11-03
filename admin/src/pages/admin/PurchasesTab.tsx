@@ -223,6 +223,19 @@ export default function PurchasesTab() {
                       {t("purchases.refundStatus." + purchase.refundStatus)}
                     </span>
                   )}
+                  {/* A refund row that has not failed is counted, so one still in flight is in this
+                      figure too - and money the bank has not confirmed back is not yet returned.
+                      The row's own word says which of the two labels is the honest one. */}
+                  {purchase.refundedAmountKopecks > 0 && (
+                    <span className="block mt-1 text-xs text-muted-foreground">
+                      {t(
+                        purchase.refundStatus === "Processing"
+                          ? "purchases.refundInFlight"
+                          : "purchases.refunded",
+                        (purchase.refundedAmountKopecks / 100).toFixed(2),
+                      )}
+                    </span>
+                  )}
                 </td>
                 <td className="p-4 text-muted-foreground text-sm">
                   {formatDateTime(purchase.createdAtUtc)}
@@ -289,18 +302,24 @@ export default function PurchasesTab() {
                       {t("purchases.downloadReceipt")}
                     </span>
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRefundTarget(purchase)}
-                    disabled={refundPurchaseMutation.isPending}
-                    className="text-warning hover:bg-warning/10"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span className="ml-1 text-xs">
-                      {t("purchases.refund")}
-                    </span>
-                  </Button>
+                  {/* Offered only while something is still owed back. A press with nothing left is not
+                      a no-op the operator can read: the backend freeze answers "Completed" with the sum
+                      the bank already returned, so the screen would claim a second return of the same
+                      money (planning #862). The figure on the row above says why there is no button. */}
+                  {purchase.refundableAmountKopecks > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRefundTarget(purchase)}
+                      disabled={refundPurchaseMutation.isPending}
+                      className="text-warning hover:bg-warning/10"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      <span className="ml-1 text-xs">
+                        {t("purchases.refund")}
+                      </span>
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}

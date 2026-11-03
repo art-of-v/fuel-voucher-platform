@@ -94,6 +94,8 @@ export interface AdminOrder {
   createdAtUtc: string;
   fulfilledAtUtc: string | null;
   voucherCount: number;
+  /** What the bank has been given back - kopecks. Zero with no refund row, or a failed one. */
+  refundedAmountKopecks: number;
   refundableAmountKopecks: number;
   refundStatus: string | null;
   refundMonobankStatus: string | null;

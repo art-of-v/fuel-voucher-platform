@@ -131,6 +131,12 @@ group by o.status, o.fulfilled_at_utc;
 If no supplier can deliver that brand / grade / size in time, refund the order from the admin order
 screen. The money goes back and the order leaves `PendingFulfillment`.
 
+The press lives on the **Purchases** tab and is offered only while the order still has value the bank
+has not been given back; the row prints that sum (`Returned: …`, or `Refunding: …` while the
+acquirer has not confirmed). A row showing its full sum returned has nothing left to press, and the
+endpoint would answer `Completed` with the same figure rather than move money twice (#862).
+"Refund failed" keeps the press — that row is money that never left.
+
 A refund does **not** take back vouchers that were already delivered: those are the customer's
 property now, and taking them back is a different decision (see the reconciliation runbook).
 
