@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
@@ -51,16 +52,38 @@ public static class RefundRepriceDrift
             return;
         }
 
+        // The VAT leg moves with the gross one, and a person posting the difference by hand needs
+        // both figures: the booked VAT is read rather than derived, because a refund booked before
+        // the VAT rule existed has no leg at all and the gap is the whole of the new one.
+        var bookedVatUah = await context.JournalEntries
+            .AsNoTracking()
+            .Where(e => e.SourceEvent == RefundJournalPoster.RefundedVatEvent
+                     && e.SourceType == JournalSourceType.Refund
+                     && e.SourceId == refund.Id
+                     && e.Status == JournalEntryStatus.Posted)
+            .SelectMany(e => e.Lines)
+            .SumAsync(l => l.DebitUah, cancellationToken);
+
+        var vatDifferenceUah =
+            VatCalculator.VatFromGross(refund.AmountUah, VatCalculator.StandardRate) - bookedVatUah;
+
+        var summary =
+            $"Refund re-priced to {refund.AmountUah:0.00} UAH after {bookedUah:0.00} UAH was booked; the difference of "
+            + $"{refund.AmountUah - bookedUah:0.00} UAH is not in the journal and needs an entry by hand";
+        if (vatDifferenceUah != 0m)
+        {
+            summary += $", as does {vatDifferenceUah:0.00} UAH of its VAT on {RefundJournalPoster.RefundedVatEvent}";
+        }
+
         auditEvents.RecordEvent(
             aggregateType: "Refund",
             aggregateId: refund.Id.ToString(),
             eventType: "RefundAmountCorrectedAfterBooking",
-            oldValue: JsonSerializer.Serialize(new { bookedUah }),
+            oldValue: JsonSerializer.Serialize(new { bookedUah, bookedVatUah }),
             newValue: JsonSerializer.Serialize(new { amountUah = refund.AmountUah }),
             changedByUserId: changedByUserId ?? Guid.Empty,
             changedByUserName: changedByUserName,
-            summary: $"Refund re-priced to {refund.AmountUah:0.00} UAH after {bookedUah:0.00} UAH was booked; "
-                     + $"the difference of {refund.AmountUah - bookedUah:0.00} UAH is not in the journal and needs an entry by hand",
+            summary: summary,
             providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown");
 
         await context.SaveChangesAsync(cancellationToken);
