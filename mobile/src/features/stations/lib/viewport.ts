@@ -50,13 +50,11 @@ export function isPointInRegion(
  * The stations worth mounting for the region currently on screen.
  *
  * The map fetches every station node once and re-renders on each pan, so this is the only thing
- * standing between a 1300-station network and ~1300 native views at once — which the OS answers
- * by killing the process under memory pressure.
- *
- * Every pin is a live view tree (`react-native-maps` does not recycle MapKit annotation views —
- * the `reuseIdentifier` property is commented out in its own marker manager), and each tree
- * carries a shadowed pin and a shadowed callout card whether or not anyone opens it. So this is
- * the raw material of the mounted set, and `markersForRegion` is what bounds it.
+ * standing between a pan that mounts nothing and a pan that mounts 1036 native view trees at
+ * once. Each pin is a live tree (`react-native-maps` does not recycle MapKit annotation views —
+ * the `reuseIdentifier` property is commented out in its own marker manager), and each one that
+ * appears in a transaction is a child the Fabric interop layer has to mount, so the count is the
+ * exposure. `markersForRegion` bounds it.
  */
 export function pointsInRegion<T extends Coords>(points: readonly T[], region: MapRegion): T[] {
   return points.filter((point) => isPointInRegion(point, region));
@@ -68,8 +66,8 @@ export function pointsInRegion<T extends Coords>(points: readonly T[], region: M
  * 120 is not a taste number: it covers a whole city at the default zoom (the Kyiv region at
  * `latitudeDelta` 0.15 holds 72 of the network's 1322 АЗК, and every one of them stays a pin)
  * and only starts thinning once the map is pulled back far enough that the pins overlap anyway.
- * Above it, the native view count grows linearly with the area on screen — which is what a pan
- * changes — and the process dies with no JS error to read.
+ * Above it the count grows linearly with the area on screen — which is what a pan changes — and
+ * every extra pin is another native tree created in that pan's transaction.
  */
 export const MAX_MOUNTED_MARKERS = 120;
 

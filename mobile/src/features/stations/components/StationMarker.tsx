@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Image, StyleSheet, type ImageSourcePropType } from 'react-native';
-import { Marker, Callout } from 'react-native-maps';
+import { Marker } from 'react-native-maps';
 
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
-import { Text } from '../../../core/ui';
-import { formatMoney } from '../../../core/utils/currency';
-import { formatShortAddress, type StationPrice } from '../lib/radar';
+import { formatShortAddress } from '../lib/radar';
 import type { StationNode } from '../../../core/types/api';
 
 /**
@@ -30,27 +28,33 @@ export function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size:
 }
 
 /**
- * A single map pin. Owns its `tracksViewChanges` flag: react-native-maps rasterises
- * a custom-view marker once, and with tracking off from the first frame an <Image>
- * can freeze blank before it has painted. Tracking stays on until the logo reports
- * `onLoad` (colour-only pins are ready at mount), then freezes -- otherwise 700+ live
- * markers re-raster every frame.
+ * A single map pin.
  *
- * A selected pin keeps tracking while it is selected: the ring and the scale change
- * after the raster would otherwise have frozen, and only one pin is ever selected.
+ * It carries no `Callout`, and that is not a feature waiting to be added. `Callout` is a
+ * second legacy view manager nested inside the marker's, and under the New Architecture the
+ * Fabric interop layer resolves each pending child through that child's `contentView` — which
+ * is nil until the child's own `finalizeUpdates` has run — and hands the result straight to
+ * `insertReactSubview:atIndex:`. A marker that mounts with a callout inside it therefore
+ * sometimes inserts `nil` into an `NSMutableArray` and dies with `NSInvalidArgumentException`:
+ * fatal, with no JS error and no red screen. Upstream has carried it since the New Architecture
+ * landed (react-native-maps #5217, #5521 — the reported workaround there is the same one), and
+ * a viewport that re-mounts pins on every pan turns it into a lottery instead of a one-off.
  *
- * The pin is a white disc with the brand's ring, so a logo reads on dark tiles and
- * light ones alike. The callout is the same `Card` language as the rest of the app —
- * opaque `surfaceElevated`, sheet radius, a shadow — where it used to be a blurred
- * pane with a hairline border, which was unreadable against the tiles it floated
- * over.
+ * The tapped station's card is `StationDetailSheet`, which shows the same name, address, price
+ * per litre and saving and adds the route action — as an ordinary React surface, so it is not in
+ * anybody's native mount order.
+ *
+ * `tracksViewChanges` is read by the Android marker manager; the iOS MapKit marker has no such
+ * prop. There a custom-view marker is rasterised once, so tracking stays on until the logo
+ * reports `onLoad` (a colour-only pin is ready at mount) and freezes after — a pin frozen too
+ * early keeps a blank disc. A selected pin keeps tracking while it is selected, because its ring
+ * and scale change after that raster, and only one pin is ever selected.
  */
 export function StationMarker({
   point,
   coordinate,
   brandColor,
   logo,
-  price,
   selected = false,
   onPress,
 }: {
@@ -58,7 +62,6 @@ export function StationMarker({
   coordinate: { latitude: number; longitude: number };
   brandColor: string;
   logo?: ImageSourcePropType;
-  price: StationPrice | null;
   selected?: boolean;
   onPress: () => void;
 }) {
@@ -72,11 +75,6 @@ export function StationMarker({
       return () => clearTimeout(id);
     }
   }, [logo]);
-
-  const saving =
-    price && price.savingsPerLiter > 0
-      ? formatMoney(price.savingsPerLiter, { decimals: 2, hideSymbol: true })
-      : null;
 
   return (
     <Marker
@@ -126,51 +124,6 @@ export function StationMarker({
           }}
         />
       </View>
-
-      <Callout tooltip>
-        <View
-          style={[
-            {
-              width: 232,
-              padding: tokens.spacing.fine14,
-              borderRadius: tokens.radius.lg,
-              gap: tokens.spacing.xxs,
-              backgroundColor: tokens.colors.surfaceElevated,
-            },
-            tokens.elevation.medium,
-          ]}
-        >
-          <Text role="bodyStrong" numberOfLines={1}>
-            {point.name}
-          </Text>
-          <Text role="caption" tone="muted" numberOfLines={2}>
-            {formatShortAddress(point) || t('map.noAddress')}
-          </Text>
-          {price ? (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'baseline',
-                flexWrap: 'wrap',
-                gap: tokens.spacing.xs,
-                marginTop: tokens.spacing.xs,
-              }}
-            >
-              <Text role="numericSmall" tone="accent">
-                {formatMoney(price.voucherPerLiter, { decimals: 2, hideSymbol: true })}
-              </Text>
-              <Text role="caption" tone="muted">
-                {t('map.perLiter')}
-              </Text>
-              {saving ? (
-                <Text role="caption" tone="success">
-                  −{saving} {t('map.vsPump')}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      </Callout>
     </Marker>
   );
 }
