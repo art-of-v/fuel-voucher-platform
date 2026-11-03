@@ -2,6 +2,7 @@ import {
   MAX_MOUNTED_MARKERS,
   VIEWPORT_PADDING,
   isPointInRegion,
+  isRegionCoveredByBox,
   markersForRegion,
   pointsInRegion,
   type MapRegion,
@@ -136,5 +137,65 @@ describe('markersForRegion', () => {
 
     expect(kept.length).toBeGreaterThan(0);
     expect(kept.every((point) => isPointInRegion(point, whole))).toBe(true);
+  });
+
+  it('keeps the pins it already had when the same zoom moves', () => {
+    // The churn the interop crash feeds on. Anchored to the region, a new centre moves every cell
+    // boundary, every cell changes its winner, and a pan that revealed nothing new re-creates all
+    // ~120 native trees in the frame right after the gesture. Anchored to the ground, the АЗК
+    // nearest a cell's centre is whoever asks — so any pin of the old set that sits well inside
+    // both boxes has to still be there. The shift is a quarter of the screen, which is a pan.
+    const all = spread(1000);
+    const shifted: MapRegion = {
+      ...whole,
+      latitude: whole.latitude + 0.6,
+      longitude: whole.longitude - 0.5,
+    };
+    const before = markersForRegion(all, whole);
+    const after = markersForRegion(all, shifted);
+
+    // "Well inside" is half the box on each side, so the cells those pins sit in are wholly inside
+    // both boxes and the candidate set that chose them did not change.
+    const stays = before.filter(
+      (point) => isPointInRegion(point, whole, -0.5) && isPointInRegion(point, shifted, -0.5),
+    );
+    const keptIds = new Set(after.map((point) => point.id));
+
+    expect(stays.length).toBeGreaterThan(5);
+    expect(stays.filter((point) => keptIds.has(point.id))).toHaveLength(stays.length);
+  });
+});
+
+describe('isRegionCoveredByBox', () => {
+  it('holds for the region the set was computed from', () => {
+    expect(isRegionCoveredByBox(KYIV, KYIV)).toBe(true);
+  });
+
+  it('holds while the screen stays inside the margin already mounted', () => {
+    // The set covers the box plus VIEWPORT_PADDING on each side, so a pan of up to a sixth of the
+    // screen (0.015° of 0.15°) reveals nothing that was not already a pin.
+    expect(isRegionCoveredByBox({ ...KYIV, latitude: KYIV.latitude + 0.014 }, KYIV)).toBe(true);
+  });
+
+  it('asks for a recomputation past the padded edge', () => {
+    expect(isRegionCoveredByBox({ ...KYIV, latitude: KYIV.latitude + 0.05 }, KYIV)).toBe(false);
+    expect(isRegionCoveredByBox({ ...KYIV, longitude: KYIV.longitude - 0.05 }, KYIV)).toBe(false);
+  });
+
+  it('asks for one when the screen outgrows the box', () => {
+    expect(isRegionCoveredByBox({ ...KYIV, latitudeDelta: 0.3, longitudeDelta: 0.3 }, KYIV)).toBe(
+      false,
+    );
+  });
+
+  it('holds while the box is still the right scale for the screen', () => {
+    // Zooming in a little keeps the pins; the box may not stay many times wider than the screen,
+    // or the street the user opened would be served by a set thinned for a city.
+    expect(isRegionCoveredByBox({ ...KYIV, latitudeDelta: 0.13, longitudeDelta: 0.13 }, KYIV)).toBe(
+      true,
+    );
+    expect(isRegionCoveredByBox({ ...KYIV, latitudeDelta: 0.01, longitudeDelta: 0.01 }, KYIV)).toBe(
+      false,
+    );
   });
 });
