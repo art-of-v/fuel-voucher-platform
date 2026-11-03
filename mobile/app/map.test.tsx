@@ -135,7 +135,6 @@ jest.mock('react-native-maps', () => {
     MapView,
     UrlTile: (props: Record<string, any>) => <Text testID="tile">{String(props.urlTemplate)}</Text>,
     Marker: (props: Record<string, any>) => <View testID="marker" {...props} />,
-    Callout: (props: Record<string, any>) => <View testID="callout" {...props} />,
     Circle: () => null,
     Polyline: () => null,
   };
@@ -437,9 +436,10 @@ describe('MapScreen', () => {
     });
 
     it('bounds the pins a pan mounts', () => {
-      // Each pin is a live native view tree carrying a shadowed callout of its own, and the
-      // count grows with the *area* on screen — which is what a pan changes. The OS answers
-      // with a killed process and no JS error to read, so the ceiling is the only defence.
+      // Each pin is a live native view tree, and the count grows with the *area* on screen —
+      // which is what a pan changes. Every tree created inside one pan's transaction is one the
+      // iOS interop layer has to mount, and the fatal it can raise there carries no JS error to
+      // read, so the ceiling is what keeps a pulled-back map mountable.
       mockNodes = lattice(1000);
       renderScreen();
 
