@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
@@ -340,6 +341,68 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         // An in-flight (Processing) refund must not move the order into a refunded state.
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
+
+        // Nothing to report either: the order still owes exactly what the refund carries, which is the
+        // shape every ordinary repeat press has.
+        (await _context.Set<AuditEventOutbox>().AnyAsync(
+            e => e.EventType == RefundAmountDisagreement.EventName)).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The figure a refund carries is the figure the acquirer was asked to move, and the order
+    /// disagreeing with it afterwards does not rewrite that figure (#856).
+    /// </summary>
+    /// <remarks>
+    /// Two units were ordered and one was delivered, so the order's undelivered value is 2 500 UAH while
+    /// the confirmed refund carries the full 5 000. Recomputing the row there is what used to happen: it
+    /// turned a closed refund into a sum no bank ever moved and the branch still reported it as
+    /// "Completed". The row now stands and the disagreement is written down for a person to decide.
+    /// </remarks>
+    [Fact]
+    public async Task HandleAsync_ShouldNotRewriteAConfirmedRefund_WhenTheOrderDisagreesWithIt()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = TestClock.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        SeedRefundPayment(order, PaymentStatus.Succeeded);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand
+        {
+            OrderId = order.Id,
+            ChangedByUserId = Guid.NewGuid(),
+            ChangedByUserName = "admin-test"
+        });
+
+        result.Status.Should().Be("Completed");
+        result.AmountKopecks.Should().Be(500000, "the panel answers with what the bank returned");
+
+        var refund = await _context.Payments.SingleAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund);
+        refund.AmountKopecks.Should().Be(500000);
+        refund.AmountUah.Should().Be(5000m);
+
+        _monobankClientMock.Verify(
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
+            Times.Never, "a confirmed refund is never cancelled twice, and no larger sum leaves for the acquirer");
+
+        var report = await _context.Set<AuditEventOutbox>().SingleAsync(
+            e => e.EventType == RefundAmountDisagreement.EventName);
+        report.AggregateId.Should().Be(refund.Id.ToString());
+        report.Summary.Should().Contain("The bank returned 5000.00 UAH");
+        report.Summary.Should().Contain("2500.00 UAH still undelivered");
+        report.Summary.Should().Contain("a difference of -2500.00 UAH");
+        // The fixture has no journal at all, so the report also names the other silence this row covers:
+        // every refund confirmed before the posting path existed left no entry behind.
+        report.Summary.Should().Contain("Nothing is booked for this refund on payment.refunded");
     }
 
     [Fact]

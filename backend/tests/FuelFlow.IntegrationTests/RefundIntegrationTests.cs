@@ -214,13 +214,13 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
-    public async Task ManualRefund_RepricedAfterTheBankBookedIt_SaysWhatTheJournalIsMissing()
+    public async Task ManualRefund_OrderChangedAfterTheBankRefundedIt_KeepsTheBankedFigureAndSaysSo()
     {
-        // #854. The entry is keyed on the refund row and the engine refuses to write that key twice,
-        // so re-pricing a confirmed refund cannot re-book it: the journal keeps the figure the bank
-        // returned, the row keeps the new one, and an accountant reading the books sees no gap. The
-        // handler may not invent the correcting entry - that is the accountant's call - but it may not
-        // be silent either.
+        // #856. The entry is keyed on the refund row and the engine refuses to write that key twice, so
+        // re-pricing a confirmed refund could never re-book it: the journal kept the figure the bank
+        // returned, the row kept a newer one, and the handler still reported the row as "Completed". A
+        // sum the acquirer moved is not recomputed here any more. What the handler may not do is stay
+        // silent - it writes both figures and what the books hold, and a person decides what the gap means.
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var invoiceId = $"test-invoice-{orderId:N}";
@@ -267,13 +267,13 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 .SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund)).Id;
         }
 
-        var bookedBeforeReprice = await BookedRefundLegsAsync(refundId);
-        bookedBeforeReprice.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
-        bookedBeforeReprice.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
+        var bookedBeforeTheSecondPress = await BookedRefundLegsAsync(refundId);
+        bookedBeforeTheSecondPress.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
+        bookedBeforeTheSecondPress.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
 
-        // One of the two units is delivered after the money came back, so the refundable value drops
-        // to 1 000 UAH and the second request re-prices the refund that is already in the books.
-        // Not SeedAsync: that truncates and would wipe the refund and its entry along with it.
+        // One of the two units is delivered after the money came back, so the order now shows 1 000 UAH
+        // still undelivered against a refund the bank closed at 2 000 UAH. The second press reports that
+        // and changes nothing. Not SeedAsync: that truncates and would wipe the refund and its entries.
         using (var deliver = CreateContext())
         {
             var voucher = new FuelVoucher
@@ -312,25 +312,26 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         using (var verify = CreateContext())
         {
             var refund = await verify.Payments.AsNoTracking().SingleAsync(p => p.Id == refundId);
-            refund.AmountUah.Should().Be(1000.00m);
+            refund.AmountUah.Should().Be(2000.00m,
+                "the acquirer moved 2 000.00 UAH; a delivery that landed afterwards does not rewrite that");
 
-            var drift = await verify.Set<AuditEventOutbox>().AsNoTracking()
-                .SingleAsync(e => e.EventType == "RefundAmountCorrectedAfterBooking");
-            drift.AggregateId.Should().Be(refundId.ToString());
-            drift.Summary.Should().Contain("is not in the journal");
-            drift.OldValue.Should().Contain("2000");
-            drift.NewValue.Should().Contain("1000");
-            drift.NewValue.Should().NotContain("2000");
-
-            // The new figure has a VAT share too, and the drift row names it: an accountant who posts
-            // only the gross difference leaves 643 and 704 wrong by the same amount.
-            drift.Summary.Should().Contain("payment.refunded.vat");
+            var report = await verify.Set<AuditEventOutbox>().AsNoTracking()
+                .SingleAsync(e => e.EventType == RefundAmountDisagreement.EventName);
+            report.AggregateId.Should().Be(refundId.ToString());
+            report.Summary.Should().Contain("1000.00 UAH still undelivered");
+            report.Summary.Should().Contain("a difference of -1000.00 UAH");
+            report.Summary.Should().Contain("is not rewritten");
+            report.Summary.Should().NotContain("Nothing is booked",
+                "the confirmation booked this refund — that sentence is for one the books never saw");
+            report.OldValue.Should().Contain("2000");
+            report.NewValue.Should().Contain("1000");
+            report.NewValue.Should().NotContain("2000");
 
             // And the entries the bank's confirmation wrote are untouched - the gap is reported, not
             // papered over by editing an accounting fact that is already posted.
-            var bookedAfterReprice = await BookedRefundLegsAsync(refundId);
-            bookedAfterReprice.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
-            bookedAfterReprice.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
+            var bookedAfterTheSecondPress = await BookedRefundLegsAsync(refundId);
+            bookedAfterTheSecondPress.Should().Contain(("payment.refunded", "681", "311", 2000.00m));
+            bookedAfterTheSecondPress.Should().Contain(("payment.refunded.vat", "643", "704", 333.33m));
         }
     }
 

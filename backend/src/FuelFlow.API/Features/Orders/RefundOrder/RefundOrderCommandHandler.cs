@@ -72,23 +72,29 @@ public sealed class RefundOrderCommandHandler
                 p => p.OrderId == command.OrderId && p.Kind == PaymentKind.Refund,
                 cancellationToken);
 
-        // A refund already in flight (Pending) or confirmed (Succeeded) is reported back
-        // as-is and must never be cancelled twice. Only a Failed refund is retryable.
+        // A refund already in flight (Pending) or confirmed (Succeeded) is reported back as-is and must
+        // never be cancelled twice. Only a Failed refund is retryable.
         if (existing is not null && existing.Status != PaymentStatus.Failed)
         {
-            var correctedAmount = ComputeRefundAmountKopecks(order);
+            // "As-is" used to mean the number too: this branch recomputed the refundable value over the
+            // row on every repeat press. The delivery state is not frozen with the money — a fulfillment
+            // the reconciliation job releases, or a retry that delivers the unit already paid back, moves
+            // that number after the acquirer has answered — so the rewrite put a figure on a banked fact
+            // that no bank ever moved, while the line below still reported it as "Completed" and the
+            // journal kept the real sum under a key the engine will not write twice.
+            //
+            // A sum the acquirer was asked to return is a document, not a draft. A further return of
+            // money would be a second document, and this build does not support one per order: the
+            // cancel is correlated by the order's own reference (see RefundStatusSyncService), so two
+            // refunds of one order would both be confirmed by the same acquirer entry. What a
+            // disagreement is worth is one audit row naming both figures, so a person sees it rather
+            // than reconstructing it at the close.
+            var undeliveredValueKopecks = ComputeRefundAmountKopecks(order);
 
-            if (correctedAmount > 0 && existing.AmountKopecks != correctedAmount)
+            if (undeliveredValueKopecks != existing.AmountKopecks)
             {
-                existing.AmountKopecks = correctedAmount;
-                existing.AmountUah = Money.FromKopecks(correctedAmount);
-                existing.UpdatedAtUtc = SystemClock.UtcNow;
-                await _context.SaveChangesAsync(cancellationToken);
-
-                // The books may already carry this refund at the old figure; say so rather than leave
-                // a ledger that looks complete and is short by the difference.
-                await RefundRepriceDrift.RecordIfBookedAmountDriftedAsync(
-                    _context, _providerEventService, existing, order,
+                await RefundAmountDisagreement.RecordAsync(
+                    _context, _providerEventService, existing, order, undeliveredValueKopecks,
                     command.ChangedByUserId, command.ChangedByUserName, cancellationToken);
             }
 
