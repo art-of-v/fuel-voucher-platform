@@ -6,11 +6,14 @@ import { StationMarker, BrandLogoChip } from './StationMarker';
 /**
  * The two map-pin components, extracted from `app/map.tsx`.
  *
- * The behaviour that must survive the move is the marker's `tracksViewChanges`
- * lifecycle: react-native-maps rasterises a custom-view marker once, so a logo pin
- * has to keep tracking until the image paints (`onLoad`), and a colour-only pin --
- * which is ready at mount -- freezes on the next tick. Freezing a logo pin too early
- * leaves 700+ blank markers; never freezing re-rasters every one every frame.
+ * Two behaviours must survive any edit here. The first is the `tracksViewChanges` lifecycle,
+ * which belongs to the Android marker manager (iOS MapKit has no such prop): a custom-view marker
+ * is rasterised once there, so a logo pin has to keep tracking until the image paints (`onLoad`),
+ * and a colour-only pin -- which is ready at mount -- freezes on the next tick. Freezing a logo
+ * pin too early leaves blank discs; never freezing re-rasters every one every frame.
+ *
+ * The second is that the pin carries no `Callout`, and so keeps a legacy view manager out of the
+ * marker's own. That is a crash, not a style rule -- see the describe below.
  */
 
 const markerProps: any[] = [];
@@ -22,10 +25,12 @@ jest.mock('react-native-maps', () => {
     __esModule: true,
     // Records the live `tracksViewChanges` on every render so the lifecycle can be
     // observed, and exposes the press target.
-    Marker: ({ children, tracksViewChanges, onPress }: any) => {
-      markerProps.push({ tracksViewChanges, onPress });
+    Marker: ({ children, tracksViewChanges, onPress, accessibilityLabel }: any) => {
+      markerProps.push({ tracksViewChanges, onPress, accessibilityLabel });
       return R.createElement(View, { testID: 'marker', onPress } as any, children);
     },
+    // Still mocked after the component stopped using it, so a reintroduced callout renders
+    // somewhere a test can see it instead of crashing the module mock.
     Callout: ({ children }: any) => R.createElement(View, { testID: 'callout' }, children),
   };
 });
@@ -56,7 +61,6 @@ function renderMarker(over: Record<string, unknown> = {}) {
       point={{ name: 'Shell Darnytsia', address: 'Kyiv, Darnytsia' } as any}
       coordinate={{ latitude: 50, longitude: 30 }}
       brandColor="#ff0000"
-      price={null}
       onPress={onPress}
       {...over}
     />,
@@ -124,46 +128,32 @@ describe('StationMarker - the tracksViewChanges lifecycle', () => {
   });
 });
 
-describe('StationMarker - the callout', () => {
-  it('names the station and its address', () => {
+describe('StationMarker - what the pin carries', () => {
+  it('mounts no callout inside the marker', () => {
+    // `Callout` is a second legacy view manager nested inside the marker's. Under the New
+    // Architecture the interop layer resolves a pending child through that child's `contentView`,
+    // which is nil until the child's own `finalizeUpdates` has run, and hands the result straight
+    // to `insertReactSubview:atIndex:` -- so a pin that mounts with a callout in the same
+    // transaction sometimes inserts nil into an NSMutableArray and dies fatally, with no JS error.
+    // A pan brings pins on screen in transactions, which is how it got reported as "the map
+    // crashes while I move it".
     renderMarker({ logo: undefined });
 
-    expect(screen.getByText('Shell Darnytsia')).toBeTruthy();
-    expect(screen.getByText('Kyiv, Darnytsia')).toBeTruthy();
+    expect(screen.queryByTestId('callout')).toBeNull();
   });
 
-  it('falls back to a no-address label when there is none', () => {
+  it('names the station and its address on the pin itself', () => {
+    // The callout used to be where the name and address were drawn. Now that the card is a
+    // separate surface, the label is what keeps a pin from being an anonymous disc.
+    renderMarker({ logo: undefined });
+
+    expect(markerProps[0].accessibilityLabel).toBe('Shell Darnytsia, Kyiv, Darnytsia');
+  });
+
+  it('falls back to the no-address copy when the node carries none', () => {
     renderMarker({ logo: undefined, point: { name: 'Shell', address: '' } as any });
 
-    expect(screen.getByText('map.noAddress')).toBeTruthy();
-  });
-
-  it('shows the voucher price and the saving when there is one', () => {
-    renderMarker({
-      logo: undefined,
-      price: { voucherPerLiter: 52.3, pumpPerLiter: 56, savingsPerLiter: 3.7 } as any,
-    });
-
-    // Money uses a decimal comma everywhere else in the app, so a dot here would
-    // read as a different number to the customer.
-    expect(screen.getByText('52,30')).toBeTruthy();
-    expect(screen.getByText(/3,70/)).toBeTruthy();
-  });
-
-  it('omits the saving when there is none', () => {
-    renderMarker({
-      logo: undefined,
-      price: { voucherPerLiter: 52.3, pumpPerLiter: 52.3, savingsPerLiter: 0 } as any,
-    });
-
-    expect(screen.getByText('52,30')).toBeTruthy();
-    expect(screen.queryByText(/map.vsPump/)).toBeNull();
-  });
-
-  it('shows no price block when the station has no price', () => {
-    renderMarker({ logo: undefined, price: null });
-
-    expect(screen.queryByText(/map.perLiter/)).toBeNull();
+    expect(markerProps[0].accessibilityLabel).toBe('Shell, map.noAddress');
   });
 });
 
