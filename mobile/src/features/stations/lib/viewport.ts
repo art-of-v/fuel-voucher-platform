@@ -49,11 +49,11 @@ export function isPointInRegion(
 /**
  * Whether the region on screen is still served by the box the markers were last computed for.
  *
- * The mounted set is expensive to replace: every marker that enters or leaves it is a native view
- * tree created inside the frame right after the gesture settles, and a pin created while `MapView`
- * is still resolving its own mount is what the iOS interop layer trips over. So the screen keeps
- * the box it computed for and only recomputes when this says `false` — a small pan changes nothing
- * at all, which is the point.
+ * The mounted set is expensive to replace: each station that enters the shortlist mounts a pin
+ * subtree into its slot and each one that leaves empties one, both inside the frame right after the
+ * gesture settles. So the screen keeps the box it computed for and only recomputes when this says
+ * `false` — a small pan changes nothing at all, which is the point. (The markers themselves are not
+ * re-created either; see {@link assignToSlots}.)
  *
  * Two ways to outgrow a box, and both are checked against {@link VIEWPORT_PADDING} (the margin the
  * set really covers, since `markersForRegion` pads the box it is given):
@@ -160,6 +160,72 @@ function onePerCell<T extends Coords>(points: readonly T[], cellLat: number, cel
 
   const chosen = new Set<T>([...best.values()].map((held) => held.point));
   return points.filter((point) => chosen.has(point));
+}
+
+/**
+ * How many markers the map mounts. It mounts this many, once, and never another.
+ *
+ * The same number as {@link MAX_MOUNTED_MARKERS} on purpose — a screen that mounted more pins than
+ * it has slots would have nowhere to put them — but a different thing: the cap bounds what a region
+ * asks for, this is what the screen builds. See {@link assignToSlots} for why the count has to be
+ * fixed rather than merely small.
+ */
+export const MARKER_POOL_SIZE = MAX_MOUNTED_MARKERS;
+
+/**
+ * Which station each of the `size` mounted markers shows: `(T | null)[]`, always exactly `size` long.
+ *
+ * `Marker` is a *legacy* view manager hosted by a Fabric interop component, and the interop layer
+ * plays the child list back to that manager as `insertReactSubview:atIndex:` — with the index the
+ * shadow tree says, into an array the manager keeps itself (`AIRMap`'s `_reactSubviews`, whose
+ * `addAnnotation:` calls also feed MapKit). Adding and removing in one transaction is how the two
+ * get out of step, and either way it goes fatally, in Objective-C, with no JS error to read:
+ * `NSInvalidArgumentException: object cannot be nil` when a child's view is not there yet (upstream
+ * #5217 — and the same line, one branch over), and `NSRangeException: index N beyond bounds` when
+ * the array is shorter than the index. Panning the network map did that on every gesture that
+ * changed the set, so no amount of making the set *smaller* ever stopped it.
+ *
+ * So the set is fixed: the screen mounts `size` markers while the map itself mounts, and after that
+ * a pan only ever changes which station a marker shows. That is a prop update — `coordinate`,
+ * `opacity` — and MapKit moves an annotation whose coordinate changes (upstream #5193 measures it as
+ * a lag, not a failure). Nothing is inserted, nothing is removed, and the array and the shadow tree
+ * never disagree.
+ *
+ * Two rules keep the pins steady inside that fixed set:
+ *
+ * - a station that already has a marker keeps it, so a pan does not move a pin the user can see to a
+ *   different slot (and swap its press handler with it);
+ * - the pins still to place go into the slots that are empty in the result. There are always enough:
+ *   the shortlist is capped at `size`, so the stations that just left the region free at least as
+ *   many slots as there are new ones to fill.
+ */
+export function assignToSlots<T extends Coords & { id: string }>(
+  points: readonly T[],
+  region: MapRegion,
+  previous: readonly (T | null)[],
+  size = MARKER_POOL_SIZE,
+): (T | null)[] {
+  // Keyed by id, so a slot is re-pointed at the *current* instance of the station rather than the
+  // object it happened to hold when it was assigned. `markersForRegion` keeps the input order, so
+  // this map's order is the order the thinning grid picked them in.
+  const wanted = new Map(markersForRegion(points, region, size).map((point) => [point.id, point]));
+
+  const slots: (T | null)[] = new Array<T | null>(size).fill(null);
+
+  previous.slice(0, size).forEach((point, index) => {
+    const held = point ? wanted.get(point.id) : undefined;
+    if (!held) return;
+    slots[index] = held;
+    wanted.delete(held.id);
+  });
+
+  const fresh = [...wanted.values()];
+  let next = 0;
+  for (let index = 0; index < size && next < fresh.length; index++) {
+    if (slots[index] == null) slots[index] = fresh[next++];
+  }
+
+  return slots;
 }
 
 /** Narrowing helper for the union the map screen actually holds. */

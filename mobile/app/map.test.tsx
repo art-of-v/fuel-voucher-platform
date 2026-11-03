@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { MAX_MOUNTED_MARKERS } from '../src/features/stations/lib/viewport';
+import { MARKER_POOL_SIZE, MAX_MOUNTED_MARKERS } from '../src/features/stations/lib/viewport';
 import MapScreen from './map';
 
 /**
@@ -431,28 +431,38 @@ describe('MapScreen', () => {
       longitudeDelta: 4,
     };
 
+    /**
+     * How many of the mounted markers are showing a pin. The mock spreads the marker's props onto a
+     * view, so `opacity` — which the pool sets to 0 for a slot with no station — is what says it.
+     */
+    const pinsShown = () =>
+      screen.getAllByTestId('marker').filter((pin) => pin.props.opacity === 1).length;
+
     afterEach(() => {
       mockNodes = [];
     });
 
-    it('bounds the pins a pan mounts', () => {
-      // Each pin is a live native view tree, and the count grows with the *area* on screen —
-      // which is what a pan changes. Every tree created inside one pan's transaction is one the
-      // iOS interop layer has to mount, and the fatal it can raise there carries no JS error to
-      // read, so the ceiling is what keeps a pulled-back map mountable.
+    it('mounts the pool once, and never another marker after it', () => {
+      // A `Marker` is a legacy view manager hosted by a Fabric interop component, and inserting or
+      // removing one replays a child-index change into the map's own array of subviews. When that
+      // array and the shadow tree disagree the app dies in Objective-C — twice over, `object cannot
+      // be nil` and `index beyond bounds` — with no JS error to read. So the screen builds the pool
+      // while the map builds and afterwards only changes which АЗК a marker shows.
       mockNodes = lattice(1000);
       renderScreen();
 
       const map = screen.getByTestId('map');
-      expect(screen.getAllByTestId('marker').length).toBeLessThan(20);
+      expect(screen.getAllByTestId('marker')).toHaveLength(MARKER_POOL_SIZE);
+      expect(pinsShown()).toBeLessThan(20);
 
       act(() => {
         fireEvent(map, 'regionChangeComplete', WIDE);
       });
 
-      const pins = screen.getAllByTestId('marker');
-      expect(pins.length).toBeGreaterThan(0);
-      expect(pins.length).toBeLessThanOrEqual(MAX_MOUNTED_MARKERS);
+      // A whole country on screen: the pins thin, the markers do not change.
+      expect(screen.getAllByTestId('marker')).toHaveLength(MARKER_POOL_SIZE);
+      expect(pinsShown()).toBeGreaterThan(0);
+      expect(pinsShown()).toBeLessThanOrEqual(MAX_MOUNTED_MARKERS);
     });
 
     it('keeps the ranking sheet standing through a map pan', () => {

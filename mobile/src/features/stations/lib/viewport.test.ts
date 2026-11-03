@@ -1,6 +1,8 @@
 import {
+  MARKER_POOL_SIZE,
   MAX_MOUNTED_MARKERS,
   VIEWPORT_PADDING,
+  assignToSlots,
   isPointInRegion,
   isRegionCoveredByBox,
   markersForRegion,
@@ -197,5 +199,84 @@ describe('isRegionCoveredByBox', () => {
     expect(isRegionCoveredByBox({ ...KYIV, latitudeDelta: 0.01, longitudeDelta: 0.01 }, KYIV)).toBe(
       false,
     );
+  });
+});
+
+describe('assignToSlots', () => {
+  const WHOLE: MapRegion = { latitude: 50, longitude: 31, latitudeDelta: 4, longitudeDelta: 4 };
+
+  function lattice(count: number) {
+    const side = Math.ceil(Math.sqrt(count));
+    return Array.from({ length: count }, (_, i) =>
+      at(48.2 + Math.floor(i / side) * (3.4 / side), 29.5 + (i % side) * (3.4 / side)),
+    );
+  }
+
+  const shown = (slots: ({ id: string } | null)[]) =>
+    slots.filter((point): point is { id: string } => point != null);
+
+  it('mounts the pool and nothing else', () => {
+    // The length is the whole point. `Marker` is hosted by a legacy view manager, and the only way
+    // the map's own child array stops being rewritten mid-gesture — which is what kills the app, in
+    // Objective-C, twice over — is for the screen to ask for the same number of markers every time.
+    expect(assignToSlots([], KYIV, [])).toHaveLength(MARKER_POOL_SIZE);
+    expect(assignToSlots(lattice(1000), WHOLE, [])).toHaveLength(MARKER_POOL_SIZE);
+  });
+
+  it('shows every pin the region wants and leaves the rest of the pool empty', () => {
+    const all = lattice(1000);
+    const wanted = markersForRegion(all, WHOLE);
+    const slots = assignToSlots(all, WHOLE, []);
+
+    expect(
+      shown(slots)
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(wanted.map((p) => p.id).sort());
+    expect(slots.length - shown(slots).length).toBe(MARKER_POOL_SIZE - wanted.length);
+  });
+
+  it('keeps a station in the slot it was already given', () => {
+    const near = [at(50.45, 30.52), at(50.46, 30.55), at(50.44, 30.5)];
+    const first = assignToSlots(near, KYIV, []);
+    const second = assignToSlots(near, { ...KYIV, latitude: 50.455, longitude: 30.51 }, first);
+
+    // The same pins in the same markers: a pan that still wants a pin must not hand it to another
+    // slot, because the press handler, the coordinates and the rasterised disc ride on it.
+    expect(second).toEqual(first);
+  });
+
+  it('takes a fresh pin into an empty slot instead of displacing one that stayed', () => {
+    const a = at(50.45, 30.52);
+    const b = at(50.46, 30.55);
+    const first = assignToSlots([a], KYIV, []);
+    const second = assignToSlots([a, b], KYIV, first);
+
+    expect(shown(second).map((point) => point.id)).toEqual(['50.45,30.52', '50.46,30.55']);
+    // Enough empty slots always exist — the shortlist is capped at the pool — so this never has to
+    // move a wanted pin out of the way to make room.
+    expect(second.length - shown(second).length).toBe(MARKER_POOL_SIZE - 2);
+  });
+
+  it('empties the slot of a station that left the region', () => {
+    const a = at(50.45, 30.52);
+    const lviv = at(49.8397, 24.0297);
+    const first = assignToSlots([a, lviv], { ...KYIV, longitudeDelta: 13, latitudeDelta: 13 }, []);
+    const second = assignToSlots([a, lviv], KYIV, first);
+
+    // A slot showing nothing is what the pool is for: the marker stays, the pin goes.
+    expect(shown(second).map((point) => point.id)).toEqual(['50.45,30.52']);
+    expect(second.every((p) => p == null || isPointInRegion(p, KYIV))).toBe(true);
+  });
+
+  it('keeps the slot when the station comes back as a new object', () => {
+    // react-query hands the screen fresh instances after a refetch. Matching by identity would move
+    // every pin to a different marker on the first refresh after a pan.
+    const a = at(50.45, 30.52);
+    const first = assignToSlots([a], KYIV, []);
+    const second = assignToSlots([{ ...a }], KYIV, first);
+
+    expect(second[0]?.id).toBe(a.id);
+    expect(second[0]).not.toBe(first[0]);
   });
 });
