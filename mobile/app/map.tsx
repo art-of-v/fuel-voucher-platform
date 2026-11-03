@@ -35,8 +35,9 @@ import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
 import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
 import {
+  assignToSlots,
   isRegionCoveredByBox,
-  markersForRegion,
+  MARKER_POOL_SIZE,
   type MapRegion,
 } from '../src/features/stations/lib/viewport';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
@@ -113,19 +114,32 @@ export default function MapScreen() {
     [allPoints, searchQuery],
   );
 
-  // Mount only what the viewport can show, and only as much of it as one transaction can carry.
-  // Every station node is fetched once, but each one inside the region becomes a live native view
-  // tree, so the count tracks the *area* on screen — which is exactly what a pan changes, and a pin
-  // created in the frame after a gesture settles is what the iOS interop layer trips over.
+  // Which pins to show, and how often to work that out. The count tracks the *area* on screen —
+  // which is what a pan changes — so it is bounded to MAX_MOUNTED_MARKERS, and
   // `markersForRegion` keeps a spread of that area rather than the first `limit` stations the API
-  // listed, and anchors its grid to the ground so a pan cannot re-shuffle it. The frozen box is the
-  // other half: the set is computed for the region it was last computed for and kept until the
-  // screen genuinely leaves it, so the settles in the middle of a long pan mount nothing.
+  // listed, on a grid anchored to the ground so a pan cannot re-shuffle it. The box is frozen at
+  // whatever region it was last computed for and recomputed only once the screen genuinely leaves
+  // it, so the settles in the middle of a long pan change nothing at all.
   const [markerBox, setMarkerBox] = React.useState<MapRegion>(KYIV_REGION);
-  const visiblePoints = React.useMemo(
-    () => markersForRegion(filteredPoints, markerBox),
-    [filteredPoints, markerBox],
+
+  // The other half is that nothing is ever mounted at all. The screen builds `MARKER_POOL_SIZE`
+  // markers with the map and afterwards only changes which АЗК each one shows, because a `Marker` is
+  // a legacy view manager: adding or removing one makes the Fabric interop layer replay that change
+  // into the map's own child array at an index the array does not necessarily have — and both ways it
+  // fails fatally, in Objective-C, with no JS error to read. See `assignToSlots`.
+  const [slots, setSlots] = React.useState<(StationNode | null)[]>(() =>
+    new Array(MARKER_POOL_SIZE).fill(null),
   );
+
+  React.useEffect(() => {
+    setSlots((previous) => {
+      const next = assignToSlots(filteredPoints, markerBox, previous);
+      // Every station still in the same slot means every marker gets the props it already has, so
+      // bail out instead of re-rendering a hundred and twenty pins for a search keystroke.
+      const unchanged = next.every((point, index) => point?.id === previous[index]?.id);
+      return unchanged ? previous : next;
+    });
+  }, [filteredPoints, markerBox]);
 
   const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
 
@@ -201,6 +215,14 @@ export default function MapScreen() {
     void requestLocation();
   }, [requestLocation]);
 
+  // A marker hands its slot's station here. An empty slot gets no handler at all, and being
+  // transparent it is not hit-tested either.
+  const pressMarker = React.useCallback((node: StationNode) => {
+    lastMarkerPressAt.current = Date.now();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedStation(node);
+  }, []);
+
   // A route needs a real position: a node without coordinates used to deep-link to
   // 0,0 — Null Island in the Atlantic — so the button reports that instead.
   const routeDestination = React.useMemo(
@@ -262,25 +284,24 @@ export default function MapScreen() {
           >
             {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
 
-            {visiblePoints.map((point) => {
-              const brandColor = BRAND_COLORS[point.brandSlug] || tokens.colors.primary;
-              const logo = BRAND_SYMBOLS[point.brandSlug] ?? BRAND_LOGOS[point.brandSlug];
-              return (
-                <StationMarker
-                  key={point.id}
-                  point={point}
-                  coordinate={{ latitude: point.lat!, longitude: point.lng! }}
-                  brandColor={brandColor}
-                  logo={logo}
-                  selected={selectedStation?.id === point.id}
-                  onPress={() => {
-                    lastMarkerPressAt.current = Date.now();
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setSelectedStation(point);
-                  }}
-                />
-              );
-            })}
+            {slots.map((point, index) => (
+              <StationMarker
+                key={`slot-${index}`}
+                point={point}
+                brandColor={
+                  point
+                    ? BRAND_COLORS[point.brandSlug] || tokens.colors.primary
+                    : tokens.colors.primary
+                }
+                logo={
+                  point
+                    ? (BRAND_SYMBOLS[point.brandSlug] ?? BRAND_LOGOS[point.brandSlug])
+                    : undefined
+                }
+                selected={point != null && selectedStation?.id === point.id}
+                onPress={point ? () => pressMarker(point) : undefined}
+              />
+            ))}
           </MapView>
 
           <View

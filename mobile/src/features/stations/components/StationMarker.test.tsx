@@ -6,7 +6,7 @@ import { StationMarker, BrandLogoChip } from './StationMarker';
 /**
  * The two map-pin components, extracted from `app/map.tsx`.
  *
- * Two behaviours must survive any edit here. The first is the `tracksViewChanges` lifecycle,
+ * Four behaviours must survive any edit here. The first is the `tracksViewChanges` lifecycle,
  * which belongs to the Android marker manager (iOS MapKit has no such prop): a custom-view marker
  * is rasterised once there, so a logo pin has to keep tracking until the image paints (`onLoad`),
  * and a colour-only pin -- which is ready at mount -- freezes on the next tick. Freezing a logo
@@ -14,6 +14,13 @@ import { StationMarker, BrandLogoChip } from './StationMarker';
  *
  * The second is that the pin carries no `Callout`, and so keeps a legacy view manager out of the
  * marker's own. That is a crash, not a style rule -- see the describe below.
+ *
+ * The third is what an empty slot does. The map mounts a fixed pool of markers and hands each one a
+ * station, so a marker showing nothing is a normal state, and the two things it must do are stay
+ * invisible and stay non-empty -- a marker with no child at all is MapKit's stock red pin.
+ *
+ * The fourth is what happens when a slot is handed a *different* station: the native marker is
+ * reused, so everything that has to be rebuilt has to be rebuilt on purpose.
  */
 
 const markerProps: any[] = [];
@@ -23,11 +30,15 @@ jest.mock('react-native-maps', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
     __esModule: true,
-    // Records the live `tracksViewChanges` on every render so the lifecycle can be
+    // Records the live props on every render so the lifecycle and the empty-slot state can both be
     // observed, and exposes the press target.
-    Marker: ({ children, tracksViewChanges, onPress, accessibilityLabel }: any) => {
-      markerProps.push({ tracksViewChanges, onPress, accessibilityLabel });
-      return R.createElement(View, { testID: 'marker', onPress } as any, children);
+    Marker: (props: any) => {
+      markerProps.push(props);
+      return R.createElement(
+        View,
+        { testID: 'marker', onPress: props.onPress } as any,
+        props.children,
+      );
     },
     // Still mocked after the component stopped using it, so a reintroduced callout renders
     // somewhere a test can see it instead of crashing the module mock.
@@ -54,17 +65,17 @@ jest.mock('../lib/radar', () => ({
 
 const { Image, View } = jest.requireActual<typeof import('react-native')>('react-native');
 
+const SHELL = {
+  id: 'n-1',
+  name: 'Shell Darnytsia',
+  address: 'Kyiv, Darnytsia',
+  lat: 50.41,
+  lng: 30.65,
+};
+
 function renderMarker(over: Record<string, unknown> = {}) {
   const onPress = jest.fn();
-  render(
-    <StationMarker
-      point={{ name: 'Shell Darnytsia', address: 'Kyiv, Darnytsia' } as any}
-      coordinate={{ latitude: 50, longitude: 30 }}
-      brandColor="#ff0000"
-      onPress={onPress}
-      {...over}
-    />,
-  );
+  render(<StationMarker point={SHELL as any} brandColor="#ff0000" onPress={onPress} {...over} />);
   return { onPress };
 }
 
@@ -135,8 +146,7 @@ describe('StationMarker - what the pin carries', () => {
     // which is nil until the child's own `finalizeUpdates` has run, and hands the result straight
     // to `insertReactSubview:atIndex:` -- so a pin that mounts with a callout in the same
     // transaction sometimes inserts nil into an NSMutableArray and dies fatally, with no JS error.
-    // A pan brings pins on screen in transactions, which is how it got reported as "the map
-    // crashes while I move it".
+    // The map mounts a whole pool of markers at once, so "sometimes" would be every launch.
     renderMarker({ logo: undefined });
 
     expect(screen.queryByTestId('callout')).toBeNull();
@@ -154,6 +164,68 @@ describe('StationMarker - what the pin carries', () => {
     renderMarker({ logo: undefined, point: { name: 'Shell', address: '' } as any });
 
     expect(markerProps[0].accessibilityLabel).toBe('Shell, map.noAddress');
+  });
+});
+
+describe('StationMarker - an empty slot', () => {
+  it('is transparent and parked where no region of this network reaches', () => {
+    renderMarker({ point: null });
+
+    expect(markerProps[0].opacity).toBe(0);
+    expect(markerProps[0].coordinate).toEqual({ latitude: 0, longitude: 0 });
+    expect(markerProps[0].accessibilityLabel).toBeUndefined();
+  });
+
+  it('still hands the marker a child view, because a childless marker draws the stock MapKit pin', () => {
+    // `AIRMapMarker.shouldUsePinView` is `reactSubviews.count == 0 && !imageSrc`. Empty the marker
+    // of children and the pool stops being 120 invisible markers and becomes 120 red Apple pins --
+    // so the container is what carries the emptiness, and it never leaves.
+    renderMarker({ point: null });
+
+    const child: any = markerProps[0].children;
+    expect(React.isValidElement(child) && child.type).toBe(View);
+    // The emptiness is what goes inside that view -- the view itself never leaves, or the marker has
+    // no react subviews and `shouldUsePinView` hands it the platform pin instead.
+    expect(child.props.children).toBeFalsy();
+  });
+
+  it('draws the station at full opacity, on its own coordinates', () => {
+    renderMarker();
+
+    expect(markerProps[0].opacity).toBe(1);
+    expect(markerProps[0].coordinate).toEqual({ latitude: 50.41, longitude: 30.65 });
+    expect(React.isValidElement(markerProps[0].children)).toBe(true);
+    expect(markerProps[0].children.props.children).toBeTruthy();
+  });
+});
+
+describe('StationMarker - a recycled slot', () => {
+  it('rebuilds the pin and tracks it again when the marker is handed another station', () => {
+    // The native marker is reused, so nothing about the new АЗК arrives by remounting it: the pin
+    // subtree has to be keyed to the station and the raster redone, or a recycled slot keeps the
+    // previous brand's disc. Rendered as one component re-rendered in place, because that is the
+    // only case where a fresh mount would hide the bug.
+    const { rerender } = render(
+      <StationMarker point={SHELL as any} brandColor="#ff0000" logo={1 as any} />,
+    );
+
+    act(() => {
+      screen.UNSAFE_getAllByType(Image)[0].props.onLoad();
+    });
+    expect(markerProps[markerProps.length - 1].tracksViewChanges).toBe(false);
+
+    rerender(
+      <StationMarker
+        point={{ ...SHELL, id: 'n-2', name: 'KLO Brest', address: 'Brest, Mira, 1' } as any}
+        brandColor="#00ff00"
+        logo={1 as any}
+      />,
+    );
+
+    expect(markerProps[markerProps.length - 1].tracksViewChanges).toBe(true);
+    expect(markerProps[markerProps.length - 1].accessibilityLabel).toBe(
+      'KLO Brest, Brest, Mira, 1',
+    );
   });
 });
 
