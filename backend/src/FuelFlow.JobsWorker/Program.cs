@@ -155,6 +155,13 @@ try
 
     builder.Services.AddScoped<RefundStatusSyncService>();
 
+    // The sync service books the refund it confirms, and the posting engine lives in the API's
+    // ServiceSetup, which this worker does not call. Registered explicitly for the same reason as
+    // AuditEventService below: without it the job fails activation here, and refunds confirmed by
+    // this worker would be booked by no one.
+    builder.Services.AddScoped<FuelFlow.Features.Ledger.JournalPostingService>();
+    builder.Services.AddScoped<FuelFlow.Features.Orders.RefundOrder.RefundJournalPoster>();
+
     // Dependencies of the API's FulfillmentService. It normally gets these from the API's
     // ServiceSetup, which this worker does not call, so they are registered explicitly -
     // otherwise the "process-fulfillments" job fails activation here.

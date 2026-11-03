@@ -3,6 +3,9 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Ledger;
+using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
@@ -113,6 +116,212 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             order.Status.Should().Be(OrderStatus.Refunded);
+
+            // And the books moved with it: the advance leaves 681 and the bank account leaves 311,
+            // the exact mirror of the receipt that brought the money in.
+            var booked = await BookedRefundLegsAsync(refund.Id);
+            booked.Should().ContainSingle("a confirmed refund is one fact, so it books one entry");
+            booked.Single().Should().Be(("payment.refunded", "681", "311", 2000.00m));
+        }
+    }
+
+    /// <summary>
+    /// The webhook route confirms the refund, and the posting that follows it runs once.
+    /// </summary>
+    [Fact]
+    public async Task ManualRefund_ConfirmedByTheWebhookCancelList_BooksTheRefundExactlyOnce()
+    {
+        // The poller above is one route; the webhook push is the other and the one that usually fires
+        // first. Both have to book, and neither may book twice: the second confirmation of the same
+        // refund reaching the ledger is what a poller and a webhook racing inside one tick looks like.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 1, unitPrice: 1000), invoiceId);
+        });
+
+        var cancelList = new List<MonobankCancelListItem>
+        {
+            new()
+            {
+                Status = "success",
+                Amount = 100000,
+                ExtRef = orderId.ToString(),
+                ModifiedDate = TestClock.UtcNow
+            }
+        };
+
+        var monobankMock = CreateMonobankMock(out _);
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
+            await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" });
+        }
+
+        // The refund id, read while it is still Pending: the ledger key is this row, so the test
+        // needs to know which row the booking is expected to hang off.
+        Guid refundId;
+        using (var read = CreateContext())
+        {
+            refundId = (await read.Payments.AsNoTracking()
+                .SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund)).Id;
+        }
+
+        using (var syncContext = CreateContext())
+        {
+            var syncService = new RefundStatusSyncService(
+                syncContext, new StubMonobankClientFactory(monobankMock.Object), NullLogger<RefundStatusSyncService>.Instance);
+            await syncService.SyncRefundForInvoiceAsync(invoiceId, cancelList);
+
+            var refund = await syncContext.Payments.AsNoTracking()
+                .SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Succeeded);
+        }
+
+        var booked = await BookedRefundLegsAsync(refundId);
+        booked.Should().ContainSingle();
+        booked.Single().Should().Be(("payment.refunded", "681", "311", 1000.00m));
+
+        // The booking call reached a second time for the same refund — what happens when the poller
+        // and the webhook both confirm one cancel within the same tick. The idempotency key is the
+        // refund row, so the second call must return the entry that exists rather than add another.
+        using (var race = CreateContext())
+        {
+            var refund = await race.Payments.AsNoTracking().SingleAsync(p => p.Id == refundId);
+            var order = await race.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+            var poster = new RefundJournalPoster(
+                new JournalPostingService(race, NullLogger<JournalPostingService>.Instance),
+                NullLogger<RefundJournalPoster>.Instance);
+
+            var again = await poster.BookConfirmedRefundAsync(refund, order);
+            again.Should().NotBeNull();
+
+            var entryCount = await race.JournalEntries.AsNoTracking()
+                .CountAsync(e => e.SourceType == JournalSourceType.Refund && e.SourceId == refundId);
+            entryCount.Should().Be(1, "a refund that arrives twice is still one fact about money");
+        }
+
+        (await BookedRefundLegsAsync(refundId))
+            .Should().ContainSingle("the second arrival added nothing to the books");
+    }
+
+    [Fact]
+    public async Task ManualRefund_RepricedAfterTheBankBookedIt_SaysWhatTheJournalIsMissing()
+    {
+        // #854. The entry is keyed on the refund row and the engine refuses to write that key twice,
+        // so re-pricing a confirmed refund cannot re-book it: the journal keeps the figure the bank
+        // returned, the row keeps the new one, and an accountant reading the books sees no gap. The
+        // handler may not invent the correcting entry - that is the accountant's call - but it may not
+        // be silent either.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000), invoiceId);
+        });
+
+        var monobankMock = CreateMonobankMock(out _);
+        monobankMock.Setup(m => m.GetInvoiceStatusAsync(invoiceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MonobankInvoiceStatus
+            {
+                InvoiceId = invoiceId,
+                Status = "success",
+                CancelList = new List<MonobankCancelListItem>
+                {
+                    new()
+                    {
+                        Status = "success",
+                        Amount = 200000,
+                        ExtRef = orderId.ToString(),
+                        ModifiedDate = TestClock.UtcNow
+                    }
+                }
+            });
+
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
+            await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" });
+        }
+
+        Guid refundId;
+        using (var syncContext = CreateContext())
+        {
+            var syncService = new RefundStatusSyncService(
+                syncContext, new StubMonobankClientFactory(monobankMock.Object), NullLogger<RefundStatusSyncService>.Instance);
+            await syncService.SyncPendingRefundsAsync();
+
+            refundId = (await syncContext.Payments.AsNoTracking()
+                .SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund)).Id;
+        }
+
+        (await BookedRefundLegsAsync(refundId))
+            .Single().Should().Be(("payment.refunded", "681", "311", 2000.00m));
+
+        // One of the two units is delivered after the money came back, so the refundable value drops
+        // to 1 000 UAH and the second request re-prices the refund that is already in the books.
+        // Not SeedAsync: that truncates and would wipe the refund and its entry along with it.
+        using (var deliver = CreateContext())
+        {
+            var voucher = new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
+                Brand = "okko",
+                FuelTypeId = ToUuid("okko-dp"),
+                Liters = 10m,
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                VoucherNumber = $"OC-{orderId:N}-drift",
+                QrPayload = $"payload-{orderId:N}-drift",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = userId,
+                OrderId = orderId,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            };
+            deliver.FuelVouchers.Add(voucher);
+            deliver.Fulfillments.Add(new Fulfillment
+            {
+                OrderId = orderId,
+                VoucherId = voucher.Id,
+                FulfilledAtUtc = TestClock.UtcNow
+            });
+            await deliver.SaveChangesAsync();
+        }
+
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
+            await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" });
+        }
+
+        using (var verify = CreateContext())
+        {
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(p => p.Id == refundId);
+            refund.AmountUah.Should().Be(1000.00m);
+
+            var drift = await verify.Set<AuditEventOutbox>().AsNoTracking()
+                .SingleAsync(e => e.EventType == "RefundAmountCorrectedAfterBooking");
+            drift.AggregateId.Should().Be(refundId.ToString());
+            drift.Summary.Should().Contain("is not in the journal");
+            drift.OldValue.Should().Contain("2000");
+            drift.NewValue.Should().Contain("1000");
+            drift.NewValue.Should().NotContain("2000");
+
+            // And the entry the bank's confirmation wrote is untouched - the gap is reported, not
+            // papered over by editing an accounting fact that is already posted.
+            (await BookedRefundLegsAsync(refundId))
+                .Single().Should().Be(("payment.refunded", "681", "311", 2000.00m));
         }
     }
 
@@ -473,6 +682,12 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             order.Status.Should().Be(OrderStatus.PartiallyRefunded);
+
+            // A partial refund books what came back, not what was paid. The 2026-11-02 production
+            // case returned 862.00 of a 1724.00 order and the book still carried the whole 1724.00.
+            var booked = await BookedRefundLegsAsync(refund.Id);
+            booked.Should().ContainSingle();
+            booked.Single().Should().Be(("payment.refunded", "681", "311", 1040.00m));
         }
     }
 
@@ -526,6 +741,9 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             refund.Status.Should().Be(PaymentStatus.Failed);
             // Same as above: the brand word is gone, the typed Failed status is the record.
             refund.ErrorMessage.Should().Be("Monobank reported refund failure");
+
+            // Money that never went back must not appear in the books.
+            (await BookedRefundLegsAsync(refund.Id)).Should().BeEmpty();
 
             // A failed refund must never leave the order in a refunded state.
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
@@ -679,6 +897,31 @@ private static Order AddPaidOrder(
             }
         }
     };
+
+    /// <summary>
+    /// What the journal booked for one refund, as (event, debit account, credit account, amount).
+    /// Read against the real seeded chart on purpose: the point of the entry is which accounts it
+    /// names, and a purpose-built chart would prove the engine works and nothing about the books.
+    /// </summary>
+    private async Task<List<(string SourceEvent, string Debit, string Credit, decimal Amount)>> BookedRefundLegsAsync(
+        Guid refundPaymentId)
+    {
+        using var ctx = CreateContext();
+        var entries = await ctx.JournalEntries
+            .AsNoTracking()
+            .Include(e => e.Lines)
+            .ThenInclude(l => l.Account)
+            .Where(e => e.SourceType == JournalSourceType.Refund && e.SourceId == refundPaymentId)
+            .ToListAsync();
+
+        return entries
+            .Select(e => (
+                e.SourceEvent,
+                e.Lines.Single(l => l.DebitUah > 0m).Account!.Code,
+                e.Lines.Single(l => l.CreditUah > 0m).Account!.Code,
+                e.Lines.Sum(l => l.DebitUah)))
+            .ToList();
+    }
 
     /// <summary>Seeds a refund payment against the capture <see cref="AddPaidOrder"/> put there.</summary>
 /// <remarks>

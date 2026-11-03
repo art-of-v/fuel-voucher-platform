@@ -1,4 +1,5 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
@@ -83,6 +84,12 @@ public sealed class RefundOrderCommandHandler
                 existing.AmountUah = Money.FromKopecks(correctedAmount);
                 existing.UpdatedAtUtc = SystemClock.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
+
+                // The books may already carry this refund at the old figure; say so rather than leave
+                // a ledger that looks complete and is short by the difference.
+                await RefundRepriceDrift.RecordIfBookedAmountDriftedAsync(
+                    _context, _providerEventService, existing, order,
+                    command.ChangedByUserId, command.ChangedByUserName, cancellationToken);
             }
 
             // Only a refund confirmed by Monobank (Completed) may move the order into a
