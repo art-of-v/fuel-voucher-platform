@@ -153,7 +153,10 @@ public sealed class SettlementUpdateHandler
                  + "so which one it pays for is not something to guess.",
         };
 
-        await RecordAsync(update, SettlementOutcomes.Unallocated, reason, amount, code, userId, ct);
+        // Held money still names the payment it created: the panel's unallocated list reads the
+        // author, the code and the message text back through this link, and a declared payment with
+        // no "who said so" attached to it is a payment with no evidence.
+        await RecordAsync(update, SettlementOutcomes.Unallocated, reason, amount, code, userId, ct, heldId);
     }
 
     private Payment BuildPayment(TelegramUpdate update, decimal amount, Guid? userId) => new()
