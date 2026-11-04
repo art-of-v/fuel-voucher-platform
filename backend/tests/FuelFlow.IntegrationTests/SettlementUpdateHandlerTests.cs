@@ -39,13 +39,23 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
     private const long AllowedSender = 555000111;
     private const long StrangerSender = 999000222;
 
-    private ApplicationDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.ConnectionString)
-            .Options, TestQrCipher.Instance);
+    private ApplicationDbContext CreateContext()
+    {
+        var context = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseNpgsql(_fixture.ConnectionString)
+                .Options, TestQrCipher.Instance);
+
+        // A settle that cannot map its event is refused loudly, and the settlement channel now settles.
+        // The chart belongs to the fixture rather than to one test because an unmapped event would fail
+        // the attach test for a reason that has nothing to do with attaching.
+        TestJournal.SeedChart(context);
+        return context;
+    }
 
     private SettlementUpdateHandler CreateHandler(TelegramSettlementOptions options, ApplicationDbContext context) =>
-        new(context, Options.Create(options), NullLogger<SettlementUpdateHandler>.Instance);
+        new(context, Options.Create(options), NullLogger<SettlementUpdateHandler>.Instance,
+            TestJournal.TrySettleFor(context));
 
     /// <summary>
     /// A working configuration. <see cref="AllowedSender"/> is always on the list; extra senders are
@@ -225,7 +235,7 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
     // --------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task One_open_order_for_exactly_this_amount_is_attached()
+    public async Task One_open_order_for_exactly_this_amount_is_attached_and_the_order_is_settled()
     {
         using var context = CreateContext();
         var (userId, code) = await SeedCustomerAsync(context);
@@ -244,6 +254,38 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
         payment.Provider.Should().Be(PaymentProviders.Declared);
         payment.Status.Should().Be(PaymentStatus.Succeeded);
         payment.PaidAtUtc.Should().NotBeNull();
+
+        // The other three writes are the whole point of this test. The name of the test used to stop at
+        // the payment row above, which is exactly how the channel came to look built while an order paid
+        // in the settlement channel stayed unpaid, unfulfilled and unbooked - and then had its invoice
+        // expire and cancel it (planning #867, production 2026-11-04).
+        var settled = await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+        settled.Status.Should().Be(OrderStatus.PendingFulfillment);
+
+        // Handover to fulfilment: without this row no stock is claimed for the order.
+        var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId });
+        (await context.OutboxEvents.AsNoTracking().CountAsync(
+                e => e.EventType == OutboxEventType.OrderCreated
+                     && EF.Functions.JsonContains(e.Payload, orderProbe)))
+            .Should().Be(1, "the money the channel declared is what handed the order to fulfilment");
+
+        // The revenue. Two entries, because the gross is in the bank and the VAT inside it is the state's.
+        (await context.JournalEntries.AsNoTracking()
+                .Where(j => j.SourceId == orderId)
+                .Select(j => j.SourceEvent)
+                .ToListAsync())
+            .Should().BeEquivalentTo(["payment.received", "payment.received.vat"]);
+
+        var gross = await context.JournalEntries.AsNoTracking()
+            .Include(j => j.Lines)
+            .SingleAsync(j => j.SourceEvent == "payment.received" && j.SourceId == orderId);
+        Math.Max(gross.Lines.Sum(l => l.DebitUah), gross.Lines.Sum(l => l.CreditUah))
+            .Should().Be(1504m, "the sale the channel declared is the sale the books are short by");
+
+        // And the acquirer's columns stay empty: nothing ever spoke to Monobank about this money, and a
+        // column that claims it did is how the next reconciliation investigation gets misled.
+        settled.MonobankStatus.Should().BeNull();
+        settled.LastWebhookProcessedAtUtc.Should().BeNull();
     }
 
     // --------------------------------------------------------------------------------------------

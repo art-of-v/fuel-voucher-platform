@@ -1,9 +1,11 @@
 using FuelFlow.Features.Feedback;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
@@ -26,21 +28,30 @@ namespace FuelFlow.Features.Settlement;
 /// it, recorded and left for an operator. A wrong guess here credits money to the wrong person or
 /// delivers fuel to the wrong one, and neither failure is recoverable from the ledger afterwards.
 /// </para>
+/// <para>
+/// The one branch that is not a guess does everything: the money is attached AND the order settled, in
+/// one transaction. Attached-and-unsettled is not a holding state — it is the state that stranded
+/// 862.00 ₴ on a cancelled order in production on 2026-11-04, because an order still reading
+/// <c>PendingPayment</c> keeps its acquirer invoice live, and the invoice expires.
+/// </para>
 /// </remarks>
 public sealed class SettlementUpdateHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly TelegramSettlementOptions _options;
     private readonly ILogger<SettlementUpdateHandler> _logger;
+    private readonly TrySettlePaidOrderCommandHandler _settle;
 
     public SettlementUpdateHandler(
         ApplicationDbContext context,
         IOptions<TelegramSettlementOptions> options,
-        ILogger<SettlementUpdateHandler> logger)
+        ILogger<SettlementUpdateHandler> logger,
+        TrySettlePaidOrderCommandHandler settle)
     {
         _context = context;
         _options = options.Value;
         _logger = logger;
+        _settle = settle;
     }
 
     public async Task HandleAsync(TelegramUpdate update, CancellationToken ct)
@@ -118,7 +129,7 @@ public sealed class SettlementUpdateHandler
             // The money is real and belongs to nobody we can find. A payment with no order and no
             // customer is the correct record - not a rejection, which would lose the fact that the
             // money arrived at all.
-            var paymentId = await WriteAsync(payment, orderId: null, ct);
+            var paymentId = await WriteHeldAsync(payment, ct);
             await RecordAsync(
                 update, SettlementOutcomes.Unallocated,
                 // No customer has that code. The reason does not quote it: the row carries the code
@@ -138,12 +149,12 @@ public sealed class SettlementUpdateHandler
         // Exactly one order, for exactly this amount: the one case where attaching is not a guess.
         if (openOrders.Count == 1 && openOrders[0].Price == amount)
         {
-            var attachedId = await WriteAsync(payment, openOrders[0].Id, ct);
+            var attachedId = await AttachAndSettleAsync(update, payment, openOrders[0].Id, amount, ct);
             await RecordAsync(update, SettlementOutcomes.Accepted, null, amount, code, userId, ct, attachedId);
             return;
         }
 
-        var heldId = await WriteAsync(payment, orderId: null, ct);
+        var heldId = await WriteHeldAsync(payment, ct);
 
         var reason = openOrders.Count switch
         {
@@ -181,15 +192,81 @@ public sealed class SettlementUpdateHandler
     };
 
     /// <summary>
-    /// Writes the payment and nothing else. The audit row is the caller's to write, because the caller
-    /// is what knows the outcome - and a row written here would either duplicate it or record an
-    /// outcome the handler has not decided yet.
+    /// Writes the money as held — named to its customer, on no order — and nothing else. The audit row
+    /// is the caller's to write, because the caller is what knows the outcome - and a row written here
+    /// would either duplicate it or record an outcome the handler has not decided yet.
     /// </summary>
-    private async Task<Guid> WriteAsync(Payment payment, Guid? orderId, CancellationToken ct)
+    /// <remarks>
+    /// The one branch that does not hold is <see cref="AttachAndSettleAsync"/>, and it does not call
+    /// this: money that pays for a visible order is not held, and leaving it named nothing is what
+    /// stranded tonight's 862.00 ₴.
+    /// </remarks>
+    private async Task<Guid> WriteHeldAsync(Payment payment, CancellationToken ct)
     {
-        payment.OrderId = orderId;
         _context.Payments.Add(payment);
         await _context.SaveChangesAsync(ct);
+        return payment.Id;
+    }
+
+    /// <summary>
+    /// Puts the money on the order and settles the order — one transaction, both or neither.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The two halves were one commit apart, and the gap is what production showed on 2026-11-04: the
+    /// payment was written attached at 07:22, nothing else happened, and the invoice that the still
+    /// unpaid-looking order had kept live expired at 08:18 and cancelled it. Money on a terminal order
+    /// is worse than money held, because nothing in the application can complete or return it — the
+    /// attach screen refuses a non-<c>PendingPayment</c> order and the only refund command is the
+    /// acquirer's own. (planning #867)
+    /// </para>
+    /// <para>
+    /// A declined settle is logged, not thrown, because the two answers it can give here are both ones
+    /// the channel cannot do anything about: <c>AlreadyHandedOver</c> means an acquirer delivery got to
+    /// the order first, which is the right answer for the customer, and anything else means the order
+    /// moved between the query and this write — money on an order that will not settle is the stranded
+    /// shape, so it is logged at warning with the reason and the message row still says what happened.
+    /// </para>
+    /// </remarks>
+    private async Task<Guid> AttachAndSettleAsync(
+        TelegramUpdate update, Payment payment, Guid orderId, decimal amount, CancellationToken ct)
+    {
+        var outcome = await _context.ExecuteReplaySafeAsync(
+            async token =>
+            {
+                payment.OrderId = orderId;
+                _context.Payments.Add(payment);
+                await _context.SaveChangesAsync(token);
+
+                return await _settle.HandleAsync(
+                    new TrySettlePaidOrderCommand
+                    {
+                        OrderId = orderId,
+                        Because = FormattableString.Invariant(
+                            $"the settlement channel declared {amount:0.00} ₴ for it"),
+                    },
+                    token);
+            },
+            ct,
+            verifySucceeded: async token => await _context.Payments
+                .AsNoTracking()
+                .AnyAsync(p => p.Id == payment.Id && p.OrderId == orderId, token));
+
+        if (outcome.Refusal is SettleRefusal.AlreadyHandedOver)
+        {
+            // The acquirer's own webhook settled it first, from an invoice for the same money. The
+            // declared payment is still the record that the channel saw the sale.
+            _logger.LogInformation(
+                "Settlement message {MessageId}: order {OrderId} was already handed to fulfilment - {Reason}",
+                update.Message!.MessageId, orderId, outcome.Reason);
+        }
+        else if (!outcome.Settled)
+        {
+            _logger.LogWarning(
+                "Settlement message {MessageId}: the money is on order {OrderId} but the order was not settled - {Reason}",
+                update.Message!.MessageId, orderId, outcome.Reason);
+        }
+
         return payment.Id;
     }
 
