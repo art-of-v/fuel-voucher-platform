@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.SettlePaidOrder;
@@ -56,10 +57,10 @@ public sealed class TrySettlePaidOrderCommandHandler
         TrySettlePaidOrderCommand command,
         CancellationToken cancellationToken = default)
     {
-        // IgnoreQueryFilters because a paid order the customer cannot see is still a paid order: the
+        // IncludingSoftDeleted because a paid order the customer cannot see is still a paid order: the
         // core restores it, and a caller that could not load it would silently drop the money.
         var order = await _context.Orders
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Include(o => o.LineItems)
             .FirstOrDefaultAsync(o => o.Id == command.OrderId, cancellationToken);
 
