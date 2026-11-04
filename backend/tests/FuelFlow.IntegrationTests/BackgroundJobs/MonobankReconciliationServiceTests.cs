@@ -62,7 +62,8 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlowMetrics(),
             NotificationDispatcher.Disabled,
-            TestJournal.SettleFor(_context));
+            TestJournal.SettleFor(_context),
+            TestJournal.TrySettleFor(_context));
 
         TestJournal.SeedChart(_context);
     }

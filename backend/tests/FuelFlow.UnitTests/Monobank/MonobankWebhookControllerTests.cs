@@ -143,7 +143,9 @@ public class MonobankWebhookControllerTests : IDisposable
             new Mock<Hangfire.IBackgroundJobClient>().Object,
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlowMetrics(),
-            NotificationDispatcher.Disabled, TestJournal.SettleFor(_context));
+            NotificationDispatcher.Disabled,
+            TestJournal.SettleFor(_context),
+            TestJournal.TrySettleFor(_context));
           TestJournal.SeedChart(_context);;
 
         var options = new MonobankOptions
