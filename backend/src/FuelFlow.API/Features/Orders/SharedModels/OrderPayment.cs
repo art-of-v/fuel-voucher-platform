@@ -1,5 +1,6 @@
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.SharedModels;
@@ -66,7 +67,7 @@ public static class OrderPayment
     /// belongs on the order, and the order still owes for what is missing.
     /// </para>
     /// <para>
-    /// <c>IgnoreQueryFilters</c> on the price is not a loophole. A hidden order whose money arrived is
+    /// <c>IncludingSoftDeleted</c> on the price is not a loophole. A hidden order whose money arrived is
     /// still a sale the customer paid for, and the deletion filter is a listing concern — it is what
     /// keeps a cancelled-and-abandoned order out of the customer's screen, not a rule about money.
     /// </para>
@@ -88,7 +89,7 @@ public static class OrderPayment
         // and 0 >= 0 would settle a phantom.
         var price = await context.Orders
             .AsNoTracking()
-            .IgnoreQueryFilters()
+            .IncludingSoftDeleted()
             .Where(o => o.Id == orderId)
             .Select(o => (decimal?)o.Price)
             .FirstOrDefaultAsync(cancellationToken);
