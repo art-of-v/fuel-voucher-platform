@@ -483,10 +483,9 @@ describe('MapScreen', () => {
       // hosted by a Fabric interop component, and inserting or removing one replays a child-index
       // change into the map's own array of subviews — when that array and the shadow tree disagree
       // the app dies in Objective-C, twice over (`object cannot be nil`, `index beyond bounds`), with
-      // no JS error to read. And `AIRMap` registers an annotation while the *map* mounts, one pass
-      // before the marker registers its own children, so a marker added in the map's transaction is
-      // childless when MapKit first asks what to draw — the stock pin, kept for that annotation's
-      // whole life. So the pool waits for the map, arrives with pins, and is never touched again.
+      // no JS error to read. So the pool arrives once, already carrying the region's pins, and is never
+      // touched again. (Which view MapKit draws for each of them is settled by the marker's `image`, not
+      // by this schedule — see `StationMarker`.)
       mockNodes = lattice(1000);
       renderScreen();
 
@@ -501,6 +500,15 @@ describe('MapScreen', () => {
       expect(screen.getAllByTestId('marker')).toHaveLength(MARKER_POOL_SIZE);
       expect(pinsShown()).toBeGreaterThan(0);
       expect(pinsShown()).toBeLessThan(20);
+
+      // Every slot carries the image, not only the ones with a pin. The pool never adds a marker again,
+      // so a slot that was born without it is Apple's pin for life — including the day it is handed an
+      // АЗК, which is exactly the pan that would otherwise put a red drop on the map.
+      const images = screen
+        .getAllByTestId('marker')
+        .map((pin) => String((pin.props as any).image?.uri));
+      expect(new Set(images).size).toBe(1);
+      expect(images[0]).toMatch(/^data:image\/png;base64,/);
 
       act(() => {
         fireEvent(map, 'regionChangeComplete', WIDE);
