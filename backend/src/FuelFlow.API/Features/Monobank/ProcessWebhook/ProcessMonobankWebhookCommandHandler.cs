@@ -1,6 +1,6 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
-using FuelFlow.Features.Ledger;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments;
 using FuelFlow.Payments.SharedModels;
@@ -18,7 +18,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
     private readonly RefundStatusSyncService _refundStatusSyncService;
     private readonly FuelFlowMetrics _metrics;
     private readonly NotificationDispatcher _notifications;
-    private readonly JournalPostingService _journal;
+    private readonly SettlePaidOrderCommandHandler _settle;
 
     public ProcessMonobankWebhookCommandHandler(
         ApplicationDbContext context,
@@ -27,7 +27,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         RefundStatusSyncService refundStatusSyncService,
         FuelFlowMetrics metrics,
         NotificationDispatcher notifications,
-        JournalPostingService journal)
+        SettlePaidOrderCommandHandler settle)
     {
         _context = context;
         _logger = logger;
@@ -35,7 +35,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         _refundStatusSyncService = refundStatusSyncService;
         _metrics = metrics;
         _notifications = notifications;
-        _journal = journal;
+        _settle = settle;
     }
 
     /// <summary>

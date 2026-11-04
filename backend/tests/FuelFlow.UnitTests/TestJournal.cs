@@ -21,6 +21,14 @@ public static class TestJournal
         => new(context, NullLogger<JournalPostingService>.Instance);
 
     /// <summary>
+    /// The settle core around the same journal: the webhook handler no longer posts on its own, it
+    /// calls this, so a test that drives a paid webhook needs the core rather than the ledger.
+    /// </summary>
+    public static FuelFlow.Features.Orders.SettlePaidOrder.SettlePaidOrderCommandHandler SettleFor(
+        ApplicationDbContext context)
+        => new(context, NullLogger<FuelFlow.Features.Orders.SettlePaidOrder.SettlePaidOrderCommandHandler>.Instance, For(context));
+
+    /// <summary>
     /// Seeds the minimum the seeded mapping needs: both sides of <c>payment.received</c> and of
     /// <c>payment.received.vat</c>. Synchronous on purpose - the test fixtures build the handler in
     /// their constructors, which cannot await.

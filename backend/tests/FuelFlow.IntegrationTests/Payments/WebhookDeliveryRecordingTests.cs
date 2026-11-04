@@ -55,7 +55,7 @@ public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFi
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
             FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
-            TestJournal.For(_context));
+            TestJournal.SettleFor(_context));
 
         TestJournal.SeedChart(_context);
     }

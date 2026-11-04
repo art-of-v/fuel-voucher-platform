@@ -60,7 +60,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IClassFixture<Te
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
             FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
-            TestJournal.For(_context));
+            TestJournal.SettleFor(_context));
 
         TestJournal.SeedChart(_context);
     }
@@ -796,7 +796,7 @@ LineItems =
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
             FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
-            TestJournal.For(secondContext));
+            TestJournal.SettleFor(secondContext));
 
         var command = WebhookCommand("INV-RACE", "success");
 
