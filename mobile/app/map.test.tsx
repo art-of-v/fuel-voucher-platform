@@ -354,6 +354,38 @@ describe('MapScreen', () => {
       renderInTheme('white');
       expect(screen.getByTestId('tile')).toHaveTextContent(/voyager/);
     });
+
+    it('mounts the overlay after the markers, so a late key appends instead of re-indexing', () => {
+      // The array the interop layer replays mounts into is the map's own list of children, and a
+      // child that appears after mount is only harmless at the end of it. `resolveCartoApiKey` can
+      // answer late in a native build — it reads `Constants.expoConfig`, which is not there for the
+      // first renders — so this overlay really does appear once. In the first position that re-indexes
+      // all 120 markers, which is the crash the pool exists to avoid, arriving through a component the
+      // pool does not control.
+      mockNodes = Array.from({ length: 5 }, (_, i) => ({
+        id: `n-${i}`,
+        brandSlug: 'klo',
+        name: `KLO ${i}`,
+        address: 'вулиця Тестова, 1',
+        lat: 50.45,
+        lng: 30.52,
+      }));
+      renderScreen();
+      act(() => {
+        fireEvent(screen.getByTestId('map'), 'mapReady');
+      });
+      mockNodes = [];
+
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- the mocked exports are the element types to compare against
+      const { UrlTile } = require('react-native-maps');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { StationMarker } = require('../src/features/stations/components/StationMarker');
+      const children = React.Children.toArray(screen.getByTestId('map').props.children);
+      const types = children.map((child) => (child as { type: unknown }).type);
+
+      expect(types.lastIndexOf(StationMarker)).toBeGreaterThanOrEqual(0);
+      expect(types.indexOf(UrlTile)).toBe(types.length - 1);
+    });
   });
 
   describe('locating the user', () => {
