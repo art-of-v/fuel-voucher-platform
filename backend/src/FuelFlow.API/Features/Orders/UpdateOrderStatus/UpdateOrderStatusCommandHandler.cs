@@ -50,10 +50,19 @@ public sealed class UpdateOrderStatusCommandHandler
 
         if (OrderStateMachine.RequiresPayment(parsedStatus))
         {
-            var paid = await OrderPayment.HasCapturedPaymentAsync(_context, entity.Id, cancellationToken);
-            if (!paid)
+            // The same rule the settle uses, not a weaker copy of it. Asking only whether a capture
+            // exists lets an operator hand 10.00 ₴ of a 1200.00 ₴ order over to fulfilment and book
+            // nothing, which is the hole planning #867 was written about — seen from the other side.
+            // Production on 2026-11-04 has no delivered order whose captures total below its price, so
+            // this refuses nothing that was ever legitimately paid.
+            if (!await OrderPayment.MoneyOnItPaysForItAsync(_context, entity.Id, cancellationToken))
+            {
+                var priceUah = FormattableString.Invariant($"{entity.Price:0.00}");
                 return UpdateOrderStatusResult.Refused(
-                    "This order has no captured payment, so it cannot go to fulfilment: the fuel would be handed over for money that never arrived.");
+                    $"This order's captured payments do not cover its {priceUah} ₴, so it cannot go to "
+                    + "fulfilment: the fuel would be handed over for money that has not all arrived. Place "
+                    + "the money on the order first — an order whose money is there settles by itself.");
+            }
         }
 
         entity.Status = parsedStatus;

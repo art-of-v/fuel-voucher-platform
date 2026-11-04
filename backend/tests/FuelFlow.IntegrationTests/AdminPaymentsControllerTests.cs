@@ -35,10 +35,18 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
     public AdminPaymentsControllerTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
-    private ApplicationDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.ConnectionString)
-            .Options, TestQrCipher.Instance);
+    private ApplicationDbContext CreateContext()
+    {
+        var context = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseNpgsql(_fixture.ConnectionString)
+                .Options, TestQrCipher.Instance);
+
+        // Placing the full amount on an order now settles it, and a settle that cannot map its event
+        // is refused loudly - which is the refusal a test should hit if the wiring were missing.
+        TestJournal.SeedChart(context);
+        return context;
+    }
 
     private AdminPaymentsController CreateController(ApplicationDbContext context)
     {
@@ -49,7 +57,11 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
             new GetUnallocatedPaymentsQueryHandler(context),
             new SearchCustomersQueryHandler(context),
             new GetCustomerByCodeQueryHandler(context),
-            new AttachPaymentCommandHandler(context, new AuditEventService(context)))
+            new AttachPaymentCommandHandler(
+                context,
+                new AuditEventService(context),
+                TestJournal.TrySettleFor(context),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<AttachPaymentCommandHandler>.Instance))
         {
             ControllerContext = new ControllerContext
             {
@@ -114,7 +126,8 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         return order.Id;
     }
 
-    private async Task<Guid> SeedHeldPaymentAsync(ApplicationDbContext context, Guid? userId, decimal amount)
+    private async Task<Guid> SeedPaymentAsync(
+        ApplicationDbContext context, Guid? userId, decimal amount, Guid? orderId = null)
     {
         var now = TestClock.UtcNow;
         var payment = new Payment
@@ -123,7 +136,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
             Kind = PaymentKind.Capture,
             Provider = PaymentProviders.Declared,
             UserId = userId,
-            OrderId = null,
+            OrderId = orderId,
             AmountUah = amount,
             AmountKopecks = (long)(amount * 100),
             Currency = "UAH",
@@ -159,7 +172,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         using var context = CreateContext();
         var code = NewCode();
         var userId = await SeedCustomerAsync(context, code);
-        var paymentId = await SeedHeldPaymentAsync(context, userId, 2001m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2001m);
 
         var response = await UnallocatedAsync(context);
         response.Data.Should().Contain(d => d.Id == paymentId && d.AmountUah == 2001m);
@@ -188,7 +201,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         var userId = await SeedCustomerAsync(context, code);
         var orderId = await SeedOrderAsync(context, userId, 2002m);
 
-        var paymentId = await SeedHeldPaymentAsync(context, userId, 2002m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2002m);
         var payment = await context.Payments.FirstAsync(p => p.Id == paymentId);
         payment.OrderId = orderId;
         await context.SaveChangesAsync();
@@ -208,7 +221,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         using var context = CreateContext();
         var code = NewCode();
         var userId = await SeedCustomerAsync(context, code);
-        var paymentId = await SeedHeldPaymentAsync(context, userId: null, 2003m);
+        var paymentId = await SeedPaymentAsync(context, userId: null, 2003m);
 
         var result = await CreateController(context).Attach(
             paymentId, new AttachPaymentRequest { UserId = userId }, default);
@@ -218,19 +231,64 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
-    public async Task Attaching_to_the_customers_open_order_settles_the_prepayment()
+    public async Task Placing_the_full_amount_on_the_open_order_settles_it()
     {
         using var context = CreateContext();
         var code = NewCode();
         var userId = await SeedCustomerAsync(context, code);
         var orderId = await SeedOrderAsync(context, userId, 2004m);
-        var paymentId = await SeedHeldPaymentAsync(context, userId, 2004m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2004m);
 
         var result = await CreateController(context).Attach(
             paymentId, new AttachPaymentRequest { OrderId = orderId }, default);
 
         result.Should().BeOfType<NoContentResult>();
         (await context.Payments.AsNoTracking().FirstAsync(p => p.Id == paymentId)).OrderId.Should().Be(orderId);
+
+        // The name of this test used to promise more than it checked: it read only the payment row, so
+        // the screen could place money on an order and leave it unpaid, unfulfilled and unbooked and the
+        // suite would call that settled. It is what stranded a real 862.00 ₴ on an order whose expired
+        // invoice cancelled it (planning #867, production 2026-11-04).
+        var settled = await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+        settled.Status.Should().Be(OrderStatus.PendingFulfillment);
+
+        var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId });
+        (await context.OutboxEvents.AsNoTracking().CountAsync(
+                e => e.EventType == OutboxEventType.OrderCreated
+                     && EF.Functions.JsonContains(e.Payload, orderProbe)))
+            .Should().Be(1, "placing the money is the act that hands the order to fulfilment");
+
+        (await context.JournalEntries.AsNoTracking()
+                .Where(j => j.SourceId == orderId)
+                .Select(j => j.SourceEvent)
+                .ToListAsync())
+            .Should().BeEquivalentTo(["payment.received", "payment.received.vat"]);
+
+        // The acquirer never spoke about this money, so nothing may say that it did.
+        settled.MonobankStatus.Should().BeNull();
+        settled.LastWebhookProcessedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Placing_less_than_the_price_leaves_the_order_awaiting_the_rest()
+    {
+        // Half of a sale is real money that belongs on the order and is not a paid order. Settling on
+        // this row would hand out fuel the customer has not paid for; refusing the row would lose the
+        // money. So the money stays and the order waits.
+        using var context = CreateContext();
+        var code = NewCode();
+        var userId = await SeedCustomerAsync(context, code);
+        var orderId = await SeedOrderAsync(context, userId, 2005m);
+        var paymentId = await SeedPaymentAsync(context, userId, 1005m);
+
+        var result = await CreateController(context).Attach(
+            paymentId, new AttachPaymentRequest { OrderId = orderId }, default);
+        result.Should().BeOfType<NoContentResult>();
+
+        (await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId))
+            .Status.Should().Be(OrderStatus.PendingPayment);
+        (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
+            .Should().Be(0, "nothing was paid, so nothing may be in the books");
     }
 
     [Fact]
@@ -242,7 +300,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         var userA = await SeedCustomerAsync(context, NewCode());
         var userB = await SeedCustomerAsync(context, NewCode());
         var bOrderId = await SeedOrderAsync(context, userB, 2005m);
-        var paymentId = await SeedHeldPaymentAsync(context, userA, 2005m);
+        var paymentId = await SeedPaymentAsync(context, userA, 2005m);
 
         var result = await CreateController(context).Attach(
             paymentId, new AttachPaymentRequest { OrderId = bOrderId }, default);
@@ -257,7 +315,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         using var context = CreateContext();
         var owner = await SeedCustomerAsync(context, NewCode());
         var other = await SeedCustomerAsync(context, NewCode());
-        var paymentId = await SeedHeldPaymentAsync(context, owner, 2006m);
+        var paymentId = await SeedPaymentAsync(context, owner, 2006m);
 
         var result = await CreateController(context).Attach(
             paymentId, new AttachPaymentRequest { UserId = other }, default);
@@ -272,7 +330,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         using var context = CreateContext();
         var userId = await SeedCustomerAsync(context, NewCode());
         var paidOrderId = await SeedOrderAsync(context, userId, 2007m, OrderStatus.Paid);
-        var paymentId = await SeedHeldPaymentAsync(context, userId, 2007m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2007m);
 
         var result = await CreateController(context).Attach(
             paymentId, new AttachPaymentRequest { OrderId = paidOrderId }, default);
@@ -286,7 +344,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
     {
         using var context = CreateContext();
         var userId = await SeedCustomerAsync(context, NewCode());
-        var paymentId = await SeedHeldPaymentAsync(context, userId, 2008m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2008m);
 
         var result = await CreateController(context).Attach(paymentId, new AttachPaymentRequest(), default);
 
@@ -296,17 +354,48 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
     [Fact]
     public async Task Placing_the_same_payment_twice_is_a_no_op_rather_than_a_failure()
     {
-        // A double-click should not look like a failure, and must not move the money twice.
+        // A double-click should not look like a failure, and must not move the money twice. The second
+        // press also cannot be refused for the order's own state, because the state it cites — the one
+        // the first press moved — is the reason the press is a no-op.
         using var context = CreateContext();
         var userId = await SeedCustomerAsync(context, NewCode());
         var orderId = await SeedOrderAsync(context, userId, 2009m);
-        var paymentId = await SeedHeldPaymentAsync(context, userId, 2009m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2009m);
 
         var controller = CreateController(context);
         await controller.Attach(paymentId, new AttachPaymentRequest { OrderId = orderId }, default);
         var second = await controller.Attach(paymentId, new AttachPaymentRequest { OrderId = orderId }, default);
 
         second.Should().BeOfType<NoContentResult>();
+
+        (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
+            .Should().Be(2, "one receipt and one VAT leg, however many presses name the same order");
+        (await context.OutboxEvents.AsNoTracking().CountAsync(e => e.EventType == OutboxEventType.OrderCreated))
+            .Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Money_already_on_a_cancelled_order_is_reported_rather_than_marked_done()
+    {
+        // The shape production woke up with on 2026-11-04: the invoice's expiry cancelled the order
+        // while the declared money sat on it (planning #867). Pressing place again cannot settle that,
+        // and answering 204 would tell the operator the sale was completed. The refusal is the feature;
+        // what to do with the money is a decision this screen is not allowed to make on its own.
+        using var context = CreateContext();
+        var userId = await SeedCustomerAsync(context, NewCode());
+        var orderId = await SeedOrderAsync(context, userId, 2013m, OrderStatus.Cancelled);
+        var paymentId = await SeedPaymentAsync(context, userId, 2013m, orderId: orderId);
+
+        var result = await CreateController(context)
+            .Attach(paymentId, new AttachPaymentRequest { OrderId = orderId }, default);
+
+        var refusal = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        ((ProblemDetails)refusal.Value!).Detail.Should().Contain("Cancelled");
+
+        (await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId))
+            .Status.Should().Be(OrderStatus.Cancelled, "this screen does not revive an order by pressing place");
+        (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
+            .Should().Be(0, "no revenue is booked for fuel nobody will deliver");
     }
 
     [Fact]
@@ -319,7 +408,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         var userId = await SeedCustomerAsync(context, code);
         var openId = await SeedOrderAsync(context, userId, 2011m, OrderStatus.PendingPayment);
         var paidId = await SeedOrderAsync(context, userId, 2012m, OrderStatus.Paid);
-        await SeedHeldPaymentAsync(context, userId, 2011m);
+        await SeedPaymentAsync(context, userId, 2011m);
 
         var response = await UnallocatedAsync(context);
 
@@ -441,7 +530,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         // customer's?". The answer has to be a record, not a recollection.
         using var context = CreateContext();
         var userId = await SeedCustomerAsync(context, NewCode());
-        var paymentId = await SeedHeldPaymentAsync(context, userId: null, 2010m);
+        var paymentId = await SeedPaymentAsync(context, userId: null, 2010m);
 
         await CreateController(context).Attach(paymentId, new AttachPaymentRequest { UserId = userId }, default);
 

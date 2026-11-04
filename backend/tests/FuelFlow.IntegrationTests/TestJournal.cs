@@ -34,6 +34,19 @@ public static class TestJournal
                 FuelFlow.Features.Orders.SettlePaidOrder.SettlePaidOrderCommandHandler>.Instance,
             For(context));
 
+    /// <summary>
+    /// The settle behind the money check: the paths that hold money and an order - the settlement
+    /// channel and the panel's place screen - call this, so a test that drives either needs it rather
+    /// than the core alone.
+    /// </summary>
+    public static FuelFlow.Features.Orders.SettlePaidOrder.TrySettlePaidOrderCommandHandler TrySettleFor(
+        ApplicationDbContext context)
+        => new(
+            context,
+            SettleFor(context),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<
+                FuelFlow.Features.Orders.SettlePaidOrder.TrySettlePaidOrderCommandHandler>.Instance);
+
     /// <summary>Seeds what the seeded mapping needs: both sides of the payment events.</summary>
     public static void SeedChart(ApplicationDbContext context)
     {

@@ -170,10 +170,13 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     /// The money record of a paid order: a capture in state Succeeded, which is the only state
     /// that means the money is ours.
     /// </summary>
-    private void SeedCapturedPayment(Guid orderId)
-        => SeedPayment(orderId, FuelFlow.Payments.SharedModels.PaymentStatus.Succeeded);
+    private void SeedCapturedPayment(Guid orderId, decimal amountUah = 2500)
+        => SeedPayment(orderId, FuelFlow.Payments.SharedModels.PaymentStatus.Succeeded, amountUah);
 
-    private void SeedPayment(Guid orderId, FuelFlow.Payments.SharedModels.PaymentStatus status)
+    private void SeedPayment(
+        Guid orderId,
+        FuelFlow.Payments.SharedModels.PaymentStatus status,
+        decimal amountUah = 2500)
     {
         _context.Payments.Add(new FuelFlow.Payments.SharedModels.Payment
         {
@@ -182,8 +185,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             Kind = FuelFlow.Payments.SharedModels.PaymentKind.Capture,
             Provider = "monobank",
             ProviderInvoiceId = $"INV-{orderId:N}",
-            AmountUah = 2500,
-            AmountKopecks = 250000,
+            AmountUah = amountUah,
+            AmountKopecks = (long)(amountUah * 100),
             Currency = "UAH",
             Status = status,
             CreatedAtUtc = TestClock.UtcNow,
@@ -352,6 +355,40 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("payment");
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_RefusesToFulfil_AnOrderWhoseMoneyDoesNotCoverItsPrice()
+    {
+        // The guard used to ask whether any capture existed, so one 10.00 ₴ row on a 2500.00 ₴ order
+        // was enough to hand over the fuel with nothing booked. It now asks the settle's question — the
+        // same rule, one implementation (planning #867).
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        SeedCapturedPayment(order.Id, 1000);
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "PendingFulfillment"));
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("2500.00", "the refusal names what the order owes");
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_Fulfils_AnOrderWhoseTransfersAddUpToItsPrice()
+    {
+        // A sum, not a single row: two real transfers that total the price are a paid order, and the
+        // operator must be able to move it.
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        SeedCapturedPayment(order.Id, 1000);
+        SeedCapturedPayment(order.Id, 1500);
+
+        (await _updateOrderStatusHandler.HandleAsync(
+            new UpdateOrderStatusCommand(order.Id, "PendingFulfillment"))).Success.Should().BeTrue();
     }
 
     [Fact]
