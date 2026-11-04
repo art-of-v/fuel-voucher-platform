@@ -1,3 +1,5 @@
+import { inflateSync } from 'zlib';
+
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 
@@ -167,6 +169,53 @@ describe('StationMarker - what the pin carries', () => {
   });
 });
 
+describe('StationMarker - which view MapKit displays', () => {
+  /**
+   * `-[AIRMapMarker shouldUsePinView]` answers `reactSubviews.count == 0 && !self.imageSrc`, MapKit keeps
+   * the first answer for the annotation's whole life, and under Fabric a marker is *always* childless
+   * when the map registers it (`RCTMountingManager.mm:82-89` configures and finalizes the child before
+   * its parent mounts it, and the child's own subview is a later mutation). So of those two terms only
+   * `imageSrc` is something JS can settle, and it has to be settled before the pin is ever drawn — which
+   * is why the empty slots carry it too: the pool never adds a marker again, so a slot born without the
+   * image is Apple's pin for as long as it lives, including the day it is handed a station.
+   *
+   * The payload is decoded rather than compared as a string because an unreadable image is the failure
+   * mode here: the flag would still be set, and every marker in the pool would carry a request that dies
+   * in the image loader.
+   */
+  function guardImage(point: typeof SHELL | null) {
+    markerProps.length = 0;
+    renderMarker({ point: point as any });
+    // The mock records what `StationMarker` hands `Marker`, which is the `{uri}` wrapper — the library
+    // unwraps it to the string on its way to the view manager (`MapMarker.js:82-85`).
+    return markerProps[0].image as { uri: string };
+  }
+
+  it('hands every slot the same image, station or none', () => {
+    const withStation = guardImage(SHELL);
+    const empty = guardImage(null);
+
+    expect(withStation.uri).toMatch(/^data:image\/png;base64,/);
+    expect(empty.uri).toBe(withStation.uri);
+  });
+
+  it('is a one-by-one fully transparent PNG', () => {
+    const image = guardImage(SHELL).uri;
+    const png = Buffer.from(image.slice('data:image/png;base64,'.length), 'base64');
+
+    expect(png.subarray(1, 4).toString('ascii')).toBe('PNG');
+    expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR');
+    expect(png.readUInt32BE(16)).toBe(1);
+    expect(png.readUInt32BE(20)).toBe(1);
+    expect(png[24]).toBe(8); // bits per channel
+    expect(png[25]).toBe(6); // RGBA, so the alpha byte below is real
+
+    const idatLength = png.readUInt32BE(33);
+    const scanline = inflateSync(png.subarray(41, 41 + idatLength));
+    expect(scanline).toEqual(Buffer.from([0, 0, 0, 0, 0])); // filter byte, then a transparent pixel
+  });
+});
+
 describe('StationMarker - an empty slot', () => {
   it('is transparent and parked where no region of this network reaches', () => {
     renderMarker({ point: null });
@@ -176,16 +225,17 @@ describe('StationMarker - an empty slot', () => {
     expect(markerProps[0].accessibilityLabel).toBeUndefined();
   });
 
-  it('still hands the marker a child view, because a childless marker draws the stock MapKit pin', () => {
-    // `AIRMapMarker.shouldUsePinView` is `reactSubviews.count == 0 && !imageSrc`. Empty the marker
-    // of children and the pool stops being 120 invisible markers and becomes 120 red Apple pins --
-    // so the container is what carries the emptiness, and it never leaves.
+  it('still hands the marker a child view, because that child is the pin', () => {
+    // The marker's own view is what MapKit displays (see the `image` below), and the disc, the logo and
+    // the stem are React views inside this child. Empty the child and the slot stops being an invisible
+    // marker and becomes an invisible nothing; the container is what carries the emptiness, and it
+    // never leaves.
     renderMarker({ point: null });
 
     const child: any = markerProps[0].children;
     expect(React.isValidElement(child) && child.type).toBe(View);
-    // The emptiness is what goes inside that view -- the view itself never leaves, or the marker has
-    // no react subviews and `shouldUsePinView` hands it the platform pin instead.
+    // The emptiness is what goes inside that view -- the view itself never leaves, and a marker with no
+    // drawing in it is a marker the user cannot tap.
     expect(child.props.children).toBeFalsy();
   });
 

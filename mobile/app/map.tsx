@@ -128,18 +128,18 @@ export default function MapScreen() {
   // into the map's own child array at an index the array does not necessarily have, and both ways it
   // fails fatally, in Objective-C, with no JS error to read. See `assignToSlots`.
   //
-  // `null` is "the pool does not exist yet", and the wait is not ceremony. `AIRMap insertReactSubview`
-  // hands a marker to MapKit in the *map's* mount pass, while the marker's own children are mounted
-  // in the marker's pass — so a marker that joins the map's own transaction is an annotation with no
-  // react subviews at the moment MapKit asks what to draw, and `shouldUsePinView` answers with the
-  // stock MapKit pin. MapKit keeps one view per annotation for its whole life, so that answer is
-  // final: no brand badge ever appears, and a pool built this way shows Apple's pin for every slot.
+  // `null` is "the pool does not exist yet". The wait is not ceremony, but it is not what puts a brand
+  // badge on a pin either: under Fabric a marker is childless when the map registers it, so which view
+  // MapKit displays is settled by props — the `image` on `StationMarker` — not by which commit the pool
+  // arrives in. Deferring keeps a hundred and twenty markers, and the subtrees inside them, out of the
+  // commit that creates the map; the second half of the gate keeps a pool that could show nothing off
+  // the screen altogether.
   const [mapIsReady, setMapIsReady] = React.useState(false);
   const [slots, setSlots] = React.useState<(StationNode | null)[] | null>(null);
 
   React.useEffect(() => {
-    // Both halves of the gate, and the second is not redundant: mounting a hundred and twenty
-    // *empty* markers would be the stock-pin transaction again, just one commit later.
+    // Both halves of the gate, and the second is not redundant: an all-empty pool would be a hundred
+    // and twenty markers mounted only to be updated one frame later.
     if (!mapIsReady || filteredPoints.length === 0) return;
     setSlots((previous) => {
       const next = assignToSlots(filteredPoints, markerBox, previous ?? []);
