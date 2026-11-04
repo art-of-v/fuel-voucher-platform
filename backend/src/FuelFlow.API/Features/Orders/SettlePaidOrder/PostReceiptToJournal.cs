@@ -3,19 +3,20 @@ using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel.Time;
 
-namespace FuelFlow.Features.Monobank.ProcessWebhook;
+namespace FuelFlow.Features.Orders.SettlePaidOrder;
 
-public sealed partial class ProcessMonobankWebhookCommandHandler
+public sealed partial class SettlePaidOrderCommandHandler
 {
     /// <summary>
     /// Books the money. Two entries, because one cannot carry both facts: the gross lands in the
     /// bank, and the VAT inside it is a liability to the state.
     /// <para>
-    /// <b>Why here and not in the Monobank webhook.</b> Both arrival paths - the push webhook and
-    /// the reconciliation poller - converge on this handler, which is what makes one hook correct
-    /// instead of two hooks that double-post. Whichever arrives second finds the entry already there
-    /// and gets it back unchanged: <c>(source_event, source_type, source_id)</c> is a unique index,
-    /// not a check, so two concurrent arrivals cannot both decide they are first.
+    /// <b>Why here and not in the Monobank webhook.</b> Every authority that can settle an order
+    /// converges on this handler - the push webhook, the reconciliation poller, and once planning
+    /// #867 lands the settlement channel - which is what makes one hook correct instead of three
+    /// hooks that double-post. Whichever arrives second finds the entry already there and gets it
+    /// back unchanged: <c>(source_event, source_type, source_id)</c> is a unique index, not a check,
+    /// so two concurrent arrivals cannot both decide they are first.
     /// </para>
     /// <para>
     /// <b>Why the reconciliation path is the one the business chose.</b> A webhook fires when

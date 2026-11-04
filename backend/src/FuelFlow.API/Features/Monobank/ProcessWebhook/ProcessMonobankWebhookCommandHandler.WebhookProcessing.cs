@@ -1,4 +1,5 @@
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
@@ -232,93 +233,36 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         }
 
         var previousStatus = order.Status;
-        order.Status = targetStatus.Value;
-        order.UpdatedAtUtc = SystemClock.UtcNow;
-        order.LastWebhookProcessedAtUtc = SystemClock.UtcNow;
-        order.LastWebhookModifiedDateUtc = command.ModifiedDate;
 
         // Time from checkout to a real payment outcome. A rising p95 means customers
         // are waiting longer for confirmation, usually before failures become visible.
         _metrics.RecordWebhookLag((SystemClock.UtcNow - order.CreatedAtUtc).TotalSeconds);
 
-        // A renewal order (its lines name the vouchers they renew) fulfils on a different path than a
-        // buy-fuel order: it must NOT write an ORDER_CREATED event (that event drives the buy-fuel
-        // handler, which would try to mint brand-new vouchers for it), and it is handed to
-        // ProcessRenewalOrderAsync instead of the generic ProcessPendingOrdersAsync sweep.
-var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
-                             && order.Kind == OrderKind.Renewal;
-
         if (targetStatus == OrderStatus.PendingFulfillment)
         {
+            // What the acquirer observed, on the acquirer's own columns, before the settle core
+            // saves the entity it was handed. The core writes the order's status, the outbox event
+            // and the journal entries for every authority; these three say "Monobank told us, at
+            // this instant, and this is the newest instant we have accepted", which is a fact only
+            // an acquirer can supply.
             order.MonobankStatus = MonobankStatus.Success;
+            order.LastWebhookProcessedAtUtc = SystemClock.UtcNow;
+            order.LastWebhookModifiedDateUtc = command.ModifiedDate;
 
-            // A soft-deleted order that just got paid must come back into view: the customer was
-            // charged, so the order has to be visible and fulfillable again, not stay hidden.
-            if (order.IsDeleted)
-            {
-                order.IsDeleted = false;
-                _logger.LogWarning(
-                    "Order {OrderId} was soft-deleted but its invoice was paid; restoring it for fulfillment",
-                    order.Id);
-            }
-
-            _logger.LogInformation("Order {OrderId} marked as PendingFulfillment", order.Id);
-
-            // Buy-fuel only: the ORDER_CREATED outbox event is consumed by ProcessOrderCreatedEventAsync,
-            // which allocates fresh stock vouchers. A renewal order extends/replaces existing vouchers on
-            // its own path, so writing this event would double-fulfil it — skip it for renewals.
-            if (!isRenewalOrder)
-            {
-                // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
-                // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
-                // String.Contains here threw 42883 on the paid-webhook path: the ORDER_CREATED
-                // event was never written, so a paid order was never handed to fulfillment.
-                var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
-                var existingEvent = await _context.OutboxEvents
-                    .Where(e => e.EventType == OutboxEventType.OrderCreated
-                             && EF.Functions.JsonContains(e.Payload, orderProbe))
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (existingEvent == null)
-                {
-                    var firstLi = order.LineItems.FirstOrDefault();
-                    var outboxEvent = new OutboxEvent
-                    {
-                        EventType = OutboxEventType.OrderCreated,
-                        Payload = System.Text.Json.JsonSerializer.Serialize(new
-                        {
-                            orderId = order.Id,
-                            userId = order.UserId,
-                            brand = firstLi?.Brand ?? "",
-                            fuelType = firstLi?.FuelTypeId ?? Guid.Empty,
-                            liters = firstLi?.Liters ?? 0m,
-                            quantity = firstLi?.Quantity ?? 0
-                        }),
-                        Processed = false,
-                        CreatedAtUtc = SystemClock.UtcNow
-                    };
-
-                    _context.OutboxEvents.Add(outboxEvent);
-                    _logger.LogInformation("Created ORDER_CREATED outbox event for order {OrderId}", order.Id);
-                }
-            }
+            await _settle.HandleAsync(new SettlePaidOrderCommand { Order = order }, cancellationToken);
         }
-        else if (targetStatus == OrderStatus.Cancelled)
+        else
         {
+            order.Status = targetStatus.Value;
+            order.UpdatedAtUtc = SystemClock.UtcNow;
             order.MonobankStatus = MonobankStatus.Failure;
+            order.LastWebhookProcessedAtUtc = SystemClock.UtcNow;
+            order.LastWebhookModifiedDateUtc = command.ModifiedDate;
+
             _logger.LogInformation("Order {OrderId} marked as Cancelled due to payment {Status}", order.Id, command.Status);
-        }
 
-        _context.Orders.Update(order);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // The receipt is posted INSIDE the transaction, before the commit. That is the whole point:
-        // a journal failure has to leave the order where it was, not half-way to being fulfilled.
-        // Only real transitions reach here - duplicates, stale replays and illegal transitions all
-        // returned earlier, so each payment is reported once.
-        if (targetStatus == OrderStatus.PendingFulfillment)
-        {
-            await PostReceiptToJournalAsync(order, cancellationToken);
+            _context.Orders.Update(order);
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
         return new ProcessingOutcome(

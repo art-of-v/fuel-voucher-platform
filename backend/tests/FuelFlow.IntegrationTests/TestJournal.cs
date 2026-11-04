@@ -22,6 +22,18 @@ public static class TestJournal
     public static JournalPostingService For(ApplicationDbContext context)
         => new(context, Microsoft.Extensions.Logging.Abstractions.NullLogger<JournalPostingService>.Instance);
 
+    /// <summary>
+    /// The settle core around the same journal: the webhook handler no longer posts on its own, it
+    /// calls this, so a test that drives a paid webhook needs the core rather than the ledger.
+    /// </summary>
+    public static FuelFlow.Features.Orders.SettlePaidOrder.SettlePaidOrderCommandHandler SettleFor(
+        ApplicationDbContext context)
+        => new(
+            context,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<
+                FuelFlow.Features.Orders.SettlePaidOrder.SettlePaidOrderCommandHandler>.Instance,
+            For(context));
+
     /// <summary>Seeds what the seeded mapping needs: both sides of the payment events.</summary>
     public static void SeedChart(ApplicationDbContext context)
     {
