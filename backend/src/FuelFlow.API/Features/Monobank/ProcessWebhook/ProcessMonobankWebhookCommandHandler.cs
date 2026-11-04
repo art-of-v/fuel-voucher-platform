@@ -19,6 +19,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
     private readonly FuelFlowMetrics _metrics;
     private readonly NotificationDispatcher _notifications;
     private readonly SettlePaidOrderCommandHandler _settle;
+    private readonly TrySettlePaidOrderCommandHandler _trySettle;
 
     public ProcessMonobankWebhookCommandHandler(
         ApplicationDbContext context,
@@ -27,7 +28,8 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         RefundStatusSyncService refundStatusSyncService,
         FuelFlowMetrics metrics,
         NotificationDispatcher notifications,
-        SettlePaidOrderCommandHandler settle)
+        SettlePaidOrderCommandHandler settle,
+        TrySettlePaidOrderCommandHandler trySettle)
     {
         _context = context;
         _logger = logger;
@@ -36,6 +38,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         _metrics = metrics;
         _notifications = notifications;
         _settle = settle;
+        _trySettle = trySettle;
     }
 
     /// <summary>

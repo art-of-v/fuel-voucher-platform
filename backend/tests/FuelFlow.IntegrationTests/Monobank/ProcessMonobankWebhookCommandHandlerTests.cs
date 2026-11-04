@@ -60,7 +60,8 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IClassFixture<Te
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
             FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
-            TestJournal.SettleFor(_context));
+            TestJournal.SettleFor(_context),
+            TestJournal.TrySettleFor(_context));
 
         TestJournal.SeedChart(_context);
     }
@@ -449,11 +450,110 @@ LineItems =
 
         var updated = await _context.Orders.FindAsync(order.Id);
         updated!.Status.Should().Be(OrderStatus.Cancelled);
+        // The column carries the brand's own word. An invoice that aged out is not a payment that
+        // failed, and an operator reading `Failure` here is told the customer pressed pay and the
+        // acquirer said no - which is a different investigation entirely (planning #867, trigger 4).
+        updated.MonobankStatus.Should().Be(MonobankStatus.Expired);
 
         _context.OutboxEvents.Should().BeEmpty();
         _backgroundJobClientMock.Verify(
             x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
             Times.Never);
+    }
+
+    [Theory]
+    [InlineData("expired")]
+    [InlineData("failure")]
+    public async Task AnInvoiceThatEndedWithoutMoney_DoesNotCancelAnOrderItsOwnMoneyPaysFor(
+        string providerStatus)
+    {
+        // The production shape of 2026-11-04: money an operator placed on the order 56 minutes
+        // before its unpaid Monobank invoice aged out, and the expiry cancelled the order around
+        // live money. What another channel brought is not the acquirer's to unsay, so the delivery
+        // settles instead of cancelling and records its own word (planning #867, trigger 4).
+        var order = BuildOrder("INV-EXP-MONEY", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        await SeedDeclaredMoneyAsync(order, order.Price);
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-EXP-MONEY", providerStatus));
+
+        response.Success.Should().BeTrue();
+        response.NewStatus.Should().Be(OrderStatus.PendingFulfillment.ToString());
+
+        var updated = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+        updated.Status.Should().Be(OrderStatus.PendingFulfillment);
+        updated.MonobankStatus.Should().Be(
+            providerStatus == "expired" ? MonobankStatus.Expired : MonobankStatus.Failure,
+            "the delivery is refused as a transition but still recorded as what the brand said");
+
+        // The money is in the books - which is the whole reason for a settle rather than a cancel:
+        // the alternative is money that exists nowhere and an order nobody can refund from.
+        var entries = await _context.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceId == order.Id)
+            .ToListAsync();
+        entries.Should().HaveCount(2, "the gross and the VAT post as one receipt");
+        entries.Should().OnlyContain(e => e.Lines.Sum(l => l.DebitUah) == e.Lines.Sum(l => l.CreditUah));
+
+        // The handover came from the settle, not from this delivery: an ORDER_CREATED event exists,
+        // and the acquirer's message queued nothing it had no part in paying for.
+        var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
+        (await _context.OutboxEvents.AnyAsync(
+                e => e.EventType == OutboxEventType.OrderCreated && EF.Functions.JsonContains(e.Payload, orderProbe)))
+            .Should().BeTrue("the settle handed the order to fulfilment itself");
+        _backgroundJobClientMock.Verify(
+            x => x.Create(It.IsAny<Job>(), It.IsAny<IState>()),
+            Times.Never,
+            "a delivery that took no money announces no payment");
+    }
+
+    [Fact]
+    public async Task AReversalOfMoneyTheAcquirerTookIsStillACancellation()
+    {
+        // The other half of the rule, pinned so the next reader does not widen it. `reversed` is
+        // money the acquirer DID take and has handed back, and the row it returned is still a
+        // succeeded capture at the instant the order transitions - SyncPaymentAsync runs after.
+        // Asking the money rule here would count the money on its way out as money that pays for
+        // the order. A return belongs to the refund path, not to the settle (planning #867).
+        var order = BuildOrder("INV-REV-MONEY", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        await SeedCaptureAsync(order, WebhookEventIdentity.Monobank, PaymentStatus.Succeeded);
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-REV-MONEY", "reversed"));
+
+        response.NewStatus.Should().Be(OrderStatus.Cancelled.ToString());
+
+        var updated = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+        updated.Status.Should().Be(OrderStatus.Cancelled);
+        updated.MonobankStatus.Should().Be(MonobankStatus.Cancelled);
+
+        (await _context.JournalEntries.AnyAsync(e => e.SourceId == order.Id))
+            .Should().BeFalse("a return books no receipt; the refund path owns that money");
+    }
+
+    [Fact]
+    public async Task AnInvoiceThatEndedWithMoneyShortOfItsPrice_StillCancels()
+    {
+        // The gate is the price, not the presence of money. A transfer that covered half an order
+        // does not hold an expiry hostage: cancelling is the answer the money itself gives.
+        var order = BuildOrder("INV-EXP-SHORT", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        await SeedDeclaredMoneyAsync(order, 1000m);
+
+        var response = await _handler.HandleAsync(WebhookCommand("INV-EXP-SHORT", "expired"));
+
+        response.NewStatus.Should().Be(OrderStatus.Cancelled.ToString());
+
+        var updated = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+        updated.Status.Should().Be(OrderStatus.Cancelled);
+        updated.MonobankStatus.Should().Be(MonobankStatus.Expired);
+
+        _context.OutboxEvents.Should().BeEmpty();
+        (await _context.JournalEntries.AnyAsync(e => e.SourceId == order.Id))
+            .Should().BeFalse();
     }
 
     [Fact]
@@ -796,7 +896,8 @@ LineItems =
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
             FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
-            TestJournal.SettleFor(secondContext));
+            TestJournal.SettleFor(secondContext),
+            TestJournal.TrySettleFor(secondContext));
 
         var command = WebhookCommand("INV-RACE", "success");
 
@@ -837,21 +938,68 @@ LineItems =
     /// <summary>
     /// The capture the checkout wrote for the invoice: the row the webhook moves to "succeeded".
     /// </summary>
-    private async Task SeedPaymentAsync(Order order)
+    private Task SeedPaymentAsync(Order order)
+        => SeedCaptureAsync(order, WebhookEventIdentity.Monobank, PaymentStatus.Pending);
+
+    /// <summary>
+    /// Money attached to the order — the row the money rule counts, and the row this handler must
+    /// neither invent nor ignore.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="provider"/> decides which channel the money came from. The Monobank row is the
+    /// acquirer's own capture, keyed by invoice so <c>SyncPaymentAsync</c> can find it; the declared
+    /// row is what the Telegram settlement channel puts on an order, and it has no invoice at all —
+    /// which is exactly the money an acquirer's expiry used to cancel.
+    /// </remarks>
+    private async Task<Payment> SeedCaptureAsync(Order order, string provider, PaymentStatus status)
+    {
+        var payment = new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            OrderId = order.Id,
+            UserId = order.UserId,
+            Kind = PaymentKind.Capture,
+            Provider = provider,
+            ProviderInvoiceId = provider == WebhookEventIdentity.Monobank ? order.MonobankInvoiceId : null,
+            AmountUah = order.Price,
+            AmountKopecks = Money.ToKopecks(order.Price),
+            Currency = "UAH",
+            Status = status,
+            PaidAtUtc = status == PaymentStatus.Succeeded ? TestClock.UtcNow : null,
+            CreatedByUserName = provider == WebhookEventIdentity.Monobank ? null : "finance",
+            IsAutomatic = provider != WebhookEventIdentity.Monobank,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
+        };
+
+        _context.Payments.Add(payment);
+        await _context.SaveChangesAsync();
+
+        return payment;
+    }
+
+    /// <summary>
+    /// Money another channel brought and an operator placed on the order — the case planning #867
+    /// opened, because no acquirer ever said anything about it.
+    /// </summary>
+    private async Task SeedDeclaredMoneyAsync(Order order, decimal amount)
     {
         _context.Payments.Add(new Payment
         {
             Id = Guid.CreateVersion7(),
-            OrderId = order.Id,
             Kind = PaymentKind.Capture,
-            Provider = WebhookEventIdentity.Monobank,
-            ProviderInvoiceId = order.MonobankInvoiceId,
-            AmountUah = order.Price,
-            AmountKopecks = Money.ToKopecks(order.Price),
+            Provider = PaymentProviders.Declared,
+            UserId = order.UserId,
+            OrderId = order.Id,
+            AmountUah = amount,
+            AmountKopecks = (long)Math.Round(amount * 100),
             Currency = "UAH",
-            Status = PaymentStatus.Pending,
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedByUserName = "finance",
+            IsAutomatic = true,
             CreatedAtUtc = TestClock.UtcNow,
-            UpdatedAtUtc = TestClock.UtcNow
+            UpdatedAtUtc = TestClock.UtcNow,
         });
 
         await _context.SaveChangesAsync();

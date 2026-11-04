@@ -29,6 +29,15 @@ public static class TestJournal
         => new(context, NullLogger<FuelFlow.Features.Orders.SettlePaidOrder.SettlePaidOrderCommandHandler>.Instance, For(context));
 
     /// <summary>
+    /// The settle behind the money check. The handler asks it whether the money already on an order
+    /// pays for that order, so a test that drives the webhook needs the door as well as the core.
+    /// </summary>
+    public static FuelFlow.Features.Orders.SettlePaidOrder.TrySettlePaidOrderCommandHandler TrySettleFor(
+        ApplicationDbContext context)
+        => new(context, SettleFor(context),
+            NullLogger<FuelFlow.Features.Orders.SettlePaidOrder.TrySettlePaidOrderCommandHandler>.Instance);
+
+    /// <summary>
     /// Seeds the minimum the seeded mapping needs: both sides of <c>payment.received</c> and of
     /// <c>payment.received.vat</c>. Synchronous on purpose - the test fixtures build the handler in
     /// their constructors, which cannot await.

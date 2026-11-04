@@ -253,9 +253,63 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         }
         else
         {
+            // "expired" and "failure" are both the brand saying it took nothing. What another channel
+            // brought is not its to unsay, and cancelling anyway is what orphaned 862.00 ₴ on a
+            // terminal order in production on 2026-11-04 (planning #867, trigger 4): an operator had
+            // placed declared money on this order 56 minutes before its unpaid invoice aged out.
+            //
+            // "reversed" is deliberately not part of this question. There the acquirer DID take the
+            // money and has handed it back, and the row it returned is still a succeeded capture until
+            // SyncPaymentAsync runs after this method - so the money this rule would count is precisely
+            // the money on its way out. A return is the refund path's business, not the settle's.
+            if (command.Status.Equals("expired", StringComparison.OrdinalIgnoreCase)
+                || command.Status.Equals("failure", StringComparison.OrdinalIgnoreCase))
+            {
+                var settledByItsOwnMoney = await _trySettle.HandleAsync(
+                    new TrySettlePaidOrderCommand
+                    {
+                        OrderId = order.Id,
+                        Because = "the brand reported the invoice dead while the money on the order covers its price",
+                    },
+                    cancellationToken);
+
+                if (settledByItsOwnMoney.Settled)
+                {
+                    // The order moved, but on the strength of its own money and not of this delivery,
+                    // so the transition the brand asked for is refused and its word is recorded. The
+                    // response still claims no transition of *this* message: announcing a payment
+                    // Monobank never saw, or queueing a fulfilment from it, would put another channel's
+                    // money in the acquirer's mouth. The settle wrote the handover itself.
+                    var priceUah = FormattableString.Invariant($"{order.Price:0.00}");
+                    _logger.LogWarning(
+                        "Order {OrderId} was about to be Cancelled by payment {Status}, but the money on it "
+                        + "covers its {Price} ₴, so it is settled instead (planning #867)",
+                        order.Id, command.Status, priceUah);
+
+                    await RecordUnappliedPaymentTruthAsync(
+                        order, command.Status, command.ModifiedDate, cancellationToken);
+
+                    return new ProcessingOutcome(
+                        new ProcessMonobankWebhookResponse
+                        {
+                            Success = true,
+                            OrderId = order.Id.ToString(),
+                            PreviousStatus = previousStatus.ToString(),
+                            NewStatus = order.Status.ToString(),
+                            Message = "The invoice ended without payment; the money on the order settled it"
+                        },
+                        order,
+                        TransitionedTo: null);
+                }
+            }
+
             order.Status = targetStatus.Value;
             order.UpdatedAtUtc = SystemClock.UtcNow;
-            order.MonobankStatus = MonobankStatus.Failure;
+            // What the brand said, rather than the enum's nearest neighbour. An invoice that aged out is
+            // not a payment that failed, and a column reading `Failure` where the word was `expired` is
+            // how the next reconciliation investigation is told the wrong question. This is the same
+            // mapping the refused transition already records.
+            order.MonobankStatus = WhatTheBrandSaid(command.Status);
             order.LastWebhookProcessedAtUtc = SystemClock.UtcNow;
             order.LastWebhookModifiedDateUtc = command.ModifiedDate;
 
@@ -279,9 +333,13 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
     }
 
     /// <summary>
-    /// Persists the brand's view of the payment for a webhook we refuse to act on.
+    /// Persists the brand's view of the payment for a webhook whose transition we did not apply.
     /// </summary>
     /// <remarks>
+    /// Two deliveries reach it: one the state machine refused, and one this handler refused on purpose
+    /// because the money already on the order pays for it (planning #867, trigger 4). Both said
+    /// something about the invoice and neither got to move the order's status.
+    ///
     /// Only <c>monobank_status</c> and the two webhook timestamps move. The order status, the
     /// voucher allocation and the outbox are deliberately untouched: the transition was refused
     /// for a reason, and this records the evidence without undoing that decision.
@@ -295,17 +353,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         DateTime providerModifiedDateUtc,
         CancellationToken cancellationToken)
     {
-        var observed = providerStatus.ToLowerInvariant() switch
-        {
-            "success" => MonobankStatus.Success,
-            "failure" => MonobankStatus.Failure,
-            // "reversed" is money that WAS taken and has since been given back, so recording it
-            // as a plain failure would understate it as never-collected. Cancelled is the closest
-            // the enum has, and the refund row is the authority for the rest.
-            "reversed" => MonobankStatus.Cancelled,
-            "expired" => MonobankStatus.Expired,
-            _ => (MonobankStatus?)null
-        };
+        var observed = WhatTheBrandSaid(providerStatus);
 
         if (observed == null || order.MonobankStatus == observed)
         {
@@ -333,4 +381,25 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         _context.Orders.Update(order);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// The order's payment column for the brand's own word about this invoice.
+    /// </summary>
+    /// <remarks>
+    /// One mapping for the two paths that record what the brand said - the transition this handler
+    /// refused, and the cancellation it applied - because the column answers the same question in both:
+    /// what did the acquirer last tell us about this invoice. A word it has never used answers null,
+    /// which leaves the column saying nothing rather than guessing.
+    /// </remarks>
+    private static MonobankStatus? WhatTheBrandSaid(string providerStatus) => providerStatus.ToLowerInvariant() switch
+    {
+        "success" => MonobankStatus.Success,
+        "failure" => MonobankStatus.Failure,
+        // "reversed" is money that WAS taken and has since been given back, so recording it
+        // as a plain failure would understate it as never-collected. Cancelled is the closest
+        // the enum has, and the refund row is the authority for the rest.
+        "reversed" => MonobankStatus.Cancelled,
+        "expired" => MonobankStatus.Expired,
+        _ => (MonobankStatus?)null
+    };
 }
