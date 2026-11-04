@@ -293,8 +293,6 @@ export default function MapScreen() {
             showsUserLocation={locationStatus === 'granted'}
             showsMyLocationButton={false}
           >
-            {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
-
             {(slots ?? []).map((point, index) => (
               <StationMarker
                 key={`slot-${index}`}
@@ -313,6 +311,20 @@ export default function MapScreen() {
                 onPress={point ? () => pressMarker(point) : undefined}
               />
             ))}
+
+            {/*
+             * Last among the map's children, on purpose. `resolveCartoApiKey` can answer late — a
+             * native build reads `Constants.expoConfig` only once the manifest is there — so this
+             * overlay is a child that *appears* after mount, and where it appears decides whether
+             * that is safe: the interop layer mounts a child appended at the end
+             * (`index == reactSubviews.count`) synchronously, but anything else is queued as a mount
+             * instruction against an index the array may not have. First position means every one of
+             * the 120 markers is re-indexed, which is the mutation that dies in `finalizeUpdates:` —
+             * the same crash the pool was built to avoid, arriving through a component the pool does
+             * not control. Overlays and annotations are separate arrays in MapKit, so this changes no
+             * stacking: the tiles stay under the pins.
+             */}
+            {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
           </MapView>
 
           <View
