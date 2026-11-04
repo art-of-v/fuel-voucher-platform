@@ -25,6 +25,8 @@
 #   - the maintenance role may purge the retention tables (DELETE) and may NOT insert
 #     or update anywhere - a defect in the traffic role must not be able to erase the
 #     ledger, and the destructive half of the lifecycle must not be able to forge it;
+#   - the maintenance role may NOT alter or truncate even the table it purges from -
+#     a retention window is a WHERE clause, and TRUNCATE is the same erase without one;
 #   - the application role may NOT create a table, alter a table, drop a table, create
 #     a role, or create a database;
 #   - the migration role may change the schema;
@@ -459,6 +461,14 @@ else
     check_denied "the maintenance role may NOT read a table the matrix does not give it" "$out" "$rc"
     out="$(as_maint "DELETE FROM public.brands WHERE false" 2>&1)"; rc=$?
     check_denied "the maintenance role may NOT delete from a mutable product table" "$out" "$rc"
+
+    # Purging rows is not the same as reshaping a table or emptying one. outbox_events is the
+    # table the role DOES hold DELETE on, so these two refusals are about the privilege and
+    # not about the table being invisible.
+    out="$(as_maint "ALTER TABLE public.outbox_events ADD COLUMN maintenance_probe text" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT alter the table it purges from" "$out" "$rc"
+    out="$(as_maint "TRUNCATE public.outbox_events" 2>&1)"; rc=$?
+    check_denied "the maintenance role may NOT truncate the table it purges from" "$out" "$rc"
 
     # The things the application must not do to the schema.
     out="$(as_app "CREATE TABLE public.app_created(id integer)" 2>&1)"; rc=$?

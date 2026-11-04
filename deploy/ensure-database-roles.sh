@@ -712,6 +712,17 @@ if [[ "$READONLY_ENABLED" == "1" ]]; then
   say "the read-only role may read and may not write"
 fi
 
+# The purge deletes the rows a retention window names. Nothing in its remit reshapes a table
+# or empties one at once, and this was never asked of the database: the probes below name only
+# this script's own table, so a probe that wrongly succeeded would erase nobody's rows.
+probe_denied "$MAINTENANCE_ROLE" "ALTER TABLE public.__fuelflow_role_probe ADD COLUMN maintenance_probe text" \
+  "the maintenance role may alter the tables. The schema belongs to the migration role - the matrix gives the purge DELETE on named tables and no way to change one."
+say "the maintenance role may not alter the tables"
+
+probe_denied "$MAINTENANCE_ROLE" "TRUNCATE public.__fuelflow_role_probe" \
+  "the maintenance role may TRUNCATE. A retention window is a WHERE clause; TRUNCATE is the same erase with no window, no row counted and nothing left to reconcile against."
+say "the maintenance role may not truncate a table"
+
 # ------------------------------------------------------------------------------
 # The matrix, asked for real. The probes below only mean something when the relation
 # the matrix classifies exists: on a fresh cluster (or the CI test database) the
