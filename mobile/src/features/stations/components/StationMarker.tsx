@@ -15,6 +15,36 @@ import type { StationNode } from '../../../core/types/api';
 const PARKED = { latitude: 0, longitude: 0 };
 
 /**
+ * A transparent 1×1 PNG, handed to `Marker` as its `image` so MapKit never reaches for its own pin.
+ *
+ * `-[AIRMapMarker shouldUsePinView]` (AIRMapMarker.m:321-323) answers `reactSubviews.count == 0 &&
+ * !self.imageSrc`, and MapKit asks once per annotation and keeps that view for its whole life. Under
+ * Fabric a marker is *always* childless when it joins the map: `RCTMountingManager.mm:82-89` applies
+ * the new child's props and runs its `finalizeUpdates:` before handing it to the parent's
+ * `mountChildComponentView:`, and the marker's own child is a separate, later mutation of the same
+ * transaction. So `addAnnotation:` (AIRMap.m:138) always sees zero subviews, and if the map is already
+ * drawing, MapKit answers there and then with a stock `MKMarkerAnnotationView` — the React pin lands in
+ * a view MapKit never displays. Mounting the pool inside the map's own commit hands MapKit a map that is
+ * not on screen yet, so the question is only deferred a frame — long enough for the children to arrive,
+ * which is why badges used to appear. That is a race being won, not a property holding.
+ *
+ * `setImageSrc:` stores the string before it asks the image loader (AIRMapMarker.m:331-339) and props
+ * land before insertion, so `image` settles the answer at prop time — whatever the mounting order does
+ * afterwards. Nothing else reads it: `self.image` matters only to `reactSetFrame:`, which Fabric never
+ * calls (that is Paper's `RCTUIManager.mm:758`; Fabric sets `center` and `bounds` itself, and
+ * `reactSetFrame` appears nowhere under `React/Fabric`), and Android composites the bitmap behind the
+ * view snapshot at the snapshot's own size (`MapMarker.java:getIcon`). The pixels are invisible on both.
+ *
+ * It is given as `{uri}` because that is the shape the library's own type allows, and `MapMarker.js:82-85`
+ * unwraps it back to the string before sending it — which is what the manager wants
+ * (`RCT_REMAP_VIEW_PROPERTY(image, imageSrc, NSString)`). An object reaching the native side would be
+ * dropped by `RCTConvert`, and the guard would silently do nothing.
+ */
+const STOCK_PIN_GUARD =
+  'data:image/png;base64,' +
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=';
+
+/**
  * The round brand badge used in the ranking list and the station sheet. Pure
  * presentation; sized by the caller.
  *
@@ -58,13 +88,11 @@ export function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size:
  * disagree, the app dies in Objective-C. A `null` here is a marker showing nothing: parked where
  * no region of this network reaches, and transparent.
  *
- * The marker keeps one child view even when it shows nothing. `AIRMapMarker` decides what to draw by
- * counting its own react subviews (`shouldUsePinView`), so a childless marker is not an empty slot —
- * it is the stock red MapKit pin, all over the map. And the count is taken once, when MapKit first
- * asks for the annotation's view, and kept: which is why the screen mounts the pool only after the
- * map has rendered and already carrying pins (see `map.tsx`), not in the map's own transaction. What
- * goes *inside* the child view is ordinary Fabric and free to come and go, and the pin subtree is
- * keyed by the station so a recycled slot builds it the way a fresh marker would.
+ * The marker keeps one child view even when it shows nothing. That child *is* the pin — the white disc,
+ * the brand logo, the stem — and MapKit agrees to display `AIRMapMarker` itself, rather than its own
+ * pin, only because of {@link STOCK_PIN_GUARD}. What goes *inside* that child is ordinary Fabric and
+ * free to come and go, and the pin subtree is keyed by the station so a recycled slot builds it the way
+ * a fresh marker would.
  *
  * `tracksViewChanges` is read by the Android marker manager; the iOS MapKit marker has no such
  * prop. There a custom-view marker is rasterised once, so tracking stays on until the logo
@@ -114,6 +142,7 @@ export function StationMarker({
         point ? { latitude: point.lat as number, longitude: point.lng as number } : PARKED
       }
       opacity={point ? 1 : 0}
+      image={{ uri: STOCK_PIN_GUARD }}
       onPress={onPress}
       tracksViewChanges={tracks || selected}
       accessibilityLabel={

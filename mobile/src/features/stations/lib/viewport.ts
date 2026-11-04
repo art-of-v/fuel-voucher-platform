@@ -191,12 +191,12 @@ export const MARKER_POOL_SIZE = MAX_MOUNTED_MARKERS;
  * annotation whose coordinate changes (upstream #5193 measures it as a lag, not a failure). Nothing
  * is inserted, nothing is removed, and the array and the shadow tree never disagree.
  *
- * Mounting later than the map, and with content, is not politeness — it is what puts the brand badge
- * on the screen. `AIRMap insertReactSubview:` registers an annotation while the *map* mounts, but the
- * marker's own children are registered in the marker's pass, and `AIRMapMarker` chooses what to draw
- * from `reactSubviews.count` (`shouldUsePinView`) at the moment MapKit first asks for the view — an
- * answer MapKit then keeps for that annotation for its whole life. A marker added childless is
- * therefore the stock MapKit pin forever, whatever arrives inside it afterwards.
+ * What puts a brand badge on the pin is not this schedule, though. `AIRMapMarker` picks between its own
+ * view and Apple's once, from `reactSubviews.count` (`shouldUsePinView`), and under Fabric a marker is
+ * *always* childless at that moment: props are applied and the marker's own `finalizeUpdates:` run
+ * before its parent mounts it, and the marker's child is a later mutation of the same transaction
+ * (`RCTMountingManager.mm:82-89`). So the choice is settled at prop time instead, by the `image` every
+ * `StationMarker` carries — see that file for why nothing else reads it.
  *
  * Two rules keep the pins steady inside that fixed set:
  *
