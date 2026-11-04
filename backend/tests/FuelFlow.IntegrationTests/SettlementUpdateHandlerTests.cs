@@ -267,6 +267,11 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
         var payment = await ThePayment(context, 1505m);
         payment.OrderId.Should().BeNull();
         payment.UserId.Should().Be(userId);
+
+        // The message still points at the payment it wrote. Money held for a customer is exactly the
+        // row an operator has to resolve later, and the panel shows its author, code and text by
+        // following this link.
+        row.PaymentId.Should().Be(payment.Id);
     }
 
     [Fact]
@@ -278,9 +283,12 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
 
         await CreateHandler(Configured(), context).HandleAsync(Message(1006, $"2006 {code}"), default);
 
-        (await TheMessage(context, 1006)).RejectionReason.Should().Contain("different amount");
+        var row = await TheMessage(context, 1006);
+        row.RejectionReason.Should().Contain("different amount");
 
-        (await ThePayment(context, 2006m)).OrderId.Should().BeNull();
+        var payment = await ThePayment(context, 2006m);
+        payment.OrderId.Should().BeNull();
+        row.PaymentId.Should().Be(payment.Id);
         orderId.Should().NotBe(Guid.Empty);
     }
 
@@ -294,9 +302,12 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
 
         await CreateHandler(Configured(), context).HandleAsync(Message(1007, $"1507 {code}"), default);
 
-        (await TheMessage(context, 1007)).RejectionReason.Should().Contain("2 orders");
+        var row = await TheMessage(context, 1007);
+        row.RejectionReason.Should().Contain("2 orders");
 
-        (await ThePayment(context, 1507m)).OrderId.Should().BeNull();
+        var payment = await ThePayment(context, 1507m);
+        payment.OrderId.Should().BeNull();
+        row.PaymentId.Should().Be(payment.Id);
     }
 
     [Fact]
@@ -317,6 +328,7 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
         var payment = await ThePayment(context, 1508m);
         payment.OrderId.Should().BeNull();
         payment.UserId.Should().BeNull();
+        row.PaymentId.Should().Be(payment.Id);
     }
 
     [Fact]
