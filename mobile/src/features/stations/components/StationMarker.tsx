@@ -58,11 +58,13 @@ export function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size:
  * disagree, the app dies in Objective-C. A `null` here is a marker showing nothing: parked where
  * no region of this network reaches, and transparent.
  *
- * The marker keeps its one child view even when empty. `AIRMapMarker` decides what to draw by
- * counting its own react subviews (`shouldUsePinView`), so a childless marker is not an empty
- * slot — it is the stock red MapKit pin, all over the map. What goes *inside* that view is
- * ordinary Fabric and free to come and go, and the pin subtree is keyed by the station so a
- * recycled slot builds it the way a fresh marker would.
+ * The marker keeps one child view even when it shows nothing. `AIRMapMarker` decides what to draw by
+ * counting its own react subviews (`shouldUsePinView`), so a childless marker is not an empty slot —
+ * it is the stock red MapKit pin, all over the map. And the count is taken once, when MapKit first
+ * asks for the annotation's view, and kept: which is why the screen mounts the pool only after the
+ * map has rendered and already carrying pins (see `map.tsx`), not in the map's own transaction. What
+ * goes *inside* the child view is ordinary Fabric and free to come and go, and the pin subtree is
+ * keyed by the station so a recycled slot builds it the way a fresh marker would.
  *
  * `tracksViewChanges` is read by the Android marker manager; the iOS MapKit marker has no such
  * prop. There a custom-view marker is rasterised once, so tracking stays on until the logo

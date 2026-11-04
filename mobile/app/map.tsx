@@ -37,7 +37,6 @@ import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
 import {
   assignToSlots,
   isRegionCoveredByBox,
-  MARKER_POOL_SIZE,
   type MapRegion,
 } from '../src/features/stations/lib/viewport';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
@@ -122,24 +121,35 @@ export default function MapScreen() {
   // it, so the settles in the middle of a long pan change nothing at all.
   const [markerBox, setMarkerBox] = React.useState<MapRegion>(KYIV_REGION);
 
-  // The other half is that nothing is ever mounted at all. The screen builds `MARKER_POOL_SIZE`
-  // markers with the map and afterwards only changes which АЗК each one shows, because a `Marker` is
-  // a legacy view manager: adding or removing one makes the Fabric interop layer replay that change
-  // into the map's own child array at an index the array does not necessarily have — and both ways it
+  // The other half is that nothing is ever mounted after the pool exists. The screen waits for the
+  // map's own first render, then builds `MARKER_POOL_SIZE` markers already carrying the pins of the
+  // region on screen, and afterwards only changes which АЗК each one shows — because a `Marker` is a
+  // legacy view manager: adding or removing one makes the Fabric interop layer replay that change
+  // into the map's own child array at an index the array does not necessarily have, and both ways it
   // fails fatally, in Objective-C, with no JS error to read. See `assignToSlots`.
-  const [slots, setSlots] = React.useState<(StationNode | null)[]>(() =>
-    new Array(MARKER_POOL_SIZE).fill(null),
-  );
+  //
+  // `null` is "the pool does not exist yet", and the wait is not ceremony. `AIRMap insertReactSubview`
+  // hands a marker to MapKit in the *map's* mount pass, while the marker's own children are mounted
+  // in the marker's pass — so a marker that joins the map's own transaction is an annotation with no
+  // react subviews at the moment MapKit asks what to draw, and `shouldUsePinView` answers with the
+  // stock MapKit pin. MapKit keeps one view per annotation for its whole life, so that answer is
+  // final: no brand badge ever appears, and a pool built this way shows Apple's pin for every slot.
+  const [mapIsReady, setMapIsReady] = React.useState(false);
+  const [slots, setSlots] = React.useState<(StationNode | null)[] | null>(null);
 
   React.useEffect(() => {
+    // Both halves of the gate, and the second is not redundant: mounting a hundred and twenty
+    // *empty* markers would be the stock-pin transaction again, just one commit later.
+    if (!mapIsReady || filteredPoints.length === 0) return;
     setSlots((previous) => {
-      const next = assignToSlots(filteredPoints, markerBox, previous);
+      const next = assignToSlots(filteredPoints, markerBox, previous ?? []);
       // Every station still in the same slot means every marker gets the props it already has, so
       // bail out instead of re-rendering a hundred and twenty pins for a search keystroke.
-      const unchanged = next.every((point, index) => point?.id === previous[index]?.id);
+      const unchanged =
+        previous != null && next.every((point, index) => point?.id === previous[index]?.id);
       return unchanged ? previous : next;
     });
-  }, [filteredPoints, markerBox]);
+  }, [mapIsReady, filteredPoints, markerBox]);
 
   const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
 
@@ -274,6 +284,7 @@ export default function MapScreen() {
               if (isMarkerPressEcho(lastMarkerPressAt.current, Date.now())) return;
               setSelectedStation(null);
             }}
+            onMapReady={() => setMapIsReady(true)}
             onRegionChangeComplete={(region) => {
               if (isRegionCoveredByBox(region, markerBox)) return;
               setMarkerBox(region);
@@ -284,7 +295,7 @@ export default function MapScreen() {
           >
             {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
 
-            {slots.map((point, index) => (
+            {(slots ?? []).map((point, index) => (
               <StationMarker
                 key={`slot-${index}`}
                 point={point}

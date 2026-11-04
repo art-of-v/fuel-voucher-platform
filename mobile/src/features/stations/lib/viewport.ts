@@ -185,11 +185,18 @@ export const MARKER_POOL_SIZE = MAX_MOUNTED_MARKERS;
  * the array is shorter than the index. Panning the network map did that on every gesture that
  * changed the set, so no amount of making the set *smaller* ever stopped it.
  *
- * So the set is fixed: the screen mounts `size` markers while the map itself mounts, and after that
- * a pan only ever changes which station a marker shows. That is a prop update — `coordinate`,
- * `opacity` — and MapKit moves an annotation whose coordinate changes (upstream #5193 measures it as
- * a lag, not a failure). Nothing is inserted, nothing is removed, and the array and the shadow tree
- * never disagree.
+ * So the set is fixed: the screen mounts `size` markers in one transaction once the map has rendered,
+ * already carrying the pins of the region on screen, and after that a pan only ever changes which
+ * station a marker shows. That is a prop update — `coordinate`, `opacity` — and MapKit moves an
+ * annotation whose coordinate changes (upstream #5193 measures it as a lag, not a failure). Nothing
+ * is inserted, nothing is removed, and the array and the shadow tree never disagree.
+ *
+ * Mounting later than the map, and with content, is not politeness — it is what puts the brand badge
+ * on the screen. `AIRMap insertReactSubview:` registers an annotation while the *map* mounts, but the
+ * marker's own children are registered in the marker's pass, and `AIRMapMarker` chooses what to draw
+ * from `reactSubviews.count` (`shouldUsePinView`) at the moment MapKit first asks for the view — an
+ * answer MapKit then keeps for that annotation for its whole life. A marker added childless is
+ * therefore the stock MapKit pin forever, whatever arrives inside it afterwards.
  *
  * Two rules keep the pins steady inside that fixed set:
  *

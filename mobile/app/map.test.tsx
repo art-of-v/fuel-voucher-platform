@@ -125,7 +125,11 @@ jest.mock('react-native-maps', () => {
       pointForCoordinate: jest.fn(() => ({ x: 0, y: 0 })),
       coordinateForPoint: jest.fn(() => ({ latitude: 0, longitude: 0 })),
     }));
-    return <View testID="map">{props.children}</View>;
+    return (
+      <View testID="map" onMapReady={props.onMapReady}>
+        {props.children}
+      </View>
+    );
   });
   MapView.displayName = 'MapView';
 
@@ -442,17 +446,28 @@ describe('MapScreen', () => {
       mockNodes = [];
     });
 
-    it('mounts the pool once, and never another marker after it', () => {
-      // A `Marker` is a legacy view manager hosted by a Fabric interop component, and inserting or
-      // removing one replays a child-index change into the map's own array of subviews. When that
-      // array and the shadow tree disagree the app dies in Objective-C — twice over, `object cannot
-      // be nil` and `index beyond bounds` — with no JS error to read. So the screen builds the pool
-      // while the map builds and afterwards only changes which АЗК a marker shows.
+    it('mounts the pool once the map has rendered, already carrying its pins', () => {
+      // Two facts, both from the interop layer this build ships. A `Marker` is a legacy view manager
+      // hosted by a Fabric interop component, and inserting or removing one replays a child-index
+      // change into the map's own array of subviews — when that array and the shadow tree disagree
+      // the app dies in Objective-C, twice over (`object cannot be nil`, `index beyond bounds`), with
+      // no JS error to read. And `AIRMap` registers an annotation while the *map* mounts, one pass
+      // before the marker registers its own children, so a marker added in the map's transaction is
+      // childless when MapKit first asks what to draw — the stock pin, kept for that annotation's
+      // whole life. So the pool waits for the map, arrives with pins, and is never touched again.
       mockNodes = lattice(1000);
       renderScreen();
 
       const map = screen.getByTestId('map');
+      expect(screen.queryAllByTestId('marker')).toHaveLength(0);
+
+      act(() => {
+        fireEvent(map, 'mapReady');
+      });
+
+      // The first thing mounted is the whole pool, with the region's АЗК already in it.
       expect(screen.getAllByTestId('marker')).toHaveLength(MARKER_POOL_SIZE);
+      expect(pinsShown()).toBeGreaterThan(0);
       expect(pinsShown()).toBeLessThan(20);
 
       act(() => {
@@ -476,6 +491,9 @@ describe('MapScreen', () => {
       // The map is taken before the sheet opens: the sheet is `accessibilityViewIsModal`, so
       // once it is up the map is outside what queries can see — the same thing VoiceOver does.
       const map = screen.getByTestId('map');
+      act(() => {
+        fireEvent(map, 'mapReady');
+      });
       fireEvent.press(screen.getByRole('button', { name: 'map.networkRanking' }));
       mockGestures.length = 0;
 
