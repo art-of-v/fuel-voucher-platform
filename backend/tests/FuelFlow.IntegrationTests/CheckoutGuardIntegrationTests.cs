@@ -265,7 +265,8 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
             new RuntimeSettingsService(context),
             NullLogger<BulkCheckoutCommandHandler>.Instance,
             NotificationDispatcher.Disabled,
-            Stock(context));
+            Stock(context),
+            new FuelFlowMetrics());
 
     private PackageStockAvailability Stock(ApplicationDbContext context)
         => new(context, new ConfigurationBuilder()

@@ -76,6 +76,43 @@ public class MonobankClientTests
     }
 
     [Fact]
+    public async Task CreateInvoiceAsync_CarriesWhatTheBankSaid_WhenItRefusesThePayment()
+    {
+        // The refusal that stopped checkout on 2026-11-05: the merchant's internet-acquiring
+        // terminal had been switched off at the bank, and every invoice request answered 403 with
+        // the bank's own code and sentence. Both are what the operator needs, so the client keeps
+        // them instead of flattening the answer into a status number.
+        var (client, _) = CreateClient(
+            """{"errCode":"FORBIDDEN","errText":"you don't have active terminal for internet acquiring"}""",
+            HttpStatusCode.Forbidden);
+
+        var failure = await Assert.ThrowsAsync<MonobankInvoiceRejectedException>(
+            () => client.CreateInvoiceAsync(new MonobankInvoiceRequest { Amount = 86200 }));
+
+        failure.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        failure.ErrCode.Should().Be("FORBIDDEN");
+        failure.ErrText.Should().Be("you don't have active terminal for internet acquiring");
+    }
+
+    [Fact]
+    public async Task CreateInvoiceAsync_InventsNoCodes_WhenTheBodyIsNotTheBanksJson()
+    {
+        // A proxy error page arrives where the bank's JSON should be. Refusing is already the bad
+        // news, so reading the refusal must not become a second failure on the way to saying so.
+        var (client, _) = CreateClient("<html>502 Bad Gateway</html>", HttpStatusCode.BadGateway);
+
+        var failure = await Assert.ThrowsAsync<MonobankInvoiceRejectedException>(
+            () => client.CreateInvoiceAsync(new MonobankInvoiceRequest { Amount = 100 }));
+
+        failure.ErrCode.Should().BeNull();
+        failure.ErrText.Should().BeNull();
+
+        // Callers that only know "the HTTP call failed" must still catch this one: reconciliation
+        // and the statement importer both catch HttpRequestException, and a refusal is one.
+        Assert.IsAssignableFrom<HttpRequestException>(failure);
+    }
+
+    [Fact]
     public async Task GetInvoiceStatusAsync_ShouldGetAndDeserialize()
     {
         var json = "{ \"invoiceId\": \"INV2\", \"status\": \"created\", \"amount\": 5000, " +

@@ -31,6 +31,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
     private readonly ILogger<BulkCheckoutCommandHandler> _logger;
     private readonly NotificationDispatcher _notifications;
     private readonly PackageStockAvailability _stock;
+    private readonly FuelFlowMetrics _metrics;
 
     public BulkCheckoutCommandHandler(
         ApplicationDbContext context,
@@ -40,7 +41,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
         RuntimeSettingsService runtimeSettings,
         ILogger<BulkCheckoutCommandHandler> logger,
         NotificationDispatcher notifications,
-        PackageStockAvailability stock)
+        PackageStockAvailability stock,
+        FuelFlowMetrics metrics)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
@@ -51,6 +53,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
         _stock = stock;
+        _metrics = metrics;
     }
 
     public async Task<BulkCheckoutResponse> HandleAsync(
@@ -387,6 +390,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         }
 
         MonobankInvoiceResponse invoiceResponse;
+        var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             var monobankClient = _monobankClientFactory.ForMerchant(merchant);
@@ -401,6 +405,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
                     WebhookUrl = _monobankOptions.WebhookUrl
                 }, cancellationToken);
 
+            _metrics.MonobankInvoiceCreated(invoiceStopwatch.Elapsed.TotalMilliseconds);
+
             _logger.LogInformation(
                 "Monobank invoice created on {Merchant} merchant for bundle: {InvoiceId}",
                 merchant,
@@ -408,6 +414,10 @@ private readonly RuntimeSettingsService _runtimeSettings;
         }
         catch (Exception ex)
         {
+            // The same counter the single-item checkout records. Without it the busiest of the two
+            // paths was invisible to the acquirer-failure alert, and a merchant whose terminal the
+            // bank has switched off produced 14 refusals and no page (planning #873).
+            _metrics.MonobankInvoiceFailed(ex.GetType().Name);
             _logger.LogError(ex, "Failed to create Monobank invoice for bundle");
 
             // The invoice never came, so this attempt is over - and an attempt that is over must

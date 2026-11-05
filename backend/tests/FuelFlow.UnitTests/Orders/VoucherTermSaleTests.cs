@@ -148,7 +148,8 @@ public sealed class VoucherTermSaleTests : IDisposable
         => new(_context, new StubMonobankClientFactory(_monobank.Object), new StubMonobankMerchantResolver(), _monobankOptions, _settings,
                new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
                NotificationDispatcher.Disabled,
-               Stock());
+               Stock(),
+               new FuelFlowMetrics());
 
     /// <summary>
     /// Checkout refuses a package with no sellable stock behind it, so every test that expects a sale

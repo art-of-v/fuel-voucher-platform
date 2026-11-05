@@ -123,8 +123,7 @@ public sealed class MonobankClient : IMonobankClient
                     response.StatusCode,
                     errorContent);
 
-                throw new HttpRequestException(
-                    $"Monobank API returned {response.StatusCode}: {errorContent}");
+                throw new MonobankInvoiceRejectedException(response.StatusCode, errorContent);
             }
 
             var result = await response.Content.ReadFromJsonAsync<MonobankInvoiceResponse>(cancellationToken);

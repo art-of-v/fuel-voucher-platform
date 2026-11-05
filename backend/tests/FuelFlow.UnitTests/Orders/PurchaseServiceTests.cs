@@ -77,7 +77,7 @@ public OrderCommandHandlersTests()
             .Returns("qr-code-data");
 
         _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled, Stock());
-        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled, Stock());
+        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled, Stock(), new FuelFlow.SharedKernel.Observability.FuelFlowMetrics());
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
