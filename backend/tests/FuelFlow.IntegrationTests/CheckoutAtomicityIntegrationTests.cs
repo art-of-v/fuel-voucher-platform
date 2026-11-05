@@ -144,6 +144,58 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
     }
 
     // ---------------------------------------------------------------------------------------------
+    // The acquirer's refusal
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// What the customer is told when the acquirer will not open a payment at all.
+    /// <para>
+    /// Production answered this with a 500 and the app showed its own crash sentence, so a merchant
+    /// whose internet-acquiring terminal the bank had switched off looked like a broken platform
+    /// (planning #873). The refusal is a 503 with a code, and the bank's words stay in the log.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task An_acquirer_that_refuses_to_open_a_payment_speaks_instead_of_crashing()
+    {
+        await AuthenticateAsync("+380991234814");
+        SeedSellableStock("okko", "okko-95", 50m);
+
+        _acquirer.RefuseWith = new MonobankInvoiceRejectedException(
+            HttpStatusCode.Forbidden,
+            """{"errCode":"FORBIDDEN","errText":"you don't have active terminal for internet acquiring"}""");
+
+        var response = await _client.PostAsJsonAsync("/api/purchases/bulk", new BulkCheckoutCommand
+        {
+            Items =
+            [
+                new CheckoutItem
+                {
+                    FuelTypeId = ToUuid("okko-95"),
+                    Liters = 50,
+                    Quantity = 1,
+                    Price = 2500,
+                    BrandId = BrandIds.Okko,
+                    BrandName = "OKKO"
+                }
+            ]
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable,
+            "nothing was charged and the next tap can work, which is exactly what a 500 does not say");
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be(MonobankInvoiceRejectedException.Code);
+        body.GetProperty("detail").GetString().Should().NotContain("terminal",
+            "the bank's sentence is for the operator; the customer gets one they can act on");
+
+        // The attempt is still a record: an order exists, and it has no invoice because none was ever
+        // minted. The basket is given back, so the customer's next tap is a fresh attempt.
+        (await PendingPaymentOrdersAsync()).Should().ContainSingle()
+            .Which.MonobankInvoiceId.Should().BeNull();
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Fixtures
     // ---------------------------------------------------------------------------------------------
 
@@ -275,6 +327,13 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
         /// </summary>
         public bool FailAfterAcceptingTheInvoice { get; set; }
 
+        /// <summary>
+        /// When set, the acquirer refuses the invoice outright: nothing is minted on its side, which
+        /// is what a merchant with no active internet-acquiring terminal answers. Distinct from
+        /// <see cref="FailAfterAcceptingTheInvoice"/>, where the invoice exists and only our call fails.
+        /// </summary>
+        public MonobankInvoiceRejectedException? RefuseWith { get; set; }
+
         /// <summary>The probe the test installs to look into the database mid-call.</summary>
         public Func<Task<int>>? OrderCountProbe { get; set; }
 
@@ -287,6 +346,11 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
             if (OrderCountProbe is not null)
             {
                 OrdersCommittedWhenAskedForMoney.Add(await OrderCountProbe());
+            }
+
+            if (RefuseWith is not null)
+            {
+                throw RefuseWith;
             }
 
             var invoiceId = $"INV-ATOMIC-{Interlocked.Increment(ref _invoiceCounter):D3}";

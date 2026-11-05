@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.GetUserPurchases;
@@ -144,6 +145,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (AccountInactiveException ex)
         {
             return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
+        }
+        catch (MonobankInvoiceRejectedException)
+        {
+            return AcquirerRefusedToOpenAPayment();
         }
         catch (Exception ex)
         {
@@ -290,6 +295,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         {
             return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
         }
+        catch (MonobankInvoiceRejectedException)
+        {
+            return AcquirerRefusedToOpenAPayment();
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating renewal checkout for user {UserId}", userId);
@@ -352,6 +361,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (AccountInactiveException ex)
         {
             return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
+        }
+        catch (MonobankInvoiceRejectedException)
+        {
+            return AcquirerRefusedToOpenAPayment();
         }
         catch (Exception ex)
         {
@@ -501,4 +514,18 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
+
+    /// <summary>
+    /// What every checkout path answers when the acquirer refuses to open a payment at all.
+    /// <para>
+    /// A 503 with its own code, not a 500: nothing was charged and the customer's next tap can
+    /// work, which is exactly what a 500 does not tell them - and the app reads the code and
+    /// answers in the customer's language. The bank's own sentence stays in the log, where the
+    /// operator needs it, and never reaches the phone.
+    /// </para>
+    /// </summary>
+    private static ObjectResult AcquirerRefusedToOpenAPayment() =>
+        ApiError.ServiceUnavailable(
+            "The payment service is not accepting payments right now. Nothing has been charged; please try again in a few minutes.",
+            MonobankInvoiceRejectedException.Code);
 }
