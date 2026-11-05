@@ -32,6 +32,9 @@ export const uk: Record<string, string> = {
   // back, and the package reappears on its own once stock is activated.
   'purchase.error.outOfStock':
     'Цього пального зараз немає на складі. Приберіть його з кошика або зачекайте, поки зʼявиться.',
+  // Банк відмовив відкривати платіж. Каже це прямо і заспокоює: гроші залишилися на рахунку.
+  'purchase.error.providerUnavailable':
+    'Платіжний сервіс тимчасово не приймає платежів. Кошти не списані — спробуйте за кілька хвилин.',
   'renew.error.providerTermExhausted':
     'Цей талон не може стільки протримати — оберіть коротший термін.',
   'renew.error.unknownTerm': 'Невідомий термін.',

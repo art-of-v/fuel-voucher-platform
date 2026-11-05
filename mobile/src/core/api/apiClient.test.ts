@@ -152,6 +152,85 @@ describe('apiClient', () => {
     expect(retryPayload).not.toBe(firstPayload);
   });
 
+  /**
+   * The retry inside `fetchWithRetry` is a second request, not a replay of the first one.
+   *
+   * The signature middleware stores its replay nonce BEFORE it runs the endpoint, so an attempt
+   * that came back 500 has already burned the timestamp it carried. Retrying with the same headers
+   * - which is what this client used to do - was refused as a replay of itself, and on 2026-11-05
+   * that turned the bank's refusal into "Request already processed" on 14 customers' screens,
+   * blaming them for a request the acquirer never accepted (planning #873).
+   */
+  it('signs the retry of a 500 from scratch, because the failed attempt already burned its nonce', async () => {
+    // Reset, so this test owns both signing calls no matter what an earlier one queued.
+    (SecurityService.hasKeys as jest.Mock)
+      .mockReset()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true);
+    (SecurityService.signPayload as jest.Mock)
+      .mockReset()
+      .mockResolvedValueOnce('signature-1')
+      .mockResolvedValueOnce('signature-2');
+
+    // One header object is filled in again per attempt, so the recorded call read afterwards shows
+    // the LAST signature twice. This copies them as they stood when the attempt went out.
+    const sent: Record<string, string>[] = [];
+    fetchMock.mockImplementation(
+      async (_url: string, init: { headers: Record<string, string> }) => {
+        sent.push({ ...init.headers });
+        return sent.length === 1
+          ? { ok: false, status: 500, headers: { get: () => null }, json: async () => ({}) }
+          : {
+              ok: true,
+              status: 200,
+              headers: { get: () => null },
+              json: async () => ({ orderIds: [] }),
+            };
+      },
+    );
+
+    const response = await apiRequest('POST', '/api/purchases', { amount: 1 });
+
+    expect(response.status).toBe(200);
+    expect(sent).toHaveLength(2);
+    expect(sent[0]['x-signature']).toBe('signature-1');
+    expect(sent[1]['x-signature']).toBe('signature-2');
+    // The nonce is keyed by (device id, timestamp), so an identical timestamp is a replay no
+    // matter what signature rides next to it.
+    expect(Number(sent[1]['x-timestamp'])).toBeGreaterThan(Number(sent[0]['x-timestamp']));
+  });
+
+  it('signs the retry of a request that never arrived, too', async () => {
+    // A dropped connection may still have reached the server, so the same rule applies: the next
+    // attempt arrives with proof of its own rather than the first attempt's.
+    (SecurityService.hasKeys as jest.Mock)
+      .mockReset()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true);
+    (SecurityService.signPayload as jest.Mock)
+      .mockReset()
+      .mockResolvedValueOnce('signature-1')
+      .mockResolvedValueOnce('signature-2');
+
+    const sent: Record<string, string>[] = [];
+    fetchMock
+      .mockImplementationOnce(async (_url: string, init: { headers: Record<string, string> }) => {
+        sent.push({ ...init.headers });
+        throw new Error('network down');
+      })
+      .mockImplementationOnce(async (_url: string, init: { headers: Record<string, string> }) => {
+        sent.push({ ...init.headers });
+        return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({}) };
+      });
+
+    const response = await apiRequest('POST', '/api/purchases', { amount: 1 });
+
+    expect(response.status).toBe(200);
+    expect(sent).toHaveLength(2);
+    expect(sent[0]['x-signature']).toBe('signature-1');
+    expect(sent[1]['x-signature']).toBe('signature-2');
+  });
+
   it('does not refresh or clear the session when the server rejects attestation', async () => {
     (isAttestationProtected as jest.Mock).mockReturnValueOnce(true);
     (getAttestationHeaders as jest.Mock).mockResolvedValueOnce({
