@@ -42,14 +42,23 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Sends a request, retrying a transient failure.
+ *
+ * `prepare` builds the request afresh for every attempt, and that is the whole point of the
+ * callback. The signature middleware writes its replay nonce before it calls the next handler, so
+ * an attempt that came back 500 has already burned the timestamp it carried - and a retry that
+ * reuses those headers is refused as a replay of itself. That is how a refused payment turned into
+ * "Request already processed" on the customer's screen (planning #873).
+ */
 async function fetchWithRetry(
   url: string,
-  options: RequestInit,
+  prepare: () => Promise<RequestInit>,
   retries = MAX_RETRIES,
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, options);
+      const response = await fetchWithTimeout(url, await prepare());
       if (attempt < retries && response.status >= 500) {
         await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
         continue;
@@ -205,14 +214,16 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
   const needsAttestation = isAttestationProtected(path);
 
   await ensureSslPinningInitialized(BASE_URL);
-  await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
-  await applyAttestation(path, method, bodyString, headers, needsAttestation);
 
-  const response = await fetchWithRetry(url, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
+  // One send, prepared as many times as it is attempted: the proof is per attempt, not per call.
+  const send = (): Promise<Response> =>
+    fetchWithRetry(url, async (): Promise<RequestInit> => {
+      await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
+      await applyAttestation(path, method, bodyString, headers, needsAttestation);
+      return { ...options, headers, credentials: 'include' };
+    });
+
+  const response = await send();
 
   if (
     response.status === 401 &&
@@ -221,18 +232,11 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
     isRetiredAppleKey(response)
   ) {
     // The server no longer knows this key (database restore, revocation, an old reinstall).
-    // Mint a fresh one and retry once; the challenge and counter are new with it. The first
-    // attempt already consumed its device-signature nonce (the middleware runs before
-    // attestation), so the retry must carry a fresh timestamp and signature as well.
+    // Mint a fresh one and retry once; the challenge, the counter and the consumed nonce all
+    // belong to the attempt that failed, so `send` builds them again.
     await clearAppleAttestationKey();
-    await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
-    await applyAttestation(path, method, bodyString, headers, needsAttestation);
 
-    return fetchWithRetry(url, {
-      ...options,
-      headers,
-      credentials: 'include',
-    });
+    return send();
   }
 
   if (
@@ -247,15 +251,7 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}): Pro
       if (storedToken) {
         headers['Authorization'] = `Bearer ${storedToken}`;
       }
-      // Re-sign and re-attest with fresh material: the first attempt may have
-      // consumed its nonce/challenge server-side, and replaying either is rejected.
-      await applySignature(deviceId, endpoint, method, bodyString, headers, needsSignature);
-      await applyAttestation(path, method, bodyString, headers, needsAttestation);
-      const retryResponse = await fetchWithRetry(url, {
-        ...options,
-        headers,
-        credentials: 'include',
-      });
+      const retryResponse = await send();
       // Only a request that carried the app's own session may end that session. A 401 on a
       // public endpoint says nothing about the session - a wrong verification code is one,
       // and so is an endpoint this caller may not use - and clearing the tokens there threw
