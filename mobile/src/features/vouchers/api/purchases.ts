@@ -104,6 +104,12 @@ export function purchaseErrorKey(code?: string): string | null {
     // different things to the operator, and one of them ("wait for stock") is actionable now.
     case 'package_out_of_stock':
       return 'purchase.error.outOfStock';
+    // The acquirer would not open a payment at all - a terminal the bank switched off, a merchant
+    // account out of order. Nothing was charged, the customer did nothing wrong, and the next tap
+    // may work, which is the whole sentence they need. The bank's own words stay server-side: they
+    // name our contract, not anything a customer can act on (planning #873).
+    case 'payment_provider_unavailable':
+      return 'purchase.error.providerUnavailable';
     default:
       return null;
   }

@@ -30,6 +30,9 @@ export const es: Record<string, string> = {
   // cuanto se activa existencias.
   'purchase.error.outOfStock':
     'Este combustible no está en el almacén. Quítelo del carrito o inténtelo más tarde.',
+  // El banco no quiso abrir el pago: se dice claro y tranquiliza, no se ha cobrado nada.
+  'purchase.error.providerUnavailable':
+    'El servicio de pagos no acepta pagos en este momento. No se ha cobrado nada - inténtelo de nuevo en unos minutos.',
   'renew.error.providerTermExhausted': 'Este vale no puede durar tanto - elige un plazo más corto.',
 
   'renew.error.unknownTerm': 'Plazo desconocido.',
