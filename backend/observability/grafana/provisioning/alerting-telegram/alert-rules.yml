@@ -566,6 +566,55 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0] }
 
+      # planning #873. On 2026-11-05 the bank switched off internet acquiring on the merchant's
+      # terminal and checkout died for three hours: 14 refusals, no invoice minted, no page. The
+      # counter already existed and the single-item path recorded it, but the bulk path - the one the
+      # app actually uses - recorded nothing, and the net that should have caught it anyway
+      # (PaymentsStuck) only looks at orders that HAVE an invoice. Both halves are fixed; this is the
+      # notice that was missing.
+      #
+      # Three in ten minutes, not one: an acquirer call fails occasionally on a bad second, and the
+      # customer's own retry lands in the same window. A merchant whose terminal is off produces a
+      # refusal per attempt, so this crosses on the second or third tap.
+      #
+      # The honest zero applies here more than anywhere (see the header): a counter with nothing
+      # recorded has no series at all, so without `or vector(0)` the healthy state and the
+      # never-deployed state are the same NoData. What this rule cannot see is a path that stops
+      # counting - that is MetricNameContractTests' job, and it reads this file.
+      - uid: fuelflow-acquirer-refuses-payments
+        title: AcquirerRefusesPayments
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: OK
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $values.B }} invoice request(s) refused by the acquirer in the last 10 minutes"
+          description: "Monobank is refusing to OPEN a payment, so nobody can check out. Read the errCode and errText in the API log: 'you don't have active terminal for internet acquiring' is the merchant account, and only the merchant cabinet or the bank switches it back on - no deploy of ours fixes it. Customers get a 503 and nothing is charged; their orders hold stock until the purge. Runbook: docs/RUNBOOK.md, planning #873."
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              # sum(), not per-reason: the page is "checkout cannot open a payment", and a message per
+              # exception type would be noise during an incident. The reason is in the log, typed.
+              expr: sum(increase(fuelflow_monobank_invoice_failed_invoices_total[10m])) or vector(0)
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+
       # #824. Money the acquirer took that no payment row of ours holds. Nothing books it
       # automatically - an unexplained receipt becomes a liability under a named operator - so the
       # only other notice was the statement pass's warning line, found at the close.
