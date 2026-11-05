@@ -79,6 +79,8 @@ public class AlertRuleNoDataContractTests
     [InlineData("fuelflow-refresh-reuse-spike")]
     [InlineData("fuelflow-ota-manifest-rollback")]
     [InlineData("fuelflow-acquirer-refuses-payments")]
+    [InlineData("fuelflow-webhook-delivery-failed")]
+    [InlineData("fuelflow-webhook-duplicate-burst")]
     public void ZeroIsHealthyRule_ReportsZeroInsteadOfGoingNoData(string uid)
     {
         RuleBlocks().Should().ContainKey(uid);
