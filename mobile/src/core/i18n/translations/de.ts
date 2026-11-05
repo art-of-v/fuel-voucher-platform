@@ -31,6 +31,9 @@ export const de: Record<string, string> = {
   // sich das von selbst, sobald Bestand aktiviert wird.
   'purchase.error.outOfStock':
     'Dieser Kraftstoff ist nicht auf Lager. Entfernen Sie ihn aus dem Warenkorb oder versuchen Sie es später.',
+  // Die Bank wollte die Zahlung nicht öffnen. Sagt es klar und beruhigt: nichts wurde belastet.
+  'purchase.error.providerUnavailable':
+    'Der Zahlungsdienst nimmt derzeit keine Zahlungen an. Es wurde nichts belastet - versuchen Sie es in wenigen Minuten erneut.',
   'renew.error.providerTermExhausted':
     'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
 

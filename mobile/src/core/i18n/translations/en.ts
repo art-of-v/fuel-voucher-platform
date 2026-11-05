@@ -30,6 +30,9 @@ export const en: Record<string, string> = {
   // it is stated as a stock fact rather than as "this fuel cannot be bought".
   'purchase.error.outOfStock':
     'This fuel is out of stock. Remove it from your basket or check back later.',
+  // The bank would not open a payment. Says so plainly, and says the money is still theirs.
+  'purchase.error.providerUnavailable':
+    'The payment service is not accepting payments right now. Nothing was charged - please try again in a few minutes.',
   'renew.error.providerTermExhausted':
     'This voucher cannot last that long - choose a shorter term.',
 
