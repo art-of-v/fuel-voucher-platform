@@ -193,6 +193,18 @@
         { "expr": "kestrel_queued_connections{job=~\"$job\"}", "legendFormat": "{{job}} queued", "refId": "B" }
       ],
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "App attestation verdicts - what Enforce would deny",
+      "description": "Every verdict the attestation middleware reaches on a protected endpoint. enforce_eligible=true means the rollout gate (a mobile client, an OS in EnforcePlatforms, a build at or above MinimumEnforcedAppVersion) would hold this request to the proof - so 'refused if enforcing' is the population that switching Mode=Enforce starts denying today, which is the number the switch is decided on. eligible=false is the older fleet, which the same gate exempts: do not read a high missing count there as lock-out risk. No data means no protected request was served, not that attestation is off.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "fuelflow-prometheus" },
+      "targets": [
+        { "expr": "sum by (verdict, enforce_eligible) (rate(fuelflow_attestation_verdict_requests_total{job=~\"$job\"}[5m]))", "legendFormat": "{{verdict}} / eligible={{enforce_eligible}}", "refId": "A" },
+        { "expr": "sum(rate(fuelflow_attestation_verdict_requests_total{job=~\"$job\",verdict!=\"valid\",enforce_eligible=\"true\"}[5m]))", "legendFormat": "refused if enforcing", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 0, "showPoints": "never" } }, "overrides": [] }
     }
   ]
 }
