@@ -19,6 +19,9 @@ import type { CartItem } from '../src/features/cart/types';
  *   context cannot buy at all
  * - the basket is emptied only after the payment page opens
  * - a failed or URL-less invoice leaves the basket intact and says why
+ * - the promotional button appears only for an account a Manager enrolled, and the order it places —
+ *   one the bank was never asked about — is told as a waiting order, not as a failed payment
+ *   (planning #889)
  *
  * `formatMoney` is mocked to a fixed suffix so assertions read as plain numbers, and
  * `GridPageLayout` is a pass-through that still renders `fixedFooter` — the pay button
@@ -41,6 +44,11 @@ let mockContext: { kind: 'personal' | 'owner' | 'worker'; company?: { id: string
   {
     kind: 'personal',
   };
+/**
+ * The account behind `useAuth`, narrowed to the one field this screen reads. `null` is the signed-out
+ * shape; `{}` is a server older than the promotional offer, which must read as "not on it".
+ */
+let mockUser: { promoAccessAvailable?: boolean } | null = { promoAccessAvailable: false };
 
 jest.mock('expo-router', () => {
   // `jest.mock` factories are hoisted above the imports, so JSX here cannot close
@@ -74,7 +82,11 @@ jest.mock('../src/features/cart/store/cartStore', () => ({
 }));
 
 jest.mock('../src/features/auth/hooks/useAuth', () => ({
-  useAuth: () => ({ isAuthenticated: mockHookAuth, isLoading: mockAuthLoading }),
+  useAuth: () => ({
+    isAuthenticated: mockHookAuth,
+    isLoading: mockAuthLoading,
+    user: mockUser,
+  }),
 }));
 
 jest.mock('../src/features/vouchers/api/purchases', () => ({
@@ -139,7 +151,7 @@ jest.mock('expo-linking', () => ({ openURL: (...a: unknown[]) => mockOpenURL(...
 
 jest.mock('lucide-react-native', () => {
   const Icon = () => null;
-  return { __esModule: true, User: Icon, Building2: Icon, Zap: Icon };
+  return { __esModule: true, User: Icon, Building2: Icon, Zap: Icon, Tag: Icon };
 });
 
 /** A basket line. Only the fields the screen actually reads are filled in. */
@@ -184,6 +196,7 @@ describe('Checkout — what gets sent to the payment brand', () => {
     mockHookAuth = true;
     mockAuthLoading = false;
     mockContext = { kind: 'personal' };
+    mockUser = { promoAccessAvailable: false };
     mockClearCart.mockClear();
     mockCreateInvoice.mockReset();
     mockOpenURL.mockReset();
@@ -346,6 +359,7 @@ describe('Checkout — the basket and the payment page', () => {
     mockHookAuth = true;
     mockAuthLoading = false;
     mockContext = { kind: 'personal' };
+    mockUser = { promoAccessAvailable: false };
     mockClearCart.mockClear();
     mockCreateInvoice.mockReset();
     mockOpenURL.mockReset();
@@ -506,6 +520,118 @@ describe('Checkout — the basket and the payment page', () => {
   });
 });
 
+describe('Checkout — the promotional button (planning #889)', () => {
+  beforeEach(() => {
+    mockCart = [];
+    mockDiscountedTotal = 0;
+    mockStoreAuth = true;
+    mockHookAuth = true;
+    mockAuthLoading = false;
+    mockContext = { kind: 'personal' };
+    mockUser = { promoAccessAvailable: false };
+    mockClearCart.mockClear();
+    mockCreateInvoice.mockReset();
+    mockOpenURL.mockReset();
+    mockPush.mockReset();
+    mockReplace.mockReset();
+    mockLogin.mockClear();
+    global.alert = jest.fn();
+    mockCreateInvoice.mockResolvedValue({
+      orderIds: ['o-1'],
+      invoiceId: 'inv-1',
+      pageUrl: 'https://monobank.com.ua/pay/inv-1',
+    });
+  });
+
+  it('offers the second button to an account a Manager enrolled, and to nobody else', () => {
+    basket();
+    const view = render(<CheckoutScreen />);
+    expect(screen.queryByText('packages.promoTitle')).toBeNull();
+
+    // A server older than the offer sends no field at all, and a revoked grant sends `false`. Both
+    // read as "not on the offer": the app never offers a route it would refuse, and never infers the
+    // entitlement from the customer simply being signed in.
+    mockUser = {};
+    view.rerender(<CheckoutScreen />);
+    expect(screen.queryByText('packages.promoTitle')).toBeNull();
+
+    mockUser = { promoAccessAvailable: true };
+    view.rerender(<CheckoutScreen />);
+    expect(screen.getByText('packages.promoTitle')).toBeTruthy();
+    // Two buttons now, and the money one is untouched by the second.
+    expect(screen.getByText('packages.payTitle 4000 UAH')).toBeTruthy();
+  });
+
+  it('sends the declared route for that button and no route for the pay button', async () => {
+    basket();
+    mockUser = { promoAccessAvailable: true };
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText('packages.promoTitle'));
+    await waitFor(() => expect(mockCreateInvoice).toHaveBeenCalled());
+
+    // One field, one button: the promotional tap is the only thing that may put the order on the
+    // settlement channel, and the pay tap must keep going to the bank exactly as it did before.
+    expect(mockCreateInvoice.mock.calls[0][2]).toBe('Declared');
+  });
+
+  it('keeps the pay button on the bank route when both are offered', async () => {
+    basket();
+    mockUser = { promoAccessAvailable: true };
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+    await waitFor(() => expect(mockCreateInvoice).toHaveBeenCalled());
+
+    expect(mockCreateInvoice.mock.calls[0][2]).toBeUndefined();
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+  });
+
+  it('tells a waiting promotional order as one, and takes the basket with it', async () => {
+    // The answer this button exists for: the order is written, the acquirer was never asked, so the
+    // body carries no `paymentUrl`. Without the route that shape is the failed-payment shape two
+    // tests above, and the customer would be told their order did not happen.
+    basket();
+    mockUser = { promoAccessAvailable: true };
+    mockCreateInvoice.mockResolvedValue({
+      orderIds: ['o-7'],
+      invoiceId: '',
+      pageUrl: '',
+      alreadyPaid: false,
+      settlementRoute: 'Declared',
+    });
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText('packages.promoTitle'));
+
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.promoOrdered'));
+    expect(mockClearCart).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/my-codes');
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('still calls held money paying for the cart a paid order, not a waiting one', async () => {
+    // Both promotional answers have no payment URL, and `alreadyPaid` is what separates them. Read in
+    // the wrong order, a cart the platform has already settled gets the sentence that tells the
+    // customer to wait for money we are holding.
+    basket();
+    mockUser = { promoAccessAvailable: true };
+    mockCreateInvoice.mockResolvedValue({
+      orderIds: ['o-8'],
+      invoiceId: '',
+      pageUrl: '',
+      alreadyPaid: true,
+      settlementRoute: 'Declared',
+    });
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText('packages.promoTitle'));
+
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.alreadyPaid'));
+    expect(global.alert).not.toHaveBeenCalledWith('purchase.promoOrdered');
+  });
+});
+
 describe('Checkout — getting to the screen at all', () => {
   beforeEach(() => {
     mockCart = [];
@@ -513,6 +639,7 @@ describe('Checkout — getting to the screen at all', () => {
     mockHookAuth = false;
     mockAuthLoading = false;
     mockContext = { kind: 'personal' };
+    mockUser = { promoAccessAvailable: false };
     mockClearCart.mockClear();
     mockCreateInvoice.mockReset();
     mockOpenURL.mockReset();

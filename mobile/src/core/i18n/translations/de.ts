@@ -37,6 +37,19 @@ export const de: Record<string, string> = {
   // Die Bank wollte die Zahlung nicht öffnen. Sagt es klar und beruhigt: nichts wurde belastet.
   'purchase.error.providerUnavailable':
     'Der Zahlungsdienst nimmt derzeit keine Zahlungen an. Es wurde nichts belastet - versuchen Sie es in wenigen Minuten erneut.',
+  // Der Warenkorb gehört zu einer Bestellung, für die schon Geld unterwegs sein kann: der zweite
+  // Knopf lehnt ab, statt den Warenkorb zu übernehmen. Er nennt die eine Sache, die es auflöst.
+  'purchase.error.checkoutInPayment':
+    'Dieser Warenkorb gehört bereits zu einer Bestellung, die gerade bezahlt wird. Bezahlen Sie diese Bestellung, oder löschen Sie sie in der Verarbeitungsliste und versuchen Sie es erneut.',
+  // Die Aktion wurde zwischen dem Erscheinen des Knopfes und dem Tipp geschlossen. Entscheidet ein
+  // Manager, also bleibt bezahlen mit Karte oder fragen - beides steht hier.
+  'purchase.error.promoAccess':
+    'Die Aktion ist für dieses Konto nicht freigeschaltet. Sie können weiterhin mit Karte bezahlen oder uns bitten, die Aktion freizuschalten.',
+  // Die Antwort des Aktions-Knopfes: die Bestellung existiert, die Bank wurde nicht gefragt, und das
+  // Geld kommt von unserer Seite. Alles drei, denn eine Bestellung ohne Zahlungsseite klingt sonst
+  // nach einer fehlgeschlagenen Zahlung (planning #889).
+  'purchase.promoOrdered':
+    'Ihre Bestellung ist im Rahmen der Aktion angelegt und wartet auf die Bestätigung der Zahlung. Über die Karte wurde nichts belastet. Sie können sie in der Verarbeitungsliste auf dem Bildschirm „Meine Codes“ verfolgen.',
   // Die Kasse fand Geld, das für diese Bestellung schon gehalten wurde: sie ist beglichen, bezahlen
   // muss nichts mehr. Sagt beides und wo die Gutscheine stehen.
   'purchase.alreadyPaid':
@@ -144,6 +157,9 @@ export const de: Record<string, string> = {
   'packages.addedToCart': 'ZUM WARENKORB HINZUGEFÜGT',
   'packages.selectCards': 'KARTEN WÄHLEN',
   'packages.payTitle': 'BEZAHLEN',
+  // Der zweite Kassen-Knopf, für ein Konto, das ein Manager für die Aktion freigeschaltet hat.
+  // Absichtlich kein Betrags-Label: dieser Tipp zahlt nicht, er bestellt.
+  'packages.promoTitle': 'MIT AKTION ERHALTEN',
   'packages.quantity': 'Menge',
   'packages.total': 'SUMME',
   'packages.added': 'HINZUGEFÜGT',

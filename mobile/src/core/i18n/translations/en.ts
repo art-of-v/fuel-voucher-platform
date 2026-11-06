@@ -37,6 +37,19 @@ export const en: Record<string, string> = {
   // The bank would not open a payment. Says so plainly, and says the money is still theirs.
   'purchase.error.providerUnavailable':
     'The payment service is not accepting payments right now. Nothing was charged - please try again in a few minutes.',
+  // The basket is already in an order that is being paid, so the promotional button refuses rather
+  // than taking the basket over. Names the one thing that resolves it: the earlier order.
+  'purchase.error.checkoutInPayment':
+    'This basket is already in an order that is being paid. Pay that order, or delete it from the processing list and try again.',
+  // The offer was closed on this account between the button appearing and the tap - a Manager decides
+  // who is on it, and the only way forward is to ask. Says the card route is still open, because it is.
+  'purchase.error.promoAccess':
+    'The promotional offer is not open on this account. You can still pay by card, or ask us to open the offer for you.',
+  // The promotional button's answer: the order is written, no bank was asked, and what it waits for is
+  // the payment on our side. Says all three, because an order with no payment page otherwise reads as
+  // a failed payment - which is exactly the confusion this sentence exists to prevent (planning #889).
+  'purchase.promoOrdered':
+    'Your order is placed under the promotional offer and waits for the payment to be confirmed. Nothing was charged to a card. You can follow it in the processing list on the My codes screen.',
   // The checkout found money it was already holding for this customer, so the order is settled and
   // there is nothing left to pay. Says both, and where to look, because the customer was mid-payment.
   'purchase.alreadyPaid':
@@ -142,6 +155,9 @@ export const en: Record<string, string> = {
   'packages.total': 'TOTAL',
   'packages.selectCards': 'SELECT CODES',
   'packages.payTitle': 'PAY',
+  // The second checkout button, for an account a Manager put on the offer. Deliberately not a money
+  // label: this tap does not pay, it orders - so it must not read as a price the customer is charged.
+  'packages.promoTitle': 'GET WITH PROMO',
   'packages.added': 'ADDED',
 
   'basket.title': 'YOUR BASKET',
