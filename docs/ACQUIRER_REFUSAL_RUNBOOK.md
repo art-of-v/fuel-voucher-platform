@@ -36,16 +36,22 @@ would only learn our contract details.
 Before #873 this path answered `500`, and an app bundle that is already on a phone retries a `>= 500`
 with the **same** device-signature headers. The first attempt burns the replay nonce, so the retry was
 refused as a replay of itself and the customer read "Request already processed" — for a request the
-bank never accepted — and ended up signed out. A bundle carrying the fix (#1699) re-signs every
-attempt; until a phone has it, expect those 401s in the log as noise next to the real refusal.
+bank never accepted — and ended up signed out. A bundle carrying the fix re-signs every attempt
+(app `bbda4bad`, PR #1699); until a phone has it, expect those 401s in the log as noise next to the
+real refusal. **As of 2026-11-06 no OTA bundle carrying it has been published, so no phone in the fleet
+has it** — the fix is on `main`, not on a device, and a 503 from us is still `>= 500` to an old bundle.
+Read those 401s as the signature of an outage, not as an attack: a refusal wave and a replay wave arrive
+together.
 
 ## What the orders do
 
-Each refused attempt leaves one `PendingPayment` order with `monobank_invoice_id IS NULL`. That is by
-design — the attempt is the record of what was tried — and the basket reservation is released
+Each refused attempt leaves one `PendingPayment` order with `monobank_invoice_id IS NULL`. The attempt
+is the record of what was tried, and the basket reservation is released deliberately
 (`CheckoutGuard.Release`), so the customer's next tap works and no stock is held hostage.
 
-Nothing ages those rows out, which is worth knowing before reading the admin purchases view:
+What is NOT a decision is the row itself: nothing ages those rows out, and that is a gap rather than a
+policy — planning #875 owns the ruling, and this is worth knowing before reading the admin purchases
+view:
 `MonobankReconciliationService` polls only orders that HAVE an invoice
 (`BackgroundJobs/MonobankReconciliationService.cs:75`), so an attempt that never got one is never
 driven to a terminal state, and `DeletedUnpaidOrderCleanupService` hard-deletes rows that are already
@@ -81,10 +87,14 @@ curl -s -u "admin:$P" http://127.0.0.1:3000/api/v1/provisioning/alert-rules | \
   node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).map(r=>r.uid).sort().join('\n')))"
 ```
 
-On 2026-11-05 this is not academic: the repo carries 21 rules and production served 16, with
+This is not academic, and it is not stale: re-measured on 2026-11-06 at 08:00Z, after every fix below
+had merged and deployed, the repo carried 21 rules and production served **16**. Absent were
 `fuelflow-webhook-delivery-failed`, `fuelflow-webhook-duplicate-burst`,
-`fuelflow-unbooked-captures` and `fuelflow-ota-manifest-rollback` absent — four payment and OTA alerts
-that were written, merged and never loaded.
+`fuelflow-unbooked-captures`, `fuelflow-ota-manifest-rollback` — and **`fuelflow-acquirer-refuses-payments`**,
+the rule written for exactly this failure. So if you are reading this because checkout is refusing,
+**expect no page**: the alert that describes tonight's incident has not run yet, because Grafana reads
+its alerting provisioning only at startup and nobody has recreated it. The four others are payment and
+OTA alerts that were written, merged and never loaded for the same reason.
 
 ## Read, do not write
 
