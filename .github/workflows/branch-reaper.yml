@@ -19,6 +19,16 @@ name: Branch reaper
 # nothing is lost. A branch with an open pull request, and a branch with no pull request at all,
 # are left alone - this workflow does not get to decide that a branch nobody offered is dead.
 #
+# THAT PROMISE DID NOT HOLD, for weeks, and the job was green every day it was broken. The rule
+# was right; the parser that read it was not. The no-pull-request case printed a three-token
+# sentinel, "0 no-pr -", and `merged_at="${pr#* }"` strips up to the FIRST space, so what got
+# compared against "-" was "no-pr -" - not equal, so reaped. Measured 2026-11-06 12:13:09 UTC:
+# `deleted: ota/236-the-spent-vouchers-have-a-way-in (PR #0, merged no-pr -` - the branch that
+# every further OTA to build 236 is cut from (`docs/MOBILE_RELEASE.md` item 6), deleted by the
+# sweep whose header says a branch nobody offered is left alone, and re-deleted each time it was
+# pushed back. A log line was the only witness, which is why the decision is now a function with
+# three assertions run before it touches a ref.
+#
 # WHY A SCHEDULE AND NOT A PUSH TRIGGER. A `push` trigger would catch the resurrection within
 # seconds, but on a private repo every job-minute is billed and rounded UP, and each push would
 # cost one. The daily sweep costs one. The window in which an orphan branch exists is a day
@@ -58,6 +68,22 @@ jobs:
           deleted=0
           kept=0
 
+          # The decision, in one place: a branch with no pull request (#0), or whose newest one was
+          # never merged, is kept. Only a merged pull request means the work is already on main.
+          classify() {
+            if [ "$1" = "0" ] || [ "$2" = "-" ]; then echo keep; else echo reap; fi
+          }
+
+          # The three cases are run before a single ref is touched, because the bug this replaces
+          # never showed up as a failure - the sweep reported success every day while deleting the
+          # one branch its header promises to leave alone.
+          if [ "$(classify 0 -)" != keep ] ||
+             [ "$(classify 1234 -)" != keep ] ||
+             [ "$(classify 1234 2026-11-06T12:11:58Z)" != reap ]; then
+            echo "SELF-CHECK FAILED: the classifier does not decide the three cases it exists to decide" >&2
+            exit 1
+          fi
+
           while read -r branch; do
             [ -z "$branch" ] && continue
 
@@ -70,23 +96,30 @@ jobs:
             # The newest pull request that used this branch as its head, and whether it is
             # merged. `sort_by(.number) | last` because the API's own order is not the one that
             # matters here: a branch can carry an old closed pull request AND a newer open one,
-            # and the newer one is the truth.
+            # and the newer one is the truth. Two tokens, always - the no-pull-request case used to
+            # print "0 no-pr -", and `${pr#* }` strips to the FIRST space, so the value compared
+            # against "-" was "no-pr -" and the branch nobody offered was reaped.
             pr="$(gh api -X GET "repos/$GH_REPO/pulls" \
               -f state=all \
               -f "head=$owner:$branch" \
-              --jq 'sort_by(.number) | last | if . == null then "0 no-pr -" else "\(.number) \(.merged_at // "-")" end')"
+              --jq 'sort_by(.number) | last | if . == null then "0 -" else "\(.number) \(.merged_at // "-")" end')"
 
             number="${pr%% *}"
             merged_at="${pr#* }"
 
-            if [ "$merged_at" != "-" ]; then
-              gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"
-              echo "deleted: $branch (PR #$number, merged $merged_at - the pull request keeps the commits)"
-              deleted=$((deleted + 1))
-            else
-              echo "kept:    $branch (PR #$number)"
+            if [ "$(classify "$number" "$merged_at")" = keep ]; then
+              if [ "$number" = "0" ]; then
+                echo "kept:    $branch (no pull request - this workflow does not get to call it dead)"
+              else
+                echo "kept:    $branch (PR #$number is open, or was closed without merging)"
+              fi
               kept=$((kept + 1))
+              continue
             fi
+
+            gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+            echo "deleted: $branch (PR #$number, merged $merged_at - the pull request keeps the commits)"
+            deleted=$((deleted + 1))
           done < <(gh api --paginate "repos/$GH_REPO/branches?per_page=100" --jq '.[].name')
 
           echo "deleted $deleted branch(es), kept $kept"
