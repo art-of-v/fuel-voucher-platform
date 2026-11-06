@@ -38,6 +38,16 @@ public static class TestJournal
             NullLogger<FuelFlow.Features.Orders.SettlePaidOrder.TrySettlePaidOrderCommandHandler>.Instance);
 
     /// <summary>
+    /// The held-money finder on top of the try-settle: a checkout asks it whether money declared
+    /// before the order existed pays for that order, so a test that drives a checkout needs it in the
+    /// handler's constructor rather than a stub that says no.
+    /// </summary>
+    public static FuelFlow.Features.Orders.SettlePaidOrder.SettleFromHeldMoneyCommandHandler HeldMoneyFor(
+        ApplicationDbContext context)
+        => new(context, TrySettleFor(context),
+            NullLogger<FuelFlow.Features.Orders.SettlePaidOrder.SettleFromHeldMoneyCommandHandler>.Instance);
+
+    /// <summary>
     /// Seeds the minimum the seeded mapping needs: both sides of <c>payment.received</c> and of
     /// <c>payment.received.vat</c>. Synchronous on purpose - the test fixtures build the handler in
     /// their constructors, which cannot await.

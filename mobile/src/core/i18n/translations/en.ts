@@ -33,6 +33,10 @@ export const en: Record<string, string> = {
   // The bank would not open a payment. Says so plainly, and says the money is still theirs.
   'purchase.error.providerUnavailable':
     'The payment service is not accepting payments right now. Nothing was charged - please try again in a few minutes.',
+  // The checkout found money it was already holding for this customer, so the order is settled and
+  // there is nothing left to pay. Says both, and where to look, because the customer was mid-payment.
+  'purchase.alreadyPaid':
+    'This basket is already paid for - we were already holding the money for it. Nothing more will be charged; your codes are on the My codes screen.',
   'renew.error.providerTermExhausted':
     'This voucher cannot last that long - choose a shorter term.',
 

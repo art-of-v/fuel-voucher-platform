@@ -33,6 +33,10 @@ export const es: Record<string, string> = {
   // El banco no quiso abrir el pago: se dice claro y tranquiliza, no se ha cobrado nada.
   'purchase.error.providerUnavailable':
     'El servicio de pagos no acepta pagos en este momento. No se ha cobrado nada - inténtelo de nuevo en unos minutos.',
+  // El pago encontró dinero que ya teníamos guardado para este pedido: está pagado y no queda nada
+  // por cobrar. Lo dice, y también dónde están los códigos.
+  'purchase.alreadyPaid':
+    'Este carrito ya está pagado - ya teníamos su dinero guardado. No se cobrará nada más; sus códigos están en la pantalla «Mis códigos».',
   'renew.error.providerTermExhausted': 'Este vale no puede durar tanto - elige un plazo más corto.',
 
   'renew.error.unknownTerm': 'Plazo desconocido.',

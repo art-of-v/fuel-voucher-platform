@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
@@ -32,6 +33,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
     private readonly NotificationDispatcher _notifications;
     private readonly PackageStockAvailability _stock;
     private readonly FuelFlowMetrics _metrics;
+    private readonly SettleFromHeldMoneyCommandHandler _heldMoney;
 
     public BulkCheckoutCommandHandler(
         ApplicationDbContext context,
@@ -42,7 +44,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
         ILogger<BulkCheckoutCommandHandler> logger,
         NotificationDispatcher notifications,
         PackageStockAvailability stock,
-        FuelFlowMetrics metrics)
+        FuelFlowMetrics metrics,
+        SettleFromHeldMoneyCommandHandler heldMoney)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
@@ -54,6 +57,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         _logger = logger;
         _stock = stock;
         _metrics = metrics;
+        _heldMoney = heldMoney;
     }
 
     public async Task<BulkCheckoutResponse> HandleAsync(
@@ -307,6 +311,22 @@ private readonly RuntimeSettingsService _runtimeSettings;
             }
         }
 
+        // An order for this cart that held money already paid is the same purchase, not a new one. It
+        // left the basket's index the moment it settled, so this read is all that stands between a
+        // second tap and a second invoice for fuel whose vouchers are already on their way.
+        var paidAlready = await CheckoutGuard.FindPaidFromHeldMoneyAsync(
+            _context, checkoutKey, now, cancellationToken);
+
+        if (paidAlready != null)
+        {
+            _logger.LogWarning(
+                "Duplicate bulk checkout for cart {CheckoutKey}; reusing the order held money paid ({OrderId}), "
+                 + "which has no invoice to pay again",
+                checkoutKey, paidAlready.Id);
+
+            return new BulkCheckoutResponse { OrderIds = [paidAlready.Id], AlreadyPaid = true };
+        }
+
         // Resolve merchant for this account. Outside the try below on purpose: a QA account routed
         // to an unconfigured sandbox is refused outright rather than degraded into an order with
         // no invoice, and never quietly pointed at the live merchant.
@@ -387,6 +407,24 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 MonobankInvoiceId = withInvoice.MonobankInvoiceId,
                 PaymentUrl = withInvoice.MonobankPaymentUrl
             };
+        }
+
+        // Planning #867 trigger 2: the money can arrive before the order does. When one payment of
+        // exactly this price is already held for this customer, it pays for the order now, and the
+        // acquirer is not asked for an invoice the customer would then pay a second time for the same
+        // fuel. Nothing is settled here that the settle core's own rules would not settle for an
+        // operator's click; what changes is that nobody has to be watching a tab for it.
+        var held = await _heldMoney.HandleAsync(
+            new SettleFromHeldMoneyCommand { OrderId = order.Id, Because = "the bulk checkout" },
+            cancellationToken);
+
+        if (held.Settled)
+        {
+            _logger.LogInformation(
+                "Bulk checkout for cart {CheckoutKey} settled on {PaymentId} held money; no invoice requested",
+                checkoutKey, held.PaymentId);
+
+            return new BulkCheckoutResponse { OrderIds = [order.Id], AlreadyPaid = true };
         }
 
         MonobankInvoiceResponse invoiceResponse;

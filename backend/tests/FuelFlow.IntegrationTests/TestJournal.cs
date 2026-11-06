@@ -47,6 +47,19 @@ public static class TestJournal
             Microsoft.Extensions.Logging.Abstractions.NullLogger<
                 FuelFlow.Features.Orders.SettlePaidOrder.TrySettlePaidOrderCommandHandler>.Instance);
 
+    /// <summary>
+    /// The held-money finder on top of the try-settle: the checkout asks it whether money declared
+    /// before the order existed pays for it, so a test that drives a checkout needs it in the
+    /// handler's constructor rather than a stub that says no.
+    /// </summary>
+    public static FuelFlow.Features.Orders.SettlePaidOrder.SettleFromHeldMoneyCommandHandler HeldMoneyFor(
+        ApplicationDbContext context)
+        => new(
+            context,
+            TrySettleFor(context),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<
+                FuelFlow.Features.Orders.SettlePaidOrder.SettleFromHeldMoneyCommandHandler>.Instance);
+
     /// <summary>Seeds what the seeded mapping needs: both sides of the payment events.</summary>
     public static void SeedChart(ApplicationDbContext context)
     {
