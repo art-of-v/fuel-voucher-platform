@@ -67,6 +67,12 @@ public sealed class Payment
     /// the business has not earned and would put VAT on the wrong side.
     /// </para>
     /// <para>
+    /// A NULL does not mean the whole amount is free. A declared transfer spends across several sales
+    /// through <see cref="Allocations"/>, which leaves it named to no order while part of it is already
+    /// committed; what an order was paid <em>by</em> is those rows, and this column is only the whole-
+    /// charge case the acquirer writes.
+    /// </para>
+    /// <para>
     /// Every acquirer-driven capture still carries one. These are payments declared outside the
     /// acquirer, where the invoice and the order are not the same thing.
     /// </para>
@@ -189,6 +195,16 @@ public sealed class Payment
     /// message makes one payment, but a payment from an acquirer has none at all.
     /// </summary>
     public ICollection<SettlementMessage> SettlementMessages { get; set; } = new List<SettlementMessage>();
+
+    /// <summary>
+    /// The orders this money has been drawn on, and how much of it each took.
+    /// </summary>
+    /// <remarks>
+    /// Empty for every capture that names an order: this is the other way money gets spent, and it
+    /// applies only while <see cref="OrderId"/> is null. The two sets are disjoint on purpose, and the
+    /// database keeps them so — see <see cref="PaymentAllocation"/>.
+    /// </remarks>
+    public ICollection<PaymentAllocation> Allocations { get; set; } = new List<PaymentAllocation>();
 }
 
 public enum PaymentKind

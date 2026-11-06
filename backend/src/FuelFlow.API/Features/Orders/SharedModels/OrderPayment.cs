@@ -24,11 +24,19 @@ namespace FuelFlow.Features.Orders.SharedModels;
 /// order and the sweep retries it — the failure mode is "no vouchers yet", never "vouchers for
 /// nothing".
 /// </para>
+/// <para>
+/// <b>Two sources, because money reaches an order two ways.</b> A whole capture naming the order —
+/// which is what an acquirer's invoice does — and a draw made on held money, which names no order
+/// and is what one declared transfer covering two sales leaves behind. The two sets are disjoint by
+/// construction, and the database keeps them disjoint: a payment either carries an order or is drawn
+/// on, never both. Every question in this file is therefore a sum over both, and a caller that reads
+/// one of them alone is reading half the money.
+/// </para>
 /// </remarks>
 public static class OrderPayment
 {
     /// <summary>
-    /// Whether a capture payment for the order has been received.
+    /// Whether any money has been received for the order, at all.
     /// </summary>
     /// <remarks>
     /// This is the weaker of the two questions in this file and it is not the settle's: it asks whether
@@ -37,28 +45,82 @@ public static class OrderPayment
     /// asks, and it stays the weaker read on purpose: production's delivered orders include two with no
     /// capture row at all — the zero-price ones a company received as vouchers — and a money-total gate
     /// there would hold back fuel for a delivery that was never a sale.
+    /// <para>
+    /// An order paid from the balance has no capture naming it, so the draws are asked as well. Without
+    /// this the fulfilment job would refuse, and then retry forever, an order the settle had already
+    /// paid for and booked.
+    /// </para>
     /// </remarks>
-    public static Task<bool> HasCapturedPaymentAsync(
+    public static async Task<bool> HasCapturedPaymentAsync(
         ApplicationDbContext context,
         Guid orderId,
         CancellationToken cancellationToken = default)
-        => context.Payments
+        => await context.Payments
             .AsNoTracking()
             .AnyAsync(
                 p => p.OrderId == orderId
                      && p.Kind == PaymentKind.Capture
                      && p.Status == PaymentStatus.Succeeded,
+                cancellationToken)
+           || await context.PaymentAllocations
+            .AsNoTracking()
+            .AnyAsync(
+                a => a.OrderId == orderId
+                     && a.Payment.Kind == PaymentKind.Capture
+                     && a.Payment.Status == PaymentStatus.Succeeded,
                 cancellationToken);
 
     /// <summary>
-    /// Whether the money already attached to the order pays for it.
+    /// How much of the order's price has been answered for, in UAH.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Both sources, and one number: the whole captures naming the order plus the draws made on held
+    /// money for it. Split out of <see cref="MoneyOnItPaysForItAsync"/> because the checkout that pays
+    /// from the balance has to know not merely whether the money is enough but by how much it is not —
+    /// and the only figure an operator or a customer can act on is the shortfall.
+    /// </para>
+    /// <para>
+    /// A draw is counted only while the payment behind it is still a succeeded capture, exactly like an
+    /// attached one. Money the acquirer reversed has been given back, and an allocation pointing at it
+    /// would be a claim on a banknote the customer already has.
+    /// </para>
+    /// </remarks>
+    public static async Task<decimal> MoneyOnItAsync(
+        ApplicationDbContext context,
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        // Nullable projections: SumAsync over an empty sequence answers NULL, and the cast that would
+        // turn that into a number is the one this file has always had to write by hand.
+        var attached = await context.Payments
+            .AsNoTracking()
+            .Where(p => p.OrderId == orderId
+                     && p.Kind == PaymentKind.Capture
+                     && p.Status == PaymentStatus.Succeeded)
+            .Select(p => (decimal?)p.AmountUah)
+            .SumAsync(cancellationToken);
+
+        var drawn = await context.PaymentAllocations
+            .AsNoTracking()
+            .Where(a => a.OrderId == orderId
+                     && a.Payment.Kind == PaymentKind.Capture
+                     && a.Payment.Status == PaymentStatus.Succeeded)
+            .Select(a => (decimal?)a.AmountUah)
+            .SumAsync(cancellationToken);
+
+        return (attached ?? 0m) + (drawn ?? 0m);
+    }
+
+    /// <summary>
+    /// Whether the money already on the order pays for it.
     /// </summary>
     /// <remarks>
     /// <para>
     /// The question every settle has to answer before it moves an order, whoever is asking. It is
     /// deliberately provider-agnostic: an acquirer's <c>success</c> and a declared settlement are two
     /// different accounts of HOW the money came to be known, and this reads the one fact they both
-    /// end in — a succeeded capture naming the order.
+    /// end in — a succeeded capture naming the order, or a draw naming it from a capture that does not.
     /// </para>
     /// <para>
     /// A sum rather than an equality, because a customer can pay one order in two real transfers;
@@ -77,14 +139,6 @@ public static class OrderPayment
         Guid orderId,
         CancellationToken cancellationToken = default)
     {
-        var paid = await context.Payments
-            .AsNoTracking()
-            .Where(p => p.OrderId == orderId
-                     && p.Kind == PaymentKind.Capture
-                     && p.Status == PaymentStatus.Succeeded)
-            .Select(p => (decimal?)p.AmountUah)
-            .SumAsync(cancellationToken);
-
         // Nullable on purpose: a non-nullable projection answers 0 for an order that does not exist,
         // and 0 >= 0 would settle a phantom.
         var price = await context.Orders
@@ -94,6 +148,7 @@ public static class OrderPayment
             .Select(o => (decimal?)o.Price)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return price is { } owed && (paid ?? 0m) >= owed;
+        return price is { } owed
+            && await MoneyOnItAsync(context, orderId, cancellationToken) >= owed;
     }
 }

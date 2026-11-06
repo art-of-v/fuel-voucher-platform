@@ -104,6 +104,10 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
 
+    // How much of a held payment pays for which order. The table that turns one declared transfer into a
+    // balance a customer can spend on more than one sale. See Features/Payments/SharedModels.
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+
     // Every message the settlement channel receives, including the ones that produced no payment.
     // Its unique (chat_id, message_id) is what stops a Telegram redelivery becoming a second payment.
     public DbSet<SettlementMessage> SettlementMessages => Set<SettlementMessage>();

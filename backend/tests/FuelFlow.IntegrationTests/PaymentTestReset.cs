@@ -30,6 +30,7 @@ public static class PaymentTestReset
         "accounting_periods",
         "outbox_events",
         "webhook_events",
+        "payment_allocations",
         "payments",
         "orders",
         "users",

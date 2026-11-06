@@ -357,10 +357,10 @@ public sealed class CreateCheckoutCommandHandler
             };
         }
 
-        // Planning #867 trigger 2: the money can arrive before the order does. When one payment of
-        // exactly this price is already held for this customer, it pays for the order now, and the
-        // acquirer is not asked for an invoice the customer would then pay a second time for the same
-        // fuel.
+        // Planning #867 trigger 2: the money can arrive before the order does. When what this order
+        // still owes is sitting in this customer's balance, the balance pays for it now — out of one
+        // transfer or across several — and the acquirer is not asked for an invoice the customer would
+        // then pay a second time for the same fuel.
         var held = await _heldMoney.HandleAsync(
             new SettleFromHeldMoneyCommand { OrderId = order.Id, Because = "the checkout" },
             cancellationToken);
@@ -368,8 +368,8 @@ public sealed class CreateCheckoutCommandHandler
         if (held.Settled)
         {
             _logger.LogInformation(
-                "Checkout for basket {CheckoutKey} settled on {PaymentId} held money; no invoice requested",
-                checkoutKey, held.PaymentId);
+                "Checkout for basket {CheckoutKey} settled on held money ({PaymentIds}); no invoice requested",
+                checkoutKey, string.Join(", ", held.PaymentIds));
 
             _metrics.OrderCreated(order.LegalEntityId.HasValue);
 
