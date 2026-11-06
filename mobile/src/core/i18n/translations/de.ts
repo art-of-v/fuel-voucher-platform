@@ -23,6 +23,9 @@ export const de: Record<string, string> = {
   'renew.error.notYours': 'Das ist nicht Ihr Gutschein.',
   'renew.error.notRenewable': 'Dieser Gutschein kann nicht verlängert werden.',
   'renew.error.unavailable': 'Die gewählte Laufzeit ist vorübergehend nicht verfügbar.',
+  // Die Verlängerung bekam keine Zahlungsseite. Das ist keine fehlgeschlagene Zahlung — sie begann nie.
+  'renew.error.linkUnavailable':
+    'Die Zahlungsseite wurde nicht erstellt. Es wurde nichts abgebucht — bitte versuchen Sie es in wenigen Minuten erneut.',
   // Kaufseitige Ablehnung: Der Grund auf unserer Seite ist eine Margenentscheidung, auf die der Kunde
   // keinen Einfluss hat. Er erfährt nur, was ihn betrifft — dieser Kraftstoff ist gerade nicht kaufbar.
   'purchase.error.belowCost':
@@ -198,6 +201,10 @@ export const de: Record<string, string> = {
   // Backend nicht auskehren würde. Diese Erklärung ist der Unterschied zwischen "Ich habe
   // bezahlt und nichts bekommen" und einer nachvollziehbaren Sackgasse.
   'codes.orderNotPayable': 'Diese Bestellung kann nicht mehr bezahlt werden.',
+  // Die Bank hat nie eine Zahlungsseite ausgestellt, die Karte bietet also eine Zahlung an, die nicht
+  // stattfinden kann. Sagt das, sagt, dass nichts abgebucht wurde, und sagt, was zu tun ist.
+  'codes.orderHasNoPaymentLink':
+    'Für diese Bestellung wurde nie eine Zahlungsseite erstellt, es wurde also nichts abgebucht. Kaufen Sie erneut im Shop – es wird eine neue Bestellung angelegt.',
   'payment.title': 'Zahlung',
   'payment.subtitle': 'Bestätigen Sie Ihre Zahlung',
   'payment.loading': 'Zahlungsseite wird geladen…',
