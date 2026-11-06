@@ -19,8 +19,8 @@ namespace FuelFlow.UnitTests.Payments;
 /// money on it (also 0) already covers it, and the rule "covered means settle" would hand it to the
 /// core - which books the receipt as the order's price and is refused by the journal, because a
 /// double-entry leg of 0 ₴ is not an entry ("Amount for 'payment.received' must be greater than
-/// zero"). Before that gate the checkout whose discount clamps the price at zero (planning #787's
-/// generous term tier) threw a 500 instead of writing the order, which is what
+/// zero"). Before that gate the checkout whose term tier clamps the price at zero (app PR #815)
+/// threw a 500 instead of writing the order, which is what
 /// <see cref="Orders.VoucherTermSaleTests.DiscountLargerThanThePrice_ClampsAtZeroRatherThanPayingTheCustomer"/>
 /// caught on CI.
 /// </remarks>
