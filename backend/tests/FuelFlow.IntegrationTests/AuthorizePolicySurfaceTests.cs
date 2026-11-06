@@ -207,6 +207,12 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
 
         // ---- the QA test access ------------------------------------------------------
         ["PUT /api/admin/qa-test-access"] = AuthPolicies.QaTestAccess,
+
+        // ---- the promotion -----------------------------------------------------------
+        // Granting a customer the promotion is not staff work and not account administration: it
+        // opens a route where an order is settled by a declaration in the finance channel instead of
+        // by the acquirer, so it is the money tier's decision (the owner's ruling of 2026-11-06).
+        ["POST /api/admin/users/{id}/promo-access"] = AuthPolicies.PromoAccess,
     };
 
     /// <summary>
@@ -237,6 +243,11 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         // not a thing the read surface hands out: the Admin tier holds it, and opening an image
         // writes an audit row (planning #622, S-13).
         (AuthPolicies.SignaturePayload, [SeedRoles.ProductOwnerName, SeedRoles.AdminName]),
+        // Who may be served outside the acquirer is a decision about money, so a Manager makes it —
+        // the same tier that may place a payment for a customer. It is NOT the tier that may mint a
+        // role: a Manager granting promotion access is one step from a sale with no invoice behind
+        // it, and the invariant that stops the sale lives with the order, not with this list.
+        (AuthPolicies.PromoAccess, [SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName]),
     ];
 
     /// <summary>

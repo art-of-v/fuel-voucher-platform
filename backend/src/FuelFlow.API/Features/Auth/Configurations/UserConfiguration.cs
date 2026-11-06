@@ -169,6 +169,13 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("pending_email_expires_at_utc").HasComment("When the pending address stops being claimable. The token is short-lived on purpose - a" +
                     "confirmation link that works for a year is a key.");
 
+        builder.Property(e => e.PromoAccessGrantedAtUtc)
+            .HasColumnName("promo_access_granted_at_utc")
+            .HasComment("When this customer was given access to the promotion, or NULL for none. The instant IS the flag: " +
+                    "a boolean beside a granted-at would be two columns claiming to know one fact, and they can disagree. " +
+                    "Only staff of Manager rank or above may write it, because it opens a way to be served without the " +
+                    "acquirer ever seeing the sale.");
+
         builder.HasOne(e => e.Role)
             .WithMany()
             .HasForeignKey(e => e.RoleId)

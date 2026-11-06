@@ -89,5 +89,28 @@ public sealed class User
     /// </summary>
     public bool IsQaAccount { get; set; }
 
+    /// <summary>
+    /// When this customer was given access to the promotion, or NULL when they have none.
+    /// <para>
+    /// <b>Why a timestamp and not a boolean.</b> The two states the product has to answer are "may they
+    /// buy under the promotion" and "since when, and who said so" — and a boolean carries only the
+    /// first, so the second one lives in a log line nobody can query a month later. The instant is the
+    /// answer and it is also the flag: NULL is "no access", anything else is "access, from this
+    /// moment". A pair of columns could disagree about the same fact; this one cannot.
+    /// </para>
+    /// <para>
+    /// Revoking sets it back to NULL, and the audit row keeps the whole sequence — an account switched
+    /// on and off twice reads as two decisions by two people, which is what it was.
+    /// </para>
+    /// <para>
+    /// Granting it is not a role change and not an account administration: it opens a way to be served
+    /// without the acquirer ever seeing the sale, so the capability that writes it is its own
+    /// (<c>AuthPolicies.PromoAccess</c>) and every write is audited. What this column does NOT carry
+    /// is the customer's settlement code — the code is what the finance channel resolves money by, and
+    /// it stays staff-only whatever this says.
+    /// </para>
+    /// </summary>
+    public DateTime? PromoAccessGrantedAtUtc { get; set; }
+
     public Role? Role { get; set; }
 }

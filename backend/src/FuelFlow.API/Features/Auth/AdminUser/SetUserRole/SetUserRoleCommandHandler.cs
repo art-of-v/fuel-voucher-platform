@@ -86,6 +86,17 @@ public sealed class SetUserRoleCommandHandler
 
         target.RoleId = targetRole.Id;
         target.Role = targetRole;
+
+        // Promotion access belongs to a customer account, so leaving the customer surface takes it
+        // away. Clearing it here is what makes that true in the database rather than a rule every
+        // reader has to remember: an account promoted to staff with the grant still set would be a
+        // person able to have themselves served outside the acquirer, and the checkout that only
+        // looks at the column would let it through. The demotion row below carries the fact, so
+        // "who took it away" has one answer — the same person who changed the role.
+        var promoAccessTaken = command.RoleName != SeedRoles.UserName && target.PromoAccessGrantedAtUtc is not null;
+        if (promoAccessTaken)
+            target.PromoAccessGrantedAtUtc = null;
+
         target.UpdatedAtUtc = SystemClock.UtcNow;
 
         // A demotion (new role ranks lower than the old one) strips privileges the user's live
@@ -115,7 +126,7 @@ public sealed class SetUserRoleCommandHandler
                 target.Id.ToString(),
                 "RoleChanged",
                 JsonSerializer.Serialize(new { role = oldRoleName }),
-                JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion }),
+                JsonSerializer.Serialize(new { role = command.RoleName, sessionsRevoked = isDemotion, promoAccessTaken }),
                 command.ActingUserId,
                 command.ActingUserName,
                 "Role of " + target.PhoneNumber + " changed to " + command.RoleName,

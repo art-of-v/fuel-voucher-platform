@@ -79,6 +79,11 @@ public sealed class GetAdminUsersQueryHandler
                 // deliberately no setter: the flag is granted by the seeding migration and by the
                 // QA-gated registration path, never from the admin UI.
                 IsQaAccount = u.IsQaAccount,
+                // The promotion access, as the instant it was given. The grid needs more than a tick:
+                // "since when" is the first question an operator asks when a customer says the button
+                // is missing, and it is the question the audit row answers if the switch has been
+                // flipped since.
+                PromoAccessGrantedAt = u.PromoAccessGrantedAtUtc,
                 // Whether the staff account has a second factor enrolled. The operator needs it to
                 // know that the "revoke the second factor" button has anything to revoke - and
                 // that a staff account without one is the one to look at.
@@ -128,6 +133,12 @@ public sealed class AdminUserDto
     public bool IsBanned { get; set; }
     public bool IsDeleted { get; set; }
     public bool IsQaAccount { get; set; }
+
+    /// <summary>
+    /// When this customer was given access to the promotion, or NULL when they have none. The instant
+    /// is the flag — see <c>User.PromoAccessGrantedAtUtc</c> for why it is not a boolean.
+    /// </summary>
+    public DateTime? PromoAccessGrantedAt { get; set; }
 
     /// <summary>
     /// Whether the account has a second factor enrolled. Only a staff account can have one, and

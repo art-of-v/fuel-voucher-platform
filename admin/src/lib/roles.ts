@@ -18,6 +18,25 @@ export const STAFF_ROLES: string[] = [
 ];
 
 /**
+ * Whether the actor may give or take the promotion access of a customer, mirroring the backend's
+ * `SeedRoles.PromoAccessRoleNames` — the list behind the `PromoAccess` policy, which is the real
+ * enforcement point. This only decides whether the control is drawn.
+ *
+ * <p>
+ * It is NOT `assignableRoles`: a Manager may not mint roles, but the owner's ruling of 2026-11-06
+ * put the promotion access in the Manager's hands on purpose, because the person who signs a
+ * customer up to the promotional channel is the person who talks to them.
+ * </p>
+ */
+export function canSetPromoAccess(actorRole: string): boolean {
+  return (
+    actorRole === ROLE_PRODUCT_OWNER ||
+    actorRole === ROLE_ADMIN ||
+    actorRole === ROLE_MANAGER
+  );
+}
+
+/**
  * Roles the actor may assign to a target, mirroring the backend RoleHierarchy.CanAssignRole
  * (which is the real enforcement point — this only shapes the dropdown). Returns [] when the
  * actor cannot change this target's role, so the caller renders plain text instead of a control.

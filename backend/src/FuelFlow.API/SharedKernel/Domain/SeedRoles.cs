@@ -160,6 +160,24 @@ internal static class SeedRoles
     /// </summary>
     public static readonly string[] SettlementCodeRoleNames = { ProductOwnerName, AdminName, ManagerName };
 
+    /// <summary>
+    /// The roles that may grant a customer access to the promotion.
+    /// <para>
+    /// <b>Why a capability of its own rather than <see cref="StaffOperationsRoleNames"/>.</b> The grant
+    /// opens a route on which a customer is served without the acquirer ever seeing the sale: the money
+    /// is a person's word in a closed channel, not a captured card payment. So writing it is a decision
+    /// about money, and the owner ruled on 2026-11-06 that a Manager makes it — which is the same
+    /// membership as the money tier, but listed separately for the reason every list here is listed
+    /// separately: narrowing one capability must not silently narrow another.
+    /// </para>
+    /// <para>
+    /// It is deliberately NOT <see cref="AdminAndOwnerRoleNames">, which is what role assignment and the
+    /// QA switch use. A Manager who may place a payment for a customer is a Manager who may say who is
+    /// allowed to be paid that way; a Manager who may not mint a role still may not.
+    /// </para>
+    /// </summary>
+    public static readonly string[] PromoAccessRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
     // Fixed, deterministic GUIDs matching the seeded database rows.
     // Admin and User IDs must match existing seeded data (migrations 20260619000001, 20260915121550).
     // ProductOwner, Manager and QA are new roles; use stable random UUIDs.

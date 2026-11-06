@@ -210,7 +210,13 @@ internal static class AuthSetup
             // capability - and opening one writes an audit row naming the operator
             // (planning #622, S-13).
             .AddPolicy(AuthPolicies.SignaturePayload, policy =>
-                policy.RequireRole(SeedRoles.SignaturePayloadRoleNames));
+                policy.RequireRole(SeedRoles.SignaturePayloadRoleNames))
+            // Granting a customer access to the promotion opens a route where an order is settled by a
+            // declaration in the finance channel instead of by the acquirer, so it is a decision about
+            // money and it is the money tier: Manager has it, the way Manager has the placement of a
+            // payment for a customer (planning #521, §7.1). It is not the role-assignment tier.
+            .AddPolicy(AuthPolicies.PromoAccess, policy =>
+                policy.RequireRole(SeedRoles.PromoAccessRoleNames));
 
         // A 401 and a 403 answer with an empty body by default, which would be a second error
         // shape. They leave as the one envelope instead - the headers are untouched.

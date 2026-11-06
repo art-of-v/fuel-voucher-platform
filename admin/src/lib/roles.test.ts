@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   assignableRoles,
+  canSetPromoAccess,
   ROLE_ADMIN,
   ROLE_MANAGER,
   ROLE_PRODUCT_OWNER,
@@ -71,5 +72,31 @@ describe("assignableRoles", () => {
     expect(assignableRoles(ROLE_MANAGER, ROLE_USER)).toEqual([]);
     expect(assignableRoles(ROLE_QA, ROLE_USER)).toEqual([]);
     expect(assignableRoles(ROLE_USER, ROLE_USER)).toEqual([]);
+  });
+});
+
+/**
+ * Who may move the promotion switch of a customer — deliberately WIDER than the role dropdown.
+ * The ruling of 2026-11-06 put the decision in the Manager's hands (the person who signs a
+ * customer up to the promotion is the person who talks to them), and a Manager mints no roles.
+ * `SeedRoles.PromoAccessRoleNames` behind the `PromoAccess` policy is the enforcement point; this
+ * only decides whether the control is drawn, so the two lists must agree.
+ */
+describe("canSetPromoAccess", () => {
+  it("admits the employee tier, which may not assign a single role", () => {
+    expect(canSetPromoAccess(ROLE_MANAGER)).toBe(true);
+    expect(assignableRoles(ROLE_MANAGER, ROLE_USER)).toEqual([]);
+  });
+
+  it("admits the staff above it", () => {
+    expect(canSetPromoAccess(ROLE_ADMIN)).toBe(true);
+    expect(canSetPromoAccess(ROLE_PRODUCT_OWNER)).toBe(true);
+  });
+
+  it("refuses the customer, the retired QA role and an actor with no role", () => {
+    // A customer deciding which customers are promo customers is exactly what the switch closes.
+    expect(canSetPromoAccess(ROLE_USER)).toBe(false);
+    expect(canSetPromoAccess(ROLE_QA)).toBe(false);
+    expect(canSetPromoAccess("")).toBe(false);
   });
 });
