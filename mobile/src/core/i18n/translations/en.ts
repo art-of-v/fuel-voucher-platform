@@ -22,6 +22,10 @@ export const en: Record<string, string> = {
   'renew.error.notYours': 'This is not your voucher.',
   'renew.error.notRenewable': 'This voucher cannot be renewed.',
   'renew.error.unavailable': 'The selected term is temporarily unavailable.',
+  // The renewal came back without a payment link. It is not a failed payment - it never started, and
+  // the difference is that the customer kept their money.
+  'renew.error.linkUnavailable':
+    'The payment link was not created. Nothing was charged - please try again in a few minutes.',
   // Purchase-side rejection. Our reason is a margin decision the customer cannot act on, so they are
   // told only what they can: this fuel cannot be bought right now.
   'purchase.error.belowCost':
@@ -192,6 +196,10 @@ export const en: Record<string, string> = {
   // cancelled order keeps accepting money the backend will refuse to fulfil. Surfacing that
   // here is the difference between "I paid and got nothing" and an explained dead end.
   'codes.orderNotPayable': 'This order can no longer be paid.',
+  // The order is waiting for payment but the bank never issued a link for it, so the card offers a
+  // payment that cannot happen. Says that, says nothing was taken, and says what to do instead.
+  'codes.orderHasNoPaymentLink':
+    'This order never got a payment link, so nothing was charged. Buy again from the shop - it will open a fresh order.',
   'payment.title': 'Payment',
   'payment.subtitle': 'Confirm your payment',
   'payment.loading': 'Loading the payment page…',
