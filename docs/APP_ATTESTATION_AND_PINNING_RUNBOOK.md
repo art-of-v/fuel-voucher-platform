@@ -167,6 +167,26 @@ traffic - `/api/brands`, `/api/app-version`, `/api/updates/manifest`, `/api/auth
 protected, so a fleet that never signs in or buys produces no lines at all. The count this rollout
 needs is a count of **sign-ins and purchases**, and the installed fleet sends no proof on any of them.
 
+**The count is a metric now (in progress as this is written: app PR #1706).** The grep above is still
+how you confirm the middleware is awake, but it cannot answer the question the switch turns on,
+because a log line carries no rollout dimension. Every verdict the middleware reaches on a protected
+endpoint is also recorded as `fuelflow_attestation_verdict_requests_total`, labelled `verdict`, `code`
+and `enforce_eligible`, and Service health has the panel "App attestation verdicts - what Enforce
+would deny". The number to read before setting `ATTESTATION_MODE=Enforce` is:
+
+```promql
+sum(rate(fuelflow_attestation_verdict_requests_total{verdict!="valid",enforce_eligible="true"}[5m]))
+```
+
+`enforce_eligible="true"` is decided by the same predicate that refuses the request, so this series is
+the population that flipping the mode starts denying - not an approximation of it. Note what it does
+*not* include: the installed 1.1.0 fleet sends no rollout headers, so its missing proofs are counted
+as **not** eligible, and a `Missing` rate read straight off the logs overstates the lock-out risk.
+Two limits on the number. It has data only for the protected routes and only from the deploy that
+carries this code, so a flat zero means nothing was counted rather than that enforcing is safe. And
+`enforce_eligible` is computed from headers anyone can forge; the verdict beside it is the
+cryptographic control, this label is only a rollout measure.
+
 ## Android Play and Google Cloud setup
 
 This is the one-time bootstrap that must exist before an Android proof can be `Valid`.
