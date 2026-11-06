@@ -270,6 +270,11 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // is one tap (planning #889).
         var route = CheckoutRoutes.Resolve(command.SettlementRoute);
 
+        // Asked before anything is written, including before the basket is settled: the customer who is
+        // not on the offer must not have their pending order dissolved by a tap that was never going to
+        // be allowed.
+        CheckoutRoutes.RequirePromoAccess(route, user);
+
         // The order that already holds this cart, if there is one. A retry or a double tap finds it
         // here and is given the same invoice. The read is an equality on an indexed column; it used
         // to be a prefix match on a key that carried a random suffix, which no b-tree can serve and
@@ -293,7 +298,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 return new BulkCheckoutResponse
                 {
                     OrderIds = [onBasket.Id],
-                    SettlementRoute = CheckoutRoutes.Of(onBasket),
+                    SettlementRoute = CheckoutRoutes.Of(onBasket).ToString(),
                     MonobankInvoiceId = onBasket.MonobankInvoiceId,
                     PaymentUrl = onBasket.MonobankPaymentUrl
                 };
@@ -329,7 +334,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             return new BulkCheckoutResponse
             {
                 OrderIds = [paidAlready.Id],
-                SettlementRoute = CheckoutRoutes.Of(paidAlready),
+                SettlementRoute = CheckoutRoutes.Of(paidAlready).ToString(),
                 AlreadyPaid = true
             };
         }
@@ -422,7 +427,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             return new BulkCheckoutResponse
             {
                 OrderIds = [withInvoice.Id],
-                SettlementRoute = CheckoutRoutes.Of(withInvoice),
+                SettlementRoute = CheckoutRoutes.Of(withInvoice).ToString(),
                 MonobankInvoiceId = withInvoice.MonobankInvoiceId,
                 PaymentUrl = withInvoice.MonobankPaymentUrl
             };
@@ -446,7 +451,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             return new BulkCheckoutResponse
             {
                 OrderIds = [order.Id],
-                SettlementRoute = route,
+                SettlementRoute = route.ToString(),
                 AlreadyPaid = true
             };
         }
@@ -465,7 +470,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             return new BulkCheckoutResponse
             {
                 OrderIds = [order.Id],
-                SettlementRoute = route
+                SettlementRoute = route.ToString()
             };
         }
 
@@ -533,7 +538,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         return new BulkCheckoutResponse
         {
             OrderIds = [order.Id],
-            SettlementRoute = route,
+            SettlementRoute = route.ToString(),
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             PaymentUrl = invoiceResponse.PageUrl,
             // Not persisted on the order - AppUrl is an opaque mbnk.app redirector that cannot be

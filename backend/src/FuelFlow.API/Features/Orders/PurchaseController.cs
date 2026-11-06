@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.Features.Orders;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.GetUserPurchases;
@@ -123,42 +124,11 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             var response = await _bulkCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
         }
-        catch (UnknownCostSaleBlockedException ex)
-        {
-            // The fuel is in stock and nobody has recorded what we paid for it, so the price cannot
-            // be checked against a cost. A distinct code, because "we do not know" is not "below
-            // cost" - the first needs a cost recorded, the second a price raised.
-            return ApiError.Conflict(ex.Message, UnknownCostSaleBlockedException.Code);
-        }
-        catch (BelowCostSaleBlockedException ex)
-        {
-            return ApiError.Conflict(ex.Message, BelowCostSaleBlockedException.Code);
-        }
-        catch (TermStockUnavailableException ex)
-        {
-            return ApiError.Conflict(ex.Message, TermStockUnavailableException.Code);
-        }
-        catch (PackageOutOfStockException ex)
-        {
-            return ApiError.Conflict(ex.Message, PackageOutOfStockException.Code);
-        }
-        catch (CheckoutAlreadyInPaymentException ex)
-        {
-            // The other button was pressed while this cart's order still had money in motion. A
-            // distinct code, because the customer's way out is not a retry: that order has to be paid
-            // or deleted first.
-            return ApiError.Conflict(ex.Message, CheckoutAlreadyInPaymentException.Code);
-        }
-        catch (AccountInactiveException ex)
-        {
-            return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
-        }
-        catch (MonobankInvoiceRejectedException)
-        {
-            return AcquirerRefusedToOpenAPayment();
-        }
         catch (Exception ex)
         {
+            if (CheckoutRefusals.TryMap(ex) is { } refusal)
+                return refusal;
+
             _logger.LogError(ex, "Error creating bulk purchase for user {UserId}", userId);
             return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
@@ -298,16 +268,11 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         {
             return ApiError.BadRequest(ex.Message, ex.Code);
         }
-        catch (AccountInactiveException ex)
-        {
-            return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
-        }
-        catch (MonobankInvoiceRejectedException)
-        {
-            return AcquirerRefusedToOpenAPayment();
-        }
         catch (Exception ex)
         {
+            if (CheckoutRefusals.TryMap(ex) is { } refusal)
+                return refusal;
+
             _logger.LogError(ex, "Error creating renewal checkout for user {UserId}", userId);
             return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
@@ -357,31 +322,11 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             var response = await _createCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
         }
-        catch (BelowCostSaleBlockedException ex)
-        {
-            return ApiError.Conflict(ex.Message, BelowCostSaleBlockedException.Code);
-        }
-        catch (PackageOutOfStockException ex)
-        {
-            return ApiError.Conflict(ex.Message, PackageOutOfStockException.Code);
-        }
-        catch (CheckoutAlreadyInPaymentException ex)
-        {
-            // The other button was pressed while this cart's order still had money in motion. A
-            // distinct code, because the customer's way out is not a retry: that order has to be paid
-            // or deleted first.
-            return ApiError.Conflict(ex.Message, CheckoutAlreadyInPaymentException.Code);
-        }
-        catch (AccountInactiveException ex)
-        {
-            return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
-        }
-        catch (MonobankInvoiceRejectedException)
-        {
-            return AcquirerRefusedToOpenAPayment();
-        }
         catch (Exception ex)
         {
+            if (CheckoutRefusals.TryMap(ex) is { } refusal)
+                return refusal;
+
             _logger.LogError(ex, "Error creating purchase for user {UserId}", userId);
             return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
@@ -528,18 +473,4 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             return ApiError.Result(StatusCodes.Status500InternalServerError, ApiError.UnexpectedError);
         }
     }
-
-    /// <summary>
-    /// What every checkout path answers when the acquirer refuses to open a payment at all.
-    /// <para>
-    /// A 503 with its own code, not a 500: nothing was charged and the customer's next tap can
-    /// work, which is exactly what a 500 does not tell them - and the app reads the code and
-    /// answers in the customer's language. The bank's own sentence stays in the log, where the
-    /// operator needs it, and never reaches the phone.
-    /// </para>
-    /// </summary>
-    private static ObjectResult AcquirerRefusedToOpenAPayment() =>
-        ApiError.ServiceUnavailable(
-            "The payment service is not accepting payments right now. Nothing has been charged; please try again in a few minutes.",
-            MonobankInvoiceRejectedException.Code);
 }

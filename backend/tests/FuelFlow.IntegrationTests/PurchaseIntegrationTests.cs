@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SimulatePayment;
@@ -427,5 +428,80 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var empty = packages.Single(p => p.BrandId == BrandIds.Wog && p.FuelTypeId == ToUuid("wog-dp") && p.Liters == 10m);
         Assert.False(empty.IsAvailable);
     }
+
+    /// <summary>
+    /// The second button (planning #889) on the wire rather than in the handler: a body built by a
+    /// phone, naming the route it wants, and an answer a phone can read without a converter table.
+    /// </summary>
+    /// <remarks>
+    /// Nothing else in the suite covers this, because the other checkout tests post a typed command
+    /// and read a typed response with the same options on both ends — an enum would survive that as a
+    /// number and prove nothing. The app sends strings and parses strings, so this sends a string and
+    /// reads the raw JSON.
+    /// </remarks>
+    [Theory]
+    [InlineData("Declared", HttpStatusCode.Forbidden, PromoAccessException.Code)]
+    [InlineData("Bitcoin", HttpStatusCode.BadRequest, null)]
+    public async Task A_Route_Named_By_The_Phone_Is_Heard_Or_Refused(string route, HttpStatusCode expected, string? code)
+    {
+        await AuthenticateAsync("+380991234711");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+        var response = await PostRawAsync($$"""
+            {
+                "brandId": "{{BrandIds.Okko}}",
+                "brandName": "OKKO",
+                "fuelTypeId": "{{ToUuid("okko-95")}}",
+                "liters": 50,
+                "quantity": 1,
+                "price": 3000,
+                "settlementRoute": "{{route}}"
+            }
+            """);
+
+        Assert.Equal(expected, response.StatusCode);
+
+        if (code is not null)
+        {
+            // The grant is a column, not a role, so an account nobody opened to the offer is refused
+            // whatever it can otherwise do — and it is refused by a code the app can translate.
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(code, body.GetProperty("code").GetString());
+        }
+    }
+
+    /// <summary>
+    /// A request that says nothing about a route gets the one every client in the field meant, and is
+    /// told so by name. An old bundle ignores the field; a new one does not have to guess from a
+    /// missing payment link.
+    /// </summary>
+    [Fact]
+    public async Task A_Checkout_That_Does_Not_Name_A_Route_Answers_With_The_Payment_One()
+    {
+        await AuthenticateAsync("+380991234712");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+        SeedSellableStock("okko", "okko-95", 50m);
+
+        var response = await PostRawAsync($$"""
+            {
+                "brandId": "{{BrandIds.Okko}}",
+                "brandName": "OKKO",
+                "fuelTypeId": "{{ToUuid("okko-95")}}",
+                "liters": 50,
+                "quantity": 1,
+                "price": 3000
+            }
+            """);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("Acquirer", body.RootElement.GetProperty("settlementRoute").GetString());
+    }
+
+    private Task<HttpResponseMessage> PostRawAsync(string json)
+        => _client.PostAsync("/api/purchases",
+            new StringContent(json, Encoding.UTF8, "application/json"));
 }
 
