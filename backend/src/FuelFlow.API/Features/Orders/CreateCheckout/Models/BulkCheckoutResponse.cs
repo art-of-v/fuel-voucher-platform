@@ -1,7 +1,5 @@
 namespace FuelFlow.API.Features.Orders.CreateCheckout.Models;
 
-using FuelFlow.Features.Orders.SharedModels;
-
 public sealed class BulkCheckoutResponse
 {
     public List<Guid> OrderIds { get; set; } = new();
@@ -9,9 +7,9 @@ public sealed class BulkCheckoutResponse
     /// <summary>
     /// What the order was written on. See the same field on <c>CreateCheckoutResponse</c>: the cart
     /// path is the one the app uses, so it is the one where an absent payment link is read as a
-    /// failure.
+    /// failure. A name for the same reason it is named there.
     /// </summary>
-    public SettlementRoute SettlementRoute { get; set; }
+    public string SettlementRoute { get; set; } = null!;
 
     public string? MonobankInvoiceId { get; set; }
 

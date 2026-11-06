@@ -1,7 +1,5 @@
 namespace FuelFlow.API.Features.Orders.CreateCheckout.Models;
 
-using FuelFlow.Features.Orders.SharedModels;
-
 public sealed class CreateCheckoutResponse
 {
     public Guid OrderId { get; set; }
@@ -16,8 +14,14 @@ public sealed class CreateCheckoutResponse
     /// <see cref="PaymentUrl"/>, and an absent link is the same shape as a payment that failed to
     /// open - which is exactly the reading the customer was given last time a checkout answered with
     /// one (planning #879). Planning #889.
+    /// <para>
+    /// A name, not the enum: this DTO's <see cref="Status"/> already answers in names, and the server
+    /// writes names for the same reason. A client that parses with the default options - which is what
+    /// an unconfigured <c>HttpClient</c> does - reads a name and cannot read a number it has no table
+    /// for.
+    /// </para>
     /// </remarks>
-    public SettlementRoute SettlementRoute { get; set; }
+    public string SettlementRoute { get; set; } = null!;
 
     public string? MonobankInvoiceId { get; set; }
 

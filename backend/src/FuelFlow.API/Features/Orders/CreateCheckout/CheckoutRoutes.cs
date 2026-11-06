@@ -2,6 +2,7 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 /// <summary>
@@ -61,6 +62,28 @@ public static class CheckoutRoutes
         => requested ?? SettlementRoute.Acquirer;
 
     /// <summary>
+    /// Refuse a request on the declared route from an account nobody opened to the offer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The route arrives as one field of a body the customer controls, so the second button exists on
+    /// the server whether or not it exists on the phone. The grant is
+    /// <c>users.promo_access_granted_at_utc</c>, and only a Manager or above may write it (planning
+    /// #889, and the capability that enforces it is <c>AuthPolicies.PromoAccess</c>) — which is what
+    /// makes a non-null value a decision by a named person rather than a preference of the account.
+    /// </para>
+    /// <para>
+    /// The payment route is never refused here. It is the one every account has always had, and
+    /// blocking it on a promotion's rules would turn a gate on the offer into a way to stop a sale.
+    /// </para>
+    /// </remarks>
+    public static void RequirePromoAccess(SettlementRoute route, User user)
+    {
+        if (route == SettlementRoute.Declared && user.PromoAccessGrantedAtUtc is null)
+            throw new PromoAccessException();
+    }
+
+    /// <summary>
     /// Decide what the pending order that holds this basket means for a request on
     /// <paramref name="requested"/>, and carry out the part that is a write (giving a stale attempt's
     /// basket back, giving up a declared order nobody has paid).
@@ -87,7 +110,9 @@ public static class CheckoutRoutes
         // attempt is known to be over.
         if (CheckoutGuard.IsStale(pending, nowUtc))
         {
-            CheckoutGuard.Release(pending);
+            if (await WritableAsync(context, pending, cancellationToken) is { } stale)
+                CheckoutGuard.Release(stale);
+
             await context.SaveChangesAsync(cancellationToken);
             return (BasketState.Free, null);
         }
@@ -113,7 +138,9 @@ public static class CheckoutRoutes
 
         // The attempt is over and it produced no invoice: the acquirer refused it, or the request that
         // owned it died. The basket is free, so this request makes a new attempt.
-        CheckoutGuard.Release(pending);
+        if (await WritableAsync(context, pending, cancellationToken) is { } refused)
+            CheckoutGuard.Release(refused);
+
         await context.SaveChangesAsync(cancellationToken);
         return (BasketState.Free, null);
     }
@@ -151,11 +178,44 @@ public static class CheckoutRoutes
 
         // PendingPayment -> Cancelled is the only move the state machine allows from here, and the row
         // is kept: an order that was placed and given up is part of the account's history.
-        pending.Status = OrderStatus.Cancelled;
-        pending.CheckoutKey = null;
-        pending.UpdatedAtUtc = nowUtc;
+        if (await WritableAsync(context, pending, cancellationToken) is not { } toGiveUp)
+            return (BasketState.Free, null);
+
+        toGiveUp.Status = OrderStatus.Cancelled;
+        toGiveUp.CheckoutKey = null;
+        toGiveUp.UpdatedAtUtc = nowUtc;
 
         await context.SaveChangesAsync(cancellationToken);
         return (BasketState.Free, null);
     }
+
+    /// <summary>
+    /// The instance of this order that this file may write, or nothing when the row is gone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The caller hands an order over to decide with, and this re-read is what changes it. That split
+    /// is deliberate rather than tidy: the order arrives from a query in whichever handler called here,
+    /// and whether that query is tracked is not something this file can see. An untracked entity is
+    /// still a correct value to decide on and a silent no-op to write to — the trap
+    /// <c>NoTrackingMutationGuardTests</c> exists to catch, which it can only catch per file, and this
+    /// file is the one that writes. Re-reading with <c>AsTracking()</c> makes the write hold whatever
+    /// the caller did, and costs one read on the primary key on the three branches that were writing
+    /// anyway. When the row is already tracked this returns the same instance the caller holds, so the
+    /// two never disagree.
+    /// </para>
+    /// <para>
+    /// Gone is reachable, and only on the last branch: that branch waits for the invoice of the attempt
+    /// for up to <see cref="CheckoutGuard.InvoiceWait"/>, and in that window the expiry job or the
+    /// customer's own delete can take the order out. Its basket went with it, so the answer is the same
+    /// one the row being here would have given.
+    /// </para>
+    /// </remarks>
+    private static Task<Order?> WritableAsync(
+        ApplicationDbContext context,
+        Order pending,
+        CancellationToken cancellationToken)
+        => context.Orders
+            .AsTracking()
+            .FirstOrDefaultAsync(o => o.Id == pending.Id, cancellationToken);
 }

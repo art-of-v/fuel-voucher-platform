@@ -187,6 +187,11 @@ public sealed class CreateCheckoutCommandHandler
         // every client that has ever called this endpoint meant (planning #889).
         var route = CheckoutRoutes.Resolve(command.SettlementRoute);
 
+        // Asked before anything is written, including before the basket is settled: the customer who is
+        // not on the offer must not have their pending order dissolved by a tap that was never going to
+        // be allowed.
+        CheckoutRoutes.RequirePromoAccess(route, user);
+
         // The order that already holds this basket, if there is one. A retry or a double tap finds
         // it here and is given the same invoice. The read is an equality on an indexed column; it
         // used to be a prefix match on a key that carried a random suffix, which no b-tree can
@@ -211,7 +216,7 @@ public sealed class CreateCheckoutCommandHandler
                 {
                     OrderId = onBasket.Id,
                     Status = onBasket.Status.ToString(),
-                    SettlementRoute = CheckoutRoutes.Of(onBasket),
+                    SettlementRoute = CheckoutRoutes.Of(onBasket).ToString(),
                     MonobankInvoiceId = onBasket.MonobankInvoiceId,
                     PaymentUrl = onBasket.MonobankPaymentUrl
                 };
@@ -249,7 +254,7 @@ public sealed class CreateCheckoutCommandHandler
             {
                 OrderId = paidAlready.Id,
                 Status = paidAlready.Status.ToString(),
-                SettlementRoute = CheckoutRoutes.Of(paidAlready),
+                SettlementRoute = CheckoutRoutes.Of(paidAlready).ToString(),
                 AlreadyPaid = true
             };
         }
@@ -346,7 +351,7 @@ public sealed class CreateCheckoutCommandHandler
             {
                 OrderId = withInvoice.Id,
                 Status = withInvoice.Status.ToString(),
-                SettlementRoute = CheckoutRoutes.Of(withInvoice),
+                SettlementRoute = CheckoutRoutes.Of(withInvoice).ToString(),
                 MonobankInvoiceId = withInvoice.MonobankInvoiceId,
                 PaymentUrl = withInvoice.MonobankPaymentUrl
             };
@@ -372,7 +377,7 @@ public sealed class CreateCheckoutCommandHandler
             {
                 OrderId = order.Id,
                 Status = OrderStatus.PendingFulfillment.ToString(),
-                SettlementRoute = route,
+                SettlementRoute = route.ToString(),
                 AlreadyPaid = true
             };
         }
@@ -400,7 +405,7 @@ public sealed class CreateCheckoutCommandHandler
             {
                 OrderId = order.Id,
                 Status = order.Status.ToString(),
-                SettlementRoute = route
+                SettlementRoute = route.ToString()
             };
         }
 
@@ -491,7 +496,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             OrderId = order.Id,
             Status = order.Status.ToString(),
-            SettlementRoute = route,
+            SettlementRoute = route.ToString(),
             MonobankInvoiceId = order.MonobankInvoiceId,
             PaymentUrl = order.MonobankPaymentUrl,
             // Not persisted on the order: AppUrl is an opaque mbnk.app redirector that cannot be
