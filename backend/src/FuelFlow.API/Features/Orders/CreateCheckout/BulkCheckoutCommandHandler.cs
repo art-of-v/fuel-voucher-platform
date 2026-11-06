@@ -295,6 +295,20 @@ private readonly RuntimeSettingsService _runtimeSettings;
                     "Duplicate bulk checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
                     onBasket!.Id, onBasket.MonobankInvoiceId);
 
+                // On the declared route the reuse is also the second button's own money question:
+                // part-funded is refused with the figure, fully funded is paid now (planning #889).
+                if (route == SettlementRoute.Declared
+                    && await DeclaredMoney.SpendOnReusedOrderAsync(
+                        _context, _heldMoney, command.UserId!.Value, onBasket, cancellationToken))
+                {
+                    return new BulkCheckoutResponse
+                    {
+                        OrderIds = [onBasket.Id],
+                        SettlementRoute = route.ToString(),
+                        AlreadyPaid = true
+                    };
+                }
+
                 return new BulkCheckoutResponse
                 {
                     OrderIds = [onBasket.Id],
@@ -337,6 +351,15 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 SettlementRoute = CheckoutRoutes.Of(paidAlready).ToString(),
                 AlreadyPaid = true
             };
+        }
+
+        // Item 5 of planning #889, asked before a row exists: money held for this account that does not
+        // cover this price is a refusal, not an order that waits half-paid and claims stock. An account
+        // holding nothing is the other branch of the ruling and is not refused.
+        if (route == SettlementRoute.Declared)
+        {
+            DeclaredMoney.RefuseIfPartlyFunded(await DeclaredMoney.InspectAsync(
+                _context, command.UserId!.Value, totalPrice, null, cancellationToken));
         }
 
         // Resolve merchant for this account. Outside the try below on purpose: a QA account routed

@@ -45,6 +45,19 @@ public static class CheckoutRefusals
         // a person's decision does (planning #889).
         PromoAccessException ex => ApiError.Forbidden(ex.Message, PromoAccessException.Code),
 
+        // The offer is open and the money is not enough. Conflict, because the account has to change
+        // for the same tap to work — the figure is the whole answer, so it travels as `data` and the
+        // phone builds its own sentence instead of parsing ours (planning #889, item 5).
+        PromoBalanceShortException ex => ApiError.Conflict(
+            ex.Message,
+            PromoBalanceShortException.Code,
+            data: new Dictionary<string, object?>
+            {
+                ["shortfallUah"] = ex.ShortfallUah,
+                ["heldUah"] = ex.HeldUah,
+                ["owedUah"] = ex.OwedUah,
+            }),
+
         // The other button was pressed while this cart's order still had money in motion. The
         // customer's way out is not a retry: that order has to be paid or deleted first.
         CheckoutAlreadyInPaymentException ex => ApiError.Conflict(ex.Message, CheckoutAlreadyInPaymentException.Code),

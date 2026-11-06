@@ -45,6 +45,11 @@ export const en: Record<string, string> = {
   // who is on it, and the only way forward is to ask. Says the card route is still open, because it is.
   'purchase.error.promoAccess':
     'The promotional offer is not open on this account. You can still pay by card, or ask us to open the offer for you.',
+  // The account holds money and it is not enough: the order is not performed and nothing was spent. The
+  // figure is the sentence - without it "not enough money" reads as a refusal with no reason
+  // (planning #889, item 5).
+  'purchase.error.promoShortfall':
+    '{0} is missing on your account for this promotional order. Nothing was charged — you can pay by card, or wait until the account covers it.',
   // The promotional button's answer: the order is written, no bank was asked, and what it waits for is
   // the payment on our side. Says all three, because an order with no payment page otherwise reads as
   // a failed payment - which is exactly the confusion this sentence exists to prevent (planning #889).
@@ -216,6 +221,13 @@ export const en: Record<string, string> = {
   // payment that cannot happen. Says that, says nothing was taken, and says what to do instead.
   'codes.orderHasNoPaymentLink':
     'This order never got a payment link, so nothing was charged. Buy again from the shop - it will open a fresh order.',
+  // A promotional order has no invoice and never gets one: its money arrives through the settlement
+  // channel, not from this customer. So the chip names what the order waits for instead of calling it
+  // unpaid - red "UNPAID" beside an action that no longer exists reads as the customer's fault - and
+  // "buy again" would duplicate an order the company has already agreed to perform.
+  'codes.promoAwaiting': 'AWAITING SETTLEMENT',
+  'codes.promoOrderWaits':
+    'This order was placed under the promotion. Its money arrives through the settlement channel, so there is nothing for you to do: nothing was charged and you do not need to buy again.',
   'payment.title': 'Payment',
   'payment.subtitle': 'Confirm your payment',
   'payment.loading': 'Loading the payment page…',

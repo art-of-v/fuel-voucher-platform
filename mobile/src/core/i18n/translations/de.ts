@@ -45,6 +45,11 @@ export const de: Record<string, string> = {
   // Manager, also bleibt bezahlen mit Karte oder fragen - beides steht hier.
   'purchase.error.promoAccess':
     'Die Aktion ist für dieses Konto nicht freigeschaltet. Sie können weiterhin mit Karte bezahlen oder uns bitten, die Aktion freizuschalten.',
+  // Das Konto hat Geld, es reicht aber nicht: die Bestellung wird nicht ausgeführt und nichts wurde
+  // belastet. Die Zahl ist die Antwort — ohne sie wirkt „nicht genug Geld“ nach einem Grund, den der
+  // Kunde nicht sehen kann (planning #889, Punkt 5).
+  'purchase.error.promoShortfall':
+    'Für diese Aktionsbestellung fehlen auf Ihrem Konto {0}. Es wurde nichts belastet — Sie können mit Karte bezahlen oder warten, bis das Konto den Betrag deckt.',
   // Die Antwort des Aktions-Knopfes: die Bestellung existiert, die Bank wurde nicht gefragt, und das
   // Geld kommt von unserer Seite. Alles drei, denn eine Bestellung ohne Zahlungsseite klingt sonst
   // nach einer fehlgeschlagenen Zahlung (planning #889).
@@ -221,6 +226,14 @@ export const de: Record<string, string> = {
   // stattfinden kann. Sagt das, sagt, dass nichts abgebucht wurde, und sagt, was zu tun ist.
   'codes.orderHasNoPaymentLink':
     'Für diese Bestellung wurde nie eine Zahlungsseite erstellt, es wurde also nichts abgebucht. Kaufen Sie erneut im Shop – es wird eine neue Bestellung angelegt.',
+  // Eine Aktionsbestellung hat keine Rechnung und bekommt nie eine: Das Geld kommt über den
+  // Verrechnungskanal, nicht von diesem Kunden. Der Chip nennt deshalb, worauf die Bestellung wartet,
+  // statt "UNBEZAHLT" zu sagen – ein roter Vermerk neben einer Aktion, die es nicht mehr gibt, klingt
+  // nach der Schuld des Kunden – und "erneut kaufen" würde eine Bestellung verdoppeln, die das
+  // Unternehmen bereits erfüllen will.
+  'codes.promoAwaiting': 'ERWARTET GUTSCHRIFT',
+  'codes.promoOrderWaits':
+    'Diese Bestellung wurde über die Aktion aufgegeben. Ihr Geld kommt über den Verrechnungskanal, Sie müssen also nichts tun: Es wurde nichts abgebucht, und Sie müssen nicht erneut kaufen.',
   'payment.title': 'Zahlung',
   'payment.subtitle': 'Bestätigen Sie Ihre Zahlung',
   'payment.loading': 'Zahlungsseite wird geladen…',
