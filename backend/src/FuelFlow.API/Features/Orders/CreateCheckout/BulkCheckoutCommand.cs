@@ -1,9 +1,18 @@
 namespace FuelFlow.Features.Orders.CreateCheckout;
 
+using FuelFlow.Features.Orders.SharedModels;
+
 public sealed class BulkCheckoutCommand
 {
     public Guid? UserId { get; set; }
     public Guid? LegalEntityId { get; set; }
+
+    /// <summary>
+    /// How the customer means to pay for the cart - one answer for the whole of it, because it is one
+    /// tap. See <see cref="CreateCheckoutCommand.SettlementRoute"/>.
+    /// </summary>
+    public SettlementRoute? SettlementRoute { get; set; }
+
     public List<CheckoutItem> Items { get; set; } = new();
 }
 

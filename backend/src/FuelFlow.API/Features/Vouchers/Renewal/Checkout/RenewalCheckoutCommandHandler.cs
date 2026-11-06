@@ -359,6 +359,11 @@ public sealed class RenewalCheckoutCommandHandler
             Price = totalUah,
             Kind = OrderKind.Renewal,
             Status = OrderStatus.PendingPayment,
+            // A renewal is paid the way it always has been: the customer taps pay and the acquirer is
+            // asked. The declared route is a purchase offer, and nothing in the ruling (planning #889)
+            // opens the renewal to it - saying so here is what keeps the next reader from assuming the
+            // column is unset by accident.
+            SettlementRoute = SettlementRoute.Acquirer,
             // The order's own key: unique per order, and the external reference the acquirer is
             // given when this order is refunded. The random suffix is what keeps it that way - the
             // batch's identity is checkout_key, and two orders may share a batch but may not share

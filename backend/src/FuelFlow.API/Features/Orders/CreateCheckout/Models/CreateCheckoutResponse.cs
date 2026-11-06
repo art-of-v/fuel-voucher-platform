@@ -1,9 +1,24 @@
 namespace FuelFlow.API.Features.Orders.CreateCheckout.Models;
 
+using FuelFlow.Features.Orders.SharedModels;
+
 public sealed class CreateCheckoutResponse
 {
     public Guid OrderId { get; set; }
     public string Status { get; set; } = null!;
+
+    /// <summary>
+    /// What the order was written on, whichever way it was decided: the customer's own answer if they
+    /// chose, and <c>Acquirer</c> for every request that did not mention it.
+    /// </summary>
+    /// <remarks>
+    /// The client is told rather than left to infer. A declared-route order has no
+    /// <see cref="PaymentUrl"/>, and an absent link is the same shape as a payment that failed to
+    /// open - which is exactly the reading the customer was given last time a checkout answered with
+    /// one (planning #879). Planning #889.
+    /// </remarks>
+    public SettlementRoute SettlementRoute { get; set; }
+
     public string? MonobankInvoiceId { get; set; }
 
     /// <summary>Embeddable payment page (see <c>MonobankInvoiceResponse.PageUrl</c>).</summary>

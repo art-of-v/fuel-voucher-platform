@@ -170,7 +170,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             if (!inStock.Contains(StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters)))
                 throw new PackageOutOfStockException(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters);
 
-            var (discountPerLiter, termCode) = ResolveTerm(item, termConfig, command.UserId.Value);
+            var (discountPerLiter, termCode) = CheckoutTermResolver.Resolve(item, termConfig, command.UserId.Value, _logger);
 
 // Slice-3 hard block (safety net at checkout): refuse a below-cost line unless this
             // supplier+fuel is opted in. One blocked item fails the whole bulk order.
@@ -266,6 +266,10 @@ private readonly RuntimeSettingsService _runtimeSettings;
 
         var now = SystemClock.UtcNow;
 
+        // Which of the two buttons this request came from - one answer for the whole cart, because it
+        // is one tap (planning #889).
+        var route = CheckoutRoutes.Resolve(command.SettlementRoute);
+
         // The order that already holds this cart, if there is one. A retry or a double tap finds it
         // here and is given the same invoice. The read is an equality on an indexed column; it used
         // to be a prefix match on a key that carried a random suffix, which no b-tree can serve and
@@ -274,41 +278,39 @@ private readonly RuntimeSettingsService _runtimeSettings;
 
         if (existingOrder != null)
         {
-            if (CheckoutGuard.IsStale(existingOrder, now))
-            {
-                // A checkout the customer walked away from. The order keeps everything it was, and
-                // gives the cart back, so that the next request for it is a new purchase.
-                CheckoutGuard.Release(existingOrder);
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-            else
-            {
-                // The attempt that holds this cart is the current one: a retry finds its invoice,
-                // and a request that arrived while it was still running waits for it. Either way it
-                // is the same order and the same invoice, and the acquirer is not asked twice.
-                var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(
-                    _context, existingOrder.Id, cancellationToken);
+            var (state, onBasket) = await CheckoutRoutes.SettleBasketAsync(
+                _context, existingOrder, route, now, cancellationToken);
 
-                if (withInvoice != null)
+            if (state == CheckoutRoutes.BasketState.Reuse)
+            {
+                // The attempt that holds this cart is the current one, on the route this request is
+                // asking for. Either it has its invoice or it is still getting one; either way it is
+                // the same order and the acquirer is not asked twice.
+                _logger.LogWarning(
+                    "Duplicate bulk checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
+                    onBasket!.Id, onBasket.MonobankInvoiceId);
+
+                return new BulkCheckoutResponse
                 {
-                    _logger.LogWarning(
-                        "Duplicate bulk checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
-                        withInvoice.Id, withInvoice.MonobankInvoiceId);
-
-                    return new BulkCheckoutResponse
-                    {
-                        OrderIds = [withInvoice.Id],
-                        MonobankInvoiceId = withInvoice.MonobankInvoiceId,
-                        PaymentUrl = withInvoice.MonobankPaymentUrl
-                    };
-                }
-
-                // The attempt is over and it produced no invoice: the acquirer refused it, or the
-                // request that owned it died. The cart is free, so this request makes a new
-                // attempt.
-                CheckoutGuard.Release(existingOrder);
-                await _context.SaveChangesAsync(cancellationToken);
+                    OrderIds = [onBasket.Id],
+                    SettlementRoute = CheckoutRoutes.Of(onBasket),
+                    MonobankInvoiceId = onBasket.MonobankInvoiceId,
+                    PaymentUrl = onBasket.MonobankPaymentUrl
+                };
             }
+
+            if (state == CheckoutRoutes.BasketState.InFlight)
+            {
+                _logger.LogWarning(
+                    "Bulk checkout on the {Route} route refused: order {OrderId} holds the cart on the "
+                     + "{HeldRoute} route and may already have money moving on it",
+                    route, onBasket!.Id, CheckoutRoutes.Of(onBasket));
+
+                throw new CheckoutAlreadyInPaymentException(onBasket.Id);
+            }
+
+            // Free: the cart's previous attempt was walked away from, or was on the other route and
+            // has just been given up. This request writes the new one.
         }
 
         // An order for this cart that held money already paid is the same purchase, not a new one. It
@@ -324,13 +326,23 @@ private readonly RuntimeSettingsService _runtimeSettings;
                  + "which has no invoice to pay again",
                 checkoutKey, paidAlready.Id);
 
-            return new BulkCheckoutResponse { OrderIds = [paidAlready.Id], AlreadyPaid = true };
+            return new BulkCheckoutResponse
+            {
+                OrderIds = [paidAlready.Id],
+                SettlementRoute = CheckoutRoutes.Of(paidAlready),
+                AlreadyPaid = true
+            };
         }
 
         // Resolve merchant for this account. Outside the try below on purpose: a QA account routed
         // to an unconfigured sandbox is refused outright rather than degraded into an order with
         // no invoice, and never quietly pointed at the live merchant.
-        var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
+        //
+        // The declared route resolves none: there is no terminal to choose when no terminal is
+        // asked, and the order says so the same way it says it has no invoice.
+        var merchant = route == SettlementRoute.Declared
+            ? (MonobankMerchant?)null
+            : _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
 
         var order = new Order
         {
@@ -339,6 +351,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
             LegalEntityId = command.LegalEntityId,
             Price = totalPrice,
             Status = OrderStatus.PendingPayment,
+            // Written here and nowhere else; the database refuses a change (see the column).
+            SettlementRoute = route,
             // The order's own key: unique per order, and the external reference the acquirer is
             // given when this order is refunded. The random suffix is what keeps it that way - the
             // cart's identity is checkout_key, and two orders may share a cart but may not share
@@ -399,11 +413,16 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 "Concurrent bulk checkout for basket {CheckoutKey} lost the race; reusing order {OrderId}",
                 checkoutKey, winner.Id);
 
-            var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
+            // A declared winner never gets an invoice, so there is nothing to wait for; the order is
+            // the answer on its own.
+            var withInvoice = CheckoutRoutes.Of(winner) == SettlementRoute.Declared
+                ? winner
+                : await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
 
             return new BulkCheckoutResponse
             {
                 OrderIds = [withInvoice.Id],
+                SettlementRoute = CheckoutRoutes.Of(withInvoice),
                 MonobankInvoiceId = withInvoice.MonobankInvoiceId,
                 PaymentUrl = withInvoice.MonobankPaymentUrl
             };
@@ -424,14 +443,41 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 "Bulk checkout for cart {CheckoutKey} settled on {PaymentId} held money; no invoice requested",
                 checkoutKey, held.PaymentId);
 
-            return new BulkCheckoutResponse { OrderIds = [order.Id], AlreadyPaid = true };
+            return new BulkCheckoutResponse
+            {
+                OrderIds = [order.Id],
+                SettlementRoute = route,
+                AlreadyPaid = true
+            };
         }
+
+        // The declared route ends here: the order exists, the acquirer was never asked, and what it
+        // waits for is a declaration. See the same answer on the single-item checkout, and the reason
+        // the response carries the route rather than leaving an absent payment link to be read as a
+        // failure.
+        if (route == SettlementRoute.Declared)
+        {
+            _logger.LogInformation(
+                "Bulk checkout for cart {CheckoutKey} written on the declared route; the acquirer was not asked "
+                 + "and order {OrderId} waits on the settlement channel",
+                checkoutKey, order.Id);
+
+            return new BulkCheckoutResponse
+            {
+                OrderIds = [order.Id],
+                SettlementRoute = route
+            };
+        }
+
+        // Past the declared route's answer, so this request is on the acquirer one - and that is the
+        // route the resolution above was asked about.
+        var acquirerMerchant = merchant!.Value;
 
         MonobankInvoiceResponse invoiceResponse;
         var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
-            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+            var monobankClient = _monobankClientFactory.ForMerchant(acquirerMerchant);
 
             invoiceResponse = await monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
@@ -447,7 +493,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
 
             _logger.LogInformation(
                 "Monobank invoice created on {Merchant} merchant for bundle: {InvoiceId}",
-                merchant,
+                acquirerMerchant,
                 invoiceResponse.InvoiceId);
         }
         catch (Exception ex)
@@ -473,7 +519,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // See CreateCheckoutCommandHandler for why the payment is its own row. Same reason here: this
         // is the only moment the invoice exists, so it is the only moment it can be recorded.
         _context.Payments.Add(PaymentFactory.CreateCapture(
-            order, merchant, invoiceResponse.InvoiceId, SystemClock.UtcNow));
+            order, acquirerMerchant, invoiceResponse.InvoiceId, SystemClock.UtcNow));
 
         // The invoice, written onto the order that is already there. A second attempt for this cart
         // is refused by the index above and never reaches this point, so this is the one and only
@@ -487,48 +533,12 @@ private readonly RuntimeSettingsService _runtimeSettings;
         return new BulkCheckoutResponse
         {
             OrderIds = [order.Id],
+            SettlementRoute = route,
             MonobankInvoiceId = invoiceResponse.InvoiceId,
             PaymentUrl = invoiceResponse.PageUrl,
             // Not persisted on the order - AppUrl is an opaque mbnk.app redirector that cannot be
             // reconstructed later, so it is returned once here. See CreateCheckoutCommandHandler.
             AppUrl = invoiceResponse.AppUrl
         };
-    }
-
-    /// <summary>
-    /// Resolves the term a line was bought on into the discount to apply and the term code to freeze.
-    /// Returns <c>(0, null)</c> — today's behaviour, the voucher's full remaining life at the
-    /// undiscounted price — when no term was requested or the feature is off.
-    /// </summary>
-    /// <remarks>
-    /// Fail-safe in the direction that costs nothing: the feature off, an absent term, an unparseable
-    /// term, or a tier the manager has not configured all fall back to the full term rather than
-    /// rejecting the sale. A customer must never be unable to buy fuel over a settings problem. Stock
-    /// sufficiency is a separate gate at fulfilment, where the voucher is actually claimed.
-    /// </remarks>
-    private (decimal DiscountPerLiter, string? TermCode) ResolveTerm(
-        CheckoutItem item, VoucherTermConfig config, Guid userId)
-    {
-        if (!config.Enabled || string.IsNullOrWhiteSpace(item.TermCode))
-            return (0m, null);
-
-        if (!VoucherRenewalTerms.TryFromCode(item.TermCode, out var term))
-        {
-            _logger.LogWarning(
-                "Ignoring unknown purchase term {TermCode} for user {UserId}; selling the full term instead",
-                item.TermCode, userId);
-            return (0m, null);
-        }
-
-        var tier = config.Tier(term);
-        if (tier is null || !tier.IsOfferable)
-        {
-            _logger.LogWarning(
-                "Purchase term {TermCode} is not configured for user {UserId}; selling the full term instead",
-                item.TermCode, userId);
-            return (0m, null);
-        }
-
-        return (tier.DiscountPerLiterUah, term.Code());
     }
 }

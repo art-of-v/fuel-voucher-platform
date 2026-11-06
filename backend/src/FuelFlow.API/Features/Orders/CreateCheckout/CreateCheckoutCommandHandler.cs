@@ -183,6 +183,10 @@ public sealed class CreateCheckoutCommandHandler
 
         var now = SystemClock.UtcNow;
 
+        // Which of the two buttons this request came from. Absent is the payment one, which is what
+        // every client that has ever called this endpoint meant (planning #889).
+        var route = CheckoutRoutes.Resolve(command.SettlementRoute);
+
         // The order that already holds this basket, if there is one. A retry or a double tap finds
         // it here and is given the same invoice. The read is an equality on an indexed column; it
         // used to be a prefix match on a key that carried a random suffix, which no b-tree can
@@ -191,44 +195,41 @@ public sealed class CreateCheckoutCommandHandler
 
         if (existingOrder != null)
         {
-            if (CheckoutGuard.IsStale(existingOrder, now))
-            {
-                // A checkout the customer walked away from. The order keeps everything it was - its
-                // price, its status, its invoice, and a customer who pays that invoice late still
-                // gets what they paid for - and gives the basket back, so that the next request
-                // for it is a new purchase.
-                CheckoutGuard.Release(existingOrder);
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-            else
-            {
-                // The attempt that holds this basket is the current one: a retry finds its invoice,
-                // and a request that arrived while it was still running waits for it. Either way it
-                // is the same order and the same invoice, and the acquirer is not asked twice.
-                var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(
-                    _context, existingOrder.Id, cancellationToken);
+            var (state, onBasket) = await CheckoutRoutes.SettleBasketAsync(
+                _context, existingOrder, route, now, cancellationToken);
 
-                if (withInvoice != null)
+            if (state == CheckoutRoutes.BasketState.Reuse)
+            {
+                // The attempt that holds this basket is the current one, on the route this request is
+                // asking for. Either it has its invoice or it is still getting one; either way it is
+                // the same order and the acquirer is not asked twice.
+                _logger.LogWarning(
+                    "Duplicate order creation attempt detected for basket {CheckoutKey}; reusing order {OrderId}",
+                    checkoutKey, onBasket!.Id);
+
+                return new CreateCheckoutResponse
                 {
-                    _logger.LogWarning(
-                        "Duplicate order creation attempt detected for basket {CheckoutKey}; reusing order {OrderId}",
-                        checkoutKey, withInvoice.Id);
-
-                    return new CreateCheckoutResponse
-                    {
-                        OrderId = withInvoice.Id,
-                        Status = withInvoice.Status.ToString(),
-                        MonobankInvoiceId = withInvoice.MonobankInvoiceId,
-                        PaymentUrl = withInvoice.MonobankPaymentUrl
-                    };
-                }
-
-                // The attempt is over and it produced no invoice: the acquirer refused it, or the
-                // request that owned it died. The basket is free, so this request makes a new
-                // attempt.
-                CheckoutGuard.Release(existingOrder);
-                await _context.SaveChangesAsync(cancellationToken);
+                    OrderId = onBasket.Id,
+                    Status = onBasket.Status.ToString(),
+                    SettlementRoute = CheckoutRoutes.Of(onBasket),
+                    MonobankInvoiceId = onBasket.MonobankInvoiceId,
+                    PaymentUrl = onBasket.MonobankPaymentUrl
+                };
             }
+
+            if (state == CheckoutRoutes.BasketState.InFlight)
+            {
+                _logger.LogWarning(
+                    "Checkout for basket {CheckoutKey} on the {Route} route refused: order {OrderId} holds the "
+                     + "basket on the {HeldRoute} route and may already have money moving on it",
+                    checkoutKey, route, onBasket!.Id, CheckoutRoutes.Of(onBasket));
+
+                throw new CheckoutAlreadyInPaymentException(onBasket.Id);
+            }
+
+            // Free. The order that held the basket was either walked away from, or was an attempt on
+            // the other route that this request has just given up; in both cases it is no longer in
+            // the way, and this request writes a new one.
         }
 
         // An order for this basket that held money already paid is the same purchase, not a new one.
@@ -248,6 +249,7 @@ public sealed class CreateCheckoutCommandHandler
             {
                 OrderId = paidAlready.Id,
                 Status = paidAlready.Status.ToString(),
+                SettlementRoute = CheckoutRoutes.Of(paidAlready),
                 AlreadyPaid = true
             };
         }
@@ -259,6 +261,10 @@ public sealed class CreateCheckoutCommandHandler
             LegalEntityId = command.LegalEntityId,
             Price = lineTotal,
             Status = OrderStatus.PendingPayment,
+            // Decided here and never again: the database raises on a change (see the column's
+            // comment), because the route says which of two pockets pays and a later writer cannot
+            // answer for what the customer chose.
+            SettlementRoute = route,
             // The order's own key: unique per order, and the external reference the acquirer is
             // given when this order is refunded. The random suffix is what keeps it that way - the
             // basket's identity is checkout_key, and two orders may share a basket but may not
@@ -296,7 +302,13 @@ public sealed class CreateCheckoutCommandHandler
         // invoice": a QA account pointed at an unconfigured sandbox is refused outright. Sending
         // that account to the live merchant instead would take real money from someone testing,
         // and an order with no payment URL at least cannot be paid by mistake.
-        var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
+        //
+        // The declared route resolves none, because on that route it is not a question: there is no
+        // terminal to choose when no terminal is asked. The order keeps no merchant for the same
+        // reason it keeps no invoice - ck_order_declared_route_asks_no_acquirer is what says so.
+        var merchant = route == SettlementRoute.Declared
+            ? (MonobankMerchant?)null
+            : _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
         order.MonobankMerchant = merchant;
 
         // The order is written BEFORE the acquirer is asked for an invoice, and that order is what
@@ -324,12 +336,17 @@ public sealed class CreateCheckoutCommandHandler
                 "Concurrent checkout for basket {CheckoutKey} lost the race; reusing order {OrderId}",
                 checkoutKey, winner.Id);
 
-            var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
+            // A declared winner never gets an invoice, so there is nothing to wait for; the order is
+            // the answer on its own.
+            var withInvoice = CheckoutRoutes.Of(winner) == SettlementRoute.Declared
+                ? winner
+                : await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
 
             return new CreateCheckoutResponse
             {
                 OrderId = withInvoice.Id,
                 Status = withInvoice.Status.ToString(),
+                SettlementRoute = CheckoutRoutes.Of(withInvoice),
                 MonobankInvoiceId = withInvoice.MonobankInvoiceId,
                 PaymentUrl = withInvoice.MonobankPaymentUrl
             };
@@ -355,9 +372,41 @@ public sealed class CreateCheckoutCommandHandler
             {
                 OrderId = order.Id,
                 Status = OrderStatus.PendingFulfillment.ToString(),
+                SettlementRoute = route,
                 AlreadyPaid = true
             };
         }
+
+        // The declared route ends here, and what it ends with is not a failure. The order exists, the
+        // acquirer was never asked, and the money it waits for is the settlement channel's: either it
+        // is already held and the next declaration names it, or it has not arrived yet and the order
+        // is the thing it will arrive against. Telling the customer this is the whole reason the
+        // response carries a route - an order with no payment URL is otherwise the same shape as a
+        // payment that failed to open.
+        //
+        // Nothing here guesses at an amount. The order keeps its price, and whether the money on hand
+        // will cover it is the settle's question, asked when the money is named (planning #889 makes
+        // that a balance rather than an exact match; until then one declaration pays one order).
+        if (route == SettlementRoute.Declared)
+        {
+            _metrics.OrderCreated(order.LegalEntityId.HasValue);
+
+            _logger.LogInformation(
+                "Checkout for basket {CheckoutKey} written on the declared route; the acquirer was not asked and "
+                 + "order {OrderId} waits on the settlement channel",
+                checkoutKey, order.Id);
+
+            return new CreateCheckoutResponse
+            {
+                OrderId = order.Id,
+                Status = order.Status.ToString(),
+                SettlementRoute = route
+            };
+        }
+
+        // Past the declared route's answer, so this request is on the acquirer one - and that is the
+        // route the resolution above was asked about.
+        var acquirerMerchant = merchant!.Value;
 
         var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -367,7 +416,7 @@ public sealed class CreateCheckoutCommandHandler
 
         try
         {
-            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+            var monobankClient = _monobankClientFactory.ForMerchant(acquirerMerchant);
 
             // The receipt's goods lines. Always sent: Monobank registers the fiscal receipt for us
             // and can only print what we declare, and the hryvnia link is switched on in the bank's
@@ -397,11 +446,11 @@ public sealed class CreateCheckoutCommandHandler
             // down that it exists - and until a Payment row exists, a payment link re-issued later
             // would have nowhere to put a second attempt.
             _context.Payments.Add(PaymentFactory.CreateCapture(
-                order, merchant, invoiceResponse.InvoiceId, SystemClock.UtcNow));
+                order, acquirerMerchant, invoiceResponse.InvoiceId, SystemClock.UtcNow));
 
             _logger.LogInformation(
                 "Monobank invoice created on {Merchant} merchant for order {OrderId}: {InvoiceId}, payment URL: {PaymentUrl}",
-                merchant,
+                acquirerMerchant,
                 order.Id,
                 invoiceResponse.InvoiceId,
                 invoiceResponse.PageUrl);
@@ -442,6 +491,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             OrderId = order.Id,
             Status = order.Status.ToString(),
+            SettlementRoute = route,
             MonobankInvoiceId = order.MonobankInvoiceId,
             PaymentUrl = order.MonobankPaymentUrl,
             // Not persisted on the order: AppUrl is an opaque mbnk.app redirector that cannot be

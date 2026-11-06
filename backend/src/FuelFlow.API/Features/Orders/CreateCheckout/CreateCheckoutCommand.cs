@@ -1,9 +1,22 @@
 namespace FuelFlow.Features.Orders.CreateCheckout;
 
+using FuelFlow.Features.Orders.SharedModels;
+
 public sealed class CreateCheckoutCommand
 {
     public Guid? UserId { get; set; }
     public Guid? LegalEntityId { get; set; }
+
+    /// <summary>
+    /// How the customer means to pay. Absent or <c>"Acquirer"</c> sends them to the bank, which is
+    /// every checkout this app has ever made; <c>"Declared"</c> is the second button - the order is
+    /// written against money the settlement channel holds or expects, and the acquirer is never asked.
+    /// </summary>
+    /// <remarks>
+    /// Anything else is a 400 from the binder, and an order written here keeps that route for good
+    /// (see <c>SettlementRoute</c>). Planning #889.
+    /// </remarks>
+    public SettlementRoute? SettlementRoute { get; set; }
 
     public Guid FuelTypeId { get; set; }
     public decimal Liters { get; set; }

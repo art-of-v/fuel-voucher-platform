@@ -55,6 +55,15 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("source_order_id").HasComment("For an issuance, the purchase the fuel originally came from. NULL on purchases and" +
                     "renewals.");
 
+        builder.Property(e => e.SettlementRoute)
+            .HasColumnName("settlement_route")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasComment("How the money for this order is expected to arrive: 'Acquirer' - the customer taps pay and the " +
+                    "checkout asks Monobank for an invoice; 'Declared' - the order spends money the platform holds or " +
+                    "is waiting for, and the acquirer is never asked. NULL for an order nobody tapped their way into " +
+                    "(an issuance, an operator's paper renewal). Written once, at creation.");
+
         builder.Property(e => e.MonobankInvoiceId)
             .HasColumnName("monobank_invoice_id")
             .HasMaxLength(100).HasComment("The invoice id the acquirer gave us - the link back to the acquirer's own record. NULL" +
@@ -258,6 +267,21 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
             t.HasCheckConstraint("ck_order_kind",
                 "kind IN ('Purchase', 'Renewal', 'ReceivedFromCompany')");
+
+            // Nullable, so NULL has to be allowed by name: it is the answer for the orders that were
+            // not a customer's choice of payment at all.
+            t.HasCheckConstraint("ck_order_settlement_route", """
+                settlement_route IS NULL OR settlement_route IN ('Acquirer', 'Declared')
+                """);
+
+            // The declared route's whole claim is that no card is involved, and a row that carries an
+            // acquirer's invoice alongside that claim is a row nobody can trust. The checkout cannot
+            // write one (it does not reach the acquirer on this route), so this is the guard for
+            // whatever is written by hand, by a migration, or by a future path that forgets.
+            t.HasCheckConstraint("ck_order_declared_route_asks_no_acquirer", """
+                settlement_route IS DISTINCT FROM 'Declared'
+                OR (monobank_invoice_id IS NULL AND monobank_payment_url IS NULL)
+                """);
         });
     }
 }

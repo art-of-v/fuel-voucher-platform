@@ -1,8 +1,18 @@
 namespace FuelFlow.API.Features.Orders.CreateCheckout.Models;
 
+using FuelFlow.Features.Orders.SharedModels;
+
 public sealed class BulkCheckoutResponse
 {
     public List<Guid> OrderIds { get; set; } = new();
+
+    /// <summary>
+    /// What the order was written on. See the same field on <c>CreateCheckoutResponse</c>: the cart
+    /// path is the one the app uses, so it is the one where an absent payment link is read as a
+    /// failure.
+    /// </summary>
+    public SettlementRoute SettlementRoute { get; set; }
+
     public string? MonobankInvoiceId { get; set; }
 
     /// <summary>Embeddable payment page (see <c>MonobankInvoiceResponse.PageUrl</c>).</summary>

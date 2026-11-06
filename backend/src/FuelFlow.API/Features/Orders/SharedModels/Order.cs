@@ -21,6 +21,19 @@ public class Order
     /// For an issuance, the purchase the fuel originally came from. Null on purchases and renewals.
     /// </summary>
     public Guid? SourceOrderId { get; set; }
+
+    /// <summary>
+    /// How the money for this order is expected to arrive, decided when the order is written.
+    /// Null for an order nobody tapped their way into: a company issuance, and a renewal the
+    /// operator recorded against the brand's own paper invoice.
+    /// </summary>
+    /// <remarks>
+    /// Immutable once written — the database raises rather than accepts a change, because the route
+    /// is the answer to "what did the customer choose", and a later writer cannot answer that. See
+    /// <see cref="SettlementRoute"/>.
+    /// </remarks>
+    public SettlementRoute? SettlementRoute { get; set; }
+
     public string? MonobankInvoiceId { get; set; }
 
     /// <summary>
