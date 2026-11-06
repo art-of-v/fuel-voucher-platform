@@ -149,7 +149,8 @@ public sealed class VoucherTermSaleTests : IDisposable
                new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
                NotificationDispatcher.Disabled,
                Stock(),
-               new FuelFlowMetrics());
+               new FuelFlowMetrics(),
+               TestJournal.HeldMoneyFor(_context));
 
     /// <summary>
     /// Checkout refuses a package with no sellable stock behind it, so every test that expects a sale

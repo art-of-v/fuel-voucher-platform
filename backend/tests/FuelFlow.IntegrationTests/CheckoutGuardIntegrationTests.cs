@@ -247,7 +247,8 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
             NullLogger<CreateCheckoutCommandHandler>.Instance,
             new FuelFlowMetrics(),
             NotificationDispatcher.Disabled,
-            Stock(context));
+            Stock(context),
+            TestJournal.HeldMoneyFor(context));
 
     private BulkCheckoutCommandHandler CartHandler(ApplicationDbContext context, CountingAcquirer acquirer)
         => new(
@@ -266,7 +267,8 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
             NullLogger<BulkCheckoutCommandHandler>.Instance,
             NotificationDispatcher.Disabled,
             Stock(context),
-            new FuelFlowMetrics());
+            new FuelFlowMetrics(),
+            TestJournal.HeldMoneyFor(context));
 
     private PackageStockAvailability Stock(ApplicationDbContext context)
         => new(context, new ConfigurationBuilder()

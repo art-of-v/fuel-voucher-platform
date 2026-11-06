@@ -62,6 +62,40 @@ public static class CheckoutGuard
                 cancellationToken);
 
     /// <summary>
+    /// The order for this basket that held money has already paid, if there is one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An order settled from held money leaves the basket's partial index, because it no longer
+    /// awaits payment — so without this read the customer's next tap writes a second order for the
+    /// same cart and asks the acquirer for an invoice on it. The vouchers for the first are already
+    /// on their way, so paying the second would be paying twice. That is the same double charge the
+    /// rest of this guard exists to prevent, arriving from a new direction: not a retry racing an
+    /// attempt, but a retry following one that finished.
+    /// </para>
+    /// <para>
+    /// The three conditions together name the case and nothing else. No invoice means the acquirer
+    /// was never asked for this order, which only the held-money settle does on a checkout;
+    /// <see cref="OrderStatus.PendingFulfillment"/> means fulfilment has not taken it yet; and the
+    /// window is the cart's own, so a customer who comes back in an hour is making a second purchase
+    /// and gets a second invoice.
+    /// </para>
+    /// </remarks>
+    public static Task<Order?> FindPaidFromHeldMoneyAsync(
+        ApplicationDbContext context,
+        string checkoutKey,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+        => context.Orders
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                o => o.CheckoutKey == checkoutKey
+                     && o.Status == OrderStatus.PendingFulfillment
+                     && o.MonobankInvoiceId == null
+                     && o.CreatedAtUtc > nowUtc - ReuseWindow,
+                cancellationToken);
+
+    /// <summary>
     /// Whether this pending order has been waiting long enough that it is no longer the current
     /// attempt - a checkout the customer walked away from. Such an order gives its basket back, and
     /// the next request for that basket is a new purchase.

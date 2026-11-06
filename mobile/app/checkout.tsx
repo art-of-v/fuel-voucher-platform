@@ -158,6 +158,17 @@ export default function CheckoutScreen() {
 
       const response = await createBulkMonobankInvoice(items, legalEntityId);
 
+      if (response.alreadyPaid) {
+        // Trigger 2 (planning #867): the platform was already holding money for this customer that
+        // pays for this cart, so the checkout settled the order instead of asking the bank. There is
+        // no page to open and nothing left to pay — which is why the branch is above the `pageUrl`
+        // check below and not folded into it: the same empty URL means a failure without this flag.
+        clearCart();
+        alert(t('purchase.alreadyPaid'));
+        router.replace('/my-codes');
+        return;
+      }
+
       if (response.pageUrl) {
         // Pay in the app's own payment screen rather than handing the customer to a browser:
         // Monobank returns an embeddable page (displayType:"iframe") plus, when we ask for it,

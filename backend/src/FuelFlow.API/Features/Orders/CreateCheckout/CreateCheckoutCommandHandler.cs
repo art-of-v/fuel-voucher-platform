@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
@@ -26,6 +27,7 @@ public sealed class CreateCheckoutCommandHandler
     private readonly FuelFlowMetrics _metrics;
     private readonly NotificationDispatcher _notifications;
     private readonly PackageStockAvailability _stock;
+    private readonly SettleFromHeldMoneyCommandHandler _heldMoney;
 
     public CreateCheckoutCommandHandler(
         ApplicationDbContext context,
@@ -35,7 +37,8 @@ public sealed class CreateCheckoutCommandHandler
         ILogger<CreateCheckoutCommandHandler> logger,
         FuelFlowMetrics metrics,
         NotificationDispatcher notifications,
-        PackageStockAvailability stock)
+        PackageStockAvailability stock,
+        SettleFromHeldMoneyCommandHandler heldMoney)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
@@ -45,6 +48,7 @@ public sealed class CreateCheckoutCommandHandler
         _metrics = metrics;
         _notifications = notifications;
         _stock = stock;
+        _heldMoney = heldMoney;
     }
 
     public async Task<CreateCheckoutResponse> HandleAsync(
@@ -227,6 +231,27 @@ public sealed class CreateCheckoutCommandHandler
             }
         }
 
+        // An order for this basket that held money already paid is the same purchase, not a new one.
+        // It left the basket's index the moment it settled, so this read is all that stands between a
+        // second tap and a second invoice for fuel whose vouchers are already on their way.
+        var paidAlready = await CheckoutGuard.FindPaidFromHeldMoneyAsync(
+            _context, checkoutKey, SystemClock.UtcNow, cancellationToken);
+
+        if (paidAlready != null)
+        {
+            _logger.LogWarning(
+                "Duplicate checkout for basket {CheckoutKey}; reusing the order held money paid ({OrderId}), "
+                 + "which has no invoice to pay again",
+                checkoutKey, paidAlready.Id);
+
+            return new CreateCheckoutResponse
+            {
+                OrderId = paidAlready.Id,
+                Status = paidAlready.Status.ToString(),
+                AlreadyPaid = true
+            };
+        }
+
         var order = new Order
         {
             Id = Guid.CreateVersion7(),
@@ -307,6 +332,30 @@ public sealed class CreateCheckoutCommandHandler
                 Status = withInvoice.Status.ToString(),
                 MonobankInvoiceId = withInvoice.MonobankInvoiceId,
                 PaymentUrl = withInvoice.MonobankPaymentUrl
+            };
+        }
+
+        // Planning #867 trigger 2: the money can arrive before the order does. When one payment of
+        // exactly this price is already held for this customer, it pays for the order now, and the
+        // acquirer is not asked for an invoice the customer would then pay a second time for the same
+        // fuel.
+        var held = await _heldMoney.HandleAsync(
+            new SettleFromHeldMoneyCommand { OrderId = order.Id, Because = "the checkout" },
+            cancellationToken);
+
+        if (held.Settled)
+        {
+            _logger.LogInformation(
+                "Checkout for basket {CheckoutKey} settled on {PaymentId} held money; no invoice requested",
+                checkoutKey, held.PaymentId);
+
+            _metrics.OrderCreated(order.LegalEntityId.HasValue);
+
+            return new CreateCheckoutResponse
+            {
+                OrderId = order.Id,
+                Status = OrderStatus.PendingFulfillment.ToString(),
+                AlreadyPaid = true
             };
         }
 

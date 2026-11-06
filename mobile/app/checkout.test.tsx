@@ -29,6 +29,7 @@ const mockClearCart = jest.fn();
 const mockCreateInvoice = jest.fn();
 const mockOpenURL = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockLogin = jest.fn();
 
 let mockCart: CartItem[] = [];
@@ -48,7 +49,7 @@ jest.mock('expo-router', () => {
   const { Text: RNText } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
     __esModule: true,
-    useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+    useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
     Redirect: ({ href }: { href: string }) => R.createElement(RNText, { testID: 'redirect' }, href),
   };
 });
@@ -187,6 +188,7 @@ describe('Checkout — what gets sent to the payment brand', () => {
     mockCreateInvoice.mockReset();
     mockOpenURL.mockReset();
     mockPush.mockReset();
+    mockReplace.mockReset();
     mockLogin.mockClear();
     global.alert = jest.fn();
     mockCreateInvoice.mockResolvedValue({
@@ -348,6 +350,7 @@ describe('Checkout — the basket and the payment page', () => {
     mockCreateInvoice.mockReset();
     mockOpenURL.mockReset();
     mockPush.mockReset();
+    mockReplace.mockReset();
     mockLogin.mockClear();
     global.alert = jest.fn();
     mockCreateInvoice.mockResolvedValue({
@@ -415,6 +418,50 @@ describe('Checkout — the basket and the payment page', () => {
     expect(mockOpenURL).not.toHaveBeenCalled();
   });
 
+  it('treats a checkout the held money already paid as a success, not as a missing URL', async () => {
+    // Planning #867 trigger 2: the money arrived before the order did, so the backend settled the
+    // order and asked the bank for nothing. The body then has no `pageUrl` — the same shape the test
+    // above reads as a failure — and only the `alreadyPaid` flag tells them apart. Getting it wrong
+    // in this direction is the worst of both: an order paid twice, or a paid order stranded.
+    basket();
+    mockCreateInvoice.mockResolvedValue({
+      orderIds: ['o-9'],
+      invoiceId: '',
+      pageUrl: '',
+      alreadyPaid: true,
+    });
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.alreadyPaid'));
+    expect(mockClearCart).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/my-codes');
+    // Not the payment screen: there is no acquirer page to render, and /pay would show its
+    // "missing link" state over an order that is already fulfilled-ready.
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockOpenURL).not.toHaveBeenCalled();
+  });
+
+  it('still explains itself when the server answers without the flag or a URL', async () => {
+    // The flag is additive: a backend that predates it sends the same body as before, and that is
+    // still a failure. Asserting the pair keeps the new branch from widening into a catch-all.
+    basket();
+    mockCreateInvoice.mockResolvedValue({
+      orderIds: [],
+      invoiceId: 'inv-3',
+      pageUrl: '',
+      alreadyPaid: false,
+    });
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('No payment URL received'));
+    expect(mockClearCart).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it('keeps the basket when the invoice request fails', async () => {
     basket();
     mockCreateInvoice.mockRejectedValue(new Error('Brand unavailable'));
@@ -470,6 +517,7 @@ describe('Checkout — getting to the screen at all', () => {
     mockCreateInvoice.mockReset();
     mockOpenURL.mockReset();
     mockPush.mockReset();
+    mockReplace.mockReset();
     mockLogin.mockClear();
     global.alert = jest.fn();
   });

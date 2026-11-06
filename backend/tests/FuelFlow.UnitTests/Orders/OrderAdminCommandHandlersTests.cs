@@ -74,7 +74,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
             NotificationDispatcher.Disabled,
             new FuelFlow.Features.Vouchers.Availability.PackageStockAvailability(_context, new ConfigurationBuilder().Build()),
-            new FuelFlow.SharedKernel.Observability.FuelFlowMetrics());
+            new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
+            TestJournal.HeldMoneyFor(_context));
 
         _deleteOrderHandler = new DeleteOrderCommandHandler(_context);
         _updateOrderStatusHandler = new UpdateOrderStatusCommandHandler(_context);

@@ -34,6 +34,10 @@ export const de: Record<string, string> = {
   // Die Bank wollte die Zahlung nicht öffnen. Sagt es klar und beruhigt: nichts wurde belastet.
   'purchase.error.providerUnavailable':
     'Der Zahlungsdienst nimmt derzeit keine Zahlungen an. Es wurde nichts belastet - versuchen Sie es in wenigen Minuten erneut.',
+  // Die Kasse fand Geld, das für diese Bestellung schon gehalten wurde: sie ist beglichen, bezahlen
+  // muss nichts mehr. Sagt beides und wo die Gutscheine stehen.
+  'purchase.alreadyPaid':
+    'Dieser Warenkorb ist bereits bezahlt - das Geld dafür hatten wir schon. Es wird nichts mehr abgebucht; Ihre Gutscheine liegen auf dem Bildschirm „Meine Codes“.',
   'renew.error.providerTermExhausted':
     'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
 

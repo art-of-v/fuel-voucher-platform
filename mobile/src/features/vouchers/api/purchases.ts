@@ -129,7 +129,13 @@ function parseSuccessBody(response: Response, bodyText: string) {
 export async function createMonobankInvoice(
   data: PurchaseData,
   legalEntityId?: string | null,
-): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string; appUrl?: string }> {
+): Promise<{
+  purchaseId: number;
+  invoiceId: string;
+  pageUrl: string;
+  appUrl?: string;
+  alreadyPaid: boolean;
+}> {
   const response = await apiFetch('/api/purchases', {
     method: 'POST',
     body: JSON.stringify({
@@ -158,13 +164,23 @@ export async function createMonobankInvoice(
     // Only present when the backend asked Monobank for `withAppUrl`. It is NOT persisted on the
     // order, so an order re-opened from the wallet has none - callers must tolerate undefined.
     appUrl: result.appUrl ?? undefined,
+    // Trigger 2 (planning #867): the money for this order was already declared and held, so the
+    // checkout settled it and asked the bank for nothing. Read as a flag, never inferred from a
+    // missing `pageUrl` — the two look identical in the body and mean the opposite.
+    alreadyPaid: result.alreadyPaid === true,
   };
 }
 
 export async function createBulkMonobankInvoice(
   items: PurchaseData[],
   legalEntityId?: string | null,
-): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string; appUrl?: string }> {
+): Promise<{
+  orderIds: string[];
+  invoiceId: string;
+  pageUrl: string;
+  appUrl?: string;
+  alreadyPaid: boolean;
+}> {
   const response = await apiFetch('/api/purchases/bulk', {
     method: 'POST',
     body: JSON.stringify({
@@ -200,5 +216,9 @@ export async function createBulkMonobankInvoice(
     // Only present when the backend asked Monobank for `withAppUrl`. It is NOT persisted on the
     // order, so an order re-opened from the wallet has none - callers must tolerate undefined.
     appUrl: result.appUrl ?? undefined,
+    // Trigger 2 (planning #867): money the platform was already holding for this customer paid for
+    // the whole cart, so no invoice was asked for and there is no page to open. A flag, not an
+    // inference from the empty `pageUrl` above: an older bundle reads that as a payment failure.
+    alreadyPaid: result.alreadyPaid === true,
   };
 }
