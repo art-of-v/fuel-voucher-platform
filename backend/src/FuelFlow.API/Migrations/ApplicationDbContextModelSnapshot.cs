@@ -2113,6 +2113,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("price")
                         .HasComment("What the customer is charged for the order, in UAH. The order's own number - the linetotals are what the price is made of, and this is what was agreed.");
 
+                    b.Property<string>("SettlementRoute")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("settlement_route")
+                        .HasComment("How the money for this order is expected to arrive: 'Acquirer' - the customer taps pay and the checkout asks Monobank for an invoice; 'Declared' - the order spends money the platform holds or is waiting for, and the acquirer is never asked. NULL for an order nobody tapped their way into (an issuance, an operator's paper renewal). Written once, at creation.");
+
                     b.Property<Guid?>("SourceOrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("source_order_id")
@@ -2177,9 +2183,13 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("orders", null, t =>
                         {
+                            t.HasCheckConstraint("ck_order_declared_route_asks_no_acquirer", "settlement_route IS DISTINCT FROM 'Declared'\nOR (monobank_invoice_id IS NULL AND monobank_payment_url IS NULL)");
+
                             t.HasCheckConstraint("ck_order_kind", "kind IN ('Purchase', 'Renewal', 'ReceivedFromCompany')");
 
                             t.HasCheckConstraint("ck_order_price_non_negative", "price >= 0");
+
+                            t.HasCheckConstraint("ck_order_settlement_route", "settlement_route IS NULL OR settlement_route IN ('Acquirer', 'Declared')");
 
                             t.HasCheckConstraint("ck_order_status", "status IN ('PendingPayment', 'Paid', 'PendingFulfillment', 'PartiallyFulfilled',\n           'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled')");
                         });

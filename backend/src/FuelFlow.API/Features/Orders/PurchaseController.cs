@@ -142,6 +142,13 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         {
             return ApiError.Conflict(ex.Message, PackageOutOfStockException.Code);
         }
+        catch (CheckoutAlreadyInPaymentException ex)
+        {
+            // The other button was pressed while this cart's order still had money in motion. A
+            // distinct code, because the customer's way out is not a retry: that order has to be paid
+            // or deleted first.
+            return ApiError.Conflict(ex.Message, CheckoutAlreadyInPaymentException.Code);
+        }
         catch (AccountInactiveException ex)
         {
             return ApiError.Forbidden(ex.Message, AccountInactiveException.Code);
@@ -357,6 +364,13 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (PackageOutOfStockException ex)
         {
             return ApiError.Conflict(ex.Message, PackageOutOfStockException.Code);
+        }
+        catch (CheckoutAlreadyInPaymentException ex)
+        {
+            // The other button was pressed while this cart's order still had money in motion. A
+            // distinct code, because the customer's way out is not a retry: that order has to be paid
+            // or deleted first.
+            return ApiError.Conflict(ex.Message, CheckoutAlreadyInPaymentException.Code);
         }
         catch (AccountInactiveException ex)
         {
