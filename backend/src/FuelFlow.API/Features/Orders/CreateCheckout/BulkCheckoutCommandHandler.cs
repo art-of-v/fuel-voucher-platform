@@ -433,11 +433,12 @@ private readonly RuntimeSettingsService _runtimeSettings;
             };
         }
 
-        // Planning #867 trigger 2: the money can arrive before the order does. When one payment of
-        // exactly this price is already held for this customer, it pays for the order now, and the
-        // acquirer is not asked for an invoice the customer would then pay a second time for the same
-        // fuel. Nothing is settled here that the settle core's own rules would not settle for an
-        // operator's click; what changes is that nobody has to be watching a tab for it.
+        // Planning #867 trigger 2: the money can arrive before the order does. When what this order
+        // still owes is sitting in this customer's balance, the balance pays for it now — out of one
+        // transfer or across several — and the acquirer is not asked for an invoice the customer would
+        // then pay a second time for the same fuel. Nothing is settled here that the settle core's own
+        // rules would not settle for an operator's click; what changes is that nobody has to be
+        // watching a tab for it.
         var held = await _heldMoney.HandleAsync(
             new SettleFromHeldMoneyCommand { OrderId = order.Id, Because = "the bulk checkout" },
             cancellationToken);
@@ -445,8 +446,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
         if (held.Settled)
         {
             _logger.LogInformation(
-                "Bulk checkout for cart {CheckoutKey} settled on {PaymentId} held money; no invoice requested",
-                checkoutKey, held.PaymentId);
+                "Bulk checkout for cart {CheckoutKey} settled on held money ({PaymentIds}); no invoice requested",
+                checkoutKey, string.Join(", ", held.PaymentIds));
 
             return new BulkCheckoutResponse
             {

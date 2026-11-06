@@ -41,6 +41,13 @@ namespace FuelFlow.IntegrationTests.Orders;
 /// fuel that is already on its way, so "zero" is the result that matters; the rest proves the settle
 /// itself is complete — money, order, outbox and books, not three of the four.
 /// </para>
+/// <para>
+/// What is asserted about the money is the <b>draw</b>, not an attached payment. The account is a
+/// balance and a balance is spent: one transfer can pay for several orders and one order can be paid
+/// from several transfers, neither of which <c>payments.order_id</c> can say. The rows that say it are
+/// <c>payment_allocations</c>, and the database, not this handler, keeps them from spending the same
+/// money twice — <see cref="Payments.HeldMoneyDrawGuardTests"/> stands that part up.
+/// </para>
 /// </remarks>
 [Collection("Integration Tests")]
 public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabaseFixture>, IAsyncLifetime
@@ -87,7 +94,22 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             + "reconciliation gets misled");
 
         (await context.Payments.AsNoTracking().CountAsync(p => p.OrderId == order.Id))
-            .Should().Be(1, "the held money is now the order's payment");
+            .Should().Be(0, "the declared transfer is money to a customer, not a charge for this sale");
+
+        var draws = await context.PaymentAllocations.AsNoTracking()
+            .Where(a => a.OrderId == order.Id)
+            .Select(a => new { a.PaymentId, a.AmountUah })
+            .ToListAsync();
+
+        draws.Should().HaveCount(1, "the order is paid by a draw on the balance, which is what lets one "
+            + "transfer pay for several sales instead of being claimed whole by the first");
+        draws.Single().AmountUah.Should().Be(BasketTotal, "the order owes its price and the balance covered it");
+
+        (await OrderPayment.MoneyOnItAsync(context, order.Id))
+            .Should().Be(BasketTotal, "the gate that decides whether fuel is handed over has to see the draw");
+
+        (await PaymentBalance.AvailableAsync(context, userId))
+            .Should().BeEmpty("the whole transfer is committed to this order now");
 
         (await context.OutboxEvents.AsNoTracking().CountAsync(e => e.EventType == OutboxEventType.OrderCreated))
             .Should().Be(1, "the settled order has to reach the job that claims stock for it");
@@ -134,25 +156,124 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             .Status.Should().Be(OrderStatus.PendingPayment);
         (await context.Payments.AsNoTracking().CountAsync(p => p.OrderId == null))
             .Should().Be(1, "the short money stays held, where an operator can see it");
+
+        (await context.PaymentAllocations.AsNoTracking().CountAsync())
+            .Should().Be(0, "a shortfall that spent the balance would leave the customer with less money "
+                + "and the order still unpaid");
+        (await PaymentBalance.AvailableAsync(context, userId)).Single().RemainingUah
+            .Should().Be(BasketTotal - 100m, "the short money is untouched and still the customer's to spend");
     }
 
+    /// <summary>
+    /// One declared transfer, two sales. The case the ruling was about: finance says 1 000,00 ₴ arrived
+    /// for this customer, the customer buys twice, and the account cannot answer the second order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The second cart is a different fuel on purpose. The same cart tapped twice is a duplicate, and
+    /// the checkout's answer to a duplicate is the order it already paid for — see
+    /// <see cref="A_second_tap_for_a_cart_the_held_money_paid_does_not_become_a_second_invoice"/>. A
+    /// second, different sale is the case where the balance has to be asked again and can say no.
+    /// </para>
+    /// <para>
+    /// The first cart settles and the second is refused, so the money left (100,00 ₴) stays visible in
+    /// the panel and the second order goes to the acquirer instead of dying on an unpaid invoice nobody
+    /// meant to send. The 800,00 ₴ that was never declared is the company's news, and the refusal is
+    /// what says it.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task Two_payments_of_that_amount_are_not_guessed_between()
+    public async Task One_transfer_pays_the_first_cart_and_the_second_order_is_short()
     {
         var userId = await SeedAsync();
-        await SeedHeldMoneyAsync(userId, BasketTotal);
-        await SeedHeldMoneyAsync(userId, BasketTotal);
+        await SeedHeldMoneyAsync(userId, 1_000m);
+
+        var acquirer = new CountingAcquirer();
+
+        using var first = CreateContext();
+        var settled = await CartHandler(first, acquirer).HandleAsync(CartCommand(userId));
+
+        settled.AlreadyPaid.Should().BeTrue("900,00 ₴ of a balance pays for a 900,00 ₴ order");
+        acquirer.InvoicesCreated.Should().Be(0);
+
+        using var second = CreateContext();
+        var shortCart = await CartHandler(second, acquirer).HandleAsync(CartCommand(userId, "okko-dp"));
+
+        shortCart.AlreadyPaid.Should().BeFalse("the order cannot be fulfilled on money the account does not hold");
+        acquirer.InvoicesCreated.Should().Be(1, "the second sale is the acquirer's until somebody declares more");
+
+        using var verify = CreateContext();
+        (await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == shortCart.OrderIds.Single()))
+            .Status.Should().Be(OrderStatus.PendingPayment, "a short balance leaves the order waiting, not settled");
+
+        (await verify.PaymentAllocations.AsNoTracking().CountAsync())
+            .Should().Be(1, "the shortfall draws nothing — the last 100,00 ₴ stays free for the next order "
+                + "instead of being spent on one that still could not settle");
+
+        var held = await PaymentBalance.AvailableAsync(verify, userId);
+        held.Should().HaveCount(1);
+        held.Single().RemainingUah.Should().Be(100m, "what the first cart took is gone and the rest is still the customer's");
+    }
+
+    /// <summary>
+    /// A balance is spent across the transfers in it, oldest first, and no single one of them has to be
+    /// big enough.
+    /// </summary>
+    [Fact]
+    public async Task A_cart_bigger_than_any_one_transfer_is_paid_from_two_of_them()
+    {
+        var userId = await SeedAsync();
+        var older = await SeedHeldMoneyAsync(userId, 500m, hoursAgo: 48);
+        var newer = await SeedHeldMoneyAsync(userId, 500m, hoursAgo: 8);
 
         var acquirer = new CountingAcquirer();
         using var context = CreateContext();
 
         var response = await CartHandler(context, acquirer).HandleAsync(CartCommand(userId));
 
-        response.AlreadyPaid.Should().BeFalse();
-        acquirer.InvoicesCreated.Should().Be(1);
+        response.AlreadyPaid.Should().BeTrue("the account holds 1 000,00 ₴ and the order owes 900,00 ₴");
+        acquirer.InvoicesCreated.Should().Be(0, "asking the bank for money the customer has already sent is a second charge");
 
-        (await context.Payments.AsNoTracking().CountAsync(p => p.OrderId == null))
-            .Should().Be(2, "which of the two transfers pays for this order is a person's decision, not a default");
+        var order = response.OrderIds.Single();
+        var draws = await context.PaymentAllocations.AsNoTracking()
+            .Where(a => a.OrderId == order)
+            .Select(a => new { a.PaymentId, a.AmountUah })
+            .ToListAsync();
+
+        draws.Should().HaveCount(2, "one transfer does not cover it, so the draw cuts across both");
+        draws.Single(d => d.PaymentId == older).AmountUah.Should().Be(500m, "the money waiting longest is emptied first");
+        draws.Single(d => d.PaymentId == newer).AmountUah.Should().Be(400m);
+
+        (await OrderPayment.MoneyOnItAsync(context, order)).Should().Be(BasketTotal);
+        (await PaymentBalance.AvailableAsync(context, userId)).Single().RemainingUah
+            .Should().Be(100m, "the newest transfer keeps the change, and it is still spendable");
+    }
+
+    /// <summary>
+    /// Two transfers for the same price as the cart used to be a coin-flip the code refused to take, and
+    /// it left the order unpaid. A balance does not need the choice: it spends the oldest money and the
+    /// customer's order settles.
+    /// </summary>
+    [Fact]
+    public async Task Two_transfers_of_that_amount_are_answered_from_the_older_one()
+    {
+        var userId = await SeedAsync();
+        var older = await SeedHeldMoneyAsync(userId, BasketTotal, hoursAgo: 48);
+        await SeedHeldMoneyAsync(userId, BasketTotal, hoursAgo: 8);
+
+        var acquirer = new CountingAcquirer();
+        using var context = CreateContext();
+
+        var response = await CartHandler(context, acquirer).HandleAsync(CartCommand(userId));
+
+        response.AlreadyPaid.Should().BeTrue("two payments are not two guesses; they are a balance");
+        acquirer.InvoicesCreated.Should().Be(0);
+
+        (await context.PaymentAllocations.AsNoTracking()
+                .Where(a => a.OrderId == response.OrderIds.Single())
+                .Select(a => a.PaymentId).ToListAsync())
+            .Should().BeEquivalentTo([older], "the draw takes the money that has been waiting longest, so the "
+                + "rule is not a choice between the customer's own transfers");
     }
 
     /// <summary>
@@ -184,7 +305,7 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             .Should().Be(1, "one cart, one order, whatever the phone did in between");
     }
 
-    private static BulkCheckoutCommand CartCommand(Guid userId) => new()
+    private static BulkCheckoutCommand CartCommand(Guid userId, string fuelKey = "okko-95") => new()
     {
         UserId = userId,
         Items =
@@ -193,7 +314,7 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             {
                 BrandId = BrandIds.Okko,
                 BrandName = "okko",
-                FuelTypeId = ToUuid("okko-95"),
+                FuelTypeId = ToUuid(fuelKey),
                 Liters = Liters,
                 Quantity = Quantity,
                 Price = PricePerLiter * Liters
@@ -257,9 +378,9 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             .Options, TestQrCipher.Instance);
 
     /// <summary>
-    /// A customer with stock behind a sellable fuel — the three things a checkout needs. The amount
-    /// the test holds money for is always this basket's total, so a settle here is the rule matching
-    /// and not a coincidence of price.
+    /// A customer with stock behind two sellable fuels — the three things a checkout needs. Every cart
+    /// in this file is the same size and the same price, so what separates a settle from a shortfall is
+    /// only how much the account holds, never what the order happens to cost.
     /// </summary>
     private async Task<Guid> SeedAsync()
     {
@@ -285,46 +406,56 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             UpdatedAtUtc = TestClock.UtcNow
         });
 
-        var fuel = await context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-95"));
-        fuel.SupplierPricePerLiter = CostPerLiter;
-        fuel.MarginUahPerLiter = PricePerLiter - CostPerLiter;
-        fuel.UpdatedAtUtc = TestClock.UtcNow;
-
-        var pool = DataKinds.Real;
-        if (!await context.FuelNominals.AnyAsync(n => n.FuelTypeId == fuel.Id && n.DataKind == pool && n.Liters == Liters))
+        // Two fuels, priced and stocked the same way, because a second DIFFERENT sale is what makes a
+        // balance say no: the same cart tapped twice is a duplicate, and the checkout answers that with
+        // the order it already paid for.
+        foreach (var fuelKey in new[] { "okko-95", "okko-dp" })
         {
-            context.FuelNominals.Add(new FuelNominal { FuelTypeId = fuel.Id, DataKind = pool, Liters = Liters });
+            var fuel = await context.FuelTypes.FirstAsync(f => f.Id == ToUuid(fuelKey));
+            fuel.SupplierPricePerLiter = CostPerLiter;
+            fuel.MarginUahPerLiter = PricePerLiter - CostPerLiter;
+            fuel.UpdatedAtUtc = TestClock.UtcNow;
+
+            var pool = DataKinds.Real;
+            if (!await context.FuelNominals.AnyAsync(n => n.FuelTypeId == fuel.Id && n.DataKind == pool && n.Liters == Liters))
+            {
+                context.FuelNominals.Add(new FuelNominal { FuelTypeId = fuel.Id, DataKind = pool, Liters = Liters });
+            }
+
+            context.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = Guid.CreateVersion7(),
+                BrandId = BrandIds.ForSlug("okko"),
+                Brand = "okko",
+                FuelTypeId = fuel.Id,
+                Liters = Liters,
+                DataKind = DataKinds.Real,
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+                VoucherNumber = $"HELD-{Guid.NewGuid():N}"[..16],
+                QrPayload = $"qr-{Guid.NewGuid():N}",
+                Status = VoucherStatus.Available,
+                CostPerLiter = CostPerLiter,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            });
         }
-
-        context.FuelVouchers.Add(new FuelVoucher
-        {
-            Id = Guid.CreateVersion7(),
-            BrandId = BrandIds.ForSlug("okko"),
-            Brand = "okko",
-            FuelTypeId = fuel.Id,
-            Liters = Liters,
-            DataKind = DataKinds.Real,
-            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
-            VoucherNumber = $"HELD-{Guid.NewGuid():N}"[..16],
-            QrPayload = $"qr-{Guid.NewGuid():N}",
-            Status = VoucherStatus.Available,
-            CostPerLiter = CostPerLiter,
-            CreatedAtUtc = TestClock.UtcNow,
-            UpdatedAtUtc = TestClock.UtcNow
-        });
 
         await context.SaveChangesAsync();
         return userId;
     }
 
-    /// <summary>Money declared for a customer with no order against it — exactly what the channel holds.</summary>
-    private async Task SeedHeldMoneyAsync(Guid userId, decimal amount)
+    /// <summary>
+    /// Money declared for a customer with no order against it — exactly what the channel holds. The id
+    /// comes back because which transfer a draw spends is one of the things these tests are about, and
+    /// it has to be named rather than found by which row a query happens to return first.
+    /// </summary>
+    private async Task<Guid> SeedHeldMoneyAsync(Guid userId, decimal amount, int hoursAgo = 0)
     {
         using var context = CreateContext();
-        var now = TestClock.UtcNow;
+        var paidAt = TestClock.UtcNow.AddHours(-hoursAgo);
 
-        context.Payments.Add(new Payment
+        var payment = new Payment
         {
             Id = Guid.CreateVersion7(),
             Kind = PaymentKind.Capture,
@@ -335,14 +466,16 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
             AmountKopecks = (long)Math.Round(amount * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = now,
+            PaidAtUtc = paidAt,
             CreatedByUserName = "finance",
             IsAutomatic = true,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now
-        });
+            CreatedAtUtc = paidAt,
+            UpdatedAtUtc = paidAt
+        };
 
+        context.Payments.Add(payment);
         await context.SaveChangesAsync();
+        return payment.Id;
     }
 
     /// <summary>The acquirer, counting only. Nothing here races, so no invoice is ever held.</summary>

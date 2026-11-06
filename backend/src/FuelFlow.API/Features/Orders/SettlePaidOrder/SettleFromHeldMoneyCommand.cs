@@ -1,10 +1,8 @@
-using FuelFlow.Features.Orders.SharedModels;
-
 namespace FuelFlow.Features.Orders.SettlePaidOrder;
 
 /// <summary>
-/// Pay this order out of the money we already hold for the customer, if one payment of exactly its
-/// price is sitting unattached.
+/// Pay this order out of the money we already hold for the customer, if the balance covers what the
+/// order still owes.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,8 +15,9 @@ namespace FuelFlow.Features.Orders.SettlePaidOrder;
 /// </para>
 /// <para>
 /// It is asked for by a path that has just written an order, and it answers whether that order is
-/// paid. It is not a general "does this customer have money": the match is one payment, for exactly
-/// this price, belonging to exactly this customer, attached to nothing.
+/// paid. It is not a general "does this customer have money": the question is whether what this order
+/// still owes is sitting in this customer's balance, and the answer is a draw across however many
+/// transfers it takes — or the shortfall, when it does not.
 /// </para>
 /// </remarks>
 public sealed record SettleFromHeldMoneyCommand
@@ -39,44 +38,54 @@ public sealed record SettleFromHeldMoneyCommand
 public enum HeldMoneyOutcome
 {
     /// <summary>
-    /// Nothing is held for this customer at this price. The normal answer, and the one most checkouts
+    /// Nothing is held for this customer at all. The normal answer, and the one most checkouts
     /// get: the customer simply has not paid yet.
     /// </summary>
     NothingHeld,
 
     /// <summary>
-    /// More than one unattached payment matches. Which one pays for this order is not something to
-    /// guess, and the same rule the settlement channel applies when a customer has two open orders.
-    /// An operator decides.
+    /// Money is held and it is not enough. Different from <see cref="NothingHeld"/> because the two
+    /// want different sentences: nothing held is an order that can wait for a transfer that has not
+    /// arrived, and short money is an account an operator or a customer has to look at and decide
+    /// about. The figure is in <see cref="SettleFromHeldMoneyResult.Reason"/> and in
+    /// <see cref="SettleFromHeldMoneyResult.ShortfallUah"/>.
     /// </summary>
-    SeveralToChoose,
+    BalanceIsShort,
 
-    /// <summary>The order is not in a state money can pay for, so nothing was attached.</summary>
+    /// <summary>The order is not in a state money can pay for, so nothing was drawn.</summary>
     OrderNotWaiting,
 
     /// <summary>
-    /// The money was attached and the settle core moved the order. The acquirer must not be asked for
-    /// an invoice now: an invoice is a request to be charged, and this customer has already been.
+    /// The balance covered what the order owed, the draws were written, and the settle core moved the
+    /// order. The acquirer must not be asked for an invoice now: an invoice is a request to be charged,
+    /// and this customer has already been.
     /// </summary>
     Settled,
 
     /// <summary>
-    /// The money was attached and the core still declined, for the reason in
-    /// <see cref="SettleFromHeldMoneyResult.Reason"/>. The payment keeps the order it is now attached
-    /// to: money that arrived for a sale belongs on that sale whether or not it also settled it.
+    /// The draws were written and the core still declined, for the reason in
+    /// <see cref="SettleFromHeldMoneyResult.Reason"/>. They were then taken back: the order did not
+    /// become a sale, so nothing had been answered for, and money left in a draw nobody can see the
+    /// point of is money missing from a balance for no reason.
     /// </summary>
-    AttachedButDeclined,
+    DrawRefused,
 }
 
 /// <summary>
-/// What happened to the held money, and which payment row is now the evidence.
+/// What happened to the held money, and which payment rows are now the evidence.
 /// </summary>
 public sealed record SettleFromHeldMoneyResult
 {
     public required HeldMoneyOutcome Outcome { get; init; }
 
-    /// <summary>The payment that paid for it, when one was attached.</summary>
-    public Guid? PaymentId { get; init; }
+    /// <summary>
+    /// The payments drawn on, oldest first. Several, because one transfer is not one sale and one sale
+    /// is not one transfer; empty when the order settled on money that was already on it.
+    /// </summary>
+    public IReadOnlyList<Guid> PaymentIds { get; init; } = [];
+
+    /// <summary>What the balance did not cover, when it did not cover it.</summary>
+    public decimal ShortfallUah { get; init; }
 
     /// <summary>A sentence safe to show a human, when the order did not settle.</summary>
     public string? Reason { get; init; }
@@ -89,6 +98,15 @@ public sealed record SettleFromHeldMoneyResult
     public static SettleFromHeldMoneyResult Declined(HeldMoneyOutcome outcome, string reason) =>
         new() { Outcome = outcome, Reason = reason };
 
-    public static SettleFromHeldMoneyResult PaidBy(Guid paymentId) =>
-        new() { Outcome = HeldMoneyOutcome.Settled, PaymentId = paymentId };
+    public static SettleFromHeldMoneyResult Short(decimal shortfallUah, decimal heldUah, decimal owedUah) =>
+        new()
+        {
+            Outcome = HeldMoneyOutcome.BalanceIsShort,
+            ShortfallUah = shortfallUah,
+            Reason = FormattableString.Invariant(
+                $"The account holds {heldUah:0.00} ₴, this order owes {owedUah:0.00} ₴, so it is {shortfallUah:0.00} ₴ short.")
+        };
+
+    public static SettleFromHeldMoneyResult PaidBy(IReadOnlyList<Guid> paymentIds) =>
+        new() { Outcome = HeldMoneyOutcome.Settled, PaymentIds = paymentIds };
 }

@@ -3931,6 +3931,49 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.Payments.SharedModels.PaymentAllocation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AmountUah")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount_uah")
+                        .HasComment("The slice drawn. Same type as orders.price and payments.amount_uah, so the money gate adds the three without a conversion. The rows sharing a payment never sum above its amount - that is a trigger, because a CHECK cannot read another table.");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the platform decided. The money's own date stays on payments.paid_at_utc: when the transfer arrived and when it was assigned to a sale are two facts, and a report that conflates them says the company held money it did not yet hold.");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id")
+                        .HasComment("The sale this much money is answering for. Not a copy of payments.order_id: that column is the whole charge on one order, and it cannot say that a transfer covered part of this one and part of another.");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id")
+                        .HasComment("The money drawn on. At write time it is a succeeded capture naming no order; the trigger assert_payment_draws_on_held_money refuses any other row, because a payment already attached to an order is counted on that order in full and a second claim on it would be the same banknote twice.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_payment_allocations_order");
+
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("ix_payment_allocations_payment");
+
+                    b.ToTable("payment_allocations", null, t =>
+                        {
+                            t.HasComment("How much of one held payment pays for one order. The table that makes a declared transfer a balance rather than a voucher for exactly one sale.");
+
+                            t.HasCheckConstraint("ck_payment_allocations_amount_positive", "amount_uah > 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Payments.SharedModels.WebhookEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5863,6 +5906,25 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FuelFlow.Payments.SharedModels.PaymentAllocation", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.Payments.SharedModels.Payment", "Payment")
+                        .WithMany("Allocations")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Payment");
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.BrandStation", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.Brand", "Brand")
@@ -6001,6 +6063,8 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Payments.SharedModels.Payment", b =>
                 {
+                    b.Navigation("Allocations");
+
                     b.Navigation("SettlementMessages");
                 });
 
