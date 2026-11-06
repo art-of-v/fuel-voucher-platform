@@ -90,7 +90,9 @@ public sealed class User
     public bool IsQaAccount { get; set; }
 
     /// <summary>
-    /// When this customer was given access to the promotion, or NULL when they have none.
+    /// When this customer was given access to the promotion, or NULL when they have none. The split of
+    /// the customer base into the two groups this column names is the owner's ruling of 2026-11-06
+    /// (planning #889).
     /// <para>
     /// <b>Why a timestamp and not a boolean.</b> The two states the product has to answer are "may they
     /// buy under the promotion" and "since when, and who said so" — and a boolean carries only the

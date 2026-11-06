@@ -124,7 +124,7 @@ internal static class AuthPolicies
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Manager, Admin and ProductOwner. The owner's ruling of 2026-11-06: a normal
+    /// Manager, Admin and ProductOwner. The owner's ruling of 2026-11-06 (planning #889): a normal
     /// customer has no access to the promotion at all, and only a staff member not lower than a Manager
     /// may give it. That is the money tier, so it is not the account-administration tier — a Manager
     /// may decide who may be paid this way and still may not mint a role.
