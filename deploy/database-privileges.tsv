@@ -73,6 +73,7 @@ public	order_line_items	SIUD	-	DeletedUnpaidOrderCleanup removes the lines of ab
 public	orders	SIUD	-	Order lifecycle incl. hard delete of abandoned unpaid orders; RLS-covered.
 public	outbox_events	SIU	SD	The dispatcher closes a row by updating it. The grant is on the table, not on two columns: EF Core's Update(entity) writes every column of the row, so a column-level grant refuses the dispatcher's own save. The row is still never deletable by the traffic role; the purge empties it as maintenance.
 public	parties	SIUD	-	Party supertype rows behind persons and companies.
+public	payment_allocations	SIUD	-	The draws on held money: inserted when an order spends the balance, taken back inside the same transaction when the settle declines. assert_payment_draws_on_held_money freezes a committed draw, so the UPDATE this grant carries is never what a settled sale uses.
 public	payments	SIU	-	Payment status moves through webhooks; a payment is never deleted.
 public	provider_event_outbox	SI	SD	The admin change audit trail: inserted by AuditEventService, read by the audit screens, purged after a year as maintenance.
 public	purchase_batches	SIUD	S	Costing records for imported stock; never purged. Maintenance reads it only for the voucher_imports reference check.
