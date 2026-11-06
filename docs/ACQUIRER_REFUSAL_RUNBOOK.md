@@ -43,11 +43,25 @@ has it** — the fix is on `main`, not on a device, and a 503 from us is still `
 Read those 401s as the signature of an outage, not as an attack: a refusal wave and a replay wave arrive
 together.
 
+The same outage also left a tap that said nothing. An order left by a refused attempt has no payment URL,
+and yet the wallet offers **Pay** on it, because the status is honest — the money really is outstanding.
+Until app PR #1704 that swipe returned silently, and so did the renewal screen when the checkout answered
+success with an empty `paymentUrl`: the lost-race reuse at
+`Features/Vouchers/Renewal/Checkout/RenewalCheckoutCommandHandler.cs:436` hands back the winner's order
+whether or not its invoice ever came. So a customer who had just been told the purchase failed pressed Pay
+and the phone gave them nothing, with no way to tell "not charged" from "charged and lost". Both taps now
+say the sentence: no payment link, nothing was charged, and what to do next. They still do not navigate —
+`/pay` with an empty URL only renders its own missing-link screen, which is the same dead end one level
+deeper. **In progress as this is written: app PR #1704.** The change is client-side, so the words reach a
+phone with an OTA bundle, not with the merge, and the bundle note above applies to it too.
+
 ## What the orders do
 
 Each refused attempt leaves one `PendingPayment` order with `monobank_invoice_id IS NULL`. The attempt
 is the record of what was tried, and the basket reservation is released deliberately
-(`CheckoutGuard.Release`), so the customer's next tap works and no stock is held hostage.
+(`CheckoutGuard.Release`), so the customer's next tap works and no stock is held hostage. That next tap is
+a new order: nothing on the old one can be resumed, which is why the wallet's Pay on one of these rows has
+only a sentence to give (see above).
 
 What is NOT a decision is the row itself: nothing ages those rows out, and that is a gap rather than a
 policy — planning #875 owns the ruling, and this is worth knowing before reading the admin purchases
