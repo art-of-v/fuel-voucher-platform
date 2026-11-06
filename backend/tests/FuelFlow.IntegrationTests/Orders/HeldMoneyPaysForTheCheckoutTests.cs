@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
@@ -277,6 +278,37 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
     }
 
     /// <summary>
+    /// The branch the price gate sits above, so that the gate is known not to have swallowed it: money
+    /// an operator placed on the order by hand (planning #862) needs no draw, only the settle the
+    /// invoice was standing in the way of.
+    /// </summary>
+    [Fact]
+    public async Task Money_already_on_the_order_is_settled_without_a_draw()
+    {
+        var userId = await SeedAsync();
+
+        var acquirer = new CountingAcquirer();
+        using var context = CreateContext();
+        var invoiceAsked = await CartHandler(context, acquirer).HandleAsync(CartCommand(userId));
+        var orderId = invoiceAsked.OrderIds.Single();
+        acquirer.InvoicesCreated.Should().Be(1, "with an empty account the checkout is the ordinary one");
+
+        await SeedAttachedMoneyAsync(orderId, userId, BasketTotal);
+
+        var result = await TestJournal.HeldMoneyFor(context)
+            .HandleAsync(new SettleFromHeldMoneyCommand { OrderId = orderId, Because = "the test" });
+
+        result.Settled.Should().BeTrue(
+            "the money is on the order and covers it; the only thing missing was the settle");
+        result.PaymentIds.Should().BeEmpty("nothing was drawn, so there is no transfer this answer names");
+
+        (await context.PaymentAllocations.AsNoTracking().CountAsync(a => a.OrderId == orderId))
+            .Should().Be(0, "an attached payment is counted whole, and drawing it as well would spend it twice");
+        (await context.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId)).Status
+            .Should().Be(OrderStatus.PendingFulfillment);
+    }
+
+    /// <summary>
     /// The retry that follows a settled checkout. An order leaves the basket's partial index when it
     /// settles, so without the guard's second read a customer whose phone shows an error — a bundle
     /// older than this change has nothing to open and says so — would tap again and be handed an
@@ -476,6 +508,35 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
         context.Payments.Add(payment);
         await context.SaveChangesAsync();
         return payment.Id;
+    }
+
+    /// <summary>
+    /// Money an operator has placed on one order: <c>payments.order_id</c> set, no draw behind it. The
+    /// shape the panel's place action writes, and the one the whole-amount read is there for.
+    /// </summary>
+    private async Task SeedAttachedMoneyAsync(Guid orderId, Guid userId, decimal amount)
+    {
+        using var context = CreateContext();
+
+        context.Payments.Add(new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            Kind = PaymentKind.Capture,
+            Provider = PaymentProviders.Declared,
+            UserId = userId,
+            OrderId = orderId,
+            AmountUah = amount,
+            AmountKopecks = (long)Math.Round(amount * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedByUserName = "finance",
+            IsAutomatic = false,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
+        });
+
+        await context.SaveChangesAsync();
     }
 
     /// <summary>The acquirer, counting only. Nothing here races, so no invoice is ever held.</summary>
