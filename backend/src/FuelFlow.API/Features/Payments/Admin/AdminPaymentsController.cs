@@ -191,9 +191,16 @@ public sealed record CustomerSearchHit(Guid Id, string? PhoneNumber, string? Set
 /// One payment waiting to be placed. Carries what finance actually typed: the operator is resolving a
 /// message, and the message is the evidence.
 /// </summary>
+/// <param name="AmountUah">What arrived.</param>
+/// <param name="FreeUah">
+/// What arrival still buys. A declared transfer is a balance and a balance is spent across orders, so
+/// the row an operator is looking at may already have paid for somebody's sale — the full amount is
+/// then not "money to place", and quoting it as if it were is how a second order comes to look funded.
+/// </param>
 public sealed record UnallocatedPaymentDto(
     Guid Id,
     decimal AmountUah,
+    decimal FreeUah,
     string Currency,
     DateTime? PaidAtUtc,
     string Provider,

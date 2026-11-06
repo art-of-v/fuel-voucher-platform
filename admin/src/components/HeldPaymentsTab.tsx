@@ -10,6 +10,7 @@ import { toast } from "sonner";
 interface HeldPayment {
   id: string;
   amountUah: number;
+  freeUah: number;
   currency: string;
   paidAtUtc: string | null;
   provider: string;
@@ -245,6 +246,11 @@ export default function HeldPaymentsTab() {
                 ? (openOrdersByUser.get(payment.userId) ?? [])
                 : [];
               const chosen = orderChoice[payment.id] ?? "";
+              // A declared transfer is a balance, and a balance is already spent on some order the
+              // customer paid for themselves. Attaching still moves the WHOLE amount onto one order,
+              // so the price comparison only speaks for money nobody has drawn on; for the rest the
+              // server refuses the press and says why in figures.
+              const drawn = payment.freeUah !== payment.amountUah;
               const matching =
                 chosen &&
                 orders.find((o) => o.id === chosen)?.price ===
@@ -258,6 +264,11 @@ export default function HeldPaymentsTab() {
                 >
                   <td className="p-4 font-bold text-foreground whitespace-nowrap">
                     {payment.amountUah.toFixed(2)} {payment.currency}
+                    {drawn && (
+                      <div className="text-xs font-normal text-muted-foreground">
+                        {t("heldPayments.freeOf", payment.freeUah.toFixed(2))}
+                      </div>
+                    )}
                   </td>
                   <td className="p-4 text-muted-foreground whitespace-nowrap">
                     {payment.paidAtUtc
@@ -420,7 +431,7 @@ export default function HeldPaymentsTab() {
                         >
                           {t("heldPayments.attach")}
                         </Button>
-                        {chosen && !matching && (
+                        {chosen && !drawn && !matching && (
                           <span className="text-xs text-muted-foreground">
                             {t("heldPayments.amountDiffers")}
                           </span>
