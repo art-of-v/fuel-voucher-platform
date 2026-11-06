@@ -167,7 +167,8 @@ traffic - `/api/brands`, `/api/app-version`, `/api/updates/manifest`, `/api/auth
 protected, so a fleet that never signs in or buys produces no lines at all. The count this rollout
 needs is a count of **sign-ins and purchases**, and the installed fleet sends no proof on any of them.
 
-**The count is a metric now (in progress as this is written: app PR #1706).** The grep above is still
+**The count is a metric now.** App PR #1706 merged as `aeaf5f3d` (2026-11-06 14:02 UTC) and this page as
+app PR #1707 (`2176b2f8`, 14:03 UTC). The grep above is still
 how you confirm the middleware is awake, but it cannot answer the question the switch turns on,
 because a log line carries no rollout dimension. Every verdict the middleware reaches on a protected
 endpoint is also recorded as `fuelflow_attestation_verdict_requests_total`, labelled `verdict`, `code`
@@ -186,6 +187,15 @@ Two limits on the number. It has data only for the protected routes and only fro
 carries this code, so a flat zero means nothing was counted rather than that enforcing is safe. And
 `enforce_eligible` is computed from headers anyone can forge; the verdict beside it is the
 cryptographic control, this label is only a rollout measure.
+
+**Where it stands on the box.** `main` has the code; that is not yet the same as the fleet being counted.
+The merge's own run on `main` was cancelled seventeen seconds later when the docs commit landed, so the
+deploy that serves both is the run of the newer tip and its `Deploy to Hetzner` job is the record to read.
+Nothing here has been checked against the droplet: the panel is a file bind-mounted into Grafana
+(`deploy/docker-compose.observability.yml:113`), the same box has already served an alert file whose rules
+were never loaded, and this session did not ask the running Grafana whether the panel is on the screen.
+Read the panel before deciding on the number, and if it is absent the first question is provisioning, not
+attestation.
 
 ## Android Play and Google Cloud setup
 
