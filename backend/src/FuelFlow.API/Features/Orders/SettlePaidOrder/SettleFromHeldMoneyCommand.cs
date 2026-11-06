@@ -39,7 +39,8 @@ public enum HeldMoneyOutcome
 {
     /// <summary>
     /// Nothing is held for this customer at all. The normal answer, and the one most checkouts
-    /// get: the customer simply has not paid yet.
+    /// get: the customer simply has not paid yet. An order with nothing to pay gets it too, because
+    /// a zero price is a balance no order could draw on.
     /// </summary>
     NothingHeld,
 

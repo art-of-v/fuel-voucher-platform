@@ -88,6 +88,19 @@ public sealed class SettleFromHeldMoneyCommandHandler
                 $"The order is {order.Status}, which is not waiting for a payment.");
         }
 
+        if (order.Price <= 0m)
+        {
+            // A free order is not this step's question, and asking it one breaks the checkout. The
+            // settle core books the receipt as the order's price, and the journal refuses a zero leg
+            // ("Amount for 'payment.received' must be greater than zero"), so settling here turns the
+            // discount tier that clamps the price at zero (planning #787) into a 500 instead of an
+            // order. Nothing is drawn and nothing is settled: the answer is the one this step gave
+            // before it knew about balances, and the order stays on the route its creation chose.
+            // What a zero-price sale should do - no invoice at all, or a discount booked instead of a
+            // receipt - is not a money question, and is not answered here.
+            return SettleFromHeldMoneyResult.Nothing();
+        }
+
         // The whole rule of what counts as paid for, from the one place that defines it, so that this
         // and the settle core cannot disagree about an order part-paid by an earlier transfer.
         var owed = order.Price - await OrderPayment.MoneyOnItAsync(_context, order.Id, cancellationToken);
