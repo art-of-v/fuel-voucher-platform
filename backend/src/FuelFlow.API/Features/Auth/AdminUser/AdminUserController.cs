@@ -1,5 +1,6 @@
 using FuelFlow.Features.Auth.AdminUser.GetAdminUserOptions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
+using FuelFlow.Features.Auth.AdminUser.SetPromoAccess;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
 using FuelFlow.Features.Auth.AdminUser.SetUserEmail;
@@ -28,6 +29,7 @@ public sealed class AdminUserController : ControllerBase
     private readonly SetUserRoleCommandHandler _setRoleHandler;
     private readonly SetUserBannedCommandHandler _setBannedHandler;
     private readonly SetUserEmailCommandHandler _setEmailHandler;
+    private readonly SetPromoAccessCommandHandler _setPromoAccessHandler;
     private readonly DeleteUserCommandHandler _deleteUserHandler;
     private readonly RevokeTwoFactorCommandHandler _revokeTwoFactorHandler;
     private readonly AuthOptions _authOptions;
@@ -39,6 +41,7 @@ public sealed class AdminUserController : ControllerBase
         SetUserRoleCommandHandler setRoleHandler,
         SetUserBannedCommandHandler setBannedHandler,
         SetUserEmailCommandHandler setEmailHandler,
+        SetPromoAccessCommandHandler setPromoAccessHandler,
         DeleteUserCommandHandler deleteUserHandler,
         RevokeTwoFactorCommandHandler revokeTwoFactorHandler,
         IOptions<AuthOptions> authOptions)
@@ -49,6 +52,7 @@ public sealed class AdminUserController : ControllerBase
         _setRoleHandler = setRoleHandler;
         _setBannedHandler = setBannedHandler;
         _setEmailHandler = setEmailHandler;
+        _setPromoAccessHandler = setPromoAccessHandler;
         _deleteUserHandler = deleteUserHandler;
         _revokeTwoFactorHandler = revokeTwoFactorHandler;
         _authOptions = authOptions.Value;
@@ -133,6 +137,48 @@ public sealed class AdminUserController : ControllerBase
             return ApiError.BadRequest(result.Error);
 
         return NoContent();
+    }
+
+    [HttpPost("{id}/promo-access")]
+    [Authorize(Policy = AuthPolicies.PromoAccess)]
+    [ProducesResponseType(typeof(PromoAccessDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetPromoAccess(
+        string id,
+        // Nullable so an empty body reaches the handler's own refusal, which carries a code the panel
+        // can print, instead of the framework's bare 400.
+        [FromBody] SetPromoAccessRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out var userId))
+            return ApiError.BadRequest("Invalid user id");
+        if (request is null)
+            return ApiError.BadRequest("No value supplied", "promo_access_no_value");
+
+        var (actingId, actingRole, actingName) = GetActor();
+        if (!actingId.HasValue)
+            return ApiError.Unauthorized("Unauthorized");
+
+        var result = await _setPromoAccessHandler.HandleAsync(
+            new SetPromoAccessCommand(userId, request.Granted, actingId.Value, actingName, actingRole),
+            cancellationToken);
+
+        if (result.NotFound)
+            return ApiError.NotFound(result.Error);
+        if (result.Forbidden)
+            return ApiError.Forbidden(result.Error);
+        if (!result.Success)
+            return ApiError.BadRequest(result.Error);
+
+        // The state back rather than a 204: the panel switch has to show what it now is, including
+        // when the call changed nothing because it was already set that way.
+        return Ok(new PromoAccessDto
+        {
+            Granted = result.Granted,
+            GrantedAtUtc = result.GrantedAtUtc,
+        });
     }
 
     [HttpPost("{id}/email")]
@@ -317,4 +363,19 @@ public sealed class SetUserEmailRequest
 {
     /// <summary>New email to verify, or null/empty to clear the address.</summary>
     public string? Email { get; set; }
+}
+
+/// <summary>Give the customer access to the promotion, or take it away.</summary>
+public sealed class SetPromoAccessRequest
+{
+    public bool Granted { get; set; }
+}
+
+/// <summary>The state the panel is left showing, which is the state the account is in either way.</summary>
+public sealed class PromoAccessDto
+{
+    public bool Granted { get; set; }
+
+    /// <summary>When it was given, or NULL when the customer does not have it.</summary>
+    public DateTime? GrantedAtUtc { get; set; }
 }

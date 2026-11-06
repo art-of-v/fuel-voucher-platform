@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
+using FuelFlow.Features.Auth.AdminUser.SetPromoAccess;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
 using FuelFlow.Features.Auth.Refresh;
@@ -311,6 +312,50 @@ public class AdminUserMutationIntegrationTests : WebApplicationFactory<Program>,
             flagged.IsQaAccount.Should().BeTrue();
             items.Should().Contain(u => u.IsQaAccount == false,
                 "an ordinary customer must not be reported as a QA account");
+        }
+    }
+
+    // ---- SetPromoAccessCommandHandler ----------------------------------------------------------
+
+    [Fact]
+    public async Task PromoAccess_WritesTheRealColumn_SoThePanelReadsTheGrantBack()
+    {
+        // The grant is a column on the customer, and the ruling says a customer without it is not
+        // served on the promotional route. InMemory cannot prove the column exists in the migrated
+        // schema nor that the users grid projects it, and a grant the panel cannot read back is a
+        // switch nobody can see the position of.
+        var phone = "+15550010008";
+        var userId = await SeedUserAsync(SeedRoles.UserName, phone);
+        var actorId = Guid.NewGuid();
+
+        using (var scope = Services.CreateScope())
+        {
+            var handler = scope.ServiceProvider.GetRequiredService<SetPromoAccessCommandHandler>();
+            var result = await handler.HandleAsync(
+                new SetPromoAccessCommand(userId, true, actorId, "Acting Manager", SeedRoles.ManagerName),
+                CancellationToken.None);
+
+            result.Success.Should().BeTrue();
+            result.GrantedAtUtc.Should().Be(TestClock.UtcNow,
+                "the instant is the flag, so the answer carries the same value the column holds");
+        }
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var target = await context.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
+            target.PromoAccessGrantedAtUtc.Should().Be(TestClock.UtcNow);
+
+            // One row, describing the same decision the column now carries.
+            var audit = await context.Set<AuditEventOutbox>().SingleAsync(e =>
+                e.AggregateId == userId.ToString() && e.EventType == "PromoAccessGranted");
+            audit.ChangedByUserId.Should().Be(actorId);
+
+            // The read model the customers table is drawn from.
+            var grid = scope.ServiceProvider.GetRequiredService<GetAdminUsersQueryHandler>();
+            var row = (await grid.HandleAsync(new GetAdminUsersQuery(Search: phone))).Items.Single();
+            row.PromoAccessGrantedAt.Should().Be(TestClock.UtcNow);
         }
     }
 }

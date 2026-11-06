@@ -39,6 +39,10 @@ public sealed class GetCurrentUserQueryHandler
             user.ReferredBy,
             user.BonusBalance,
             user.Role?.Name,
-            user.CreatedAtUtc);
+            user.CreatedAtUtc,
+            // The grant itself, not a guess from the role: a staff account cannot hold it (the write
+            // refuses one, and a role change takes it away), so this reads false for every member of
+            // the staff surface without anybody having to special-case them here.
+            user.PromoAccessGrantedAtUtc is not null);
     }
 }

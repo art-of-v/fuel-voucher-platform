@@ -224,6 +224,7 @@ const CONTRACT: { admin: string; backend: string }[] = [
   { admin: "PagedResult", backend: "PagedResult" },
   { admin: "AdminUserOption", backend: "AdminUserOptionDto" },
   { admin: "AdminUser", backend: "AdminUserDto" },
+  { admin: "PromoAccessResult", backend: "PromoAccessDto" },
   { admin: "AdminOrder", backend: "AdminPurchaseDto" },
   { admin: "AdminOrderLine", backend: "OrderLineItemDto" },
   { admin: "AdminVoucher", backend: "AdminVoucherListItemDto" },

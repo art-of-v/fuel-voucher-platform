@@ -56,6 +56,11 @@ export interface AdminUser {
   referredBy: string | null;
   /** Read-only and staff-only: the code an operator quotes to attribute money to this customer. */
   settlementCode: string;
+  /**
+   * When this customer was given access to the promotion, or null when they have none. The instant
+   * IS the flag, so there is no separate boolean to disagree with it.
+   */
+  promoAccessGrantedAt: string | null;
   bonusBalance: number;
   isActive: boolean;
   isBanned: boolean;
@@ -66,6 +71,12 @@ export interface AdminUser {
   hasTwoFactor: boolean;
   role: string | null;
   createdAt: string;
+}
+
+/** What the promotion switch answers with: the state it settled on, and when it was set. */
+export interface PromoAccessResult {
+  granted: boolean;
+  grantedAtUtc: string | null;
 }
 
 /** One line of an order (`OrderLineItemDto`). */

@@ -10,6 +10,18 @@ export const users: Record<Language, Record<string, string>> = {
     "users.noRole": "No role",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "QA test account — see QA_TEST_ACCESS.md",
+    "users.promoBadge": "Promo",
+    "users.promoBadgeTitle":
+      "Served on the promotional route: the order is settled from the money declared for this customer, and the acquirer is not asked.",
+    "users.grantPromo": "Give promo access",
+    "users.grantPromoTitle":
+      "Let this customer be served on the promotional route: the order is settled from the money declared for them, and no acquirer invoice is raised.",
+    "users.revokePromo": "Take promo access",
+    "users.revokePromoTitle":
+      "Close the promotional route for this customer. Orders already placed are not touched.",
+    "users.promoGranted": "Promotion access granted",
+    "users.promoRevoked": "Promotion access taken away",
+    "users.promoFailed": "Failed to change promotion access",
     "users.settlementCodeTitle":
       "Issued once at registration. Quote this to the finance channel to attribute a payment. It never changes, and it is not the referral code.",
     "users.createdAt": "Created Date",
@@ -55,6 +67,18 @@ export const users: Record<Language, Record<string, string>> = {
     "users.noRole": "Без ролі",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "QA-тестовий акаунт — див. QA_TEST_ACCESS.md",
+    "users.promoBadge": "Промо",
+    "users.promoBadgeTitle":
+      "Обслуговується за промо-акцією: замовлення закривається коштами, заявленими для цього клієнта, банку-еквайеру рахунок не виставляється.",
+    "users.grantPromo": "Дати промо-доступ",
+    "users.grantPromoTitle":
+      "Дозволити обслуговувати цього клієнта за промо-акцією: замовлення закривається заявленими для нього коштами, рахунок-квитанція банку не створюється.",
+    "users.revokePromo": "Забрати промо-доступ",
+    "users.revokePromoTitle":
+      "Закрити для цього клієнта промо-акцію. Вже створені замовлення не змінюються.",
+    "users.promoGranted": "Промо-доступ надано",
+    "users.promoRevoked": "Промо-доступ забрано",
+    "users.promoFailed": "Не вдалося змінити промо-доступ",
     "users.settlementCodeTitle":
       "Видається один раз при реєстрації. Саме цей код оператор передає у фінансовий канал, щоб прив'язати платіж. Незмінний і не є реферальним кодом.",
     "users.createdAt": "Дата створення",
@@ -101,6 +125,18 @@ export const users: Record<Language, Record<string, string>> = {
     "users.noRole": "Keine Rolle",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "QA-Testkonto — siehe QA_TEST_ACCESS.md",
+    "users.promoBadge": "Aktion",
+    "users.promoBadgeTitle":
+      "Wird über den Aktionskanal bedient: Die Bestellung wird mit den für diesen Kunden gemeldeten Mitteln beglichen, der Acquirer wird nicht gefragt.",
+    "users.grantPromo": "Aktionszugang geben",
+    "users.grantPromoTitle":
+      "Erlaubt, diesen Kunden über den Aktionskanal zu bedienen: Die Bestellung wird mit den für ihn gemeldeten Mitteln beglichen, ohne Rechnung des Acquirers.",
+    "users.revokePromo": "Aktionszugang entziehen",
+    "users.revokePromoTitle":
+      "Schließt den Aktionskanal für diesen Kunden. Bereits angelegte Bestellungen bleiben unberührt.",
+    "users.promoGranted": "Aktionszugang gewährt",
+    "users.promoRevoked": "Aktionszugang entzogen",
+    "users.promoFailed": "Aktionszugang konnte nicht geändert werden",
     "users.settlementCodeTitle":
       "Wird bei der Registrierung einmal vergeben. Dieser Code wird an den Finanzkanal übermittelt, um eine Zahlung zuzuordnen. Er ändert sich nie und ist nicht der Empfehlungscode.",
     "users.createdAt": "Erstellt am",
@@ -147,6 +183,18 @@ export const users: Record<Language, Record<string, string>> = {
     "users.noRole": "Sin rol",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "Cuenta de prueba QA — ver QA_TEST_ACCESS.md",
+    "users.promoBadge": "Promo",
+    "users.promoBadgeTitle":
+      "Se atiende por el canal promocional: el pedido se liquida con el dinero declarado para este cliente y no se pide factura al adquirente.",
+    "users.grantPromo": "Dar acceso promocional",
+    "users.grantPromoTitle":
+      "Permite atender a este cliente por la promoción: el pedido se liquida con el dinero declarado para él, sin factura del adquirente.",
+    "users.revokePromo": "Quitar acceso promocional",
+    "users.revokePromoTitle":
+      "Cierra la promoción para este cliente. Los pedidos ya creados no cambian.",
+    "users.promoGranted": "Acceso promocional concedido",
+    "users.promoRevoked": "Acceso promocional retirado",
+    "users.promoFailed": "No se pudo cambiar el acceso promocional",
     "users.settlementCodeTitle":
       "Se emite una vez al registrarse. Este es el código que el operador comunica al canal financiero para imputar un pago. Nunca cambia y no es el código de referido.",
     "users.createdAt": "Fecha de Creación",

@@ -1,33 +1,34 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Ban,
-  ChevronLeft,
-  ChevronRight,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
 import { assignableRoles } from "@/lib/roles";
 import { useSession } from "@/lib/session-store";
 import { formatDate } from "@/lib/utils";
+import { UserRowActions } from "./UserRowActions";
 import type { AdminUser, PagedResult } from "@/lib/api-types";
 
 /** The customers table shows fifty rows at a time; the endpoint is paged to match. */
 const USERS_PAGE_SIZE = 50;
 
 /**
- * The customers table: a page of customers, and the four things an operator may do to one.
+ * The customers table: a page of customers and the role dropdown of each one.
  *
  * <p>
  * The table is a PAGE, not the whole table. The endpoint used to answer with every customer the
  * platform had ever registered, and the table grew with every registration: the screen got slower
  * as the business did, and the server held every customer in memory to draw a screen that shows
  * fifty rows.
+ * </p>
+ *
+ * <p>
+ * What an operator may DO to a row is not here — it lives in `UserRowActions`, which owns those
+ * mutations. This file owns the page: the query, the columns and the role control, which belongs to
+ * a column rather than to the tail of the row.
+ * </p>
  */
 export default function UsersTab() {
   const { t } = useI18n();
@@ -35,10 +36,6 @@ export default function UsersTab() {
   const user = useSession((s) => s.user);
 
   const [usersPage, setUsersPage] = useState(1);
-  const [userConfirm, setUserConfirm] = useState<{
-    id: string;
-    action: "ban" | "delete";
-  } | null>(null);
 
   const { data: usersPageData } = useQuery<PagedResult<AdminUser>>({
     queryKey: ["/api/admin/users", usersPage],
@@ -54,67 +51,6 @@ export default function UsersTab() {
   const usersList = usersPageData?.items ?? [];
   const usersTotalPages = usersPageData?.totalPages ?? 0;
 
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      await apiRequest<void, unknown>("DELETE", `/api/admin/users/${userId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(t("users.deleteSuccess"));
-    },
-    onError: (err: Error) => {
-      toast.error(`${t("users.deleteFailed")}: ${err.message}`);
-    },
-  });
-
-  const setUserActiveMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      isActive,
-    }: {
-      userId: string;
-      isActive: boolean;
-    }) => {
-      const endpoint = isActive
-        ? `/api/admin/users/${userId}/activate`
-        : `/api/admin/users/${userId}/deactivate`;
-      await apiRequest<void, unknown>("POST", endpoint);
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(
-        variables.isActive ? t("users.activated") : t("users.deactivated"),
-      );
-    },
-    onError: (err: Error) => {
-      toast.error(`${t("users.toggleFailed")}: ${err.message}`);
-    },
-  });
-
-  const setUserBannedMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      isBanned,
-    }: {
-      userId: string;
-      isBanned: boolean;
-    }) => {
-      const endpoint = isBanned
-        ? `/api/admin/users/${userId}/ban`
-        : `/api/admin/users/${userId}/unban`;
-      await apiRequest<void, unknown>("POST", endpoint);
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(
-        variables.isBanned ? t("users.banned") : t("users.unbanned"),
-      );
-    },
-    onError: (err: Error) => {
-      toast.error(`${t("users.banFailed")}: ${err.message}`);
-    },
-  });
-
   const setUserRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       await apiRequest<{ role: string }, unknown>(
@@ -129,51 +65,6 @@ export default function UsersTab() {
     },
     onError: (err: Error) => {
       toast.error(`${t("users.roleChangeFailed")}: ${err.message}`);
-    },
-  });
-
-  // The second factor of a staff account. Revoking it is the recovery path: the
-  // authenticator phone was lost, and without a way to take the factor away the account
-  // would be locked out of the panel with no way back in.
-  const revokeTwoFactorMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      await apiRequest<void, unknown>(
-        "POST",
-        `/api/admin/users/${userId}/two-factor/revoke`,
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(t("users.twoFactorRevoked"));
-    },
-    onError: (err: Error) => {
-      toast.error(`${t("users.twoFactorRevokeFailed")}: ${err.message}`);
-    },
-  });
-
-  const setUserEmailMutation = useMutation({
-    mutationFn: async ({
-      userId,
-      email,
-    }: {
-      userId: string;
-      email: string | null;
-    }) => {
-      return await apiRequest<
-        { email: string | null },
-        { pendingConfirmation: boolean }
-      >("POST", `/api/admin/users/${userId}/email`, { email });
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(
-        data?.pendingConfirmation
-          ? t("users.emailChangeSent")
-          : t("users.emailCleared"),
-      );
-    },
-    onError: (err: Error) => {
-      toast.error(`${t("users.emailChangeFailed")}: ${err.message}`);
     },
   });
 
@@ -232,6 +123,14 @@ export default function UsersTab() {
                         className="inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold"
                       >
                         {t("users.qaBadge")}
+                      </span>
+                    )}
+                    {row.promoAccessGrantedAt && (
+                      <span
+                        title={`${t("users.promoBadgeTitle")} (${formatDate(row.promoAccessGrantedAt)})`}
+                        className="inline-flex items-center px-1.5 py-0.5 rounded bg-success/10 text-success text-xs font-semibold"
+                      >
+                        {t("users.promoBadge")}
                       </span>
                     )}
                   </span>
@@ -335,133 +234,7 @@ export default function UsersTab() {
                   {formatDate(row.createdAt)}
                 </td>
                 <td className="p-4 text-right">
-                  {!row.isDeleted && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setUserActiveMutation.mutate({
-                            userId: row.id,
-                            isActive: !row.isActive,
-                          })
-                        }
-                        disabled={setUserActiveMutation.isPending}
-                        className={
-                          row.isActive
-                            ? "text-warning hover:bg-warning/10"
-                            : "text-success hover:bg-success/10"
-                        }
-                      >
-                        {row.isActive ? (
-                          <>
-                            <span className="ml-1 text-xs">
-                              {t("users.deactivate")}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="ml-1 text-xs">
-                              {t("users.activate")}
-                            </span>
-                          </>
-                        )}
-                      </Button>
-                      {row.hasTwoFactor && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => revokeTwoFactorMutation.mutate(row.id)}
-                          disabled={revokeTwoFactorMutation.isPending}
-                          title={t("users.revokeTwoFactorTitle")}
-                          className="text-warning hover:bg-warning/10"
-                        >
-                          <span className="ml-1 text-xs">
-                            {t("users.revokeTwoFactor")}
-                          </span>
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const next = window.prompt(
-                            t("users.emailPrompt"),
-                            row.email || "",
-                          );
-                          if (next !== null) {
-                            const trimmed = next.trim();
-                            setUserEmailMutation.mutate({
-                              userId: row.id,
-                              email: trimmed === "" ? null : trimmed,
-                            });
-                          }
-                        }}
-                        disabled={setUserEmailMutation.isPending}
-                        className="text-info hover:bg-info/10"
-                      >
-                        <span className="ml-1 text-xs">
-                          {t("users.editEmail")}
-                        </span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (row.isBanned) {
-                            setUserBannedMutation.mutate({
-                              userId: row.id,
-                              isBanned: false,
-                            });
-                          } else {
-                            setUserConfirm({
-                              id: row.id,
-                              action: "ban",
-                            });
-                          }
-                        }}
-                        disabled={setUserBannedMutation.isPending}
-                        className={
-                          row.isBanned
-                            ? "text-success hover:bg-success/10"
-                            : "text-destructive hover:bg-destructive/10"
-                        }
-                      >
-                        {row.isBanned ? (
-                          <>
-                            <ShieldCheck className="w-4 h-4" />
-                            <span className="ml-1 text-xs">
-                              {t("users.unban")}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Ban className="w-4 h-4" />
-                            <span className="ml-1 text-xs">
-                              {t("users.ban")}
-                            </span>
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setUserConfirm({
-                            id: row.id,
-                            action: "delete",
-                          });
-                        }}
-                        disabled={deleteUserMutation.isPending}
-                        className="text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="ml-1 text-xs">
-                          {t("users.delete")}
-                        </span>
-                      </Button>
-                    </>
-                  )}
+                  <UserRowActions row={row} />
                 </td>
               </tr>
             ))}
@@ -509,37 +282,6 @@ export default function UsersTab() {
           </div>
         </div>
       )}
-
-      <ConfirmDialog
-        open={userConfirm !== null}
-        onOpenChange={(open) => {
-          if (!open) setUserConfirm(null);
-        }}
-        destructive
-        title={
-          userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")
-        }
-        description={
-          userConfirm?.action === "ban"
-            ? t("users.banConfirm")
-            : t("users.deleteConfirm")
-        }
-        confirmLabel={
-          userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")
-        }
-        cancelLabel={t("common.cancel")}
-        onConfirm={() => {
-          if (!userConfirm) return;
-          if (userConfirm.action === "ban") {
-            setUserBannedMutation.mutate({
-              userId: userConfirm.id,
-              isBanned: true,
-            });
-          } else {
-            deleteUserMutation.mutate(userConfirm.id);
-          }
-        }}
-      />
     </div>
   );
 }
