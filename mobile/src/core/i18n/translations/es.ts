@@ -36,6 +36,19 @@ export const es: Record<string, string> = {
   // El banco no quiso abrir el pago: se dice claro y tranquiliza, no se ha cobrado nada.
   'purchase.error.providerUnavailable':
     'El servicio de pagos no acepta pagos en este momento. No se ha cobrado nada - inténtelo de nuevo en unos minutos.',
+  // El carrito lo sujeta un pedido por el que ya puede estar corriendo dinero: el segundo botón se
+  // niega en vez de quedarse con el carrito. Dice lo único que lo resuelve.
+  'purchase.error.checkoutInPayment':
+    'Este carrito ya forma parte de un pedido que se está pagando. Pague ese pedido o elimínelo de la lista de procesamiento e inténtelo de nuevo.',
+  // La promoción se cerró para esta cuenta entre que aparece el botón y el toque. Decide un gestor,
+  // así que queda pagar con tarjeta o pedirnos que la abramos - y la tarjeta sí está disponible.
+  'purchase.error.promoAccess':
+    'La promoción no está disponible para esta cuenta. Aún puede pagar con tarjeta o pedirnos que activemos la promoción.',
+  // La respuesta del botón de la promoción: el pedido existe, el banco no intervino y lo que espera
+  // es el pago de nuestra parte. Dice las tres cosas, porque un pedido sin enlace de pago se lee
+  // como un pago fallido (planning #889).
+  'purchase.promoOrdered':
+    'Su pedido se ha creado con la promoción y espera la confirmación del pago. No se ha cobrado nada con la tarjeta. Puede seguirlo en la lista de procesamiento de la pantalla «Mis códigos».',
   // El pago encontró dinero que ya teníamos guardado para este pedido: está pagado y no queda nada
   // por cobrar. Lo dice, y también dónde están los códigos.
   'purchase.alreadyPaid':
@@ -142,6 +155,9 @@ export const es: Record<string, string> = {
   'packages.total': 'TOTAL',
   'packages.selectCards': 'SELECCIONAR TARJETAS',
   'packages.payTitle': 'PAGAR',
+  // El segundo botón de la compra, para una cuenta que un gestor ha incluido en la promoción.
+  // A propósito no lleva importe: este toque no paga, hace el pedido.
+  'packages.promoTitle': 'OBTENER CON PROMO',
   'packages.added': 'AÑADIDO',
 
   'basket.title': 'TU CESTA',

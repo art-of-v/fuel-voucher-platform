@@ -26,8 +26,22 @@ describe('purchaseErrorKey', () => {
     expect(purchaseErrorKey('package_out_of_stock')).toBe('purchase.error.outOfStock');
   });
 
+  it('gives the two checkout-route refusals their own wording', () => {
+    // `CheckoutAlreadyInPaymentException.Code` and `PromoAccessException.Code`. Both are produced by
+    // the promotional button, and the server's English sentence for either one names a rule the
+    // customer cannot act on - which order holds the basket, and who decides the offer.
+    expect(purchaseErrorKey('checkout_in_payment')).toBe('purchase.error.checkoutInPayment');
+    expect(purchaseErrorKey('promo_access_not_granted')).toBe('purchase.error.promoAccess');
+  });
+
   it('names no sentence that is missing from a language the app offers', () => {
-    const codes = ['below_cost', 'package_out_of_stock', 'payment_provider_unavailable'];
+    const codes = [
+      'below_cost',
+      'package_out_of_stock',
+      'payment_provider_unavailable',
+      'checkout_in_payment',
+      'promo_access_not_granted',
+    ];
 
     const missing = codes.flatMap((code) => {
       const key = purchaseErrorKey(code);
@@ -113,5 +127,47 @@ describe('the checkout response', () => {
     const result = await createBulkMonobankInvoice([line], null);
 
     expect(result.alreadyPaid).toBe(false);
+  });
+
+  /**
+   * The pay button sends no route at all, which is what an absent field has always meant on the
+   * server (planning #889 resolves it to the bank). Only the promotional button puts `Declared` in the
+   * body - so a body that carried it for an ordinary payment would order fuel outside the acquirer
+   * from a screen that looks like it is taking the customer to the bank.
+   */
+  it('asks for the promotional route only when the second button pressed it', async () => {
+    mockedApiFetch.mockResolvedValue(jsonResponse({ orderIds: ['o-1'] }));
+
+    await createBulkMonobankInvoice([line], null);
+    await createBulkMonobankInvoice([line], null, 'Declared');
+
+    const bodyOf = (call: unknown[]) => JSON.parse((call[1] as { body: string }).body);
+    expect(bodyOf(mockedApiFetch.mock.calls[0])).not.toHaveProperty('settlementRoute');
+    expect(bodyOf(mockedApiFetch.mock.calls[1]).settlementRoute).toBe('Declared');
+  });
+
+  it('reads back the route the order was written on', async () => {
+    // An answer with no payment URL is either a promotional order that waits or a payment that never
+    // started; only this field tells them apart, and the screen branches on it.
+    mockedApiFetch.mockResolvedValue(
+      jsonResponse({ orderIds: ['o-1'], settlementRoute: 'Declared', paymentUrl: '' }),
+    );
+
+    const result = await createBulkMonobankInvoice([line], null, 'Declared');
+
+    expect(result.settlementRoute).toBe('Declared');
+    expect(result.pageUrl).toBe('');
+    expect(result.alreadyPaid).toBe(false);
+  });
+
+  it('leaves the route un-set for a server that has never heard of it', async () => {
+    mockedApiFetch.mockResolvedValue(
+      jsonResponse({ orderIds: ['o-1'], paymentUrl: 'https://pay' }),
+    );
+
+    const result = await createBulkMonobankInvoice([line], null);
+
+    expect(result.settlementRoute).toBeUndefined();
+    expect(result.pageUrl).toBe('https://pay');
   });
 });
