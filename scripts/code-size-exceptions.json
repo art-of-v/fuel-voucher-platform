@@ -66,7 +66,7 @@
     },
     {
       "path": "mobile/app/my-codes.tsx",
-      "lines": 907,
+      "lines": 914,
       "reason": "Was already 831 lines when the target was adopted and the table, which lists mobile/src but not mobile/app, never named it. The split is tracked in planning #807."
     },
     {
@@ -86,22 +86,22 @@
     },
     {
       "path": "mobile/src/core/i18n/translations/de.ts",
-      "lines": 676,
+      "lines": 686,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/uk.ts",
-      "lines": 665,
+      "lines": 675,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/es.ts",
-      "lines": 663,
+      "lines": 673,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/en.ts",
-      "lines": 657,
+      "lines": 668,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {

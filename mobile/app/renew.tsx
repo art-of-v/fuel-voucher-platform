@@ -112,7 +112,8 @@ export default function RenewScreen() {
     try {
       const result = await createRenewalCheckout(items);
       // An invoice with no page URL is not payable, and /pay would only show its "missing link"
-      // screen. Leave the customer where they are, as before - the wallet shows the unpaid order.
+      // screen, so the tap does not go anywhere. It still has to answer: this is a request that came
+      // back without a link, and the customer is left holding the money (planning #879).
       if (result.paymentUrl) {
         // In-app payment screen, not a browser hand-off. appUrl is present here because this
         // invoice was created in this request; an order re-opened later from the wallet has none.
@@ -123,6 +124,8 @@ export default function RenewScreen() {
             appUrl: result.appUrl,
           }),
         );
+      } else {
+        Alert.alert(t('renew.errorTitle'), t('renew.error.linkUnavailable'));
       }
     } catch (err) {
       const code = err instanceof RenewalApiError ? err.code : undefined;

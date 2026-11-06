@@ -22,6 +22,9 @@ export const uk: Record<string, string> = {
   'renew.error.notYours': 'Це не ваш талон.',
   'renew.error.notRenewable': 'Цей талон не можна продовжити.',
   'renew.error.unavailable': 'Обраний термін тимчасово недоступний.',
+  // Продовження не отримало посилання на оплату. Це не невдала сплата — її не було, і гроші лишились.
+  'renew.error.linkUnavailable':
+    'Посилання на оплату не створено. Нічого не списано — спробуйте ще раз за кілька хвилин.',
   // A purchase-side rejection, not a renewal one. The reason on our side is a margin decision
   // (the fuel is priced below what we pay), which the customer can do nothing about and should not
   // be shown: all they can act on is that this fuel cannot be bought right now.
@@ -190,6 +193,10 @@ export const uk: Record<string, string> = {
   // або скасоване замовлення й далі приймає гроші, які бекенд відмовиться видавати. Пояснення
   // тут — це різниця між «я заплатив і нічого не отримав» і поясненим тупиком.
   'codes.orderNotPayable': 'Це замовлення вже не можна оплатити.',
+  // Банк не видав посилання на оплату, тож картка пропонує платіж, якого статися не може. Каже й це,
+  // й що гроші лишилися, і що робити далі.
+  'codes.orderHasNoPaymentLink':
+    'Це замовлення не отримало посилання на оплату, тому нічого не списано. Оформіть покупку ще раз у магазині — створиться нове замовлення.',
   'payment.title': 'Оплата',
   'payment.subtitle': 'Підтвердіть оплату',
   'payment.loading': 'Завантажуємо сторінку оплати…',

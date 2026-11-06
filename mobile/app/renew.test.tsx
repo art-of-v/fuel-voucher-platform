@@ -433,9 +433,11 @@ describe('Renew — paying', () => {
     expect(mockOpenURL).not.toHaveBeenCalled();
   });
 
-  it('stays put when no payment URL comes back', async () => {
+  it('stays put and says the money is untouched when no payment URL comes back', async () => {
     // An invoice with no page URL is not payable, and /pay would only render its
-    // "missing link" screen - a dead end on a screen the customer already paid nothing for.
+    // "missing link" screen - a dead end on a screen the customer already paid nothing for. Staying
+    // put is right; staying silent is what this test used to pin (planning #879).
+    alertSpy.mockClear();
     mockCreateCheckout.mockResolvedValue({
       orderId: 'o-1',
       monobankInvoiceId: 'inv-1',
@@ -450,6 +452,8 @@ describe('Renew — paying', () => {
     await waitFor(() => expect(mockCreateCheckout).toHaveBeenCalled());
     expect(mockPush).not.toHaveBeenCalled();
     expect(mockOpenURL).not.toHaveBeenCalled();
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+    expect(alertSpy.mock.calls[0][1]).toBe('renew.error.linkUnavailable');
   });
 
   it('surfaces a failed renewal as a localised alert', async () => {

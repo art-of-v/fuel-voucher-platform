@@ -22,6 +22,9 @@ export const es: Record<string, string> = {
   'renew.error.notYours': 'Este vale no es tuyo.',
   'renew.error.notRenewable': 'Este vale no se puede renovar.',
   'renew.error.unavailable': 'El plazo seleccionado no está disponible temporalmente.',
+  // La renovación no recibió enlace de pago. No es un pago fallido: nunca empezó, y el dinero es suyo.
+  'renew.error.linkUnavailable':
+    'No se creó el enlace de pago. No se ha cobrado nada; inténtelo de nuevo en unos minutos.',
   // Rechazo en la compra: nuestro motivo es una decisión de margen sobre la que el cliente no puede
   // actuar, así que solo se le dice lo que le afecta: este combustible no se puede comprar ahora.
   'purchase.error.belowCost':
@@ -189,6 +192,10 @@ export const es: Record<string, string> = {
   // pedido fallido o cancelado sigue aceptando dinero que el backend no entregaría. Esta
   // explicación es la diferencia entre "pagué y no recibí nada" y un callejón sin salida claro.
   'codes.orderNotPayable': 'Este pedido ya no se puede pagar.',
+  // El banco nunca emitió un enlace de pago, así que la tarjeta ofrece un pago que no puede ocurrir.
+  // Dice eso, dice que no se cobró nada y dice qué hacer.
+  'codes.orderHasNoPaymentLink':
+    'Este pedido nunca recibió un enlace de pago, así que no se ha cobrado nada. Vuelva a comprar en la tienda: se creará un pedido nuevo.',
   'payment.title': 'Pago',
   'payment.subtitle': 'Confirma tu pago',
   'payment.loading': 'Cargando la página de pago…',

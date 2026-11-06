@@ -294,7 +294,14 @@ export default function MyCodesScreen() {
       Alert.alert(t('codes.orderNotPayable'));
       return;
     }
-    if (!order.monobankPaymentUrl) return;
+    if (!order.monobankPaymentUrl) {
+      // The order is in PENDING_PAYMENT, so the card offers this swipe, and there is nothing behind it:
+      // the bank never issued a link, because the checkout that wrote this order was refused one. A
+      // silent return reads as a dead button on a phone that has just been told its money is gone, so
+      // the answer has to say the money is still there and what to do with it (planning #879).
+      Alert.alert(t('codes.orderHasNoPaymentLink'));
+      return;
+    }
 
     // In-app payment screen. appUrl is not persisted on the order, so it is absent here; /pay
     // shows the embeddable page and omits the "open the Monobank app" affordance.

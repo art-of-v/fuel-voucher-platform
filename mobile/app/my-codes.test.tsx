@@ -397,14 +397,20 @@ describe('MyCodesScreen', () => {
       expect(mockOpenURL).not.toHaveBeenCalled();
     });
 
-    it('opens nothing when the order has no payment URL', () => {
-      // Opening `undefined` would throw or navigate somewhere meaningless.
+    it('says the money is untouched when the order has no payment URL', () => {
+      // Opening `undefined` would throw or navigate somewhere meaningless — that half is unchanged.
+      // What changed is the silence: the card offered Pay because the status says the payment is
+      // outstanding, and the bank never issued a link for it, so the tap has to explain that rather
+      // than do nothing (planning #879).
+      alertSpy.mockClear();
+      alertSpy.mockImplementation(() => {});
       renderScreen({ pendingOrders: [order('pay-2', 'PENDING_PAYMENT')] });
 
       fireEvent.press(screen.getByTestId('pay-pay-2'));
 
       expect(mockPush).not.toHaveBeenCalled();
       expect(mockOpenURL).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledWith('codes.orderHasNoPaymentLink');
     });
 
     it('refuses to reopen payment for an order that is no longer awaiting it', () => {
