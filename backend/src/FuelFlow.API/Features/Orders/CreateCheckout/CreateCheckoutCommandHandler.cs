@@ -390,8 +390,9 @@ public sealed class CreateCheckoutCommandHandler
         // payment that failed to open.
         //
         // Nothing here guesses at an amount. The order keeps its price, and whether the money on hand
-        // will cover it is the settle's question, asked when the money is named (planning #889 makes
-        // that a balance rather than an exact match; until then one declaration pays one order).
+        // covers it is the settle's question, asked above at the checkout and again when the next
+        // declaration names this customer (planning #889: held money is a balance that orders spend,
+        // and money short of the price leaves the order waiting rather than half-paid).
         if (route == SettlementRoute.Declared)
         {
             _metrics.OrderCreated(order.LegalEntityId.HasValue);

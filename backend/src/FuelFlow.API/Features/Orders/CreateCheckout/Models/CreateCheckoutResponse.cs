@@ -36,9 +36,9 @@ public sealed class CreateCheckoutResponse
 
     /// <summary>
     /// The order is paid and the customer has nothing left to pay, because the acquirer was never
-    /// asked for an invoice: money the finance channel had already declared for this customer, at
-    /// exactly this price, was sitting unattached when this order was written, and it moved onto it
-    /// (planning #867, trigger 2).
+    /// asked for an invoice: money the finance channel had already declared for this customer covered
+    /// its price, out of one transfer or across several, and the order spent it as it was written
+    /// (planning #867, trigger 2; planning #889 for the balance).
     /// </summary>
     /// <remarks>
     /// With it the client is told the fact rather than made to infer it from a missing
