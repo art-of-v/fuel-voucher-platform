@@ -19,6 +19,14 @@ namespace FuelFlow.Features.Payments.Admin.GetUnallocatedPayments;
 /// The list is deliberately not filtered by customer: "money belonging to nobody" is the hardest case
 /// and the one an operator arrives to solve.
 /// </para>
+/// <para>
+/// Nor is it filtered by what is left of a transfer. A declared payment that has already paid for one
+/// order is still money the company holds and still a row an operator has to be able to find — the
+/// message finance typed is attached to it, and hiding the row would hide the evidence with it. So it
+/// is listed whole, carrying <c>FreeUah</c> beside the amount that arrived. The two numbers part
+/// company as soon as a balance is spent across orders, and an operator who read only the first would
+/// place money that is already committed.
+/// </para>
 /// </remarks>
 public sealed class GetUnallocatedPaymentsQueryHandler
 {
@@ -47,6 +55,9 @@ public sealed class GetUnallocatedPaymentsQueryHandler
             .Select(p => new UnallocatedPaymentDto(
                 p.Id,
                 p.AmountUah,
+                // What is left of the transfer, not what arrived: money drawn by earlier orders is
+                // committed and the worklist is a list of what can still be placed.
+                p.AmountUah - p.Allocations.Sum(a => a.AmountUah),
                 p.Currency,
                 p.PaidAtUtc,
                 p.Provider,

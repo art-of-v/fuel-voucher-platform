@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.SettlePaidOrder;
@@ -32,6 +33,13 @@ namespace FuelFlow.Features.Payments.Admin.AttachPayment;
 /// it AND settles the order, in the same transaction as the audit row. Before that, the screen that
 /// looked like "the money is on the order" left the order waiting for a payment an invoice then expired
 /// on — the sequence production read on 2026-11-04 (planning #867).
+/// </para>
+/// <para>
+/// Only money nobody has drawn on can be named to an order. A declared transfer is a balance, and a
+/// balance is spent by settling orders out of it; a transfer that has already paid for two orders has
+/// what is left of it and no order it belongs to. Attaching it whole would tell the money gate to count
+/// the same banknote a second time, so the write is refused by the database and said here in the figures
+/// an operator needs — drawn, free, and where the difference went.
 /// </para>
 /// </remarks>
 public sealed class AttachPaymentCommandHandler
@@ -137,6 +145,36 @@ public sealed class AttachPaymentCommandHandler
             return AttachPaymentResult.Done();
         }
 
+        if (orderId is not null)
+        {
+            // A transfer that has already paid for orders is a balance with part of it committed, and
+            // attaching it would tell the money gate to count the WHOLE amount on this one order. The
+            // database refuses that write — assert_spent_money_is_not_attached — and the refusal is
+            // said here so an operator's press ends in a sentence about their customer's money instead
+            // of a 500 about a rule nobody ever showed them.
+            var spent = await _context.PaymentAllocations
+                .AsNoTracking()
+                .Where(a => a.PaymentId == payment.Id)
+                .Select(a => a.AmountUah)
+                .ToListAsync(cancellationToken);
+
+            if (spent.Count > 0)
+            {
+                var drawn = spent.Sum();
+                var free = payment.AmountUah - drawn;
+
+                _logger.LogInformation(
+                    "Payment {PaymentId} cannot be placed on order {OrderId}: {Drawn} ₴ of it is "
+                     + "already drawn on {Orders} order(s)",
+                    payment.Id, orderId, Uah(drawn), spent.Count);
+
+                return AttachPaymentResult.Refused(
+                    $"This transfer has already paid for {spent.Count} order(s): {Uah(drawn)} ₴ drawn and "
+                    + $"{Uah(free)} ₴ free. It cannot be attached to a further order — that counts the same "
+                    + "money twice. Pay the order out of the balance instead.");
+            }
+        }
+
         var before = JsonSerializer.Serialize(new
         {
             order_id = payment.OrderId?.ToString(),
@@ -227,6 +265,9 @@ public sealed class AttachPaymentCommandHandler
 
         return AttachPaymentResult.Done();
     }
+
+    /// <summary>A money figure in a sentence an operator reads, in the currency's format and not the server's culture.</summary>
+    private static string Uah(decimal amount) => amount.ToString("0.00", CultureInfo.InvariantCulture);
 
     private void Record(
         Payment payment,

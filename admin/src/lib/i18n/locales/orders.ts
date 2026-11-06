@@ -27,6 +27,7 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Pick an order…",
     "heldPayments.attach": "Attach",
     "heldPayments.amountDiffers": "different amount",
+    "heldPayments.freeOf": "{0} of it still free",
     "heldPayments.empty":
       "Nothing is being held. Every payment is against an order.",
     "customerRenewal.searchPlaceholder": "Search by voucher number or owner…",
@@ -137,6 +138,7 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Оберіть замовлення…",
     "heldPayments.attach": "Прикріпити",
     "heldPayments.amountDiffers": "інша сума",
+    "heldPayments.freeOf": "{0} ще вільно",
     "heldPayments.empty":
       "Нічого не утримується. Кожен платіж привʼязаний до замовлення.",
     "customerRenewal.searchPlaceholder":
@@ -248,6 +250,7 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Bestellung wählen…",
     "heldPayments.attach": "Zuordnen",
     "heldPayments.amountDiffers": "anderer Betrag",
+    "heldPayments.freeOf": "{0} noch frei",
     "heldPayments.empty":
       "Es wird nichts gehalten. Jede Zahlung ist einer Bestellung zugeordnet.",
     "customerRenewal.searchPlaceholder":
@@ -360,6 +363,7 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Elige un pedido…",
     "heldPayments.attach": "Asignar",
     "heldPayments.amountDiffers": "importe distinto",
+    "heldPayments.freeOf": "{0} aún libre",
     "heldPayments.empty":
       "No se retiene nada. Cada pago está asignado a un pedido.",
     "customerRenewal.searchPlaceholder": "Buscar por número de vale o titular…",

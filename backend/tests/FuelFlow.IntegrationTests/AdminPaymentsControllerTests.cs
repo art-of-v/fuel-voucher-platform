@@ -153,6 +153,24 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         return payment.Id;
     }
 
+    /// <summary>
+    /// Part of a held transfer committed to an order — the draw the balance rule writes instead of
+    /// attaching the money, and the reason the worklist's amount is no longer the whole story.
+    /// </summary>
+    private async Task SeedDrawAsync(ApplicationDbContext context, Guid paymentId, Guid orderId, decimal amount)
+    {
+        context.PaymentAllocations.Add(new PaymentAllocation
+        {
+            Id = Guid.CreateVersion7(),
+            PaymentId = paymentId,
+            OrderId = orderId,
+            AmountUah = amount,
+            CreatedAtUtc = TestClock.UtcNow,
+        });
+
+        await context.SaveChangesAsync();
+    }
+
     private static string NewCode()
     {
         const string alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -337,6 +355,55 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
         result.Should().BeOfType<BadRequestObjectResult>();
         (await context.Payments.AsNoTracking().FirstAsync(p => p.Id == paymentId)).OrderId.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The worklist is a list of what can still be placed, and a declared transfer whose balance has been
+    /// spent across orders is not placeable in full. Both numbers are on the row: what arrived is the
+    /// evidence, what is free is the decision.
+    /// </summary>
+    [Fact]
+    public async Task The_worklist_says_what_is_left_of_a_transfer_that_has_already_paid()
+    {
+        using var context = CreateContext();
+        var userId = await SeedCustomerAsync(context, NewCode());
+        var paidFor = await SeedOrderAsync(context, userId, 1500m, OrderStatus.PendingFulfillment);
+        var paymentId = await SeedPaymentAsync(context, userId, 2014m);
+        await SeedDrawAsync(context, paymentId, paidFor, 1500m);
+
+        var response = await UnallocatedAsync(context);
+        var row = response.Data.Single(d => d.Id == paymentId);
+
+        row.AmountUah.Should().Be(2014m, "that is what finance declared, and the row is the record of it");
+        row.FreeUah.Should().Be(514m,
+            "1 500,00 ₴ of the transfer paid for an order already, and an operator who read only the "
+            + "first number would place money that is committed");
+    }
+
+    /// <summary>
+    /// The press that the balance rule makes impossible: naming a whole transfer to one order when part
+    /// of it already answers for another.
+    /// </summary>
+    [Fact]
+    public async Task A_transfer_that_has_paid_for_an_order_is_not_placed_on_a_second_one()
+    {
+        using var context = CreateContext();
+        var userId = await SeedCustomerAsync(context, NewCode());
+        var paidFor = await SeedOrderAsync(context, userId, 1200m, OrderStatus.PendingFulfillment);
+        var waiting = await SeedOrderAsync(context, userId, 800m);
+        var paymentId = await SeedPaymentAsync(context, userId, 2015m);
+        await SeedDrawAsync(context, paymentId, paidFor, 1200m);
+
+        var result = await CreateController(context).Attach(
+            paymentId, new AttachPaymentRequest { OrderId = waiting }, default);
+
+        // Without this refusal the answer is the database's trigger and the screen shows a 500 about a
+        // rule the operator was never told.
+        result.Should().BeOfType<BadRequestObjectResult>();
+
+        (await context.Payments.AsNoTracking().FirstAsync(p => p.Id == paymentId)).OrderId.Should().BeNull();
+        (await context.Orders.AsNoTracking().FirstAsync(o => o.Id == waiting))
+            .Status.Should().Be(OrderStatus.PendingPayment, "a refusal leaves the order exactly as it was");
     }
 
     [Fact]
