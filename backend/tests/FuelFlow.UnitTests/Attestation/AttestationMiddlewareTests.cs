@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -6,6 +7,7 @@ using FuelFlow.Features.Attestation;
 using FuelFlow.Middleware;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security.Attestation;
 using FuelFlow.SharedKernel.Services;
@@ -24,6 +26,7 @@ public sealed class AttestationMiddlewareTests : IDisposable
 {
     private readonly ApplicationDbContext _db;
     private readonly TestTimeProvider _time = new(TestClock.Now);
+    private readonly FuelFlowMetrics _metrics = new();
     private readonly Mock<IAppleAppAttestVerifier> _apple = new();
     private readonly Mock<IPlayIntegrityVerifier> _google = new();
     private readonly AttestationOptions _settings = new()
@@ -49,6 +52,7 @@ public sealed class AttestationMiddlewareTests : IDisposable
 
     public void Dispose()
     {
+        _metrics.Dispose();
         _db.Database.EnsureDeleted();
         _db.Dispose();
     }
@@ -206,13 +210,97 @@ public sealed class AttestationMiddlewareTests : IDisposable
         ReadCode(context).Should().Be("ATTESTATION_UNAVAILABLE");
     }
 
-    private AttestationMiddleware CreateMiddleware() => new(
+    [Fact]
+    public async Task ReportOnly_BuildInsideTheRollout_IsCountedAsWhatEnforceWouldDeny()
+    {
+        _settings.Mode = AttestationMode.ReportOnly;
+
+        var verdicts = new List<(string Verdict, string Code, string Eligible)>();
+        using var listener = ListenForVerdicts(verdicts);
+        using var metrics = new FuelFlowMetrics();
+
+        var context = CreateRequest("/api/purchases", "{}");
+        AddRolloutHeaders(context, "ios", "1.2.0");
+
+        await CreateMiddleware(metrics).InvokeAsync(
+            context,
+            CreateService(),
+            CreateOptions(),
+            CreateEnvironment());
+
+        // The request still goes through - that is the whole point of report-only - but it is counted
+        // in the population that switching Mode would start refusing, which is the number the switch
+        // is decided on.
+        _nextCalled.Should().BeTrue();
+        verdicts.Should().Equal(("missing", "ATTESTATION_REQUIRED", "true"));
+    }
+
+    [Fact]
+    public async Task ReportOnly_RequestOutsideTheRollout_IsCountedAsNotDeniableYet()
+    {
+        _settings.Mode = AttestationMode.ReportOnly;
+
+        var verdicts = new List<(string Verdict, string Code, string Eligible)>();
+        using var listener = ListenForVerdicts(verdicts);
+        using var metrics = new FuelFlowMetrics();
+
+        // What the installed 1.1.0 fleet actually looks like: none of the rollout headers at all, which
+        // is the Loki line "os null version null". It is still a missing proof and still counted, but
+        // NOT as deniable - the same gate that would hold the new build to the proof exempts this one,
+        // so a raw missing-count would overstate the lock-out risk of enforcing.
+        var context = CreateRequest("/api/purchases", "{}");
+
+        await CreateMiddleware(metrics).InvokeAsync(
+            context,
+            CreateService(),
+            CreateOptions(),
+            CreateEnvironment());
+
+        _nextCalled.Should().BeTrue();
+        verdicts.Should().Equal(("missing", "ATTESTATION_REQUIRED", "false"));
+    }
+
+    [Fact]
+    public async Task ReportOnly_BadProof_IsCountedWithTheServersOwnReason()
+    {
+        _settings.Mode = AttestationMode.ReportOnly;
+
+        var verdicts = new List<(string Verdict, string Code, string Eligible)>();
+        using var listener = ListenForVerdicts(verdicts);
+        using var metrics = new FuelFlowMetrics();
+
+        var context = CreateRequest("/api/purchases", "{}");
+        AddRolloutHeaders(context, "ios", "1.2.0");
+        context.Request.Headers[AttestationMiddleware.ProviderHeader] = "apple";
+        context.Request.Headers[AttestationMiddleware.ChallengeHeader] = "challenge";
+        context.Request.Headers[AttestationMiddleware.ProofHeader] = Convert.ToBase64String(
+            RandomNumberGenerator.GetBytes(32));
+        context.Request.Headers[AttestationMiddleware.KeyIdHeader] = Convert.ToBase64String(
+            RandomNumberGenerator.GetBytes(32));
+
+        await CreateMiddleware(metrics).InvokeAsync(
+            context,
+            CreateService(),
+            CreateOptions(),
+            CreateEnvironment());
+
+        // A bad proof and no proof are different failures and have to be countable apart: one is a
+        // client bug or an attack, the other is an old build. The label is the same string the refused
+        // response would carry, not a second classification invented for the metric.
+        _nextCalled.Should().BeTrue();
+        verdicts.Should().Equal(("invalid", "ATTESTATION_CHALLENGE_INVALID", "true"));
+    }
+
+    // A fresh FuelFlowMetrics is passed in by the tests that listen: the instruments are published in
+    // its constructor, so a listener started afterwards would never see them.
+    private AttestationMiddleware CreateMiddleware(FuelFlowMetrics? metrics = null) => new(
         _ =>
         {
             _nextCalled = true;
             return Task.CompletedTask;
         },
-        NullLogger<AttestationMiddleware>.Instance);
+        NullLogger<AttestationMiddleware>.Instance,
+        metrics ?? _metrics);
 
     private AttestationService CreateService(ICacheService? cache = null)
     {
@@ -262,6 +350,47 @@ public sealed class AttestationMiddlewareTests : IDisposable
         context.Request.Headers[AttestationMiddleware.ClientOsHeader] = os;
         context.Request.Headers[AttestationMiddleware.AppVersionHeader] = version;
         context.Request.Headers[AttestationMiddleware.DeviceIdHeader] = "device-1";
+    }
+
+    /// <summary>
+    /// Collects every attestation verdict emitted while the returned listener is alive, as the three
+    /// labels the metric is documented to carry. Deliberately reads the labels rather than counting:
+    /// the whole point of the instrument is what it can be grouped by, and a test that ignored them
+    /// would pass while the panel it feeds queried labels nobody emits.
+    /// </summary>
+    private static MeterListener ListenForVerdicts(
+        List<(string Verdict, string Code, string Eligible)> verdicts)
+    {
+        var listener = new MeterListener();
+
+        listener.InstrumentPublished = (instrument, activeListener) =>
+        {
+            if (instrument.Meter.Name == ObservabilityConstants.MeterName)
+            {
+                activeListener.EnableMeasurementEvents(instrument);
+            }
+        };
+
+        listener.SetMeasurementEventCallback<long>((instrument, _, tags, _) =>
+        {
+            if (instrument.Name != "fuelflow.attestation.verdict")
+            {
+                return;
+            }
+
+            var labels = new Dictionary<string, string>();
+
+            foreach (var tag in tags)
+            {
+                labels[tag.Key] = tag.Value?.ToString() ?? "-";
+            }
+
+            verdicts.Add((labels["verdict"], labels["code"], labels["enforce_eligible"]));
+        });
+
+        listener.Start();
+
+        return listener;
     }
 
     private static string? ReadCode(HttpContext context)

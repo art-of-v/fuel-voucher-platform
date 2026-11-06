@@ -1,6 +1,7 @@
 using System.Text;
 using FuelFlow.Features.Attestation;
 using FuelFlow.SharedKernel.Errors;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Security.Attestation;
@@ -19,6 +20,13 @@ namespace FuelFlow.Middleware;
 /// the same deploy would lock every existing install out of checkout. ReportOnly measures the
 /// fleet first; Enforce is turned on per platform, for builds at or above a minimum version, once
 /// the real-device evidence exists.
+/// </para>
+/// <para>
+/// Measuring is a count, not a log grep: every verdict on a protected endpoint is recorded in
+/// <c>fuelflow_attestation_verdict_requests_total</c>, labelled by the server's own reason code and by
+/// whether the request would be held to the proof under Enforce. The last label is what makes the
+/// decision readable before it is made - those two labels together are the population that flipping
+/// the mode would start refusing.
 /// </para>
 /// <para>
 /// The rollout headers (<c>X-Client-OS</c>, <c>X-App-Version</c>) decide whether this request is
@@ -40,13 +48,16 @@ public sealed class AttestationMiddleware
 
     private readonly RequestDelegate _next;
     private readonly ILogger<AttestationMiddleware> _logger;
+    private readonly FuelFlowMetrics _metrics;
 
     public AttestationMiddleware(
         RequestDelegate next,
-        ILogger<AttestationMiddleware> logger)
+        ILogger<AttestationMiddleware> logger,
+        FuelFlowMetrics metrics)
     {
         _next = next;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task InvokeAsync(
@@ -69,7 +80,12 @@ public sealed class AttestationMiddleware
             return;
         }
 
-        var enforce = ShouldEnforce(context, settings);
+        var enforceEligible = IsEnforceEligible(context, settings);
+
+        // One predicate, two consequences. In ReportOnly it only labels the metric; in Enforce it
+        // decides who is refused. Keeping them the same function is what makes the report-only
+        // measurement mean the enforcement, rather than something near it.
+        var enforce = settings.Mode == AttestationMode.Enforce && enforceEligible;
 
         if (enforce && environment.IsDevelopment() && settings.AllowDevelopmentBypass)
         {
@@ -91,6 +107,8 @@ public sealed class AttestationMiddleware
             && string.IsNullOrWhiteSpace(proof)
             && string.IsNullOrWhiteSpace(provider))
         {
+            _metrics.AttestationVerdict(Verdict(AttestationStatus.Missing), "ATTESTATION_REQUIRED", enforceEligible);
+
             if (enforce)
             {
                 _logger.LogWarning(
@@ -165,6 +183,8 @@ public sealed class AttestationMiddleware
 
         if (result.IsValid)
         {
+            _metrics.AttestationVerdict(Verdict(result.Status), "none", enforceEligible);
+
             if (!enforce)
             {
                 _logger.LogInformation(
@@ -180,6 +200,10 @@ public sealed class AttestationMiddleware
             await _next(context);
             return;
         }
+
+        // Recorded once for both outcomes: the same bad proof is a measurement in report-only and a
+        // refusal in enforce, and the count must not depend on which one the box is configured for.
+        _metrics.AttestationVerdict(Verdict(result.Status), result.Code ?? "none", enforceEligible);
 
         if (!enforce)
         {
@@ -221,11 +245,20 @@ public sealed class AttestationMiddleware
             cancellationToken: context.RequestAborted);
     }
 
-    private static bool ShouldEnforce(HttpContext context, AttestationOptions settings)
+    /// <summary>
+    /// Whether this request comes from the population the enforcement gate applies to: a mobile
+    /// client, an OS named in <see cref="AttestationOptions.EnforcePlatforms"/>, and a build at or
+    /// above <see cref="AttestationOptions.MinimumEnforcedAppVersion"/>.
+    /// </summary>
+    /// <remarks>
+    /// The mode is deliberately NOT consulted here. The same question is asked under ReportOnly, where
+    /// it labels the metric, and under Enforce, where it decides whether the request is refused — so
+    /// "what would enforcement deny" is computed by the predicate that will do the denying, not by a
+    /// second copy of it that can drift. The headers are spoofable; that is acceptable because this
+    /// labels a rollout measurement, while the cryptographic verdict beside it is the control.
+    /// </remarks>
+    private static bool IsEnforceEligible(HttpContext context, AttestationOptions settings)
     {
-        if (settings.Mode != AttestationMode.Enforce)
-            return false;
-
         var platform = Header(context, ClientPlatformHeader);
 
         if (!string.Equals(platform, "mobile", StringComparison.OrdinalIgnoreCase))
@@ -268,6 +301,9 @@ public sealed class AttestationMiddleware
 
     private static string? Header(HttpContext context, string name) =>
         context.Request.Headers[name].FirstOrDefault();
+
+    private static string Verdict(AttestationStatus status) =>
+        status.ToString().ToLowerInvariant();
 
     private static string Short(string? value) =>
         string.IsNullOrEmpty(value) ? "-" : value.Length <= 8 ? value : value[..8];

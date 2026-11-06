@@ -75,6 +75,9 @@ public sealed class FuelFlowMetrics : IDisposable
     // OTA updates
     private readonly Counter<long> _updateManifestRollback;
 
+    // Client integrity
+    private readonly Counter<long> _attestationVerdict;
+
     public FuelFlowMetrics()
     {
         _meter = new Meter(ObservabilityConstants.MeterName);
@@ -204,6 +207,12 @@ public sealed class FuelFlowMetrics : IDisposable
             "OTA manifests whose signed commit is older than the one last served for the same "
             + "platform and runtime version. Every increment is a whole channel moving backward, so "
             + "this is an alerting target, not a trend.");
+
+        _attestationVerdict = _meter.CreateCounter<long>(
+            "fuelflow.attestation.verdict", "requests",
+            "App-attestation verdicts on protected endpoints, by verdict, by the server's own reason "
+            + "code, and by whether the request would be held to the proof if Mode were Enforce. "
+            + "In report-only this is the measurement that answers what enforcement would deny today.");
     }
 
     /// <summary>
@@ -401,6 +410,35 @@ public sealed class FuelFlowMetrics : IDisposable
     /// </summary>
     public void UpdateManifestRollback(string platform) =>
         _updateManifestRollback.Add(1, new KeyValuePair<string, object?>("platform", platform));
+
+    /// <summary>
+    /// Records one app-attestation verdict on a protected endpoint.
+    /// </summary>
+    /// <param name="verdict">
+    /// <c>valid</c>, <c>missing</c>, <c>invalid</c> or <c>unavailable</c> — the middleware's own four
+    /// outcomes, not a client-supplied string.
+    /// </param>
+    /// <param name="code">
+    /// The server's reason code (<c>ATTESTATION_REQUIRED</c>, <c>ATTESTATION_CHALLENGE_INVALID</c>,
+    /// …), or <c>none</c> when the proof passed. Also server-generated, never echoed from a header.
+    /// </param>
+    /// <param name="enforceEligible">
+    /// Whether this request would be held to the proof if <c>Mode</c> were <c>Enforce</c>: mobile
+    /// platform, an OS in <c>EnforcePlatforms</c>, and a build at or above
+    /// <c>MinimumEnforcedAppVersion</c>. This is the label that makes report-only measurable —
+    /// <c>verdict</c> != valid with this true is exactly the population enforcement would start
+    /// refusing, so the decision stops being a log grep. It is deliberately not the same thing as
+    /// the version band: a header-less old build counts as NOT eligible, because the rollout gate
+    /// exempts it, and a fleet-wide "missing" count alone would overstate the lock-out risk.
+    /// The headers this is computed from are spoofable; the metric is a rollout measurement, not a
+    /// security decision, and the cryptographic verdict next to it is the control.
+    /// </param>
+    public void AttestationVerdict(string verdict, string code, bool enforceEligible) =>
+        _attestationVerdict.Add(
+            1,
+            new KeyValuePair<string, object?>("verdict", verdict),
+            new KeyValuePair<string, object?>("code", code),
+            new KeyValuePair<string, object?>("enforce_eligible", enforceEligible ? "true" : "false"));
 
     public void Dispose() => _meter.Dispose();
 }
