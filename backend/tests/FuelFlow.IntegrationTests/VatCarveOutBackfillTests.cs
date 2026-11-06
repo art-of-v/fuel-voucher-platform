@@ -114,21 +114,24 @@ public sealed class VatCarveOutBackfillTests : IClassFixture<TestDatabaseFixture
         // rewrite an entry an auditor has already read - and the ledger's own triggers would not
         // stop it, because the migration removes the 703 lines before anyone looks at the balance.
         var voucherId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
 
         await WithSchemaFrom(BeforeVatAccount, async context =>
         {
             var periodId = await EnsureOctoberPeriodAsync(context);
 
-            var user = new User
-            {
-                Id = Guid.NewGuid(),
-                PhoneNumber = $"+38099{voucherId:N}"[..16],
-                SettlementCode = $"bk{voucherId:N}"[..8],
-                CreatedAtUtc = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc),
-                UpdatedAtUtc = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc),
-            };
-            context.Users.Add(user);
-            await context.SaveChangesAsync();
+            // Raw SQL, not an entity: EF names every column the current model maps, and this schema
+            // is deliberately older than that model. Writing a User here fails on whichever column
+            // was added between BeforeVatAccount and head - which is not the thing under test.
+            // The settlement code comes from the trigger that predates this pin, so it stays unset.
+#pragma warning disable EF1002 // identifiers and values, not SQL fragments; all from this file
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO users (id, phone_number, created_at_utc, updated_at_utc)
+                VALUES ({0}, {1}, '2026-10-15 12:00:00+00', '2026-10-15 12:00:00+00')
+                """,
+                userId, $"+38099{voucherId:N}"[..16]);
+#pragma warning restore EF1002
 
             var revenueId = await InsertDraftAsync(
                 context, periodId, voucherId,
@@ -139,8 +142,8 @@ public sealed class VatCarveOutBackfillTests : IClassFixture<TestDatabaseFixture
                 sourceEvent: "voucher.redeemed.vat",
                 debitCode: "643", creditCode: "703", amount: VatShare);
 
-            await PostAsync(context, revenueId, user.Id);
-            await PostAsync(context, vatId, user.Id);
+            await PostAsync(context, revenueId, userId);
+            await PostAsync(context, vatId, userId);
         });
 
         await using var verify = CreateContext();
