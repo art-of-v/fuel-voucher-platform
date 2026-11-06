@@ -93,11 +93,11 @@ public sealed class SettleFromHeldMoneyCommandHandler
             // A free order is not this step's question, and asking it one breaks the checkout. The
             // settle core books the receipt as the order's price, and the journal refuses a zero leg
             // ("Amount for 'payment.received' must be greater than zero"), so settling here turns the
-            // discount tier that clamps the price at zero (planning #787) into a 500 instead of an
-            // order. Nothing is drawn and nothing is settled: the answer is the one this step gave
-            // before it knew about balances, and the order stays on the route its creation chose.
-            // What a zero-price sale should do - no invoice at all, or a discount booked instead of a
-            // receipt - is not a money question, and is not answered here.
+            // term tier whose discount clamps the price at zero (`ServerPricing.cs:72`, app PR #815)
+            // into a 500 instead of an order. Nothing is drawn and nothing is settled: the answer is
+            // the one this step gave before it knew about balances, and the order stays on the route
+            // its creation chose. What a zero-price sale should do - no invoice at all, or a discount
+            // booked instead of a receipt - is not a money question, and is not answered here.
             return SettleFromHeldMoneyResult.Nothing();
         }
 
