@@ -52,8 +52,17 @@ whether or not its invoice ever came. So a customer who had just been told the p
 and the phone gave them nothing, with no way to tell "not charged" from "charged and lost". Both taps now
 say the sentence: no payment link, nothing was charged, and what to do next. They still do not navigate —
 `/pay` with an empty URL only renders its own missing-link screen, which is the same dead end one level
-deeper. **In progress as this is written: app PR #1704.** The change is client-side, so the words reach a
-phone with an OTA bundle, not with the merge, and the bundle note above applies to it too.
+deeper. **App PR #1704, merged as `6f4dfaff` (2026-11-06 13:14 UTC) — and not on a phone.** A merge never
+delivers a client, so this was checked against what the fleet is actually served: asking
+`npm run verify:ota` for the new sentence at 13:55 UTC answers `absent from the bundle`, because build 236
+is still served manifest `b3b9b69f-2352-0da4-d53d-9bba33fc1b25`, stamped 2026-11-06 09:06 UTC — four hours
+before the merge. Publishing the bundle from `main` would not fix that either, and `MOBILE_RELEASE.md` says
+why: main's `mobile/package.json` carries `@expo/app-integrity`, `expo-crypto` and
+`react-native-ssl-public-key-pinning`, none of which exist in build 236's binary, so main's fingerprint is
+not `6902daa7…` and a forced publish under it would ship JS the device cannot run. Two ways this sentence
+reaches a customer: a bundle published from a tree whose native layer still matches build 236 — the
+backport route `fix/build-236-brand-fields` used — or the 237 store build. Until one of those exists, the
+tap in the field is still the silent one, and the note above about 401 noise applies to it too.
 
 ## What the orders do
 
