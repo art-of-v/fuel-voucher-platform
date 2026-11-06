@@ -293,6 +293,14 @@ export interface User {
    * and then for good: a customer is referred once.
    */
   referredBy?: string | null;
+  /**
+   * Whether a Manager has opened this account to the promotional offer, which is
+   * what puts the second checkout button on the screen. `false` the moment the
+   * grant is revoked, and absent on a server that predates the offer — the
+   * customer cannot give it to themselves, so the app treats a missing value the
+   * same as `false` and never offers a route the server would refuse.
+   */
+  promoAccessAvailable?: boolean;
 }
 
 export interface CartItem {

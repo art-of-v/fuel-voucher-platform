@@ -18,6 +18,16 @@ interface PurchaseData {
   termCode?: string;
 }
 
+/**
+ * Which of the two checkout buttons a tap came from, in the server's own words.
+ *
+ * `Declared` is the promotional one: the order is written, the bank is never asked, and the money that
+ * pays for it is money a person on our side states arrived (planning #889). Sending it is a request and
+ * not an entitlement — only an account a Manager has enrolled may ask, and the answer to any other
+ * request is the refusal `promo_access_not_granted`.
+ */
+export type CheckoutSettlementRoute = 'Acquirer' | 'Declared';
+
 interface AccountInactiveError extends Error {
   code: 'account_inactive';
 }
@@ -110,6 +120,16 @@ export function purchaseErrorKey(code?: string): string | null {
     // name our contract, not anything a customer can act on (planning #873).
     case 'payment_provider_unavailable':
       return 'purchase.error.providerUnavailable';
+    // The basket is held by an order that may already have money moving on it, so the other button is
+    // refused rather than quietly taking the basket over. The customer has one action: the earlier
+    // order, which is waiting in the wallet's processing list — so the sentence points there instead
+    // of saying "try again", which would fail the same way.
+    case 'checkout_in_payment':
+      return 'purchase.error.checkoutInPayment';
+    // The offer was closed for this account between the button appearing and the tap. Says who decides,
+    // because the customer cannot act on it and the only way forward is to ask us (planning #889).
+    case 'promo_access_not_granted':
+      return 'purchase.error.promoAccess';
     default:
       return null;
   }
@@ -129,7 +149,13 @@ function parseSuccessBody(response: Response, bodyText: string) {
 export async function createMonobankInvoice(
   data: PurchaseData,
   legalEntityId?: string | null,
-): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string; appUrl?: string }> {
+): Promise<{
+  purchaseId: number;
+  invoiceId: string;
+  pageUrl: string;
+  appUrl?: string;
+  alreadyPaid: boolean;
+}> {
   const response = await apiFetch('/api/purchases', {
     method: 'POST',
     body: JSON.stringify({
@@ -158,19 +184,35 @@ export async function createMonobankInvoice(
     // Only present when the backend asked Monobank for `withAppUrl`. It is NOT persisted on the
     // order, so an order re-opened from the wallet has none - callers must tolerate undefined.
     appUrl: result.appUrl ?? undefined,
+    // Trigger 2 (planning #867): the money for this order was already declared and held, so the
+    // checkout settled it and asked the bank for nothing. Read as a flag, never inferred from a
+    // missing `pageUrl` — the two look identical in the body and mean the opposite.
+    alreadyPaid: result.alreadyPaid === true,
   };
 }
 
 export async function createBulkMonobankInvoice(
   items: PurchaseData[],
   legalEntityId?: string | null,
-): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string; appUrl?: string }> {
+  settlementRoute?: CheckoutSettlementRoute,
+): Promise<{
+  orderIds: string[];
+  invoiceId: string;
+  pageUrl: string;
+  appUrl?: string;
+  alreadyPaid: boolean;
+  settlementRoute?: CheckoutSettlementRoute;
+}> {
   const response = await apiFetch('/api/purchases/bulk', {
     method: 'POST',
     body: JSON.stringify({
       // legalEntityId is a command-level field for bulk checkout (applies to
       // every item), not per-item.
       ...(legalEntityId ? { legalEntityId } : {}),
+      // Omitted for the pay button, which is what an absent field has always meant: the bank. Sent as
+      // `Declared` by the promotional one, and only ever by that button — the server refuses it for an
+      // account nobody enrolled, whatever the app's copy of the flag says.
+      ...(settlementRoute ? { settlementRoute } : {}),
       items: items.map((data) => ({
         brand: 'MONOBANK',
         packageId: data.packageId,
@@ -200,5 +242,17 @@ export async function createBulkMonobankInvoice(
     // Only present when the backend asked Monobank for `withAppUrl`. It is NOT persisted on the
     // order, so an order re-opened from the wallet has none - callers must tolerate undefined.
     appUrl: result.appUrl ?? undefined,
+    // Trigger 2 (planning #867): money the platform was already holding for this customer paid for
+    // the whole cart, so no invoice was asked for and there is no page to open. A flag, not an
+    // inference from the empty `pageUrl` above: an older bundle reads that as a payment failure.
+    alreadyPaid: result.alreadyPaid === true,
+    // Which of the two routes the order was written on. It is read, not guessed, because an answer with
+    // no payment URL means two opposite things: a promotional order that waits for the settlement
+    // channel, or a bank payment that failed to start. Absent on a server older than the second button,
+    // where the bank was the only route there was and an empty URL was only ever a failure.
+    settlementRoute:
+      result.settlementRoute === 'Declared' || result.settlementRoute === 'Acquirer'
+        ? (result.settlementRoute as CheckoutSettlementRoute)
+        : undefined,
   };
 }
