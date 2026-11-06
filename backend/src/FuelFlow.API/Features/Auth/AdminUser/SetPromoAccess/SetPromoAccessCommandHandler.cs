@@ -13,12 +13,14 @@ namespace FuelFlow.Features.Auth.AdminUser.SetPromoAccess;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why the endpoint exists at all.</b> The owner's ruling of 2026-11-06 splits the customers into
-/// two groups: those who may be served on the promotional route and those who may not, with a normal
-/// customer in the second group and nobody below a Manager able to move anyone into the first. The
-/// mobile app shows a second button because of this column, but the button is not the check — an order
-/// created on the promotional route is refused here at creation, so a hand-built request cannot buy
-/// what was not granted.
+/// <b>Why the endpoint exists at all.</b> The owner's ruling of 2026-11-06 (planning #889) splits the
+/// customers into two groups: those who may be served on the promotional route and those who may not,
+/// with a normal customer in the second group and nobody below a Manager able to move anyone into the
+/// first. The mobile app shows a second button because of this column, but the button is not the check:
+/// an order created on the promotional route must be refused at creation, by the server, so that a
+/// hand-built request cannot buy what was not granted. That refusal is slice 2 of the same issue and
+/// <b>is not in this change</b>: until it lands a granted customer has no way to act on the grant, and
+/// the flag changes nothing about a sale.
 /// </para>
 /// <para>
 /// <b>What the access actually opens.</b> A route where the money is a person's word in a closed
