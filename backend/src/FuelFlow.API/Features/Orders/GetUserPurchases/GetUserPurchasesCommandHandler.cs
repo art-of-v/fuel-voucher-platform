@@ -1,3 +1,4 @@
+using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Import;
@@ -226,6 +227,10 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                 FulfilledAtUtc = order.FulfilledAtUtc,
                 IsRenewal = renewalOrderIds.Contains(order.Id),
                 Kind = order.Kind.ToString(),
+                // Which button wrote it. The wallet branches on this rather than on an absent payment
+                // URL, because a declared order waiting on a declaration and a payment that never
+                // opened are one field apart in the body and the opposite thing to tell the customer.
+                SettlementRoute = CheckoutRoutes.Of(order).ToString(),
                 LineItems = order.LineItems.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,

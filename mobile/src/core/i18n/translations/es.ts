@@ -44,6 +44,11 @@ export const es: Record<string, string> = {
   // así que queda pagar con tarjeta o pedirnos que la abramos - y la tarjeta sí está disponible.
   'purchase.error.promoAccess':
     'La promoción no está disponible para esta cuenta. Aún puede pagar con tarjeta o pedirnos que activemos la promoción.',
+  // La cuenta tiene dinero, pero no cubre el pedido: no se crea el pedido y no se cobra nada. La cifra
+  // es la respuesta — sin ella «falta dinero» suena a un motivo que el cliente no puede ver
+  // (planning #889, punto 5).
+  'purchase.error.promoShortfall':
+    'Faltan {0} en su cuenta para este pedido de la promoción. No se ha cobrado nada: puede pagar con tarjeta o esperar a que la cuenta cubra el importe.',
   // La respuesta del botón de la promoción: el pedido existe, el banco no intervino y lo que espera
   // es el pago de nuestra parte. Dice las tres cosas, porque un pedido sin enlace de pago se lee
   // como un pago fallido (planning #889).
@@ -216,6 +221,13 @@ export const es: Record<string, string> = {
   // Dice eso, dice que no se cobró nada y dice qué hacer.
   'codes.orderHasNoPaymentLink':
     'Este pedido nunca recibió un enlace de pago, así que no se ha cobrado nada. Vuelva a comprar en la tienda: se creará un pedido nuevo.',
+  // Un pedido promocional no tiene factura y nunca la tendrá: el dinero llega por el canal de
+  // liquidación, no de este cliente. Por eso el chip dice qué espera el pedido en vez de llamarlo "NO
+  // PAGADO" — ese aviso en rojo junto a una acción que ya no existe suena a culpa del cliente — y
+  // "comprar de nuevo" duplicaría un pedido que la empresa ya se comprometió a cumplir.
+  'codes.promoAwaiting': 'ESPERA UN INGRESO',
+  'codes.promoOrderWaits':
+    'Este pedido se hizo con la promoción. El dinero llega por el canal de liquidación, así que no tienes nada que hacer: no se ha cobrado nada y no necesitas comprar de nuevo.',
   'payment.title': 'Pago',
   'payment.subtitle': 'Confirma tu pago',
   'payment.loading': 'Cargando la página de pago…',

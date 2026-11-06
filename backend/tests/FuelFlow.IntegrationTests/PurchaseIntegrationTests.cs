@@ -9,6 +9,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
@@ -468,6 +469,84 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             var body = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal(code, body.GetProperty("code").GetString());
         }
+    }
+
+    /// <summary>
+    /// Item 5 of planning #889 on the wire. The app's sentence is «Не вистачає 1 500 ₴», in four
+    /// languages, so the amount has to arrive as a number and not inside ours: a client that read it out
+    /// of a detail string would need a parser per locale, and the first locale to change its thousands
+    /// separator would show the customer a shortfall of 1.
+    /// </summary>
+    [Fact]
+    public async Task A_Promo_Checkout_On_A_Short_Account_Answers_409_With_The_Figures()
+    {
+        const decimal declared = 1000m;
+
+        await AuthenticateAsync("+380991234713");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+        SeedSellableStock("okko", "okko-95", 50m);
+
+        Guid userId;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var user = context.Users.Single(u => u.PhoneNumber == "+380991234713");
+            user.PromoAccessGrantedAtUtc = TestClock.UtcNow;
+
+            context.Payments.Add(new Payment
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = PaymentKind.Capture,
+                Provider = PaymentProviders.Declared,
+                UserId = user.Id,
+                OrderId = null,
+                AmountUah = declared,
+                AmountKopecks = (long)Math.Round(declared * 100),
+                Currency = "UAH",
+                Status = PaymentStatus.Succeeded,
+                PaidAtUtc = TestClock.UtcNow,
+                CreatedByUserName = "finance",
+                IsAutomatic = true,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
+            });
+
+            await context.SaveChangesAsync();
+            userId = user.Id;
+        }
+
+        var response = await PostRawAsync($$"""
+            {
+                "brandId": "{{BrandIds.Okko}}",
+                "brandName": "OKKO",
+                "fuelTypeId": "{{ToUuid("okko-95")}}",
+                "liters": 50,
+                "quantity": 1,
+                "price": 2500,
+                "settlementRoute": "Declared"
+            }
+            """);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(PromoBalanceShortException.Code, body.GetProperty("code").GetString());
+
+        var data = body.GetProperty("data");
+        var held = data.GetProperty("heldUah").GetDecimal();
+        var owed = data.GetProperty("owedUah").GetDecimal();
+        var shortfall = data.GetProperty("shortfallUah").GetDecimal();
+
+        Assert.Equal(declared, held);
+        Assert.True(owed > held, "the order has to owe more than the account holds, or there is nothing to refuse");
+        Assert.True(shortfall == owed - held,
+            "the number the customer is shown is the one the balance is short by, not one the message rounded");
+
+        using var verify = _fixture.Services.CreateScope();
+        Assert.False(verify.ServiceProvider.GetRequiredService<ApplicationDbContext>()
+            .Orders.Any(o => o.UserId == userId), "and the refusal writes no order to explain afterwards");
     }
 
     /// <summary>

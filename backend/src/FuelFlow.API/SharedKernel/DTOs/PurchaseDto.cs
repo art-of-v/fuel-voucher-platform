@@ -33,4 +33,18 @@ public sealed class PurchaseDto
     /// app needs it to tell a worker's handover receipt apart from a purchase they made.
     /// </summary>
     public string Kind { get; set; } = "Purchase";
+
+    /// <summary>
+    /// Which of the two buttons wrote this order: <c>Acquirer</c> or <c>Declared</c>. The wallet needs it
+    /// because an order waiting on the settlement channel and a payment the bank never opened have the
+    /// same body — no invoice, no payment URL — and without this field the first one gets the second
+    /// one's sentence, which ends in "buy again" (planning #889, item 6).
+    /// </summary>
+    /// <remarks>
+    /// It is the route, not the money: the settlement code that identifies an account on the finance
+    /// channel is staff-only and stays out of every customer read, which
+    /// <c>SettlementCodeTests</c> checks by type. An order from before the column existed is reported as
+    /// <c>Acquirer</c>, which is what it was.
+    /// </remarks>
+    public string SettlementRoute { get; set; } = null!;
 }

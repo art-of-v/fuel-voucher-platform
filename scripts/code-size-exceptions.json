@@ -56,27 +56,27 @@
     },
     {
       "path": "mobile/src/core/i18n/translations/de.ts",
-      "lines": 709,
+      "lines": 722,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/uk.ts",
-      "lines": 698,
+      "lines": 710,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/es.ts",
-      "lines": 696,
+      "lines": 708,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/core/i18n/translations/en.ts",
-      "lines": 691,
+      "lines": 703,
       "reason": "Translation data, recorded when the target was adopted (planning #688); split by feature when next materially changed."
     },
     {
       "path": "mobile/src/features/vouchers/components/OrderCard.tsx",
-      "lines": 640,
+      "lines": 652,
       "reason": "Existing mobile component, recorded when the target was adopted (planning #688); split when next materially changed."
     },
     {

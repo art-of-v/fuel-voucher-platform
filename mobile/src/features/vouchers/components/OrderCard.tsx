@@ -98,6 +98,13 @@ export function OrderCard({
   const isSwipeOpenRef = useRef(false);
 
   const needsPayment = order.status === 'PENDING_PAYMENT';
+  /**
+   * A promotional order is unpaid in the sense that no money moved yet, and paid in the sense that
+   * nobody is being asked for any: the settlement channel brings the money, and the customer's tap
+   * has nothing to do with it. It therefore wears the waiting tone and not the red of a payment the
+   * customer owes, because red beside an action that no longer exists reads as a problem they caused.
+   */
+  const awaitsSettlement = needsPayment && order.settlementRoute === 'Declared';
   const isPending = order.status === 'PENDING_FULFILLMENT' || needsPayment;
   const isPartiallyRefunded = order.status === 'PARTIALLY_REFUNDED';
   /**
@@ -105,7 +112,8 @@ export function OrderCard({
    * plain card so the list has no dead horizontal drag zones, and no
    * Swipeable is mounted behind them to steal the scroll gesture.
    */
-  const canSwipe = needsPayment && (!!onPay || !!onDelete);
+  const canPay = !!onPay && !awaitsSettlement;
+  const canSwipe = needsPayment && (canPay || !!onDelete);
 
   /**
    * A receipt exists for money that actually moved, so it is the opposite condition to canSwipe:
@@ -125,15 +133,17 @@ export function OrderCard({
    * A fully refunded order is `neutral`, not `success` — it used to share the
    * green "fulfilled" treatment, which claimed the fuel had been delivered.
    */
-  const statusRole = needsPayment
-    ? tokens.colors.status.danger
-    : isPending
-      ? tokens.colors.status.warning
-      : isPartiallyRefunded
-        ? tokens.colors.status.info
-        : order.status === 'REFUNDED'
-          ? tokens.colors.status.neutral
-          : tokens.colors.status.success;
+  const statusRole = awaitsSettlement
+    ? tokens.colors.status.warning
+    : needsPayment
+      ? tokens.colors.status.danger
+      : isPending
+        ? tokens.colors.status.warning
+        : isPartiallyRefunded
+          ? tokens.colors.status.info
+          : order.status === 'REFUNDED'
+            ? tokens.colors.status.neutral
+            : tokens.colors.status.success;
   const accentColor = statusRole.base;
   const orderVouchers = order.vouchers || [];
   const voucherCount = orderVouchers.length;
@@ -151,15 +161,17 @@ export function OrderCard({
   // receipt. Kopeck-exact by default: `formatMoney` keeps ",57" when there is one (see #121).
   const showAmount = order.kind !== 'ReceivedFromCompany' && order.price > 0;
 
-  const statusLabel = needsPayment
-    ? t('codes.unpaid') || 'UNPAID'
-    : isPending
-      ? t('codes.pending')
-      : order.status === 'REFUNDED'
-        ? 'REFUNDED'
-        : isPartiallyRefunded
-          ? t('codes.partiallyRefunded')
-          : t('codes.fulfilled');
+  const statusLabel = awaitsSettlement
+    ? t('codes.promoAwaiting') || 'AWAITING SETTLEMENT'
+    : needsPayment
+      ? t('codes.unpaid') || 'UNPAID'
+      : isPending
+        ? t('codes.pending')
+        : order.status === 'REFUNDED'
+          ? 'REFUNDED'
+          : isPartiallyRefunded
+            ? t('codes.partiallyRefunded')
+            : t('codes.fulfilled');
 
   useEffect(() => {
     Animated.spring(expandAnim, {
@@ -224,7 +236,7 @@ export function OrderCard({
    */
   const renderRightActions = () => (
     <View style={styles.swipeActions}>
-      {onPay && (
+      {canPay && (
         // The coloured box is a plain View so its fill always paints:
         // a Pressable whose background lives only in a function-form
         // style does not render that background at rest on Fabric when
@@ -317,7 +329,7 @@ export function OrderCard({
           accessibilityActions={
             canSwipe
               ? [
-                  ...(onPay ? [{ name: 'pay', label: t('codes.payNow') || 'PAY' }] : []),
+                  ...(canPay ? [{ name: 'pay', label: t('codes.payNow') || 'PAY' }] : []),
                   ...(onDelete
                     ? [{ name: 'delete', label: t('codes.deleteAction') || 'DELETE' }]
                     : []),

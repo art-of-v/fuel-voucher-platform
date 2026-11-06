@@ -34,6 +34,13 @@ describe('purchaseErrorKey', () => {
     expect(purchaseErrorKey('promo_access_not_granted')).toBe('purchase.error.promoAccess');
   });
 
+  it('gives the shortfall its own wording, apart from the order that waits', () => {
+    // `PromoBalanceShortException.Code`. The offer IS open here and the money is not enough, which is
+    // a different sentence from the promotional order that waits for a declaration: one tells the
+    // customer what they are short, the other tells them nothing is owed yet (planning #889, item 5).
+    expect(purchaseErrorKey('promo_balance_short')).toBe('purchase.error.promoShortfall');
+  });
+
   it('names no sentence that is missing from a language the app offers', () => {
     const codes = [
       'below_cost',
@@ -41,6 +48,7 @@ describe('purchaseErrorKey', () => {
       'payment_provider_unavailable',
       'checkout_in_payment',
       'promo_access_not_granted',
+      'promo_balance_short',
     ];
 
     const missing = codes.flatMap((code) => {
@@ -169,5 +177,73 @@ describe('the checkout response', () => {
 
     expect(result.settlementRoute).toBeUndefined();
     expect(result.pageUrl).toBe('https://pay');
+  });
+});
+
+/**
+ * The one refusal whose customer-facing sentence is built around a number: «Не вистачає 500 ₴». The
+ * figure travels as `data`, beside the server's own detail, so the app can put it through its money
+ * formatter. Reading it out of `detail` instead would need a parser per language — and would break the
+ * first time the sentence was reworded, silently for the customer.
+ */
+describe('the shortfall a refusal carries', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const asRefusal = (e: unknown) => e as Error & { code?: string; shortfallUah?: number };
+
+  it('reads the figure off the wire onto the refusal', async () => {
+    mockedApiFetch.mockResolvedValue(
+      jsonResponse(
+        {
+          status: 409,
+          title: 'Conflict',
+          detail:
+            'This order needs 900.00 ₴ and the account holds 400.00 ₴, so 500.00 ₴ is missing. ' +
+            'Nothing was ordered and nothing was spent.',
+          code: 'promo_balance_short',
+          data: { shortfallUah: 500, heldUah: 400, owedUah: 900 },
+        },
+        409,
+      ),
+    );
+
+    const refusal = asRefusal(
+      await createBulkMonobankInvoice([line], null, 'Declared').catch((e) => e),
+    );
+
+    expect(refusal.code).toBe('promo_balance_short');
+    expect(refusal.shortfallUah).toBe(500);
+    expect(purchaseErrorKey(refusal.code)).toBe('purchase.error.promoShortfall');
+  });
+
+  it('carries no figure for a refusal that has none', async () => {
+    mockedApiFetch.mockResolvedValue(
+      jsonResponse(
+        { status: 409, detail: 'This fuel is out of stock.', code: 'package_out_of_stock' },
+        409,
+      ),
+    );
+
+    const refusal = asRefusal(await createBulkMonobankInvoice([line], null).catch((e) => e));
+
+    expect(refusal.code).toBe('package_out_of_stock');
+    expect(refusal.shortfallUah).toBeUndefined();
+  });
+
+  it('does not invent a zero out of a figure the server did not send', async () => {
+    // `Number(null)` is 0, and a refusal that told the customer «не вистачає 0 ₴» would be worse than
+    // one that said nothing: it reads as a shortfall that costs nothing.
+    mockedApiFetch.mockResolvedValue(
+      jsonResponse(
+        { status: 409, detail: 'short', code: 'promo_balance_short', data: { heldUah: null } },
+        409,
+      ),
+    );
+
+    const refusal = asRefusal(
+      await createBulkMonobankInvoice([line], null, 'Declared').catch((e) => e),
+    );
+
+    expect(refusal.shortfallUah).toBeUndefined();
   });
 });

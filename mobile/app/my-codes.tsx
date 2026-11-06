@@ -184,6 +184,16 @@ export default function MyCodesScreen() {
       Alert.alert(t('codes.orderNotPayable'));
       return;
     }
+    // A promotional order carries no invoice by design: its money comes from the settlement channel,
+    // so an empty `monobankPaymentUrl` here is the order working, not a payment that failed to open.
+    // Without this branch the two states answer with the same sentence, and that sentence ends "buy
+    // again from the shop" - an instruction to duplicate an order the company is already paid to
+    // perform (planning #889, item 6). The card withholds the swipe and the rotor action, so this is
+    // the same defence-in-depth as the status guard above: the handler is where the invariant lives.
+    if (order.settlementRoute === 'Declared') {
+      Alert.alert(t('codes.promoOrderWaits'));
+      return;
+    }
     if (!order.monobankPaymentUrl) {
       // The order is in PENDING_PAYMENT, so the card offers this swipe, and there is nothing behind it:
       // the bank never issued a link, because the checkout that wrote this order was refused one. A
