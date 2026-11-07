@@ -34,6 +34,19 @@ public sealed class DeleteMyOrderCommandHandler
                 cancellationToken);
         if (order is null) return false;
 
+        // No invoice means the acquirer refused to open a payment page, so nothing can ever arrive
+        // against this order: it is over, and it says so. Left PendingPayment it read as awaiting
+        // payment forever, and DeletedUnpaidOrderCleanupService - which only collects Cancelled
+        // rows - never purged it.
+        //
+        // With an invoice it stays PendingPayment on purpose: the invoice is live and the customer
+        // may still pay it. The webhook finds the order by invoice id, and Cancelled is terminal,
+        // so cancelling here would turn a payment made a moment later into money with no order.
+        if (order.MonobankInvoiceId is null)
+        {
+            order.Status = OrderStatus.Cancelled;
+        }
+
         order.IsDeleted = true;
         order.UpdatedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
