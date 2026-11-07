@@ -72,15 +72,22 @@ is the record of what was tried, and the basket reservation is released delibera
 a new order: nothing on the old one can be resumed, which is why the wallet's Pay on one of these rows has
 only a sentence to give (see above).
 
-What is NOT a decision is the row itself: nothing ages those rows out, and that is a gap rather than a
-policy — planning #875 owns the ruling, and this is worth knowing before reading the admin purchases
-view:
-`MonobankReconciliationService` polls only orders that HAVE an invoice
-(`BackgroundJobs/MonobankReconciliationService.cs:75`), so an attempt that never got one is never
-driven to a terminal state, and `DeletedUnpaidOrderCleanupService` hard-deletes rows that are already
-`Cancelled` *and* soft-deleted. A refusal therefore leaves `PendingPayment` behind until staff cancel
-it. Those rows hold no money and no stock; they are noise, and their count is the count of refused
-attempts, which makes them a useful cross-check against the metric. **No manual SQL on them.**
+What is NOT a decision is the row itself, and it has two halves. **An attempt the customer swipes
+away is closed in the same save:** `DELETE /api/purchases/{id}` marks it `Cancelled` as it soft-deletes
+it (app PR #1720), so `DeletedUnpaidOrderCleanupService` — which hard-deletes rows that are `Cancelled`
+*and* soft-deleted — collects it after retention. Before that the delete only flipped `is_deleted`, so
+the row read as *awaiting payment* in the admin purchases view forever and was never collected: on
+2026-11-07 there were 34 of them, all without an invoice and all without a payment. **An attempt the
+customer never deletes is still nobody's job:** `MonobankReconciliationService` polls only orders that
+HAVE an invoice (`BackgroundJobs/MonobankReconciliationService.cs:75`), so it is never driven to a
+terminal state and stays `PendingPayment` — the gap planning #875 owns. Those rows hold no money and
+no stock; they are noise, and their count is the count of refused attempts, which makes them a useful
+cross-check against the metric. **No manual SQL on them.**
+
+An order that **does** have an invoice keeps `PendingPayment` when the customer deletes it, on purpose:
+that invoice is still payable at the acquirer and the webhook finds the order by invoice id, while
+`Cancelled` is terminal in `OrderStateMachine` — so cancelling there would turn a payment made a moment
+later into money with no order to fulfil.
 
 Note that `fuelflow_payments_stuck_pending_payment` does **not** see them: that gauge only counts
 orders that have an invoice. It read `0` through the whole 2026-11-05 incident.
