@@ -1,5 +1,6 @@
 using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +69,29 @@ public sealed class RedemptionJournalPoster
 
         var id = voucher.Id;
         var entryDate = DateOnly.FromDateTime(occurredAtUtc);
+
+        // Promo ruling 2026-11-07: a voucher issued against a Declared-route (promotional) order is a
+        // promotional redemption, and a promotional redemption books no ledger entry at all - not cost
+        // of sales, not revenue. The promo channel's money and the fulfilment's custody records are
+        // the facts; the accounting pair is not this channel's business. Real (Acquirer) redemptions
+        // keep the revenue / cost-of-sales pair.
+        if (voucher.OrderId is not null)
+        {
+            var orderRoute = await _context.Orders
+                .AsNoTracking()
+                .Where(o => o.Id == voucher.OrderId)
+                .Select(o => (SettlementRoute?)o.SettlementRoute)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (orderRoute == SettlementRoute.Declared)
+            {
+                _logger.LogInformation(
+                    "REDEMPTIONS: voucher {VoucherId} belongs to the Declared (promo) order {OrderId}, so no redemption entry was posted",
+                    voucher.Id, voucher.OrderId);
+                return;
+            }
+        }
+
         var cost = Math.Round(liters * (voucher.CostPerLiter ?? 0m), 2, MidpointRounding.AwayFromZero);
 
         if (cost > 0m)
