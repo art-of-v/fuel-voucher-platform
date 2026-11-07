@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Payments.Admin;
 using FuelFlow.Features.Payments.Admin.AttachPayment;
+using FuelFlow.Features.Payments.Admin.DismissPayment;
 using FuelFlow.Features.Payments.Admin.GetCustomerByCode;
 using FuelFlow.Features.Payments.Admin.GetUnallocatedPayments;
 using FuelFlow.Features.Payments.Admin.SearchCustomers;
@@ -61,7 +62,11 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
                 context,
                 new AuditEventService(context),
                 TestJournal.TrySettleFor(context),
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<AttachPaymentCommandHandler>.Instance))
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<AttachPaymentCommandHandler>.Instance),
+            new DismissPaymentCommandHandler(
+                context,
+                new AuditEventService(context),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<DismissPaymentCommandHandler>.Instance))
         {
             ControllerContext = new ControllerContext
             {
