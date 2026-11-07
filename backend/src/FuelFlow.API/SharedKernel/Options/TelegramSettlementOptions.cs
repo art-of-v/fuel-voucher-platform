@@ -58,6 +58,15 @@ public sealed class TelegramSettlementOptions
     public List<long> AllowedUserIds { get; set; } = [];
 
     /// <summary>
+    /// Environment-friendly allow list, supplied via <c>Telegram__Settlement__AllowedUserIdsCsv</c>.
+    /// Options registration parses comma-separated positive Int64 ids, trimming each entry. When
+    /// present it replaces <see cref="AllowedUserIds"/>; blank means nobody. A malformed entry
+    /// rejects the entire configuration without including its contents in the error. When absent,
+    /// the typed list remains available for indexed configuration and tests.
+    /// </summary>
+    public string? AllowedUserIdsCsv { get; set; }
+
+    /// <summary>
     /// Whether the integration is provisioned. <see cref="AllowedUserIds"/> being non-empty is part
     /// of it, and deliberately so: a bot with a token, a secret and a chat but no whitelist is
     /// provisioned and *wide open*, which is the configuration most likely to be reached by accident

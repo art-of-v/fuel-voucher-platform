@@ -431,7 +431,8 @@ services:
       Telegram__Settlement__BotToken: ${TELEGRAM_SETTLEMENT_BOT_TOKEN:-}
       Telegram__Settlement__WebhookSecret: ${TELEGRAM_SETTLEMENT_WEBHOOK_SECRET:-}
       Telegram__Settlement__AllowedChatId: ${TELEGRAM_SETTLEMENT_CHAT_ID:-0}
-      Telegram__Settlement__AllowedUserIds__0: ${TELEGRAM_SETTLEMENT_ALLOWED_USER_IDS:-}
+      # CSV is a scalar, not one Int64 collection slot; registration parses it as a whole.
+      Telegram__Settlement__AllowedUserIdsCsv: ${TELEGRAM_SETTLEMENT_ALLOWED_USER_IDS:-}
 
       # --- Feedback triage classifier (optional) -------------------------------------------
       # Unset => IsConfigured is false, and every message is stored and shown unfiltered

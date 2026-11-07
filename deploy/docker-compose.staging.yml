@@ -145,6 +145,15 @@ services:
       SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
 
+      # Settlement bot: opt-in, with a staging-only token/chat, never production's.
+      # CSV is a scalar, not one Int64 collection slot; registration parses it as a whole.
+      # Empty means nobody; malformed entries reject the entire options configuration.
+      Telegram__Settlement__Enabled: ${TELEGRAM_SETTLEMENT_ENABLED:-false}
+      Telegram__Settlement__BotToken: ${TELEGRAM_SETTLEMENT_BOT_TOKEN:-}
+      Telegram__Settlement__WebhookSecret: ${TELEGRAM_SETTLEMENT_WEBHOOK_SECRET:-}
+      Telegram__Settlement__AllowedChatId: ${TELEGRAM_SETTLEMENT_CHAT_ID:-0}
+      Telegram__Settlement__AllowedUserIdsCsv: ${TELEGRAM_SETTLEMENT_ALLOWED_USER_IDS:-}
+
       # Staging domains. `fuelflow-staging-backend` is the in-network name the staging admin nginx and
       # (via the shared network) Caddy use; keep it in AllowedHosts or host filtering 400s.
       AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};fuelflow-staging-backend"
