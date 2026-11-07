@@ -44,6 +44,7 @@ The handler refuses:
 | A payment that is not `Succeeded` | `Only succeeded money can be dismissed. This payment is {Status}.` |
 | A payment that is on an order | `This payment is on an order; the worklist does not hold it.` |
 | The same press again | success, silently: a double click is not an error, and the first reason stands (`PaymentDismissed` is not written twice) |
+| A request that carries no actor | `A dismissal names the person who made it.` — refused rather than recorded anonymously |
 | An unknown id | 404 |
 
 `GET /api/admin/payments/unallocated` filters `dismissed_at_utc IS NULL`, so the row leaves the list

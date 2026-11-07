@@ -115,6 +115,21 @@ public sealed class DismissPaymentCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleAsync_ShouldRefuseADismissalThatCannotNameWhoMadeIt()
+    {
+        var payment = await SeedHeldAsync();
+
+        var result = await Handler().HandleAsync(
+            new DismissPaymentCommand(payment.Id, "a test capture", null, null));
+
+        result.Success.Should().BeFalse("the audit row is the only answer to who closed this money");
+        result.Error.Should().Be("A dismissal names the person who made it.");
+        (await _context.Payments.AsNoTracking().FirstAsync(p => p.Id == payment.Id))
+            .DismissedAtUtc.Should().BeNull();
+        (await _context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task HandleAsync_ShouldTakeTheMoneyOffTheWorklistAndLeaveTheMoneyBooked()
     {
         var payment = await SeedHeldAsync();

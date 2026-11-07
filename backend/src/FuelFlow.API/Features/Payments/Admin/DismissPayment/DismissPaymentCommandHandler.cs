@@ -58,6 +58,11 @@ public sealed class DismissPaymentCommandHandler
         if (reason.Length > MaxReasonLength)
             return DismissPaymentResult.Refused($"The reason is longer than {MaxReasonLength} characters.");
 
+        // No actor, no dismissal: the audit row is the only answer to "who closed this money", and a
+        // dismissal that cannot name somebody is not one this platform should record.
+        if (command.ActorId is null)
+            return DismissPaymentResult.Refused("A dismissal names the person who made it.");
+
         // AsTracking, stated rather than inherited: under a default of NoTracking this would be a
         // silent no-op that still answered 204. NoTrackingMutationGuardTests enforces the pattern.
         var payment = await _context.Payments
@@ -126,13 +131,10 @@ public sealed class DismissPaymentCommandHandler
         DismissPaymentCommand command,
         string reason)
     {
-        // No actor, no record: an audit row that cannot name who closed money names nothing.
-        if (command.ActorId is null) return;
-
         _events.RecordEvent(
             "Payment", payment.Id.ToString(),
             "PaymentDismissed", before, after,
-            command.ActorId.Value, command.ActorName,
+            command.ActorId!.Value, command.ActorName,
             $"Dismissed {payment.AmountUah:N2} {payment.Currency} from the worklist: {reason}",
             "all");
     }
