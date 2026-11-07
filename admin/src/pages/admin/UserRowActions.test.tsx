@@ -107,13 +107,36 @@ describe("the promotion control of a customer row", () => {
     expect(screen.queryByText("users.grantPromo")).toBeNull();
   });
 
-  it("is not drawn for a staff row, which cannot hold the access at all", () => {
-    // The endpoint refuses a Manager or Admin target, and a control that is guaranteed to refuse
-    // is worse than no control (the same rule the role dropdown follows).
+  it("is not drawn for a staff row when the actor is below the ProductOwner", () => {
+    // The endpoint refuses a Manager or Admin target from these actors, and a control that is
+    // guaranteed to refuse is worse than no control (the same rule the role dropdown follows).
     mockedApiRequest.mockResolvedValue({});
-    renderRow(customer({ role: "Manager" }), "ProductOwner");
+    renderRow(customer({ role: "Manager" }), "Manager");
 
     expect(screen.queryByText("users.grantPromo")).toBeNull();
+  });
+
+  it("is drawn for the ProductOwner on a staff row, which the ruling lets him put on the route", async () => {
+    mockedApiRequest.mockResolvedValue({ granted: true, grantedAtUtc: "" });
+    const row = customer({ role: "Manager", id: "b5b5bde2-042e-73b9-88a6-b92f6ddf2c94" });
+    renderRow(row, "ProductOwner");
+
+    fireEvent.click(screen.getByText("users.grantPromo"));
+
+    await waitFor(() => {
+      expect(mockedApiRequest).toHaveBeenCalledWith(
+        "POST",
+        `/api/admin/users/${row.id}/promo-access`,
+        { granted: true },
+      );
+    });
+  });
+
+  it("is drawn on the ProductOwner's own row, because nobody above him can press it", () => {
+    mockedApiRequest.mockResolvedValue({});
+    renderRow(customer({ role: "ProductOwner" }), "ProductOwner");
+
+    expect(screen.getByText("users.grantPromo")).toBeDefined();
   });
 
   it("still draws the controls the ruling did not change", () => {

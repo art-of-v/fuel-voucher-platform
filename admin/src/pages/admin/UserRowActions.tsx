@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
-import { ROLE_USER, canSetPromoAccess } from "@/lib/roles";
+import { ROLE_PRODUCT_OWNER, ROLE_USER, canSetPromoAccess } from "@/lib/roles";
 import { useSession } from "@/lib/session-store";
 import type { AdminUser, PromoAccessResult } from "@/lib/api-types";
 
@@ -226,7 +226,8 @@ export function UserRowActions({ row }: { row: AdminUser }) {
       >
         <span className="ml-1 text-xs">{t("users.editEmail")}</span>
       </Button>
-      {row.role === ROLE_USER && canSetPromoAccess(actorRole) && (
+      {(row.role === ROLE_USER || actorRole === ROLE_PRODUCT_OWNER) &&
+        canSetPromoAccess(actorRole) && (
         <Button
           variant="ghost"
           size="sm"
