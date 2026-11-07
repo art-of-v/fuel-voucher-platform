@@ -27,6 +27,12 @@ export const STAFF_ROLES: string[] = [
  * put the promotion access in the Manager's hands on purpose, because the person who signs a
  * customer up to the promotional channel is the person who talks to them.
  * </p>
+ *
+ * <p>
+ * Who may *hold* it is a separate question, and the panel asks it per row: a `User` row always, and
+ * any row when the actor is the ProductOwner — the ruling of 2026-11-07, so the route can be walked
+ * by the person who owns the money before a customer is put on it.
+ * </p>
  */
 export function canSetPromoAccess(actorRole: string): boolean {
   return (

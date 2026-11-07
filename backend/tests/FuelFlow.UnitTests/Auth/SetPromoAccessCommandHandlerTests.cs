@@ -157,6 +157,61 @@ public sealed class SetPromoAccessCommandHandlerTests
         (await context.Users.FirstAsync(u => u.Id == manager.Id)).PromoAccessGrantedAtUtc.Should().BeNull();
     }
 
+    /// <summary>
+    /// The ceiling the ruling of 2026-11-07 puts over the type rule: the ProductOwner is the one
+    /// account nobody above him can take the route away from, so the switch has to work on himself.
+    /// </summary>
+    [Fact]
+    public async Task TheProductOwner_MaySetItOnTheirOwnAccount()
+    {
+        await using var context = CreateContext();
+        await SeedRolesAsync(context);
+        var owner = await AddUserAsync(context, SeedRoles.ProductOwnerName, "+380991234569");
+
+        var result = await CreateHandler(context).HandleAsync(
+            new SetPromoAccessCommand(owner.Id, true, owner.Id, "Owner", SeedRoles.ProductOwnerName),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue("the ProductOwner answers to nobody, so no second person can press it");
+        (await context.Users.FirstAsync(u => u.Id == owner.Id)).PromoAccessGrantedAtUtc.Should().NotBeNull();
+        (await context.Set<AuditEventOutbox>().SingleAsync()).EventType.Should().Be("PromoAccessGranted",
+            "the ruling widens who may be served, not who answers for it");
+    }
+
+    [Fact]
+    public async Task TheProductOwner_MayGrantItToAStaffAccount()
+    {
+        await using var context = CreateContext();
+        await SeedRolesAsync(context);
+        var manager = await AddUserAsync(context, SeedRoles.ManagerName);
+
+        var result = await CreateHandler(context).HandleAsync(
+            new SetPromoAccessCommand(manager.Id, true, Guid.NewGuid(), "Owner", SeedRoles.ProductOwnerName),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue("the type rule is the ProductOwner's to waive; nothing above him holds it");
+        (await context.Users.FirstAsync(u => u.Id == manager.Id)).PromoAccessGrantedAtUtc.Should().NotBeNull();
+    }
+
+    /// <summary>
+    /// The waiver is the ProductOwner's alone. An Admin is above a Manager and still may not put the
+    /// route on a peer, because the two-person rule is what the refusal is for.
+    /// </summary>
+    [Fact]
+    public async Task AnAdmin_StillCannotGrantItToStaff()
+    {
+        await using var context = CreateContext();
+        await SeedRolesAsync(context);
+        var manager = await AddUserAsync(context, SeedRoles.ManagerName);
+
+        var result = await CreateHandler(context).HandleAsync(
+            new SetPromoAccessCommand(manager.Id, true, Guid.NewGuid(), "Admin", SeedRoles.AdminName),
+            CancellationToken.None);
+
+        result.Forbidden.Should().BeTrue();
+        result.Error.Should().Contain("staff");
+    }
+
     [Fact]
     public async Task AnAccountWithNoRole_IsToldWhatToDoAboutIt()
     {

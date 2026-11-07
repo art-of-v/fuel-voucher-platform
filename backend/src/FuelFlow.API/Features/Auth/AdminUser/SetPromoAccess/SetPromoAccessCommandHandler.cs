@@ -29,17 +29,23 @@ namespace FuelFlow.Features.Auth.AdminUser.SetPromoAccess;
 /// asks is not "was the flag true" but "who said this customer may be paid that way, and when".
 /// </para>
 /// <para>
-/// <b>Only a customer account may hold it.</b> A staff account with the flag set would be a person able
-/// to have themselves served outside the acquirer — the one shape the money-first rule of the order is
-/// there to refuse, reached from the other side. So the refusal is not a hierarchy rule
-/// (<see cref="RoleHierarchy"/>) but a type rule: the grant belongs to a <c>User</c> row. An account
-/// with no role is refused too, and the sentence says what to do about it, because a roleless row is
+/// <b>Only a customer account may hold it — except the ProductOwner.</b> A staff account with the flag
+/// set would be a person able to have themselves served outside the acquirer — the one shape the
+/// money-first rule of the order is there to refuse, reached from the other side. So the refusal is not
+/// a hierarchy rule (<see cref="RoleHierarchy"/>) but a type rule: the grant belongs to a <c>User</c>
+/// row. The owner's ruling of 2026-11-07 carves out the ProductOwner, who may set it on any account
+/// including their own: the top of the hierarchy answers to nobody, and the person who owns the money
+/// is the one who has to be able to walk the route himself before a customer is put on it. An account
+/// with no role is still refused, and the sentence says what to do about it, because a roleless row is
 /// already unreachable through the rest of this surface (planning #299).
 /// </para>
 /// <para>
-/// <b>No self-grant.</b> The two-person rule of the channel — finance declares, somebody else serves —
-/// has to survive the switch that decides who may be declared for. A Manager granting themselves the
-/// promotion is one click from a sale with no acquirer and no second person in it.
+/// <b>No self-grant — except for the ProductOwner.</b> The two-person rule of the channel — finance
+/// declares, somebody else serves — has to survive the switch that decides who may be declared for. A
+/// Manager granting themselves the promotion is one click from a sale with no acquirer and no second
+/// person in it. The ProductOwner is outside that rule for the same reason as above: there is no
+/// second person above him, and the declaration he would be served on is still a Telegram message with
+/// a name on it.
 /// </para>
 /// <para>
 /// <b>What revoking does not do.</b> It closes the door, not the room: a promotional order already
@@ -78,7 +84,13 @@ public sealed class SetPromoAccessCommandHandler
         if (target is null)
             return SetPromoAccessResult.CreateNotFound("User not found");
 
-        if (command.ActingUserId == target.Id)
+        // The ProductOwner is the one actor the two-person rule cannot bind: nobody above him decides,
+        // and the route has to be walkable by the person who owns the money before a customer is put
+        // on it (ruling of 2026-11-07). Everybody else keeps both refusals.
+        var actsAsProductOwner = string.Equals(
+            command.ActingRole, SeedRoles.ProductOwnerName, StringComparison.Ordinal);
+
+        if (!actsAsProductOwner && command.ActingUserId == target.Id)
         {
             _logger.LogWarning(
                 "Promotion access refused: staff {ActingId} ({ActingRole}) tried to set it on their own account.",
@@ -89,12 +101,18 @@ public sealed class SetPromoAccessCommandHandler
         }
 
         var targetRole = target.Role?.Name;
-        if (targetRole != SeedRoles.UserName)
+        if (targetRole is null)
         {
-            var reason = targetRole is null
-                ? "This account has no role, so it is not a customer account yet. Give it one first."
-                : $"A {targetRole} account is staff, and staff cannot be granted promotion access.";
+            const string reason =
+                "This account has no role, so it is not a customer account yet. Give it one first.";
+            _logger.LogWarning(
+                "Promotion access refused for user {TargetId}: {Reason}", command.UserId, reason);
+            return SetPromoAccessResult.CreateForbidden(reason);
+        }
 
+        if (!actsAsProductOwner && targetRole != SeedRoles.UserName)
+        {
+            var reason = $"A {targetRole} account is staff, and staff cannot be granted promotion access.";
             _logger.LogWarning(
                 "Promotion access refused for user {TargetId}: {Reason}", command.UserId, reason);
             return SetPromoAccessResult.CreateForbidden(reason);
