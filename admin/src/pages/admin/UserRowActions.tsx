@@ -228,33 +228,33 @@ export function UserRowActions({ row }: { row: AdminUser }) {
       </Button>
       {(row.role === ROLE_USER || actorRole === ROLE_PRODUCT_OWNER) &&
         canSetPromoAccess(actorRole) && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() =>
-            setPromoAccessMutation.mutate({
-              userId: row.id,
-              granted: !hasPromoAccess,
-            })
-          }
-          disabled={setPromoAccessMutation.isPending}
-          title={
-            hasPromoAccess
-              ? t("users.revokePromoTitle")
-              : t("users.grantPromoTitle")
-          }
-          className={
-            hasPromoAccess
-              ? "text-warning hover:bg-warning/10"
-              : "text-success hover:bg-success/10"
-          }
-        >
-          <Ticket className="w-4 h-4" />
-          <span className="ml-1 text-xs">
-            {hasPromoAccess ? t("users.revokePromo") : t("users.grantPromo")}
-          </span>
-        </Button>
-      )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setPromoAccessMutation.mutate({
+                userId: row.id,
+                granted: !hasPromoAccess,
+              })
+            }
+            disabled={setPromoAccessMutation.isPending}
+            title={
+              hasPromoAccess
+                ? t("users.revokePromoTitle")
+                : t("users.grantPromoTitle")
+            }
+            className={
+              hasPromoAccess
+                ? "text-warning hover:bg-warning/10"
+                : "text-success hover:bg-success/10"
+            }
+          >
+            <Ticket className="w-4 h-4" />
+            <span className="ml-1 text-xs">
+              {hasPromoAccess ? t("users.revokePromo") : t("users.grantPromo")}
+            </span>
+          </Button>
+        )}
       <Button
         variant="ghost"
         size="sm"

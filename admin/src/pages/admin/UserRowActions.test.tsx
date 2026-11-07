@@ -118,7 +118,10 @@ describe("the promotion control of a customer row", () => {
 
   it("is drawn for the ProductOwner on a staff row, which the ruling lets him put on the route", async () => {
     mockedApiRequest.mockResolvedValue({ granted: true, grantedAtUtc: "" });
-    const row = customer({ role: "Manager", id: "b5b5bde2-042e-73b9-88a6-b92f6ddf2c94" });
+    const row = customer({
+      role: "Manager",
+      id: "b5b5bde2-042e-73b9-88a6-b92f6ddf2c94",
+    });
     renderRow(row, "ProductOwner");
 
     fireEvent.click(screen.getByText("users.grantPromo"));
