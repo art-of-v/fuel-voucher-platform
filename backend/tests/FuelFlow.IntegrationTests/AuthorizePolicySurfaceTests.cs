@@ -179,6 +179,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["POST /api/admin/ledger/unapplied-receipts"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/orders/{id}/refund"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/payments/{id:guid}/attach"] = AuthPolicies.MoneyMovement,
+        // Closes a money question rather than moving money: the payment, its journal entry and its
+        // statement row stay, and only the worklist forgets the row. It is the operator answering
+        // for money we hold, so it carries the money capability and not the read surface's (PR #1721).
+        ["POST /api/admin/payments/{id:guid}/dismiss"] = AuthPolicies.MoneyMovement,
         ["POST /api/purchases/simulate"] = AuthPolicies.MoneyMovement,
         ["PUT /api/admin/orders/{id}"] = AuthPolicies.MoneyMovement,
 
