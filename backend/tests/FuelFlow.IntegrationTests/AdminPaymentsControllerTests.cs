@@ -281,11 +281,11 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
                      && EF.Functions.JsonContains(e.Payload, orderProbe)))
             .Should().Be(1, "placing the money is the act that hands the order to fulfilment");
 
-        (await context.JournalEntries.AsNoTracking()
-                .Where(j => j.SourceId == orderId)
-                .Select(j => j.SourceEvent)
-                .ToListAsync())
-            .Should().BeEquivalentTo(["payment.received", "payment.received.vat"]);
+        // The books say nothing. The money placed here is declared money - the settlement channel's -
+        // and the promo ruling of 2026-11-07 says a sale it pays for books nothing. The order is
+        // settled and handed to fulfilment; the books would otherwise show promo revenue.
+        (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
+            .Should().Be(0, "promo revenue is not revenue");
 
         // The acquirer never spoke about this money, so nothing may say that it did.
         settled.MonobankStatus.Should().BeNull();
@@ -440,10 +440,17 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
         second.Should().BeOfType<NoContentResult>();
 
+        // The books say nothing, and that is the promo ruling of 2026-11-07: the money placed here is
+        // declared money, and a sale it pays for books nothing. The idempotency this test is about is
+        // therefore proved on the order and the hand-off to fulfilment, not on the receipt - there is
+        // no receipt to post twice.
         (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
-            .Should().Be(2, "one receipt and one VAT leg, however many presses name the same order");
+            .Should().Be(0, "promo revenue is not revenue");
+
+        (await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId))
+            .Status.Should().Be(OrderStatus.PendingFulfillment);
         (await context.OutboxEvents.AsNoTracking().CountAsync(e => e.EventType == OutboxEventType.OrderCreated))
-            .Should().Be(1);
+            .Should().Be(1, "the hand-off to fulfilment happens once, however many presses name the order");
     }
 
     [Fact]

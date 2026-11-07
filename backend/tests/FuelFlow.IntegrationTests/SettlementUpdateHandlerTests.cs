@@ -269,18 +269,12 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
                      && EF.Functions.JsonContains(e.Payload, orderProbe)))
             .Should().Be(1, "the money the channel declared is what handed the order to fulfilment");
 
-        // The revenue. Two entries, because the gross is in the bank and the VAT inside it is the state's.
-        (await context.JournalEntries.AsNoTracking()
-                .Where(j => j.SourceId == orderId)
-                .Select(j => j.SourceEvent)
-                .ToListAsync())
-            .Should().BeEquivalentTo(["payment.received", "payment.received.vat"]);
-
-        var gross = await context.JournalEntries.AsNoTracking()
-            .Include(j => j.Lines)
-            .SingleAsync(j => j.SourceEvent == "payment.received" && j.SourceId == orderId);
-        Math.Max(gross.Lines.Sum(l => l.DebitUah), gross.Lines.Sum(l => l.CreditUah))
-            .Should().Be(1504m, "the sale the channel declared is the sale the books are short by");
+        // The books say nothing, and that is the promo ruling of 2026-11-07: this channel's money is
+        // declared money, and a sale it pays for is not a sale the books may carry. The order moved, the
+        // fuel is owed and the money row says who declared it - the books would otherwise show revenue
+        // that came out of a promo budget nobody recognised as such.
+        (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
+            .Should().Be(0, "promo revenue is not revenue");
 
         // And the acquirer's columns stay empty: nothing ever spoke to Monobank about this money, and a
         // column that claims it did is how the next reconciliation investigation gets misled.

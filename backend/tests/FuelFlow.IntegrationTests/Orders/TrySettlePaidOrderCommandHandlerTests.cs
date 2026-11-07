@@ -109,7 +109,8 @@ public sealed class TrySettlePaidOrderCommandHandlerTests : IClassFixture<TestDa
         decimal amount,
         PaymentStatus status = PaymentStatus.Succeeded,
         PaymentKind kind = PaymentKind.Capture,
-        Guid? parentPaymentId = null)
+        Guid? parentPaymentId = null,
+        string provider = PaymentProviders.Monobank)
     {
         var now = TestClock.UtcNow;
 
@@ -117,8 +118,11 @@ public sealed class TrySettlePaidOrderCommandHandlerTests : IClassFixture<TestDa
         {
             Id = Guid.CreateVersion7(),
             Kind = kind,
-            // Declared: the channel's money, which is the case no authority but this rule can settle.
-            Provider = PaymentProviders.Declared,
+            // The provider is a parameter because the two kinds of money are told apart by the books,
+            // not only by the settle: the acquirer's money is revenue, and declared money - the
+            // settlement channel's - is the promo channel's, and a sale it pays for books nothing
+            // (2026-11-07). A test that only ever sees one of them cannot tell the two rules apart.
+            Provider = provider,
             UserId = userId,
             OrderId = orderId,
             AmountUah = amount,
@@ -128,8 +132,10 @@ public sealed class TrySettlePaidOrderCommandHandlerTests : IClassFixture<TestDa
             // A refund is a refund of something, and the database refuses one without a parent.
             ParentPaymentId = parentPaymentId,
             PaidAtUtc = status == PaymentStatus.Succeeded ? now : null,
-            CreatedByUserName = "finance",
-            IsAutomatic = true,
+            // A declared capture names who said so; an acquirer's capture must not, and the database
+            // says so (ck_payments_refund_audit_only_on_refund).
+            CreatedByUserName = provider == PaymentProviders.Declared ? "finance" : null,
+            IsAutomatic = provider == PaymentProviders.Declared,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
@@ -164,6 +170,31 @@ public sealed class TrySettlePaidOrderCommandHandlerTests : IClassFixture<TestDa
                 .Select(j => j.SourceEvent)
                 .ToListAsync())
             .Should().BeEquivalentTo(["payment.received", "payment.received.vat"]);
+    }
+
+    [Fact]
+    public async Task Money_a_person_declared_settles_the_order_and_books_nothing()
+    {
+        // The promo ruling of 2026-11-07. Declared money is the settlement channel's money - the promo
+        // channel's - and a sale it pays for is not a sale the books may carry. The order still moves:
+        // the customer paid, the fuel is owed. The books stay silent about it.
+        //
+        // The order here is on the acquirer route, which is the point: production showed a 4 310,00 ₴
+        // order paid out of declared money booking a receipt and a VAT leg, because the old gate asked
+        // about the route and not about the money.
+        var (orderId, userId) = await SeedOrderAsync();
+        await SeedMoneyAsync(orderId, userId, 1200m, provider: PaymentProviders.Declared);
+
+        (await TryAsync(orderId)).Settled.Should().BeTrue();
+
+        var settled = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+        settled.Status.Should().Be(OrderStatus.PendingFulfillment);
+
+        (await _context.OutboxEvents.AsNoTracking().CountAsync(e => e.EventType == OutboxEventType.OrderCreated))
+            .Should().Be(1, "the customer paid, so the fuel is owed whatever the books say about it");
+
+        (await _context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == orderId))
+            .Should().Be(0, "promo revenue is not revenue");
     }
 
     [Fact]
