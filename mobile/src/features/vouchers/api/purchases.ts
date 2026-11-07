@@ -84,9 +84,18 @@ function buildPurchaseError(response: Response, bodyText: string): Error {
       const code = typeof body?.code === 'string' && body.code ? body.code : undefined;
       const message = body?.detail ?? body?.title;
       if (typeof message === 'string' && message.trim()) {
-        return code
-          ? (Object.assign(new Error(message.trim()), { code }) as Error & { code: string })
-          : new Error(message.trim());
+        const error = new Error(message.trim()) as Error & { code?: string; shortfallUah?: number };
+        if (code) error.code = code;
+
+        // One refusal carries a number the customer has to see: how much a promotional order is short
+        // of the money the account holds (planning #889, item 5). It travels as `data`, beside the
+        // sentence, precisely so the amount can be formatted here — picking it out of our English
+        // detail would need a parser per language and would break the first time we reworded it.
+        const shortfall = body?.data?.shortfallUah;
+        if (typeof shortfall === 'number' && Number.isFinite(shortfall))
+          error.shortfallUah = shortfall;
+
+        return error;
       }
     } catch {
       // Not JSON after all — fall through to the generic message.
@@ -130,6 +139,12 @@ export function purchaseErrorKey(code?: string): string | null {
     // because the customer cannot act on it and the only way forward is to ask us (planning #889).
     case 'promo_access_not_granted':
       return 'purchase.error.promoAccess';
+    // The offer is open and the money is not enough. The one refusal whose sentence needs a number, so
+    // it is the one the caller fills in — from `data.shortfallUah`, not out of our wording. Nothing was
+    // ordered and nothing was spent, which is what makes this different from the order that waits for a
+    // declaration that has not arrived yet (planning #889, item 5).
+    case 'promo_balance_short':
+      return 'purchase.error.promoShortfall';
     default:
       return null;
   }

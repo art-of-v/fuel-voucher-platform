@@ -21,17 +21,27 @@ jest.mock('../../../core/i18n', () => ({
   useI18n: () => ({ t: (key: string) => key, language: 'uk', setLanguage: jest.fn() }),
 }));
 
-// The swipe reveal reaches for the worklets native module and cannot load under Jest.
+// The swipe reveal reaches for the worklets native module and cannot load under Jest. The stand-in
+// renders the reveal's contents inline rather than ignoring them, because which actions a card
+// exposes is exactly what these tests have to read.
 jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const React = require('react');
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports
   const { View } = require('react-native');
   const Swipeable = React.forwardRef(function Swipeable(
-    { children }: { children: React.ReactNode },
+    { children, enabled, renderRightActions }: any,
     ref: unknown,
   ) {
-    return React.createElement(View, { ref }, children);
+    // The card holds this ref to collapse the reveal before an action's alert opens, so the
+    // stand-in has to answer `close` the way the real component does.
+    React.useImperativeHandle(ref as any, () => ({ close() {} }));
+    return React.createElement(
+      View,
+      null,
+      children,
+      enabled && renderRightActions ? renderRightActions() : null,
+    );
   });
   return { __esModule: true, default: Swipeable };
 });
@@ -290,6 +300,74 @@ describe('OrderCard receipt action (#119)', () => {
     renderCard([], { order: mkOrder({ status: 'REFUNDED' }), onReceipt: jest.fn() });
 
     expect(screen.getByTestId('receipt-order-1')).toBeTruthy();
+  });
+});
+
+/**
+ * An order waiting on the settlement channel and an order whose bank payment never opened are one
+ * field apart in the same response body, and the card used to treat them as one: it offered the
+ * first the second's payment - which has nothing behind it, since a promotional order carries no
+ * invoice - and called it «НЕ ОПЛАЧЕНО», which tells the customer to do the one thing the flow
+ * cannot use (planning #889, item 6).
+ */
+describe('OrderCard - which button wrote the unpaid order', () => {
+  function renderUnpaid(
+    over: Partial<Order> = {},
+    props: Partial<React.ComponentProps<typeof OrderCard>> = {},
+  ) {
+    render(
+      <OrderCard
+        order={mkOrder({ status: 'PENDING_PAYMENT', vouchers: [], ...over })}
+        isExpanded={false}
+        onToggle={jest.fn()}
+        onVoucherPress={jest.fn()}
+        onPay={jest.fn()}
+        onDelete={jest.fn()}
+        brandColor="#ff0000"
+        {...props}
+      />,
+    );
+  }
+
+  it('offers the payment to an order the pay button wrote', () => {
+    renderUnpaid();
+
+    expect(screen.getByText('codes.payNow')).toBeTruthy();
+    expect(screen.getByText('codes.unpaid')).toBeTruthy();
+  });
+
+  it('withholds the payment from an order the promotional button wrote', () => {
+    // There is no invoice behind this order and never will be, so the swipe would open nothing.
+    renderUnpaid({ settlementRoute: 'Declared' });
+
+    expect(screen.queryByText('codes.payNow')).toBeNull();
+  });
+
+  // An older server, or any order from before the column, says nothing about its route. The bank is
+  // what every one of them was, so the payment stays: the withheld action is the destructive half of
+  // this field, and it may not be taken away on an absent value.
+  it('keeps offering the payment to an order that reports no route', () => {
+    renderUnpaid({ settlementRoute: undefined });
+
+    expect(screen.getByText('codes.payNow')).toBeTruthy();
+  });
+
+  it('says what a promotional order waits for instead of calling it unpaid', () => {
+    renderUnpaid({ settlementRoute: 'Declared' });
+
+    expect(screen.getByText('codes.promoAwaiting')).toBeTruthy();
+    expect(screen.queryByText('codes.unpaid')).toBeNull();
+  });
+
+  it('still lets the customer drop a promotional order', () => {
+    // The delete is the exit the flow gives them: tapping the other button cannot re-take the cart
+    // while this order holds it, so dropping this one is how they change their mind.
+    const onDelete = jest.fn();
+    renderUnpaid({ settlementRoute: 'Declared' }, { onDelete });
+
+    fireEvent.press(screen.getByText('codes.deleteAction'));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });
 

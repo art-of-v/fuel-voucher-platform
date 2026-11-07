@@ -241,7 +241,15 @@ export default function CheckoutScreen() {
       // margin decision, which is nothing they can act on.
       const code = e instanceof Error ? (e as Error & { code?: string }).code : undefined;
       const key = purchaseErrorKey(code);
-      alert(key ? t(key) : e instanceof Error ? e.message : t('common.error'));
+      // The one wording that needs a figure: a promotional tap the account cannot cover says how much
+      // is missing, and the amount arrives as a number so it can be shown in the customer's own money
+      // format. A key with no placeholder ignores the argument, so this is the figure when the refusal
+      // carried one and nothing when it did not (planning #889, item 5).
+      const shortfall =
+        e instanceof Error ? (e as Error & { shortfallUah?: number }).shortfallUah : undefined;
+      const figure =
+        typeof shortfall === 'number' && Number.isFinite(shortfall) ? [formatMoney(shortfall)] : [];
+      alert(key ? t(key, ...figure) : e instanceof Error ? e.message : t('common.error'));
       setIsProcessing(false);
     }
   };

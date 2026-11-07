@@ -136,6 +136,16 @@ export async function getMyOrders(): Promise<Order[]> {
       legalEntityId: o.legalEntityId ?? null,
       isRenewal: !!o.isRenewal,
       kind: o.kind ?? 'Purchase',
+      // Only the two names the app knows are kept. A route the wallet has never heard of must not
+      // silently become the promotional one - the payment it withholds is the only way an unknown
+      // order can still be paid - so an unrecognised value reads as the bank, as it did before the
+      // column existed (planning #889, item 6).
+      settlementRoute:
+        o.settlementRoute === 'Declared'
+          ? 'Declared'
+          : o.settlementRoute === 'Acquirer'
+            ? 'Acquirer'
+            : undefined,
       vouchers: Array.isArray(o.vouchers) ? o.vouchers.map(mapVoucher) : [],
       lineItems: Array.isArray(o.lineItems)
         ? o.lineItems.map((li: any) => ({

@@ -65,8 +65,14 @@ jest.mock('expo-router', () => {
 jest.mock('../src/core/i18n', () => ({
   __esModule: true,
   // Keys, not translations: the button label is built as `${t('packages.payTitle')} …`,
-  // so a real Ukrainian string would make every money assertion depend on the copy.
-  useI18n: () => ({ t: (key: string) => key, language: 'uk', setLanguage: jest.fn() }),
+  // so a real Ukrainian string would make every money assertion depend on the copy. The arguments are
+  // kept beside the key for the same reason — a refusal that carries a figure has to be asserted with
+  // it, and a mock that dropped the parameters would pass whether or not the screen ever sent one.
+  useI18n: () => ({
+    t: (key: string, ...params: string[]) => [key, ...params].join(' '),
+    language: 'uk',
+    setLanguage: jest.fn(),
+  }),
 }));
 
 jest.mock('../src/core/state/appStore', () => ({
@@ -98,7 +104,9 @@ jest.mock('../src/features/vouchers/api/purchases', () => ({
       ? 'purchase.error.belowCost'
       : code === 'package_out_of_stock'
         ? 'purchase.error.outOfStock'
-        : null,
+        : code === 'promo_balance_short'
+          ? 'purchase.error.promoShortfall'
+          : null,
 }));
 
 jest.mock('../src/features/company/hooks/useAccountContext', () => ({
@@ -583,6 +591,48 @@ describe('Checkout — the promotional button (planning #889)', () => {
 
     await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.alreadyPaid'));
     expect(global.alert).not.toHaveBeenCalledWith('purchase.promoOrdered');
+  });
+
+  it('names the money a refused promotional tap is short by, and keeps the basket', async () => {
+    // Item 5 (planning #889): the offer is open and the account holds some of the price, which is the
+    // one refusal that cannot be performed and says by how much. The screen's part is to hand the
+    // figure to the wording as an argument — the server's number through the app's money formatter,
+    // never a substring of the server's sentence — and to leave the cart alone, because nothing was
+    // ordered and the customer may still press the pay button.
+    basket();
+    mockUser = { promoAccessAvailable: true };
+    mockCreateInvoice.mockRejectedValue(
+      Object.assign(
+        new Error('This order needs 900 ₴ and the account holds 400 ₴, so 500 ₴ is missing.'),
+        { code: 'promo_balance_short', shortfallUah: 500 },
+      ),
+    );
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText('packages.promoTitle'));
+
+    // One argument, because this suite's `t` renders the key with the parameters behind it: what is
+    // being proved is that the figure reached the wording at all, in the app's money format.
+    await waitFor(() =>
+      expect(global.alert).toHaveBeenCalledWith('purchase.error.promoShortfall 500 UAH'),
+    );
+    expect(mockClearCart).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('says the wording without a figure when the refusal sent none', async () => {
+    // A shortfall that arrives as no number at all must not render «не вистачає undefined ₴». The
+    // placeholder is filled by the formatter only when there is something to format.
+    basket();
+    mockUser = { promoAccessAvailable: true };
+    mockCreateInvoice.mockRejectedValue(
+      Object.assign(new Error('the account is short'), { code: 'promo_balance_short' }),
+    );
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText('packages.promoTitle'));
+
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.error.promoShortfall'));
   });
 });
 
