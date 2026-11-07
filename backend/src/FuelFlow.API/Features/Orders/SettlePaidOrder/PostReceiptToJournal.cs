@@ -9,7 +9,9 @@ public sealed partial class SettlePaidOrderCommandHandler
 {
     /// <summary>
     /// Books the money. Two entries, because one cannot carry both facts: the gross lands in the
-    /// bank, and the VAT inside it is a liability to the state.
+    /// bank, and the VAT inside it is a liability to the state. A Declared-route (promotional) order
+    /// books nothing: it is settled out of declared held money and its accounting entry is skipped
+    /// by decision, not by accident.
     /// <para>
     /// <b>Why here and not in the Monobank webhook.</b> Every authority that can settle an order
     /// converges on this handler - the push webhook, the reconciliation poller, and once planning
@@ -33,6 +35,20 @@ public sealed partial class SettlePaidOrderCommandHandler
     /// </summary>
     private async Task PostReceiptToJournalAsync(Order order, CancellationToken cancellationToken)
     {
+        // Planning ruling 2026-11-07 (promo cleanup): a Declared-route order is a promotional purchase,
+        // settled out of money a manager declared against an account opened for the offer - not a sale
+        // against the acquirer. The receipt and its VAT leg are the signature of a real sale, and a
+        // promotional channel must not write one, or the books end up showing revenue that came from a
+        // promo budget nobody ever recognised as such. The money row, the draw and the fulfilment
+        // records the transfer itself; only the accounting entry is skipped.
+        if (order.SettlementRoute == SettlementRoute.Declared)
+        {
+            _logger.LogInformation(
+                "SETTLEMENTS: order {OrderId} is on the Declared (promo) route, so no receipt was posted",
+                order.Id);
+            return;
+        }
+
         // The VAT rate is a parameter, not a constant: fuel has carried a reduced rate in this
         // jurisdiction, and the business is the one that knows which it is registered for.
         const decimal vatRate = VatCalculator.StandardRate;
