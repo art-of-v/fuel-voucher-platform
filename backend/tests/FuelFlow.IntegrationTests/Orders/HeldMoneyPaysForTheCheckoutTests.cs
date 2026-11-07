@@ -115,10 +115,13 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
         (await context.OutboxEvents.AsNoTracking().CountAsync(e => e.EventType == OutboxEventType.OrderCreated))
             .Should().Be(1, "the settled order has to reach the job that claims stock for it");
 
-        (await context.JournalEntries.AsNoTracking().Where(j => j.SourceId == order.Id)
-                .Select(j => j.SourceEvent).ToListAsync())
-            .Should().BeEquivalentTo(["payment.received", "payment.received.vat"],
-                "money that bought something is revenue from this moment, not a liability");
+        // The books say nothing. The money that paid for this order is declared money - the settlement
+        // channel's, the promo channel's - and the ruling of 2026-11-07 is that a sale it pays for
+        // books nothing: no receipt, no VAT leg, no revenue. The money row, the draw and the
+        // fulfilment's custody records are the facts; the books would otherwise show revenue that came
+        // out of a promo budget nobody recognised as such.
+        (await context.JournalEntries.AsNoTracking().CountAsync(j => j.SourceId == order.Id))
+            .Should().Be(0, "promo revenue is not revenue");
     }
 
     [Fact]

@@ -113,6 +113,88 @@ public static class OrderPayment
     }
 
     /// <summary>
+    /// Whether the money on the order is money a person declared - money a manager stated arrived,
+    /// rather than money an acquirer reported.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The route on the order is not the same question. An order written on the acquirer route can
+    /// still be paid out of the customer's declared balance, and a sale paid out of a promotional
+    /// budget is a promotional sale whatever route the checkout took. The books follow the money,
+    /// not the button.
+    /// </para>
+    /// <para>
+    /// Both ways money reaches an order are asked, because <see cref="MoneyOnItAsync"/> asks both: a
+    /// capture naming the order, and a draw made on held money for it. Asking one and not the other
+    /// would let a draw - which names no payment on the order at all - slip past.
+    /// </para>
+    /// </remarks>
+    public static async Task<bool> PaidByDeclaredMoneyAsync(
+        ApplicationDbContext context,
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        var attached = await context.Payments
+            .AsNoTracking()
+            .AnyAsync(
+                p => p.OrderId == orderId
+                     && p.Kind == PaymentKind.Capture
+                     && p.Status == PaymentStatus.Succeeded
+                     && p.Provider == PaymentProviders.Declared,
+                cancellationToken);
+
+        if (attached)
+        {
+            return true;
+        }
+
+        return await context.PaymentAllocations
+            .AsNoTracking()
+            .AnyAsync(
+                a => a.OrderId == orderId
+                     && a.Payment.Kind == PaymentKind.Capture
+                     && a.Payment.Status == PaymentStatus.Succeeded
+                     && a.Payment.Provider == PaymentProviders.Declared,
+                cancellationToken);
+    }
+
+    /// <summary>
+    /// Whether this order is a promotional one - and so is not a sale the books may carry.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two facts make an order promotional, and they are asked in one place because the two places
+    /// that book this - the receipt at settle time and the redemption at issue time - have to agree.
+    /// The route says the checkout was written on the promotional path; the money says the sale was
+    /// paid out of a declared balance, whichever route the checkout took.
+    /// </para>
+    /// <para>
+    /// The ruling is the business's of 2026-11-07: a promotional sale books nothing. Not a receipt,
+    /// not a VAT leg, not a revenue line - the money row, the draw and the fulfilment's custody
+    /// records are the facts, and the books would otherwise show revenue that came out of a promo
+    /// budget nobody recognised as such.
+    /// </para>
+    /// </remarks>
+    public static async Task<bool> IsPromoOrderAsync(
+        ApplicationDbContext context,
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        var route = await context.Orders
+            .AsNoTracking()
+            .Where(o => o.Id == orderId)
+            .Select(o => (SettlementRoute?)o.SettlementRoute)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (route == SettlementRoute.Declared)
+        {
+            return true;
+        }
+
+        return await PaidByDeclaredMoneyAsync(context, orderId, cancellationToken);
+    }
+
+    /// <summary>
     /// Whether the money already on the order pays for it.
     /// </summary>
     /// <remarks>

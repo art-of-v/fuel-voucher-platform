@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Redemptions;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Domain;
@@ -47,22 +48,34 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             """);
 
     /// <summary>A voucher sold at 2500 gross with 50 liters bought at 45.00 - a 250 margin.</summary>
-    private async Task<(Guid UserId, Guid VoucherId)> SeedSaleAsync(ApplicationDbContext context, decimal costPerLiter)
+    private async Task<(Guid UserId, Guid VoucherId)> SeedSaleAsync(
+        ApplicationDbContext context,
+        decimal costPerLiter,
+        SettlementRoute? route = null,
+        string? moneyProvider = null)
     {
         var (userId, voucherIds) = await SeedPackSaleAsync(
-            context, quantity: 1, unitPrice: 2500m, liters: 50m, costPerLiter);
+            context, quantity: 1, unitPrice: 2500m, liters: 50m, costPerLiter, route, moneyProvider);
         return (userId, voucherIds.Single());
     }
 
     /// <summary>
     /// A paid order of <paramref name="quantity"/> vouchers on one line - the shape a multi-pack has.
     /// </summary>
+    /// <param name="route">The route the order was written on. Acquirer by default.</param>
+    /// <param name="moneyProvider">
+    /// The provider of the money that answered for the order. A declared capture is the settlement
+    /// channel's money - the promo channel's - and it is what makes the sale a promotional one even
+    /// when the route says otherwise.
+    /// </param>
     private async Task<(Guid UserId, IReadOnlyList<Guid> VoucherIds)> SeedPackSaleAsync(
         ApplicationDbContext context,
         int quantity,
         decimal unitPrice,
         decimal liters,
-        decimal costPerLiter)
+        decimal costPerLiter,
+        SettlementRoute? route = null,
+        string? moneyProvider = null)
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
@@ -84,6 +97,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             UserId = userId,
             Price = unitPrice * quantity,
             Status = OrderStatus.Fulfilled,
+            SettlementRoute = route,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         });
@@ -143,6 +157,34 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
                 ActorKind = VoucherActorKinds.User,
                 ActorUserId = userId,
                 OccurredAtUtc = now,
+            });
+        }
+
+        // The money that answered for the order, when the sale is a promotional one. It is a capture
+        // attached to the order, which is the shape the settlement channel's attach-and-settle writes
+        // - and the shape production showed on 2026-11-07, where a 4 310,00 ₴ order on the acquirer
+        // route was paid out of declared money.
+        if (moneyProvider is not null)
+        {
+            context.Payments.Add(new Payment
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = PaymentKind.Capture,
+                Provider = moneyProvider,
+                UserId = userId,
+                OrderId = orderId,
+                AmountUah = unitPrice * quantity,
+                AmountKopecks = (long)Math.Round(unitPrice * quantity * 100),
+                Currency = "UAH",
+                Status = PaymentStatus.Succeeded,
+                PaidAtUtc = now,
+                // The declared capture names who said so: that money arrived because a person stated
+                // it. The acquirer's capture must name nobody and carry no approver - the database
+                // refuses a card capture that looks like a human touched it.
+                CreatedByUserName = moneyProvider == PaymentProviders.Declared ? "finance" : null,
+                IsAutomatic = moneyProvider == PaymentProviders.Declared,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
             });
         }
 
@@ -411,5 +453,76 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
 
         posted.Should().HaveCount(1, "only cost of sales is knowable without a price to recognise");
         posted["voucher.redeemed.cogs"].Should().Be(("808", "281", 450m));
+    }
+
+    [Fact]
+    public async Task A_Voucher_Of_An_Order_Paid_By_Declared_Money_Books_No_Redemption_Entry()
+    {
+        // The promo ruling of 2026-11-07, on the redemption side. The receipt at settle time already
+        // asks the order whether the sale is promotional; the redemption asks the same question,
+        // because a sale that booked no receipt may not book revenue either - otherwise the books show
+        // revenue for a sale they never admitted, and the margin is invented.
+        //
+        // The order here is on the acquirer route, which is the point: production showed a 4 310,00 ₴
+        // order paid out of declared money booking a receipt, a VAT leg and a revenue line, because
+        // the gate asked about the route and not about the money.
+        await using var setup = CreateContext();
+        await ResetAsync(setup);
+        var (userId, voucherId) = await SeedSaleAsync(
+            setup, costPerLiter: 45m, route: SettlementRoute.Acquirer,
+            moneyProvider: PaymentProviders.Declared);
+
+        await PostAsync(userId, voucherId);
+
+        await using var verify = CreateContext();
+        var entries = await verify.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceId == voucherId)
+            .ToListAsync();
+
+        entries.Should().BeEmpty(
+            "a promotional redemption books nothing - neither the revenue nor the cost of sales");
+    }
+
+    [Fact]
+    public async Task A_Voucher_Of_A_Promo_Route_Order_Books_No_Redemption_Entry()
+    {
+        // The same ruling from the other side: an order written on the promotional route is a
+        // promotional sale even before a single coin of declared money is attached to it. The route is
+        // a promise about where the money will come from, and the books must not carry the sale until
+        // it does.
+        await using var setup = CreateContext();
+        await ResetAsync(setup);
+        var (userId, voucherId) = await SeedSaleAsync(
+            setup, costPerLiter: 45m, route: SettlementRoute.Declared);
+
+        await PostAsync(userId, voucherId);
+
+        await using var verify = CreateContext();
+        var entries = await verify.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceId == voucherId)
+            .ToListAsync();
+
+        entries.Should().BeEmpty(
+            "a promotional redemption books nothing - neither the revenue nor the cost of sales");
+    }
+
+    [Fact]
+    public async Task A_Voucher_Of_A_Real_Sale_Is_Still_Booked()
+    {
+        // The gate is not a blanket: a sale the acquirer paid for still books its revenue and its
+        // cost of sales. A test that only proves the promo case would pass just as well with the
+        // redemption posting broken altogether.
+        await using var setup = CreateContext();
+        await ResetAsync(setup);
+        var (userId, voucherId) = await SeedSaleAsync(
+            setup, costPerLiter: 45m, route: SettlementRoute.Acquirer,
+            moneyProvider: PaymentProviders.Monobank);
+
+        var posted = await PostAsync(userId, voucherId);
+
+        posted.Should().HaveCount(2, "revenue and cost of sales are two facts; the VAT was booked with the receipt");
+        posted["voucher.redeemed.revenue"].Should().Be(("681", "702", 2500m));
     }
 }

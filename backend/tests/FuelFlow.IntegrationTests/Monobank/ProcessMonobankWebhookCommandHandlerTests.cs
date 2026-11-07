@@ -487,14 +487,15 @@ LineItems =
             providerStatus == "expired" ? MonobankStatus.Expired : MonobankStatus.Failure,
             "the delivery is refused as a transition but still recorded as what the brand said");
 
-        // The money is in the books - which is the whole reason for a settle rather than a cancel:
-        // the alternative is money that exists nowhere and an order nobody can refund from.
+        // The books say nothing, and that is the promo ruling of 2026-11-07: the money on this order is
+        // declared money - the settlement channel's - and a sale it pays for books nothing. The settle
+        // still wins over the cancel, which is what this test is about: the order moves, the fuel is
+        // owed, and the money row names who declared it.
         var entries = await _context.JournalEntries
             .Include(e => e.Lines)
             .Where(e => e.SourceId == order.Id)
             .ToListAsync();
-        entries.Should().HaveCount(2, "the gross and the VAT post as one receipt");
-        entries.Should().OnlyContain(e => e.Lines.Sum(l => l.DebitUah) == e.Lines.Sum(l => l.CreditUah));
+        entries.Should().BeEmpty("promo revenue is not revenue");
 
         // The handover came from the settle, not from this delivery: an ORDER_CREATED event exists,
         // and the acquirer's message queued nothing it had no part in paying for.

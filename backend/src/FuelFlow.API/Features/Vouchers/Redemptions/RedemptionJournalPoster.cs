@@ -70,26 +70,23 @@ public sealed class RedemptionJournalPoster
         var id = voucher.Id;
         var entryDate = DateOnly.FromDateTime(occurredAtUtc);
 
-        // Promo ruling 2026-11-07: a voucher issued against a Declared-route (promotional) order is a
-        // promotional redemption, and a promotional redemption books no ledger entry at all - not cost
-        // of sales, not revenue. The promo channel's money and the fulfilment's custody records are
-        // the facts; the accounting pair is not this channel's business. Real (Acquirer) redemptions
-        // keep the revenue / cost-of-sales pair.
-        if (voucher.OrderId is not null)
+        // Promo ruling 2026-11-07: a voucher issued against a promotional order is a promotional
+        // redemption, and a promotional redemption books no ledger entry at all - not cost of sales,
+        // not revenue. The promo channel's money and the fulfilment's custody records are the facts;
+        // the accounting pair is not this channel's business. Real redemptions keep the revenue /
+        // cost-of-sales pair.
+        //
+        // The question asked is the ORDER's: an order on the acquirer route can be paid out of the
+        // customer's declared balance, and the redemption of that order's vouchers is a promotional
+        // redemption whatever route its checkout took. The receipt and the redemption have to agree -
+        // a sale that booked no receipt may not book revenue either.
+        if (voucher.OrderId is { } orderId
+            && await OrderPayment.IsPromoOrderAsync(_context, orderId, cancellationToken))
         {
-            var orderRoute = await _context.Orders
-                .AsNoTracking()
-                .Where(o => o.Id == voucher.OrderId)
-                .Select(o => (SettlementRoute?)o.SettlementRoute)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (orderRoute == SettlementRoute.Declared)
-            {
-                _logger.LogInformation(
-                    "REDEMPTIONS: voucher {VoucherId} belongs to the Declared (promo) order {OrderId}, so no redemption entry was posted",
-                    voucher.Id, voucher.OrderId);
-                return;
-            }
+            _logger.LogInformation(
+                "REDEMPTIONS: voucher {VoucherId} belongs to the promo order {OrderId}, so no redemption entry was posted",
+                voucher.Id, orderId);
+            return;
         }
 
         var cost = Math.Round(liters * (voucher.CostPerLiter ?? 0m), 2, MidpointRounding.AwayFromZero);

@@ -9,9 +9,9 @@ public sealed partial class SettlePaidOrderCommandHandler
 {
     /// <summary>
     /// Books the money. Two entries, because one cannot carry both facts: the gross lands in the
-    /// bank, and the VAT inside it is a liability to the state. A Declared-route (promotional) order
-    /// books nothing: it is settled out of declared held money and its accounting entry is skipped
-    /// by decision, not by accident.
+    /// bank, and the VAT inside it is a liability to the state. A promotional order books nothing:
+    /// it is settled out of declared money, and its accounting entry is skipped by decision, not by
+    /// accident.
     /// <para>
     /// <b>Why here and not in the Monobank webhook.</b> Every authority that can settle an order
     /// converges on this handler - the push webhook, the reconciliation poller, and once planning
@@ -35,16 +35,20 @@ public sealed partial class SettlePaidOrderCommandHandler
     /// </summary>
     private async Task PostReceiptToJournalAsync(Order order, CancellationToken cancellationToken)
     {
-        // Planning ruling 2026-11-07 (promo cleanup): a Declared-route order is a promotional purchase,
-        // settled out of money a manager declared against an account opened for the offer - not a sale
-        // against the acquirer. The receipt and its VAT leg are the signature of a real sale, and a
-        // promotional channel must not write one, or the books end up showing revenue that came from a
-        // promo budget nobody ever recognised as such. The money row, the draw and the fulfilment
-        // records the transfer itself; only the accounting entry is skipped.
-        if (order.SettlementRoute == SettlementRoute.Declared)
+        // Planning ruling 2026-11-07 (promo cleanup): a promotional sale books nothing. The receipt and
+        // its VAT leg are the signature of a real sale, and the promo channel must not write one, or the
+        // books end up showing revenue that came out of a promo budget nobody ever recognised as such.
+        // The money row, the draw and the fulfilment records the transfer itself; only the accounting
+        // entry is skipped.
+        //
+        // The question asked is the ORDER's, not the route's: an order written on the acquirer route can
+        // be paid out of the customer's declared balance, and that sale is a promotional sale whatever
+        // route its checkout took. Production showed it on 2026-11-07: a 4 310,00 ₴ order paid out of
+        // declared money booked a receipt and a VAT leg, and the books showed promo revenue.
+        if (await OrderPayment.IsPromoOrderAsync(_context, order.Id, cancellationToken))
         {
             _logger.LogInformation(
-                "SETTLEMENTS: order {OrderId} is on the Declared (promo) route, so no receipt was posted",
+                "SETTLEMENTS: order {OrderId} is a promo order, so no receipt was posted",
                 order.Id);
             return;
         }
