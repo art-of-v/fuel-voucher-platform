@@ -129,4 +129,33 @@ describe("the held-money worklist", () => {
     // and counts all 500 on a 900 order.
     expect(screen.getByText("heldPayments.amountDiffers")).toBeInTheDocument();
   });
+
+  it("takes a row off the queue only with a reason, and sends that reason", async () => {
+    renderTab();
+    await screen.findByText("heldPayments.freeOf:514.00");
+
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "heldPayments.dismiss" })[0],
+    );
+
+    // The act is answerable later: the server refuses a dismissal nobody can explain, so the
+    // confirm press is dead until the operator types one.
+    const confirm = screen.getByRole("button", {
+      name: "heldPayments.dismissConfirm",
+    });
+    expect(confirm).toBeDisabled();
+
+    await userEvent.type(
+      screen.getByPlaceholderText("heldPayments.dismissPlaceholder"),
+      "1 ₴ test capture",
+    );
+    expect(confirm).toBeEnabled();
+    await userEvent.click(confirm);
+
+    expect(mockedApiRequest).toHaveBeenCalledWith(
+      "POST",
+      "/api/admin/payments/p-whole/dismiss",
+      { reason: "1 ₴ test capture" },
+    );
+  });
 });

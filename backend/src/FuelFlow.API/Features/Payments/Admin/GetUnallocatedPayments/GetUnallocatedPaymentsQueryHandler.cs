@@ -41,9 +41,14 @@ public sealed class GetUnallocatedPaymentsQueryHandler
         GetUnallocatedPaymentsQuery query,
         CancellationToken cancellationToken = default)
     {
+        // Dismissed money is money an operator has already looked at and closed: it is real, it stays
+        // booked, and it will never be placed. Leaving it here would make the queue grow by every test
+        // capture the platform ever takes, and a queue that is mostly noise stops being read.
         var payments = _context.Payments
             .AsNoTracking()
-            .Where(p => p.OrderId == null && p.Status == PaymentStatus.Succeeded);
+            .Where(p => p.OrderId == null
+                     && p.Status == PaymentStatus.Succeeded
+                     && p.DismissedAtUtc == null);
 
         var total = await payments.CountAsync(cancellationToken);
 

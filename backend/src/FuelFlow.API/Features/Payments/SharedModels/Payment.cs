@@ -183,6 +183,32 @@ public sealed class Payment
     /// <summary>Why the refund could not be completed, when it could not.</summary>
     public string? ErrorMessage { get; set; }
 
+    /// <summary>
+    /// When an operator took this money off the worklist, and why. NULL means it is still there.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Some money we hold will never be allocated: a test capture of one hryvnia, a rounding transfer,
+    /// a charge from before the customer ever registered. Those rows are real — the acquirer took the
+    /// money and the journal booked it — so they cannot be deleted: the statement would then show a
+    /// received capture no payment row holds, which is the alarm the unbooked-receipts check exists to
+    /// raise. What an operator needed was a way to say "seen, closed, not going anywhere", and this is
+    /// it.
+    /// </para>
+    /// <para>
+    /// The dismissal is about the queue, not the books. The payment, its journal entry and its
+    /// statement row all stay; only the operator worklist stops asking. The reason is required and the
+    /// act is audited, because "why is this money not on the list" is a question somebody asks later.
+    /// </para>
+    /// </remarks>
+    public DateTime? DismissedAtUtc { get; set; }
+
+    /// <summary>Why it left the worklist. Required with <see cref="DismissedAtUtc"/>, enforced by a CHECK.</summary>
+    public string? DismissedReason { get; set; }
+
+    /// <summary>Who dismissed it. Null only for a dismissal written by a job, which does not exist today.</summary>
+    public Guid? DismissedByUserId { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 

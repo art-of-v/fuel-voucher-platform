@@ -3778,6 +3778,22 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("currency")
                         .HasComment("The currency the amounts are in.");
 
+                    b.Property<DateTime?>("DismissedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dismissed_at_utc")
+                        .HasComment("When an operator took this money off the worklist. NULL means it is still there. The payment, its journal entry and its statement row are untouched: this hides the row from the queue, it does not delete money.");
+
+                    b.Property<Guid?>("DismissedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dismissed_by_user_id")
+                        .HasComment("Who dismissed it. A copy for the row's own answer; the audit event carries the full act.");
+
+                    b.Property<string>("DismissedReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dismissed_reason")
+                        .HasComment("Why it left the worklist. Required whenever dismissed_at_utc is set.");
+
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -3912,6 +3928,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_payments_amount_units_agree", "amount_kopecks = round(amount_uah * 100)");
 
                             t.HasCheckConstraint("ck_payments_currency", "currency = 'UAH'");
+
+                            t.HasCheckConstraint("ck_payments_dismissal_pair", "(dismissed_at_utc IS NULL) = (dismissed_reason IS NULL)");
 
                             t.HasCheckConstraint("ck_payments_kind", "kind IN ('Capture','Refund')");
 

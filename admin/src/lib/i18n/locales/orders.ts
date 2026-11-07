@@ -30,6 +30,12 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.freeOf": "{0} of it still free",
     "heldPayments.empty":
       "Nothing is being held. Every payment is against an order.",
+    "heldPayments.dismiss": "Remove from queue",
+    "heldPayments.dismissHint":
+      "Why will this never be placed? The money stays booked; only this list forgets the row.",
+    "heldPayments.dismissPlaceholder": "e.g. a 1 ₴ test capture",
+    "heldPayments.dismissConfirm": "Remove",
+    "heldPayments.dismissed": "Removed from the queue. The money stays booked.",
     "customerRenewal.searchPlaceholder": "Search by voucher number or owner…",
     "customerRenewal.allBrands": "All brands",
     "customerRenewal.allStatuses": "All statuses",
@@ -141,6 +147,12 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.freeOf": "{0} ще вільно",
     "heldPayments.empty":
       "Нічого не утримується. Кожен платіж привʼязаний до замовлення.",
+    "heldPayments.dismiss": "Прибрати з черги",
+    "heldPayments.dismissHint":
+      "Чому ці гроші ніколи не буде розміщено? Гроші лишаються в обліку — зникає лише рядок зі списку.",
+    "heldPayments.dismissPlaceholder": "напр. тестове надходження на 1 ₴",
+    "heldPayments.dismissConfirm": "Прибрати",
+    "heldPayments.dismissed": "Прибрано з черги. Гроші лишаються в обліку.",
     "customerRenewal.searchPlaceholder":
       "Пошук за номером талона або власником…",
     "customerRenewal.allBrands": "Усі мережі",
@@ -253,6 +265,13 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.freeOf": "{0} noch frei",
     "heldPayments.empty":
       "Es wird nichts gehalten. Jede Zahlung ist einer Bestellung zugeordnet.",
+    "heldPayments.dismiss": "Aus der Warteliste entfernen",
+    "heldPayments.dismissHint":
+      "Warum wird dieses Geld nie zugeordnet? Das Geld bleibt gebucht, nur diese Liste vergisst die Zeile.",
+    "heldPayments.dismissPlaceholder": "z. B. eine Testzahlung über 1 ₴",
+    "heldPayments.dismissConfirm": "Entfernen",
+    "heldPayments.dismissed":
+      "Aus der Warteliste entfernt. Das Geld bleibt gebucht.",
     "customerRenewal.searchPlaceholder":
       "Suche nach Gutscheinnummer oder Inhaber…",
     "customerRenewal.allBrands": "Alle Marken",
@@ -366,6 +385,13 @@ export const orders: Record<Language, Record<string, string>> = {
     "heldPayments.freeOf": "{0} aún libre",
     "heldPayments.empty":
       "No se retiene nada. Cada pago está asignado a un pedido.",
+    "heldPayments.dismiss": "Quitar de la cola",
+    "heldPayments.dismissHint":
+      "¿Por qué este dinero nunca se asignará? El dinero sigue contabilizado; solo esta lista olvida la fila.",
+    "heldPayments.dismissPlaceholder": "p. ej. un pago de prueba de 1 ₴",
+    "heldPayments.dismissConfirm": "Quitar",
+    "heldPayments.dismissed":
+      "Quitado de la cola. El dinero sigue contabilizado.",
     "customerRenewal.searchPlaceholder": "Buscar por número de vale o titular…",
     "customerRenewal.allBrands": "Todas las marcas",
     "customerRenewal.allStatuses": "Todos los estados",
