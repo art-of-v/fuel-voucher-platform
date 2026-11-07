@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import HeldPaymentDismiss from "@/components/HeldPaymentDismiss";
 import { apiRequest } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
@@ -73,8 +74,6 @@ export default function HeldPaymentsTab() {
   const [ownerSearch, setOwnerSearch] = useState("");
   const [chosenOwner, setChosenOwner] = useState<CustomerOption | null>(null);
   const [orderChoice, setOrderChoice] = useState<Record<string, string>>({});
-  const [dismissing, setDismissing] = useState<string | null>(null);
-  const [dismissReason, setDismissReason] = useState("");
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["admin", "heldPayments"],
@@ -104,27 +103,6 @@ export default function HeldPaymentsTab() {
     // ApiError.message already carries the server's sentence — see api-client — so the refusal
     // the operator most needs ("that order belongs to a different customer") is shown as-is
     // rather than being replaced with "something went wrong".
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : String(e)),
-  });
-
-  // Closes a row somebody has looked at and that will never be placed — a test capture, a transfer
-  // from before the payer registered. The money stays booked; only the queue forgets it.
-  const dismiss = useMutation({
-    mutationFn: (body: { paymentId: string; reason: string }) =>
-      apiRequest<{ reason: string }, void>(
-        "POST",
-        `/api/admin/payments/${body.paymentId}/dismiss`,
-        { reason: body.reason },
-      ),
-    onSuccess: () => {
-      invalidate();
-      setDismissing(null);
-      setDismissReason("");
-      toast.success(t("heldPayments.dismissed"));
-    },
-    // The server's refusal says what is wrong with this row (not succeeded, already on an order),
-    // and replacing it with "something went wrong" would hide the one sentence that explains it.
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : String(e)),
   });
@@ -464,57 +442,10 @@ export default function HeldPaymentsTab() {
                     )}
                   </td>
                   <td className="p-4">
-                    {dismissing === payment.id ? (
-                      <div className="space-y-2 min-w-56">
-                        <p className="text-xs text-muted-foreground">
-                          {t("heldPayments.dismissHint")}
-                        </p>
-                        <Input
-                          value={dismissReason}
-                          onChange={(e) => setDismissReason(e.target.value)}
-                          placeholder={t("heldPayments.dismissPlaceholder")}
-                          maxLength={200}
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={
-                              dismiss.isPending || !dismissReason.trim()
-                            }
-                            onClick={() =>
-                              dismiss.mutate({
-                                paymentId: payment.id,
-                                reason: dismissReason,
-                              })
-                            }
-                          >
-                            {t("heldPayments.dismissConfirm")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setDismissing(null);
-                              setDismissReason("");
-                            }}
-                          >
-                            {t("common.cancel")}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setDismissing(payment.id);
-                          setDismissReason("");
-                        }}
-                      >
-                        {t("heldPayments.dismiss")}
-                      </Button>
-                    )}
+                    <HeldPaymentDismiss
+                      paymentId={payment.id}
+                      onDismissed={invalidate}
+                    />
                   </td>
                 </tr>
               );
