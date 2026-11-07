@@ -1,3 +1,5 @@
+using System.Globalization;
+using Microsoft.Extensions.Options;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
@@ -554,10 +556,32 @@ var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
     /// be a dependency that does nothing until someone wires it up.
     /// </para>
     /// </summary>
-    private static void AddSettlementServices(IServiceCollection services, IConfiguration config)
+    internal static void AddSettlementServices(IServiceCollection services, IConfiguration config)
     {
         services.Configure<TelegramSettlementOptions>(
             config.GetSection(TelegramSettlementOptions.SectionName));
+        services.PostConfigure<TelegramSettlementOptions>(options =>
+        {
+            if (options.AllowedUserIdsCsv is not { } csv)
+                return; // No scalar supplied: retain the typed list used by indexed config and tests.
+
+            var ids = new List<long>();
+            if (!string.IsNullOrWhiteSpace(csv))
+            {
+                foreach (var entry in csv.Split(',', StringSplitOptions.TrimEntries))
+                {
+                    if (!long.TryParse(entry, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0)
+                    {
+                        // Never skip a bad entry or echo configuration values into logs/errors.
+                        throw new OptionsValidationException(Options.DefaultName, typeof(TelegramSettlementOptions),
+                            ["Telegram:Settlement:AllowedUserIdsCsv must contain only comma-separated positive Int64 user ids."]);
+                    }
+                    ids.Add(id);
+                }
+            }
+            // Replace, never append: an explicitly empty scalar must also clear an indexed list.
+            options.AllowedUserIds = ids;
+        });
 
         services.AddScoped<SettlementUpdateHandler>();
     }
