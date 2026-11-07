@@ -152,6 +152,21 @@ builder.Property(e => e.ProviderAmountKopecks)
             .HasMaxLength(500)
             .HasComment(                "Why the refund could not be completed, when it could not.");
 
+        builder.Property(e => e.DismissedAtUtc)
+            .HasColumnName("dismissed_at_utc")
+            .HasComment(                "When an operator took this money off the worklist. NULL means it is still there. The " +
+                    "payment, its journal entry and its statement row are untouched: this hides the row from the " +
+                    "queue, it does not delete money.");
+
+        builder.Property(e => e.DismissedReason)
+            .HasColumnName("dismissed_reason")
+            .HasMaxLength(200)
+            .HasComment(                "Why it left the worklist. Required whenever dismissed_at_utc is set.");
+
+        builder.Property(e => e.DismissedByUserId)
+            .HasColumnName("dismissed_by_user_id")
+            .HasComment(                "Who dismissed it. A copy for the row's own answer; the audit event carries the full act.");
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired().HasComment("When the row was written.");
@@ -277,6 +292,13 @@ builder.Property(e => e.ProviderAmountKopecks)
                 "(kind = 'Refund' AND parent_payment_id IS NOT NULL) OR (kind = 'Capture')");
 
             t.HasCheckConstraint("ck_payments_parent_not_self", "parent_payment_id IS DISTINCT FROM id");
+
+            // A dismissal without a reason is a row nobody can explain later, and a reason without a
+            // dismissal is a note in the wrong column. The comparison is written as two IS NULL tests
+            // because a CHECK that evaluates to NULL passes, and "dismissed_at_utc <> NULL" is exactly
+            // that trap.
+            t.HasCheckConstraint("ck_payments_dismissal_pair",
+                "(dismissed_at_utc IS NULL) = (dismissed_reason IS NULL)");
 
             // The approval columns arrived here from the `refunds` table. Only a refund is approved
             // by anyone, so a capture carrying an approver is a row that was written by the wrong

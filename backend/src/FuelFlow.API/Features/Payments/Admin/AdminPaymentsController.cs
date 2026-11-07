@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.Features.Payments.Admin.AttachPayment;
+using FuelFlow.Features.Payments.Admin.DismissPayment;
 using FuelFlow.Features.Payments.Admin.GetCustomerByCode;
 using FuelFlow.Features.Payments.Admin.GetUnallocatedPayments;
 using FuelFlow.Features.Payments.Admin.SearchCustomers;
@@ -42,17 +43,20 @@ public sealed class AdminPaymentsController : ControllerBase
     private readonly SearchCustomersQueryHandler _customersHandler;
     private readonly GetCustomerByCodeQueryHandler _customerByCodeHandler;
     private readonly AttachPaymentCommandHandler _attachHandler;
+    private readonly DismissPaymentCommandHandler _dismissHandler;
 
     public AdminPaymentsController(
         GetUnallocatedPaymentsQueryHandler unallocatedHandler,
         SearchCustomersQueryHandler customersHandler,
         GetCustomerByCodeQueryHandler customerByCodeHandler,
-        AttachPaymentCommandHandler attachHandler)
+        AttachPaymentCommandHandler attachHandler,
+        DismissPaymentCommandHandler dismissHandler)
     {
         _unallocatedHandler = unallocatedHandler;
         _customersHandler = customersHandler;
         _customerByCodeHandler = customerByCodeHandler;
         _attachHandler = attachHandler;
+        _dismissHandler = dismissHandler;
     }
 
     /// <summary>
@@ -157,6 +161,31 @@ public sealed class AdminPaymentsController : ControllerBase
     }
 
     /// <summary>
+    /// Takes money we hold off the worklist, with a reason. The money is not moved: the payment, its
+    /// journal entry and its statement row all stay, because they are what happened.
+    /// </summary>
+    /// <remarks>
+    /// This exists for money that will never be placed — a test capture, a transfer from before the
+    /// payer registered — and it is deliberately not a delete. Removing the payment row would make the
+    /// acquisition statement show a received capture no payment row holds, which is the alarm the
+    /// unbooked-receipts check exists to raise, and it would leave the cash in the ledger unaccounted
+    /// for. The worklist is a queue of questions; this answers one.
+    /// </remarks>
+    [HttpPost("{id:guid}/dismiss")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
+    public async Task<ActionResult> Dismiss(Guid id, DismissPaymentRequest request, CancellationToken ct)
+    {
+        var result = await _dismissHandler.HandleAsync(
+            new DismissPaymentCommand(id, request.Reason, ActorId(), ActorName()),
+            ct);
+
+        if (!result.Found) return ApiError.NotFound("Not found");
+        if (!result.Success) return ApiError.BadRequest(result.Error);
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Who is placing the money. The claims are the controller's to read — a handler is told who,
     /// not how to find out.
     /// </summary>
@@ -218,4 +247,10 @@ public sealed class AttachPaymentRequest
 
     /// <summary>The customer this money belongs to, for money declared with an unrecognised code.</summary>
     public Guid? UserId { get; set; }
+}
+
+public sealed class DismissPaymentRequest
+{
+    /// <summary>Why this money will never be placed. Required — the dismissal is only as good as its reason.</summary>
+    public string? Reason { get; set; }
 }

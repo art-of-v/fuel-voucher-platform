@@ -73,6 +73,8 @@ export default function HeldPaymentsTab() {
   const [ownerSearch, setOwnerSearch] = useState("");
   const [chosenOwner, setChosenOwner] = useState<CustomerOption | null>(null);
   const [orderChoice, setOrderChoice] = useState<Record<string, string>>({});
+  const [dismissing, setDismissing] = useState<string | null>(null);
+  const [dismissReason, setDismissReason] = useState("");
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["admin", "heldPayments"],
@@ -102,6 +104,27 @@ export default function HeldPaymentsTab() {
     // ApiError.message already carries the server's sentence — see api-client — so the refusal
     // the operator most needs ("that order belongs to a different customer") is shown as-is
     // rather than being replaced with "something went wrong".
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : String(e)),
+  });
+
+  // Closes a row somebody has looked at and that will never be placed — a test capture, a transfer
+  // from before the payer registered. The money stays booked; only the queue forgets it.
+  const dismiss = useMutation({
+    mutationFn: (body: { paymentId: string; reason: string }) =>
+      apiRequest<{ reason: string }, void>(
+        "POST",
+        `/api/admin/payments/${body.paymentId}/dismiss`,
+        { reason: body.reason },
+      ),
+    onSuccess: () => {
+      invalidate();
+      setDismissing(null);
+      setDismissReason("");
+      toast.success(t("heldPayments.dismissed"));
+    },
+    // The server's refusal says what is wrong with this row (not succeeded, already on an order),
+    // and replacing it with "something went wrong" would hide the one sentence that explains it.
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : String(e)),
   });
@@ -224,19 +247,20 @@ export default function HeldPaymentsTab() {
               <th className="text-left p-4">{t("heldPayments.customer")}</th>
               <th className="text-left p-4">{t("heldPayments.declared")}</th>
               <th className="text-left p-4">{t("heldPayments.place")}</th>
+              <th className="text-left p-4">{t("heldPayments.dismiss")}</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td className="p-4" colSpan={5}>
+                <td className="p-4" colSpan={6}>
                   {t("common.loading")}
                 </td>
               </tr>
             )}
             {!isLoading && rows.length === 0 && (
               <tr>
-                <td className="p-4 text-muted-foreground" colSpan={5}>
+                <td className="p-4 text-muted-foreground" colSpan={6}>
                   {t("heldPayments.empty")}
                 </td>
               </tr>
@@ -437,6 +461,59 @@ export default function HeldPaymentsTab() {
                           </span>
                         )}
                       </div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    {dismissing === payment.id ? (
+                      <div className="space-y-2 min-w-56">
+                        <p className="text-xs text-muted-foreground">
+                          {t("heldPayments.dismissHint")}
+                        </p>
+                        <Input
+                          value={dismissReason}
+                          onChange={(e) => setDismissReason(e.target.value)}
+                          placeholder={t("heldPayments.dismissPlaceholder")}
+                          maxLength={200}
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={
+                              dismiss.isPending || !dismissReason.trim()
+                            }
+                            onClick={() =>
+                              dismiss.mutate({
+                                paymentId: payment.id,
+                                reason: dismissReason,
+                              })
+                            }
+                          >
+                            {t("heldPayments.dismissConfirm")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setDismissing(null);
+                              setDismissReason("");
+                            }}
+                          >
+                            {t("common.cancel")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setDismissing(payment.id);
+                          setDismissReason("");
+                        }}
+                      >
+                        {t("heldPayments.dismiss")}
+                      </Button>
                     )}
                   </td>
                 </tr>
