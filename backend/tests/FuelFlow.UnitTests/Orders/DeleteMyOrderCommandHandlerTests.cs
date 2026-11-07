@@ -26,6 +26,44 @@ public sealed class DeleteMyOrderCommandHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ShouldCancelAnOrderThatNeverGotAnInvoice()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        // The acquirer refused to open an invoice: there is no payment page, so no money can arrive
+        // and "waiting for payment" is a state that will never end.
+        var order = await AddOrderAsync(context, userId, OrderStatus.PendingPayment);
+        var handler = new DeleteMyOrderCommandHandler(context);
+
+        await handler.HandleAsync(new DeleteMyOrderCommand(order.Id, userId), CancellationToken.None);
+
+        var persisted = await context.Orders.IgnoreQueryFilters().FirstAsync(o => o.Id == order.Id);
+        persisted.IsDeleted.Should().BeTrue();
+        persisted.Status.Should().Be(OrderStatus.Cancelled);
+        (await context.OrderEvents.AnyAsync(e => e.OrderId == order.Id
+                                                 && e.EventType == "StatusChanged"
+                                                 && e.ToStatus == nameof(OrderStatus.Cancelled)))
+            .Should().BeTrue("the transition is part of the order's history");
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldLeaveAnInvoicedOrderAwaitingPayment()
+    {
+        await using var context = CreateContext();
+        var userId = Guid.NewGuid();
+        // An invoice exists at the acquirer and the customer may still pay it after hiding the card.
+        // Cancelled is terminal, so the webhook could not fulfil that payment.
+        var order = await AddOrderAsync(context, userId, OrderStatus.PendingPayment, invoiceId: "inv-live-1");
+        var handler = new DeleteMyOrderCommandHandler(context);
+
+        await handler.HandleAsync(new DeleteMyOrderCommand(order.Id, userId), CancellationToken.None);
+
+        var persisted = await context.Orders.IgnoreQueryFilters().FirstAsync(o => o.Id == order.Id);
+        persisted.IsDeleted.Should().BeTrue();
+        persisted.Status.Should().Be(OrderStatus.PendingPayment);
+    }
+
+    [Fact]
     public async Task HandleAsync_ShouldReturnFalseForOrderOwnedByAnotherUser()
     {
         await using var context = CreateContext();
@@ -98,7 +136,8 @@ public sealed class DeleteMyOrderCommandHandlerTests
             .UseInMemoryDatabase(dbName, root)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options, TestQrCipher.Instance);
 
-    private static async Task<Order> AddOrderAsync(ApplicationDbContext context, Guid userId, OrderStatus status)
+    private static async Task<Order> AddOrderAsync(
+        ApplicationDbContext context, Guid userId, OrderStatus status, string? invoiceId = null)
     {
         var order = new Order
         {
@@ -106,6 +145,7 @@ public sealed class DeleteMyOrderCommandHandlerTests
             UserId = userId,
             Price = 2500,
             Status = status,
+            MonobankInvoiceId = invoiceId,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow,
         };
