@@ -413,6 +413,26 @@ describe('MyCodesScreen', () => {
       expect(alertSpy).toHaveBeenCalledWith('codes.orderHasNoPaymentLink');
     });
 
+    // The card withholds the swipe for this order too, so the guard is the same defence in depth as
+    // the status check below. What it prevents is the sentence above firing on an order that is
+    // correctly waiting: a promotional order carries no invoice by design, and answering it with
+    // "buy again from the shop" tells the customer to duplicate an order the platform is already
+    // paid to perform (planning #889, item 6).
+    it('names the declaration a promotional order waits for, and never says buy again', () => {
+      alertSpy.mockClear();
+      alertSpy.mockImplementation(() => {});
+      renderScreen({
+        pendingOrders: [order('pay-4', 'PENDING_PAYMENT', { settlementRoute: 'Declared' })],
+      });
+
+      fireEvent.press(screen.getByTestId('pay-pay-4'));
+
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockOpenURL).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledWith('codes.promoOrderWaits');
+      expect(alertSpy).not.toHaveBeenCalledWith('codes.orderHasNoPaymentLink');
+    });
+
     it('refuses to reopen payment for an order that is no longer awaiting it', () => {
       // Defence in depth, not the fix. OrderCard already withholds the swipe pay action for a
       // non-PENDING_PAYMENT order (canSwipe at OrderCard.tsx:96 gates renderRightActions), so a

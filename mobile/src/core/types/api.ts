@@ -208,6 +208,13 @@ export interface Order {
    * Defaults to a purchase so an older server response still renders.
    */
   kind?: 'Purchase' | 'Renewal' | 'ReceivedFromCompany';
+  /**
+   * Which checkout button wrote this order. An order on `Declared` has no invoice and never will:
+   * its money arrives through the settlement channel, so the wallet must not offer it a payment.
+   * Absent on a server older than the route column, where every order came from the bank - which is
+   * what the pay affordance assumes when this is not there (planning #889, item 6).
+   */
+  settlementRoute?: 'Acquirer' | 'Declared';
 }
 
 export interface SyncResponse {
