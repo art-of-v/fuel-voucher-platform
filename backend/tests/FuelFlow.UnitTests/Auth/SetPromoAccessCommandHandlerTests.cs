@@ -72,10 +72,32 @@ public sealed class SetPromoAccessCommandHandlerTests
         revoked.GrantedAtUtc.Should().BeNull();
         (await context.Users.FirstAsync(u => u.Id == target.Id)).PromoAccessGrantedAtUtc.Should().BeNull();
 
-        // Two decisions, two rows: an account switched on and off twice is a history, and the
-        // current state alone cannot answer who turned it off and when.
-        var events = await context.Set<AuditEventOutbox>().OrderBy(e => e.Id).Select(e => e.EventType).ToListAsync();
-        events.Should().ContainInOrder("PromoAccessGranted", "PromoAccessRevoked");
+        // Two decisions, two rows: an account switched on and off twice is a history, and the current
+        // state alone cannot answer who turned it off and when. Each row is read by what it says.
+        //
+        // It used to be read by where it sorted, and that claim was never true. The assertion ordered
+        // the outbox by `Id` and required grant-then-revoke; `Id` is `Guid.CreateVersion7()`, whose time
+        // field resolves to a millisecond, and both rows are written inside one. Measured on 5000
+        // back-to-back pairs: all 5000 share the timestamp bits, and 2458 of them (49.2%) sort the wrong
+        // way — so the test was asserting the random half of the guid, and it reddened `main`'s run for
+        // `f2a326cc` when the coin finally landed the other side. The suite cannot widen that
+        // millisecond: the clock is frozen for the whole assembly (finding C-10) and its classes run in
+        // parallel, so advancing it from inside one test would advance it for all of them. Nor does
+        // anything else promise that order — the panel reads these rows by `ChangedAtUtc` and keeps `Id`
+        // only as a pagination tie-break, on a comment that says "many audit rows share one timestamp"
+        // (`GetAuditEventsQueryHandler.cs:58-61`).
+        var rows = await context.Set<AuditEventOutbox>().ToListAsync();
+
+        rows.Should().HaveCount(2,
+            "one row per press — a revocation that overwrote the grant would leave a history of one");
+
+        var grantedEvent = rows.Should().ContainSingle(e => e.EventType == "PromoAccessGranted").Which;
+        grantedEvent.NewValue.Should().Contain("\"granted\":true");
+
+        var revokedEvent = rows.Should().ContainSingle(e => e.EventType == "PromoAccessRevoked").Which;
+        revokedEvent.NewValue.Should().Contain("\"granted\":false");
+        revokedEvent.ChangedByUserId.Should().Be(actorId,
+            "the question a history answers is who turned it off, and the row has to carry that");
     }
 
     [Fact]
