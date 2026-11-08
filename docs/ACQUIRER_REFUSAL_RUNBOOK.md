@@ -103,7 +103,11 @@ Two consequences for whoever is on call:
 The rows the outage already left behind are a separate, closing matter (planning #875): those were written
 by the old code, several were cleaned by hand on 2026-11-07, and any that remain are handled the same way
 this rule would have handled them at the source — `Cancelled` and soft-deleted, so the cleanup job collects
-them. **No manual SQL on them** beyond that.
+them. **No manual SQL on them** beyond that. Checked against production on 2026-11-08 07:18 UTC: **none are
+left** — zero orders are `PendingPayment` with `monobank_invoice_id IS NULL` and not deleted, and ten
+cancelled + soft-deleted rows are waiting for the cleanup job. What #875 still owns is the row a request
+leaves when it dies before its catch block runs (a crash, not a refusal); this change does not touch that
+path.
 
 ## The alerts that should speak first
 
