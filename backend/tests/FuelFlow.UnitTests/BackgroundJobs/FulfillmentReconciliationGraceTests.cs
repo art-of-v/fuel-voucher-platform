@@ -50,7 +50,8 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
             refundHandler,
             new RuntimeSettingsService(_context),
             NotificationDispatcher.Disabled,
-            new ConfigurationBuilder().AddInMemoryCollection().Build());
+            new ConfigurationBuilder().AddInMemoryCollection().Build(),
+            LedgerTestDoubles.VatRelease(_context));
     }
 
     public void Dispose() => _context.Dispose();

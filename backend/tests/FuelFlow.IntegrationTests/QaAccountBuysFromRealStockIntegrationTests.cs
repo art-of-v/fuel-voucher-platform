@@ -263,7 +263,8 @@ public sealed class QaAccountBuysFromRealStockIntegrationTests : IClassFixture<T
             new RefundOrderCommandHandler(context, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(context)),
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
-            new ConfigurationBuilder().Build());
+            new ConfigurationBuilder().Build(),
+            LedgerTestDoubles.VatRelease(context));
 
     /// <summary>Exposes the protected atomic claim so the row-kind backstop can be tested directly,
     /// independent of the candidate SELECT that already filters by kind.</summary>
@@ -273,7 +274,7 @@ public sealed class QaAccountBuysFromRealStockIntegrationTests : IClassFixture<T
             ApplicationDbContext context,
             RefundOrderCommandHandler refundHandler,
             RuntimeSettingsService settings)
-            : base(context, NullLogger<FuelFlow.API.BackgroundJobs.FulfillmentService>.Instance, refundHandler, settings, NotificationDispatcher.Disabled, new ConfigurationBuilder().Build())
+            : base(context, NullLogger<FuelFlow.API.BackgroundJobs.FulfillmentService>.Instance, refundHandler, settings, NotificationDispatcher.Disabled, new ConfigurationBuilder().Build(), LedgerTestDoubles.VatRelease(context))
         {
         }
 

@@ -1,5 +1,6 @@
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.API.Features.Orders.RefundOrder;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
@@ -51,6 +52,7 @@ public partial class FulfillmentService
     private readonly RuntimeSettingsService _settings;
     private readonly NotificationDispatcher _notifications;
     private readonly IConfiguration _configuration;
+    private readonly ReleaseVatOutsideThePerimeterCommandHandler _vatRelease;
 
     public FulfillmentService(
         ApplicationDbContext context,
@@ -58,7 +60,8 @@ public partial class FulfillmentService
         RefundOrderCommandHandler refundHandler,
         RuntimeSettingsService settings,
         NotificationDispatcher notifications,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ReleaseVatOutsideThePerimeterCommandHandler vatRelease)
     {
         _context = context;
         _logger = logger;
@@ -66,7 +69,23 @@ public partial class FulfillmentService
         _settings = settings;
         _notifications = notifications;
         _configuration = configuration;
+        _vatRelease = vatRelease;
     }
+
+    /// <summary>
+    /// Corrects the receipt's VAT carve for an order whose delivery just completed.
+    /// </summary>
+    /// <remarks>
+    /// Called at every point that turns an order into a delivered one, rather than at the point that
+    /// claims the stock, because the route each voucher came in on is only a fact once the whole order
+    /// is out. The command it is the whole error handling of: a posting the ledger refuses is logged
+    /// there and never reaches this caller, because a bookkeeping refusal must not stop fuel that has
+    /// been paid for from reaching the customer who paid for it.
+    /// </remarks>
+    private Task ReleaseVatOutsideThePerimeterAsync(Guid orderId, CancellationToken cancellationToken)
+        => _vatRelease.HandleAsync(
+            new ReleaseVatOutsideThePerimeterCommand { OrderId = orderId },
+            cancellationToken);
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
     {
