@@ -259,17 +259,19 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
 /// <summary>
-    /// The acquirer refuses the payment. The order is still written - it is written BEFORE the
-    /// acquirer is asked for money - and the caller is told the payment could not be set up.
+    /// The merchant the order would have been paid through is not configured. The order is written -
+    /// it is written BEFORE the acquirer is asked for money - and the caller is told the payment
+    /// could not be set up. The attempt is then closed: no invoice can ever exist for it, so it must
+    /// not read as a payment the customer still owes.
     /// </summary>
     /// <remarks>
     /// This used to answer with an order and no invoice, as if the checkout had worked. It had not:
-    /// the customer had no link to pay, and the failure was swallowed into a success. Now the sale
-    /// is on record (with the merchant it would have been paid through, so the retry and the
-    /// reconciliation paths know whom to ask), and the failure reaches the caller.
+    /// the customer had no link to pay, and the failure was swallowed into a success. The merchant is
+    /// still recorded on the closed row, because that is a fact about the attempt and the refund path
+    /// reads it from the order.
     /// </remarks>
     [Fact]
-    public async Task CreateCheckout_UnconfiguredMerchant_LeavesTheOrderBehindAndFails()
+    public async Task CreateCheckout_UnconfiguredMerchant_ClosesTheOrderAndFails()
     {
         var factory = new ThrowingMonobankClientFactory(MonobankMerchant.Live);
         var handler = CheckoutHandlerWith(new StubMonobankMerchantResolver(), factory);
@@ -277,13 +279,15 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         await Assert.ThrowsAsync<MonobankMerchantUnavailableException>(
             () => handler.HandleAsync(CheckoutCommand()));
 
-        var order = await _context.Orders.SingleAsync();
-        Assert.Equal(OrderStatus.PendingPayment, order.Status);
+        var order = await _context.Orders.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.True(order.IsDeleted, "the wallet must not paint a dead attempt as a refund");
         // The merchant is still recorded: the later refund/reconciliation paths read it from here.
         Assert.Equal(MonobankMerchant.Live, order.MonobankMerchant);
         // And there is no invoice, because the acquirer never minted one.
         Assert.Null(order.MonobankInvoiceId);
         Assert.Null(order.MonobankPaymentUrl);
+        Assert.Null(order.CheckoutKey);
     }
 
     /// <summary>
@@ -433,9 +437,10 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
 
     /// <summary>
     /// A failed attempt is over, and an attempt that is over must not hold the basket against the
-    /// customer's next try. The order stays - it is the record of what was attempted - and gives
-    /// the basket back. The failure also reaches the caller: a checkout that cannot be paid is
-    /// not a successful checkout, and the operator has to hear that the payment setup broke.
+    /// customer's next try - nor sit in the wallet as a payment nobody can make. The row stays as the
+    /// record of what was attempted, closed and hidden. The failure also reaches the caller: a
+    /// checkout that cannot be paid is not a successful checkout, and the operator has to hear that
+    /// the payment setup broke.
     /// </summary>
     [Fact]
     public async Task CreateCheckout_WhenTheAcquirerRefuses_GivesTheBasketBackAndFails()
@@ -452,10 +457,12 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         await Assert.ThrowsAsync<HttpRequestException>(() => handler.HandleAsync(CheckoutCommand()));
 
         // The basket is given back even so: the attempt is over, and the customer's next tap is a
-        // fresh one.
-        var order = await _context.Orders.SingleAsync();
+        // fresh one. And the attempt itself is closed, because no invoice exists to be paid.
+        var order = await _context.Orders.IgnoreQueryFilters().SingleAsync();
         Assert.Null(order.MonobankInvoiceId);
         Assert.Null(order.CheckoutKey);
+        Assert.Equal(OrderStatus.Cancelled, order.Status);
+        Assert.True(order.IsDeleted);
     }
 
     /// <summary>
