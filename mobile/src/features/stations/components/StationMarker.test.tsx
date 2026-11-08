@@ -289,6 +289,15 @@ describe('StationMarker - pressing', () => {
     expect(markerProps[markerProps.length - 1].onPress).toBe(onPress);
   });
 
+  it('hands the same handler as onSelect, so MapKit selection opens the pin on iOS', () => {
+    // A custom marker's own onPress gesture mostly loses to MapKit's selection under Fabric;
+    // onSelect is that selection, so it must carry the same callback. The screen de-duplicates
+    // the one tap that reaches both.
+    const { onPress } = renderMarker({ logo: undefined });
+
+    expect(markerProps[markerProps.length - 1].onSelect).toBe(onPress);
+  });
+
   it('calls back when the pin is tapped', () => {
     const { onPress } = renderMarker({ logo: undefined });
 

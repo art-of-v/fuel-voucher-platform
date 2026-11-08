@@ -143,7 +143,14 @@ export function StationMarker({
       }
       opacity={point ? 1 : 0}
       image={{ uri: STOCK_PIN_GUARD }}
+      // A custom marker (one MapKit draws instead of its own pin) stops answering its own `onPress`
+      // gesture reliably under Fabric: the tap mostly loses the race to MapKit's selection. `onSelect`
+      // *is* that selection (`didSelectAnnotationView:` → `onSelect`), so it fires on every tap; the
+      // marker keeps `onPress` as well because it is the only one Android fires, and on iOS it covers
+      // a re-tap of a pin MapKit already has selected. The map screen de-duplicates the one iOS tap
+      // that reaches both.
       onPress={onPress}
+      onSelect={onPress}
       tracksViewChanges={tracks || selected}
       accessibilityLabel={
         point ? `${point.name}, ${formatShortAddress(point) || t('map.noAddress')}` : undefined
