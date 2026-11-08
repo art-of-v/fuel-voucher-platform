@@ -1,9 +1,11 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.GetUserPurchases;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
 using Hangfire;
@@ -28,17 +30,20 @@ public sealed class SimulatePaymentCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
+    private readonly SettlePaidOrderCommandHandler _settle;
     private readonly ILogger<SimulatePaymentCommandHandler> _logger;
     private readonly IBackgroundJobClient _backgroundJobClient;
 
     public SimulatePaymentCommandHandler(
         ApplicationDbContext context,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
+        SettlePaidOrderCommandHandler settle,
         ILogger<SimulatePaymentCommandHandler> logger,
         IBackgroundJobClient backgroundJobClient)
     {
         _context = context;
         _getUserPurchasesHandler = getUserPurchasesHandler;
+        _settle = settle;
         _logger = logger;
         _backgroundJobClient = backgroundJobClient;
     }
@@ -47,7 +52,13 @@ public sealed class SimulatePaymentCommandHandler
         SimulatePaymentCommand command,
         CancellationToken cancellationToken = default)
     {
-        var order = await _context.Orders.FindAsync(new object[] { command.OrderId }, cancellationToken);
+        // IncludingSoftDeleted and LineItems, for the same two reasons the webhook loads its order
+        // that way: a paid order that had been swipe-deleted must settle and come back into view,
+        // and the ORDER_CREATED payload names the first line's brand, fuel type and litres.
+        var order = await _context.Orders
+            .IncludingSoftDeleted()
+            .Include(o => o.LineItems)
+            .FirstOrDefaultAsync(o => o.Id == command.OrderId, cancellationToken);
 
         if (order == null)
         {
@@ -97,10 +108,9 @@ public sealed class SimulatePaymentCommandHandler
                 throw new InvalidOrderStateException();
             }
 
-            order.Status = OrderStatus.PendingFulfillment;
+            // What the acquirer would have observed, on the acquirer's own column - the same mark
+            // the real webhook sets before it hands the order to the settle core.
             order.MonobankStatus = MonobankStatus.Success;
-            order.UpdatedAtUtc = SystemClock.UtcNow;
-            _context.Orders.Update(order);
 
             // The money row follows the order, exactly as the real webhook does it: the acquirer
             // says the money moved, and the payment record says so too. It used to be left at
@@ -109,49 +119,16 @@ public sealed class SimulatePaymentCommandHandler
             // for, it would have refused the order the simulation had just paid for.
             await MarkCaptureAsSucceededAsync(order, cancellationToken);
 
-            // A renewal order fulfils on its own path (extend/replace existing vouchers). It must not
-            // write an ORDER_CREATED event (that drives the buy-fuel handler, which mints fresh stock),
-            // and it is handed to ProcessRenewalOrderAsync — mirrors the real webhook handler so a
-            // simulated renewal payment behaves like a real one in Development.
-            var isRenewalOrder = order.Kind == OrderKind.Renewal;
+            // The transition, the hidden-order restore, the ORDER_CREATED handover and the receipt
+            // are the settle core's, not a copy kept here. The simulation used to write three of
+            // those itself and book nothing, so a paid order in Development was invisible to the
+            // revenue report; one authority answers "the money arrived", whichever path found out.
+            await _settle.HandleAsync(new SettlePaidOrderCommand { Order = order }, cancellationToken);
 
-            if (!isRenewalOrder)
-            {
-                // Match the orderId field with jsonb containment, NOT a substring LIKE. payload is
-                // a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE) operator, so
-                // String.Contains threw 42883 here (same defect as the real webhook path).
-                var orderProbe = System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id });
-                var existingEvent = await _context.OutboxEvents
-                    .Where(e => e.EventType == OutboxEventType.OrderCreated
-                             && EF.Functions.JsonContains(e.Payload, orderProbe))
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                if (existingEvent == null)
-                {
-                    var firstLi = order.LineItems.FirstOrDefault();
-                    var outboxEvent = new OutboxEvent
-                    {
-                        EventType = OutboxEventType.OrderCreated,
-                        Payload = System.Text.Json.JsonSerializer.Serialize(new
-                        {
-                            orderId = order.Id,
-                            userId = order.UserId,
-                            brand = firstLi?.Brand ?? "",
-                            fuelType = firstLi?.FuelTypeId ?? Guid.Empty,
-                            liters = firstLi?.Liters ?? 0m,
-                            quantity = firstLi?.Quantity ?? 0
-                        }),
-                        Processed = false,
-                        CreatedAtUtc = SystemClock.UtcNow
-                    };
-
-                    _context.OutboxEvents.Add(outboxEvent);
-                }
-            }
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            if (isRenewalOrder)
+            // A renewal order fulfils on its own path (extend/replace existing vouchers): the core
+            // deliberately writes no ORDER_CREATED for it, and it is handed to
+            // ProcessRenewalOrderAsync exactly as the real webhook hands one.
+            if (order.Kind == OrderKind.Renewal)
             {
                 _backgroundJobClient.Enqueue<FulfillmentService>(
                     s => s.ProcessRenewalOrderAsync(order.Id, CancellationToken.None));
