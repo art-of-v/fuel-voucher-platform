@@ -474,7 +474,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(ctx)),
             new RuntimeSettingsService(ctx),
             NotificationDispatcher.Disabled,
-            new ConfigurationBuilder().Build());
+            new ConfigurationBuilder().Build(),
+            LedgerTestDoubles.VatRelease(ctx));
 
     private static void SeedUser(ApplicationDbContext ctx, Guid userId)
         => ctx.Users.Add(new User

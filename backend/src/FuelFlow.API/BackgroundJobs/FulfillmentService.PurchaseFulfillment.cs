@@ -175,6 +175,12 @@ public partial class FulfillmentService
                 if (updatedCount > 0)
                 {
                     _logger.LogInformation("Order {OrderId} already had all vouchers assigned, marked as fulfilled", order.Id);
+
+                    // The delivery is complete here even though this run assigned nothing: an earlier
+                    // one claimed the stock and died before it could mark the order, and the VAT the
+                    // receipt carved has to be corrected on the strength of the vouchers that stand,
+                    // not on the strength of which run happened to pick them.
+                    await ReleaseVatOutsideThePerimeterAsync(order.Id, cancellationToken);
                 }
                 else
                 {
@@ -350,6 +356,12 @@ public partial class FulfillmentService
                 if (updatedCount > 0)
                 {
                     _logger.LogInformation("Order {OrderId} fully fulfilled", order.Id);
+
+                    // In this same transaction, on purpose: the release describes the delivery, so it
+                    // commits or rolls back with the vouchers that caused it. A release posted after
+                    // the commit could be lost with the process, and one posted before it could
+                    // describe a delivery the transaction then refused to make.
+                    await ReleaseVatOutsideThePerimeterAsync(order.Id, cancellationToken);
 
                     // Match the orderId field with jsonb containment, NOT a substring LIKE.
                     // payload is a jsonb column and Postgres has no `jsonb ~~ jsonb` (LIKE)

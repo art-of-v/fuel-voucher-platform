@@ -266,7 +266,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             RuntimeSettingsService settings,
             NotificationDispatcher notificationDispatcher,
             IConfiguration configuration)
-            : base(ctx, logger, refundHandler, settings, notificationDispatcher, configuration)
+            : base(ctx, logger, refundHandler, settings, notificationDispatcher, configuration,
+                LedgerTestDoubles.VatRelease(ctx))
         {
         }
 
@@ -288,7 +289,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             RuntimeSettingsService settings,
             NotificationDispatcher notificationDispatcher,
             IConfiguration configuration)
-            : base(ctx, logger, refundHandler, settings, notificationDispatcher, configuration)
+            : base(ctx, logger, refundHandler, settings, notificationDispatcher, configuration,
+                LedgerTestDoubles.VatRelease(ctx))
         {
         }
 
@@ -1262,7 +1264,8 @@ var exchangedId = Guid.NewGuid();
             new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(monobankClient), new AuditEventService(ctx)),
             new RuntimeSettingsService(ctx),
             NotificationDispatcher.Disabled,
-            new ConfigurationBuilder().Build());
+            new ConfigurationBuilder().Build(),
+            LedgerTestDoubles.VatRelease(ctx));
 
     private static void SeedUser(ApplicationDbContext ctx, Guid userId)
         => ctx.Users.Add(new User

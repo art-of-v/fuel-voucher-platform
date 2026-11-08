@@ -308,7 +308,8 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             refundHandler,
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
-            new ConfigurationBuilder().Build());
+            new ConfigurationBuilder().Build(),
+            LedgerTestDoubles.VatRelease(context));
     }
     /// <summary>
     /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row

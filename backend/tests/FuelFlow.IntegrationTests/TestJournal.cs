@@ -75,7 +75,10 @@ public static class TestJournal
             Map("payment.received", cash, NormalBalance.Debit),
             Map("payment.received", advance, NormalBalance.Credit),
             Map("payment.received.vat", contra, NormalBalance.Debit),
-            Map("payment.received.vat", vat, NormalBalance.Credit));
+            Map("payment.received.vat", vat, NormalBalance.Credit),
+            // The release of that same carve, which a delivery outside the tax perimeter writes.
+            Map("payment.received.vat.out_of_perimeter", vat, NormalBalance.Debit),
+            Map("payment.received.vat.out_of_perimeter", contra, NormalBalance.Credit));
 
         context.SaveChanges();
     }

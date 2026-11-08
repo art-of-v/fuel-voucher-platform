@@ -78,7 +78,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             RefundOrderCommandHandler refundHandler,
             RuntimeSettingsService settings,
             IConfiguration configuration)
-            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, configuration)
+            : base(context, logger, refundHandler, settings, FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, configuration, LedgerTestDoubles.VatRelease(context))
         {
             _db = context;
         }

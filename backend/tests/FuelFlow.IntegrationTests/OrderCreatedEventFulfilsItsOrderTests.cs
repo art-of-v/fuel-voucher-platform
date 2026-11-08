@@ -206,6 +206,7 @@ public sealed class OrderCreatedEventFulfilsItsOrderTests : IClassFixture<TestDa
             refundHandler,
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
-            new ConfigurationBuilder().Build());
+            new ConfigurationBuilder().Build(),
+            LedgerTestDoubles.VatRelease(context));
     }
 }
