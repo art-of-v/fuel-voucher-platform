@@ -44,7 +44,7 @@ export default function PackagesScreen() {
 
   const GLOBAL_PADDING = tokens.spacing.containerPadding;
 
-  const { data: packages, isLoading, error } = usePackages(selectedStation?.id, selectedFuel?.name);
+  const { data: packages, isLoading, error } = usePackages(selectedStation?.id, selectedFuel?.id);
 
   if (!selectedStation || !selectedFuel) return null;
 
@@ -134,7 +134,7 @@ export default function PackagesScreen() {
           <ErrorState
             onRetry={() =>
               queryClient.invalidateQueries({
-                queryKey: ['packages', selectedStation.id, selectedFuel.name],
+                queryKey: ['packages', selectedStation.id, selectedFuel.id],
               })
             }
             detail={error instanceof Error ? error.message : undefined}
