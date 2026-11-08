@@ -27,7 +27,7 @@ const packageRow = (
   isAvailable,
 });
 
-function wrapper({ children }: PropsWithChildren) {
+function Wrapper({ children }: PropsWithChildren) {
   const [client] = useState(
     () =>
       new QueryClient({
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 it('selects only the exact fuel and brand, retaining its unavailable denominations in order', async () => {
-  const { result } = renderHook(() => usePackages('okko', 'regular'), { wrapper });
+  const { result } = renderHook(() => usePackages('okko', 'regular'), { wrapper: Wrapper });
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data?.map((p) => [p.id, p.isAvailable])).toEqual([
     ['a95-10', true],
@@ -62,7 +62,7 @@ it('selects only the exact fuel and brand, retaining its unavailable denominatio
 it('changes the cached selection when the fuel ID changes', async () => {
   const { result, rerender } = renderHook(({ fuel }) => usePackages('okko', fuel), {
     initialProps: { fuel: 'regular' },
-    wrapper,
+    wrapper: Wrapper,
   });
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   rerender({ fuel: 'premium' });
@@ -73,7 +73,7 @@ it.each([
   [undefined, 'regular'],
   ['okko', undefined],
 ])('does not fetch without both selected identities (%s, %s)', (brandId, fuelTypeId) => {
-  const { result } = renderHook(() => usePackages(brandId, fuelTypeId), { wrapper });
+  const { result } = renderHook(() => usePackages(brandId, fuelTypeId), { wrapper: Wrapper });
   expect(result.current.fetchStatus).toBe('idle');
   expect(getPackages).not.toHaveBeenCalled();
 });
