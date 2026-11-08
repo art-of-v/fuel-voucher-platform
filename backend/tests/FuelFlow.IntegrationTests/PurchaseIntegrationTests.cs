@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
@@ -293,6 +294,30 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         Assert.NotNull(result);
         Assert.Equal("success", result.Status);
         Assert.NotNull(result.Purchase);
+
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var settled = await context.Orders
+            .IgnoreQueryFilters()
+            .FirstAsync(o => o.Id == createResult!.OrderId);
+        Assert.Equal(OrderStatus.PendingFulfillment, settled.Status);
+        Assert.Equal(MonobankStatus.Success, settled.MonobankStatus);
+
+        var capture = await context.Payments
+            .FirstAsync(p => p.OrderId == createResult!.OrderId && p.Kind == PaymentKind.Capture);
+        Assert.Equal(PaymentStatus.Succeeded, capture.Status);
+
+        // The receipt is the half the simulation used to skip: without it a paid order in a test
+        // environment is invisible to the revenue report, while the same payment through the
+        // webhook is in the books. Two entries per payment, gross and the VAT inside it.
+        var receipts = await context.JournalEntries
+            .Where(e => e.SourceType == JournalSourceType.Payment && e.SourceId == createResult!.OrderId)
+            .Select(e => e.SourceEvent)
+            .ToListAsync();
+        Assert.Equal(
+            new[] { "payment.received", "payment.received.vat" },
+            receipts.OrderBy(e => e, StringComparer.Ordinal));
     }
 
     [Fact]

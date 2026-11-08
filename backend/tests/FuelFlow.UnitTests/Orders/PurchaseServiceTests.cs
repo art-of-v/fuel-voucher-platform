@@ -79,7 +79,7 @@ public OrderCommandHandlersTests()
         _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled, Stock(), TestJournal.HeldMoneyFor(_context));
         _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled, Stock(), new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), TestJournal.HeldMoneyFor(_context));
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
-        _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
+        _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, TestJournal.SettleFor(_context), simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
     }
 
@@ -593,27 +593,6 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var purchases = await _getUserPurchasesHandler.HandleAsync(new GetUserPurchasesCommand(user.Id));
 
         Assert.Empty(purchases);
-    }
-
-    [Fact]
-    public async Task SimulatePayment_WithSuccess_ShouldMarkOrderAsPendingFulfillment()
-    {
-        var order = BuildOrder(OrderStatus.PendingPayment);
-        _context.Orders.Add(order);
-        await _context.SaveChangesAsync();
-
-        var response = await _simulatePaymentHandler.HandleAsync(new SimulatePaymentCommand
-        {
-            OrderId = order.Id,
-            Scenario = "success"
-        });
-
-        Assert.Equal("success", response.Status);
-        Assert.NotNull(response.Purchase);
-
-        var updatedOrder = await _context.Orders.FindAsync(order.Id);
-        Assert.Equal(OrderStatus.PendingFulfillment, updatedOrder!.Status);
-        Assert.Equal(MonobankStatus.Success, updatedOrder.MonobankStatus);
     }
 
     [Fact]
