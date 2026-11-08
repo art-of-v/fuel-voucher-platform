@@ -369,7 +369,7 @@ export const uk: Record<string, string> = {
   'profile.birthdate': 'ДАТА НАРОДЖЕННЯ',
   'profile.operator': 'ОПЕРАТОР',
 
-  'referral.title': 'ПОЗАПРОСИТИ ДРУГА',
+  'referral.title': 'ЗАПРОСИТИ ДРУГА',
   'referral.subtitle': 'Покличте друга або введіть код, який вам дали',
   'referral.myCodeTitle': 'ВАШ КОД',
   'referral.myCodeLabel': 'ВАШ РЕФЕРАЛЬНИЙ КОД',
