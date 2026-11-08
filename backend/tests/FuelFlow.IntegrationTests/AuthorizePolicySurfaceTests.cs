@@ -177,6 +177,9 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         // Writes money into the books: Dr 311 / Cr 681 for a received capture no order accounts
         // for. It is the operator standing behind the posting, and the journal records them (#780).
         ["POST /api/admin/ledger/unapplied-receipts"] = AuthPolicies.MoneyMovement,
+        // Corrects the books: releases the VAT a delivery took outside the perimeter for an order
+        // fulfilled before the release existed, and posts the same entry the delivery would have.
+        ["POST /api/admin/ledger/vat-release"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/orders/{id}/refund"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/payments/{id:guid}/attach"] = AuthPolicies.MoneyMovement,
         // Closes a money question rather than moving money: the payment, its journal entry and its
