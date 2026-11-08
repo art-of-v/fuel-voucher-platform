@@ -370,6 +370,37 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         (await _context.Orders.Select(o => o.IdempotencyKey).Distinct().CountAsync()).Should().Be(2);
     }
 
+    // ---- The acquirer refuses ----------------------------------------------------------------
+
+    /// <summary>
+    /// A renewal whose invoice the acquirer refuses is the same dead attempt as a refused purchase:
+    /// nothing was charged, no page exists, and the order must not sit in the customer's list as
+    /// "awaiting payment" for ever - nor as a refund, which is what <c>Cancelled</c> alone paints.
+    /// </summary>
+    [Fact]
+    public async Task Handle_InvoiceRefused_ShouldCloseTheOrderAndNotLeaveItAwaitingPayment()
+    {
+        EnableRenewal(("1m", 10m));
+        var source = SeedVoucher(liters: 50m, expiry: Today.AddDays(5), status: VoucherStatus.Assigned);
+
+        _monobankClientMock
+            .Setup(x => x.CreateInvoiceAsync(It.IsAny<MonobankInvoiceRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new MonobankInvoiceRejectedException(
+                System.Net.HttpStatusCode.Forbidden,
+                """{"errCode":"FORBIDDEN","errText":"you don't have active terminal for internet acquiring"}"""));
+
+        await Assert.ThrowsAsync<MonobankInvoiceRejectedException>(
+            () => _handler.HandleAsync(Command((source.Id, "1m"))));
+
+        var order = await _context.Orders.IgnoreQueryFilters().SingleAsync();
+
+        order.Status.Should().Be(OrderStatus.Cancelled,
+            "no invoice means nothing can ever arrive against this order");
+        order.IsDeleted.Should().BeTrue("and the wallet must not paint it as a refund");
+        order.MonobankInvoiceId.Should().BeNull();
+        order.CheckoutKey.Should().BeNull("the batch is free for the customer's next try");
+    }
+
     // ---- Helpers -------------------------------------------------------------------------------
 
     private RenewalCheckoutCommand Command(params (Guid VoucherId, string TermCode)[] items)

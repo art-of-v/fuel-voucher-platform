@@ -64,33 +64,46 @@ reaches a customer: a bundle published from a tree whose native layer still matc
 backport route `fix/build-236-brand-fields` used — or the 237 store build. Until one of those exists, the
 tap in the field is still the silent one, and the note above about 401 noise applies to it too.
 
+That paragraph describes the rows the outage had already written. **A refusal no longer writes one** — the
+attempt is closed at the source (below), so the wallet has nothing to offer Pay on, and the sentence in
+#1704 remains the answer for the attempts that are already on phones and in the database.
+
 ## What the orders do
 
-Each refused attempt leaves one `PendingPayment` order with `monobank_invoice_id IS NULL`. The attempt
-is the record of what was tried, and the basket reservation is released deliberately
-(`CheckoutGuard.Release`), so the customer's next tap works and no stock is held hostage. That next tap is
-a new order: nothing on the old one can be resumed, which is why the wallet's Pay on one of these rows has
-only a sentence to give (see above).
+Each refused attempt is **closed at the source**, in the same save that gives the basket back
+(`CheckoutGuard.AbandonAsync`): `status = 'Cancelled'`, `is_deleted = true`, `checkout_key` cleared. The
+attempt is over as a sale — no invoice was ever minted, so no webhook can arrive for it and no payment
+page exists anywhere — and the basket is free for the customer's next tap.
 
-What is NOT a decision is the row itself, and it has two halves. **An attempt the customer swipes
-away is closed in the same save:** `DELETE /api/purchases/{id}` marks it `Cancelled` as it soft-deletes
-it (app PR #1720), so `DeletedUnpaidOrderCleanupService` — which hard-deletes rows that are `Cancelled`
-*and* soft-deleted — collects it after retention. Before that the delete only flipped `is_deleted`, so
-the row read as *awaiting payment* in the admin purchases view forever and was never collected: on
-2026-11-07 there were 34 of them, all without an invoice and all without a payment. **An attempt the
-customer never deletes is still nobody's job:** `MonobankReconciliationService` polls only orders that
-HAVE an invoice (`BackgroundJobs/MonobankReconciliationService.cs:75`), so it is never driven to a
-terminal state and stays `PendingPayment` — the gap planning #875 owns. Those rows hold no money and
-no stock; they are noise, and their count is the count of refused attempts, which makes them a useful
-cross-check against the metric. **No manual SQL on them.**
+Cancelled alone was not enough, and this is the part that matters to the customer. The wallet paints
+`Cancelled` as **REFUNDED**, with the order's amount and a receipt button: a claim that money came back
+which never left. The customer was never shown the attempt either way — the request that wrote it
+answered with an error — so hiding it conceals nothing. The row is kept for the record, and
+`DeletedUnpaidOrderCleanupService` — which collects rows that are `Cancelled` *and* soft-deleted, with no
+vouchers and no refund — hard-deletes it after retention. That is exactly the state the customer's own
+delete produces for an invoice-less order (app PR #1720).
+
+The one thing this rule will not touch is money. If a declaration was named on the order while the attempt
+ran, the order keeps `PendingPayment` and stays visible: that is a real transfer, and what happens to it is
+a person's decision, not a checkout's. The basket is still released; only the status is left alone.
 
 An order that **does** have an invoice keeps `PendingPayment` when the customer deletes it, on purpose:
 that invoice is still payable at the acquirer and the webhook finds the order by invoice id, while
 `Cancelled` is terminal in `OrderStateMachine` — so cancelling there would turn a payment made a moment
 later into money with no order to fulfil.
 
-Note that `fuelflow_payments_stuck_pending_payment` does **not** see them: that gauge only counts
-orders that have an invoice. It read `0` through the whole 2026-11-05 incident.
+Two consequences for whoever is on call:
+
+- **The refused attempts are not in the admin purchases list any more.** They are closed and hidden in the
+  same save, so the count of refusals comes from `fuelflow_monobank_invoice_failed_invoices_total` and the
+  log line, not from counting rows. That is the metric's job; the rows were never a worklist.
+- **`fuelflow_payments_stuck_pending_payment` still does not see them**: that gauge only counts orders that
+  have an invoice. It read `0` through the whole 2026-11-05 incident.
+
+The rows the outage already left behind are a separate, closing matter (planning #875): those were written
+by the old code, several were cleaned by hand on 2026-11-07, and any that remain are handled the same way
+this rule would have handled them at the source — `Cancelled` and soft-deleted, so the cleanup job collects
+them. **No manual SQL on them** beyond that.
 
 ## The alerts that should speak first
 

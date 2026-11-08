@@ -473,9 +473,10 @@ public sealed class RenewalCheckoutCommandHandler
             _logger.LogError(ex, "Failed to create Monobank invoice for renewal batch");
 
             // The invoice never came, so this attempt is over - and an attempt that is over must
-            // not hold the batch against the customer's next try. The order itself stays: it is the
-            // record of what was attempted.
-            CheckoutGuard.Release(order);
+            // not hold the batch against the customer's next try. It is also over as a sale: no
+            // invoice means nothing can ever arrive against this order, so it is closed rather than
+            // left reading as "awaiting payment" for ever (see CheckoutGuard.AbandonAsync).
+            await CheckoutGuard.AbandonAsync(_context, order, SystemClock.UtcNow, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
 
             throw;

@@ -417,6 +417,126 @@ public sealed class DeclaredRouteCheckoutTests : IClassFixture<TestDatabaseFixtu
                 "a declared order with an invoice is the double charge this constraint exists to prevent");
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // The attempt the acquirer refuses
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The production shape of 2026-11-07: Monobank answers the invoice request with FORBIDDEN, so
+    /// the customer has no page to pay and the order has no invoice it could ever be paid against.
+    /// Left in <c>PendingPayment</c> it read as "unpaid" in the customer's app for ever; left merely
+    /// <c>Cancelled</c> the wallet would paint it "REFUNDED", money coming back that never left.
+    /// </summary>
+    [Fact]
+    public async Task AnInvoiceTheAcquirerRefuses_CancelsTheOrder_InsteadOfLeavingItAwaitingPayment()
+    {
+        var userId = await SeedAsync(granted: false);
+
+        using var context = CreateContext();
+        var act = () => PurchaseHandler(context, new RefusingAcquirer())
+            .HandleAsync(PurchaseCommand(userId, SettlementRoute.Acquirer));
+
+        await act.Should().ThrowAsync<MonobankInvoiceRejectedException>(
+            "a checkout nobody can pay is not a successful checkout");
+
+        using var verify = CreateContext();
+        var order = await verify.Orders.IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(o => o.UserId == userId);
+
+        order.Status.Should().Be(OrderStatus.Cancelled,
+            "no invoice means nothing can ever arrive against this order, so the attempt is over");
+        order.IsDeleted.Should().BeTrue(
+            "the wallet paints Cancelled as a refund, and no money moved on this attempt");
+        order.MonobankInvoiceId.Should().BeNull();
+        order.CheckoutKey.Should().BeNull("and the basket is free for the customer's next tap");
+
+        (await verify.Payments.AsNoTracking().CountAsync(p => p.OrderId == order.Id))
+            .Should().Be(0, "no money moved; there was no page for it to move on");
+    }
+
+    /// <summary>
+    /// The same refusal on the cart endpoint. The two checkouts are one behaviour, and the wallet
+    /// lists <c>PendingPayment</c> as unpaid whichever of them wrote the order.
+    /// </summary>
+    [Fact]
+    public async Task ACartTheAcquirerRefuses_LeavesNoOrderAwaitingPayment()
+    {
+        var userId = await SeedAsync(granted: false);
+
+        using var context = CreateContext();
+        var act = () => CartHandler(context, new RefusingAcquirer())
+            .HandleAsync(CartCommand(userId, SettlementRoute.Acquirer));
+
+        await act.Should().ThrowAsync<MonobankInvoiceRejectedException>();
+
+        using var verify = CreateContext();
+        var order = await verify.Orders.IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(o => o.UserId == userId);
+
+        order.Status.Should().Be(OrderStatus.Cancelled,
+            "a refused cart is the same dead attempt as a refused single item");
+        order.IsDeleted.Should().BeTrue("nothing was charged, so nothing may read as a refund");
+        order.CheckoutKey.Should().BeNull();
+        (await verify.Payments.AsNoTracking().CountAsync(p => p.OrderId == order.Id)).Should().Be(0);
+    }
+
+    /// <summary>
+    /// The rule on its own, for the row no handler reaches: an attempt whose request died before it
+    /// could clean up. <c>Cancelled</c> is the only terminal state an invoice-less order can reach -
+    /// the reconciliation poller needs an invoice id and the cleanup job needs a cancelled row - and
+    /// it is soft-deleted with it, so the wallet never paints it as a refund.
+    /// </summary>
+    [Fact]
+    public async Task AnInvoiceLessOrder_IsCancelledByTheAttemptThatAbandonedIt()
+    {
+        var userId = await SeedAsync(granted: false);
+        var orderId = await SeedInvoiceLessOrderAsync(userId, "basket-that-died");
+
+        using (var context = CreateContext())
+        {
+            var order = await context.Orders.FirstAsync(o => o.Id == orderId);
+            await CheckoutGuard.AbandonAsync(context, order, TestClock.UtcNow, default);
+            await context.SaveChangesAsync();
+        }
+
+        using var verify = CreateContext();
+        var saved = await verify.Orders.IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(o => o.Id == orderId);
+        saved.Status.Should().Be(OrderStatus.Cancelled);
+        saved.IsDeleted.Should().BeTrue();
+        saved.CheckoutKey.Should().BeNull();
+    }
+
+    /// <summary>
+    /// The line this rule must not cross: money the finance channel named on the order while the
+    /// attempt ran. That is a real transfer, not a failed tap, and dissolving it would strand it on
+    /// a cancelled order.
+    /// </summary>
+    [Fact]
+    public async Task AnInvoiceLessOrderWithMoneyNamedOnIt_IsNotDissolved()
+    {
+        var userId = await SeedAsync(granted: false);
+        var orderId = await SeedInvoiceLessOrderAsync(userId, "basket-with-money");
+        await NameMoneyOnAsync(orderId, userId, BasketTotal);
+
+        using (var context = CreateContext())
+        {
+            var order = await context.Orders.FirstAsync(o => o.Id == orderId);
+            await CheckoutGuard.AbandonAsync(context, order, TestClock.UtcNow, default);
+            await context.SaveChangesAsync();
+        }
+
+        using var verify = CreateContext();
+        var saved = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+        saved.Status.Should().Be(OrderStatus.PendingPayment,
+            "somebody's money is on this order; a person decides what happens to it");
+        saved.IsDeleted.Should().BeFalse("and it must stay visible, because the money is real");
+        saved.CheckoutKey.Should().BeNull("the attempt is still over, so the basket is free");
+    }
+
     private static CreateCheckoutCommand PurchaseCommand(Guid userId, SettlementRoute route) => new()
     {
         UserId = userId,
@@ -447,7 +567,7 @@ public sealed class DeclaredRouteCheckoutTests : IClassFixture<TestDatabaseFixtu
         }
     };
 
-    private BulkCheckoutCommandHandler CartHandler(ApplicationDbContext context, CountingAcquirer acquirer)
+    private BulkCheckoutCommandHandler CartHandler(ApplicationDbContext context, IMonobankClient acquirer)
         => new(
             context,
             new StubMonobankClientFactory(acquirer),
@@ -461,7 +581,7 @@ public sealed class DeclaredRouteCheckoutTests : IClassFixture<TestDatabaseFixtu
             TestJournal.HeldMoneyFor(context));
 
     private CreateCheckoutCommandHandler PurchaseHandler(
-        ApplicationDbContext context, CountingAcquirer acquirer, CountingMerchantResolver? merchant = null)
+        ApplicationDbContext context, IMonobankClient acquirer, CountingMerchantResolver? merchant = null)
         => new(
             context,
             new StubMonobankClientFactory(acquirer),
@@ -558,6 +678,29 @@ public sealed class DeclaredRouteCheckoutTests : IClassFixture<TestDatabaseFixtu
         return userId;
     }
 
+    /// <summary>An order written by an attempt that never got an invoice and never cleaned up.</summary>
+    private async Task<Guid> SeedInvoiceLessOrderAsync(Guid userId, string checkoutKey)
+    {
+        using var context = CreateContext();
+        var now = TestClock.UtcNow;
+
+        var order = new Order
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            Price = BasketTotal,
+            Status = OrderStatus.PendingPayment,
+            SettlementRoute = SettlementRoute.Acquirer,
+            CheckoutKey = checkoutKey,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        };
+
+        context.Orders.Add(order);
+        await context.SaveChangesAsync();
+        return order.Id;
+    }
+
     /// <summary>Money the finance channel has already named on an order — the state no tap may undo.</summary>
     private async Task NameMoneyOnAsync(Guid orderId, Guid userId, decimal amount)
     {
@@ -617,6 +760,32 @@ public sealed class DeclaredRouteCheckoutTests : IClassFixture<TestDatabaseFixtu
         public Task<IReadOnlyList<MonobankStatementItem>> GetStatementAsync(
             DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<MonobankStatementItem>>([]);
+    }
+
+    /// <summary>
+    /// The acquirer refusing the way production did on 2026-11-07: FORBIDDEN, and no page at all.
+    /// </summary>
+    private sealed class RefusingAcquirer : IMonobankClient
+    {
+        public Task<MonobankInvoiceResponse> CreateInvoiceAsync(
+            MonobankInvoiceRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new MonobankInvoiceRejectedException(
+                System.Net.HttpStatusCode.Forbidden,
+                """{"errorDescription":"you don't have active terminal for internet acquiring","errorCode":"FORBIDDEN"}""");
+
+        public Task<MonobankInvoiceStatus> GetInvoiceStatusAsync(
+            string invoiceId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("the refusal never produced an invoice to poll");
+
+        public Task<MonobankCancelResponse> CancelInvoiceAsync(
+            string invoiceId, long amountKopecks, string extRef,
+            IReadOnlyList<MonobankBasketItem>? items = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("the refusal never produced an invoice to cancel");
+
+        public Task<IReadOnlyList<MonobankStatementItem>> GetStatementAsync(
+            DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("the refusal is not a statement question");
     }
 
     /// <summary>
