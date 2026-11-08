@@ -183,7 +183,7 @@ describe('Packages - nothing to show', () => {
 
     fireEvent.press(screen.getByTestId('error-state'));
     expect(mockInvalidate).toHaveBeenCalledWith({
-      queryKey: ['packages', 'st-1', 'A95'],
+      queryKey: ['packages', 'st-1', 'f-1'],
     });
   });
 
