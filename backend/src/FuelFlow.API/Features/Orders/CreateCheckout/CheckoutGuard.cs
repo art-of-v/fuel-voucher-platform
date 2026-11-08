@@ -118,6 +118,65 @@ public static class CheckoutGuard
     public static void Release(Order order) => order.CheckoutKey = null;
 
     /// <summary>
+    /// Ends an attempt that will never get an invoice: gives the basket back, and closes the order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An order the acquirer never invoiced cannot be paid.</b> There is no payment page anywhere
+    /// and no webhook will ever arrive for it, so <see cref="OrderStatus.PendingPayment"/> is a lie
+    /// that never expires: it reads as "awaiting payment" in the customer's wallet and in the admin
+    /// list, and nothing collects it - the reconciliation poller only looks at orders that have an
+    /// invoice, and the unpaid-order cleanup only collects rows that are already cancelled and
+    /// deleted. Production showed the result on 2026-11-07: three refused bulk checkouts sat in the
+    /// customer's app as "unpaid" until an operator deleted them by hand.
+    /// </para>
+    /// <para>
+    /// <b>And it is hidden, not just cancelled.</b> The wallet paints <c>Cancelled</c> as "REFUNDED",
+    /// with the order's amount and a receipt button - a claim that money came back which never left.
+    /// The customer was never shown this attempt at all (the request that wrote it answered with an
+    /// error), so nothing is being concealed from them: the row is kept for the record and the
+    /// unpaid-order cleanup collects it after retention. That is exactly what the customer's own
+    /// delete does with an invoice-less order (app PR #1720), and it is the one state in which no
+    /// job, no poller and no wallet has a reason to look at it again.
+    /// </para>
+    /// <para>
+    /// <b>Money named on the order is not ours to dissolve.</b> A declaration can arrive while the
+    /// attempt runs - the settlement channel writes the payment row before it settles - and an order
+    /// carrying a real transfer is not an attempt to throw away. It stays exactly as it is, and the
+    /// customer is sent to a person who can see the money; only an order with nothing on it is
+    /// closed. The rule is the same one <c>DeleteMyOrderCommandHandler</c> follows: no invoice means
+    /// nothing can ever arrive against the order.
+    /// </para>
+    /// </remarks>
+    public static async Task AbandonAsync(
+        ApplicationDbContext context,
+        Order order,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var moneyIsNamedOnIt = await context.Payments
+            .AsNoTracking()
+            .AnyAsync(p => p.OrderId == order.Id, cancellationToken);
+
+        // The status is checked as well as the invoice: this runs on a row that was re-read, and a
+        // row another writer has already moved on is not this attempt's to end.
+        if (order.Status == OrderStatus.PendingPayment
+            && order.MonobankInvoiceId is null
+            && !moneyIsNamedOnIt)
+        {
+            order.Status = OrderStatus.Cancelled;
+
+            // Soft-deleted in the same save, so the wallet has nothing to paint: see the remarks on
+            // why "Cancelled" alone would read as a refund. The cleanup job collects it after
+            // retention, exactly as it does the customer's own deleted attempts.
+            order.IsDeleted = true;
+            order.UpdatedAtUtc = nowUtc;
+        }
+
+        order.CheckoutKey = null;
+    }
+
+    /// <summary>
     /// Whether this failure is the database refusing a second order for the same basket.
     /// </summary>
     /// <remarks>

@@ -92,7 +92,7 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
     }
 
     [Fact]
-    public async Task A_failed_invoice_leaves_the_order_behind()
+    public async Task A_failed_invoice_does_not_leave_an_order_awaiting_payment()
     {
         await AuthenticateAsync("+380991234812");
         SeedSellableStock("okko", "okko-95", 50m);
@@ -106,13 +106,24 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
         response.IsSuccessStatusCode.Should().BeFalse(
             "a checkout that cannot be paid is not a successful checkout");
 
-        // The invoice the acquirer accepted has an order behind it: the sale is on record, and
-        // the order is the retryable state - written, awaiting an invoice.
+        // The invoice the acquirer accepted has an order behind it - but that order cannot be paid:
+        // the customer was never given a page, and without an invoice id no webhook can ever be
+        // matched to it. Awaiting a payment that cannot arrive is what production showed the
+        // customer as "unpaid" for ever, so the attempt ends as a cancelled row.
         _acquirer.AcceptedInvoiceIds.Should().ContainSingle();
-        var orders = await PendingPaymentOrdersAsync();
-        orders.Should().ContainSingle("the sale is on record even though its invoice failed");
-        orders[0].MonobankInvoiceId.Should().BeNull("the platform never learned the invoice id");
-        orders[0].MonobankPaymentUrl.Should().BeNull();
+
+        var orders = await OrdersAsync();
+        orders.Should().ContainSingle("the attempt is still on record");
+
+        var attempt = orders.Single();
+
+        attempt.Status.Should().Be(OrderStatus.Cancelled,
+            "no invoice id reached us, so nothing can ever arrive against this order");
+        attempt.IsDeleted.Should().BeTrue(
+            "the wallet paints a cancelled order as refunded, and no money moved here");
+        attempt.MonobankInvoiceId.Should().BeNull("the platform never learned the invoice id");
+        attempt.MonobankPaymentUrl.Should().BeNull();
+        attempt.CheckoutKey.Should().BeNull("and the basket is free for the customer's next tap");
     }
 
     [Fact]
@@ -132,12 +143,22 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
         result!.MonobankInvoiceId.Should().NotBeNull("the retry minted an invoice");
         result.PaymentUrl.Should().NotBeNull();
 
-        // The failed attempt gave its basket back and stays as the record of what was attempted;
-        // the retry is a new attempt, and that one has the invoice the customer can pay.
-        var orders = await PendingPaymentOrdersAsync();
-        orders.Should().HaveCount(2, "the failed attempt stays as the record of what was attempted");
+        // The failed attempt gave its basket back and was cancelled - it is the record of what was
+        // tried, not a debt the customer still owes. The retry is a new order, and that one has the
+        // invoice the customer can pay.
+        var orders = await OrdersAsync();
+        orders.Should().HaveCount(2, "the failed attempt stays on record beside the retry");
 
-        var payable = orders.Single(o => o.MonobankInvoiceId != null);
+        var abandoned = orders.Single(o => o.Status == OrderStatus.Cancelled);
+        abandoned.MonobankInvoiceId.Should().BeNull();
+        abandoned.CheckoutKey.Should().BeNull();
+        abandoned.IsDeleted.Should().BeTrue("a dead attempt is not something the wallet shows");
+
+        var pending = await PendingPaymentOrdersAsync();
+        pending.Should().ContainSingle(
+            "only the retry awaits a payment, and it is the one with the invoice");
+
+        var payable = pending.Single();
         payable.Id.Should().Be(result.OrderId);
         payable.MonobankInvoiceId.Should().Be(result.MonobankInvoiceId);
         payable.MonobankPaymentUrl.Should().Be(result.PaymentUrl);
@@ -189,10 +210,17 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
         body.GetProperty("detail").GetString().Should().NotContain("terminal",
             "the bank's sentence is for the operator; the customer gets one they can act on");
 
-        // The attempt is still a record: an order exists, and it has no invoice because none was ever
-        // minted. The basket is given back, so the customer's next tap is a fresh attempt.
-        (await PendingPaymentOrdersAsync()).Should().ContainSingle()
-            .Which.MonobankInvoiceId.Should().BeNull();
+        // The attempt is still a record, but it is a closed one: no invoice was ever minted, so no
+        // payment can arrive and the order must not read as "awaiting payment". The basket is given
+        // back, so the customer's next tap is a fresh attempt.
+        (await PendingPaymentOrdersAsync()).Should().BeEmpty(
+            "an order nobody can pay must not sit in the wallet as unpaid");
+
+        var attempt = (await OrdersAsync()).Should().ContainSingle().Which;
+        attempt.Status.Should().Be(OrderStatus.Cancelled);
+        attempt.IsDeleted.Should().BeTrue();
+        attempt.MonobankInvoiceId.Should().BeNull();
+        attempt.CheckoutKey.Should().BeNull();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -269,6 +297,20 @@ public class CheckoutAtomicityIntegrationTests : WebApplicationFactory<Program>,
         BrandId = BrandIds.Okko,
         BrandName = "OKKO"
     };
+
+    /// <summary>
+    /// Every order of THIS test's customer, whatever state it is in. Used where the point is what
+    /// happened to the attempt rather than which orders are still awaiting payment.
+    /// </summary>
+    private async Task<List<Order>> OrdersAsync()
+    {
+        await using var context = _fixture.CreateOwnerContext();
+        return await context.Orders
+            .IgnoreQueryFilters()
+            .Where(o => o.UserId == _userId)
+            .OrderBy(o => o.CreatedAtUtc)
+            .ToListAsync();
+    }
 
     /// <summary>
     /// The pending-payment orders of THIS test's customer. The class shares one cloned database,
