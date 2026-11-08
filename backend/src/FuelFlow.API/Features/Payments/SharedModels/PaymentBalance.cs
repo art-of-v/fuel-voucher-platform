@@ -15,11 +15,13 @@ using Microsoft.EntityFrameworkCore;
 /// nobody has spent yet and is the mistake this whole slice replaces.
 /// </para>
 /// <para>
-/// Only <b>held</b> money appears: a succeeded capture, naming this customer, naming no order. A
-/// payment already attached to an order is that order's money in full and is not in anyone's balance,
-/// and the database refuses a draw on it — see <see cref="PaymentAllocation"/>. A refund is not money
-/// the customer holds; it is money going the other way, and it is excluded by kind rather than by
-/// judgement.
+/// Only <b>held</b> money appears: a succeeded capture, naming this customer, naming no order, and not
+/// dismissed from the worklist. A payment already attached to an order is that order's money in full
+/// and is not in anyone's balance, and the database refuses a draw on it — see
+/// <see cref="PaymentAllocation"/>. A dismissal is the operator's answer that this money will never be
+/// placed on a sale, so spending it automatically would reverse a decision a person made on purpose —
+/// the shape a test capture on a QA account would otherwise take. A refund is not money the customer
+/// holds; it is money going the other way, and it is excluded by kind rather than by judgement.
 /// </para>
 /// </remarks>
 public static class PaymentBalance
@@ -60,7 +62,13 @@ public static class PaymentBalance
             .Where(p => p.UserId == userId
                      && p.OrderId == null
                      && p.Kind == PaymentKind.Capture
-                     && p.Status == PaymentStatus.Succeeded)
+                     && p.Status == PaymentStatus.Succeeded
+                     // Dismissal is not a note on the worklist, it is a decision about the money: the
+                     // operator looked at the transfer, said which answer it was, and closed it. A
+                     // dismissed row stays in the bank and in the books, but it is not the customer's
+                     // to spend any more - without this line the next checkout would quietly settle
+                     // from the test capture the operator had just declared will never be placed.
+                     && p.DismissedAtUtc == null)
             .OrderBy(p => p.PaidAtUtc)
             .ThenBy(p => p.Id)
             .Select(p => new Held(

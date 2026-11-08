@@ -169,6 +169,40 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
     }
 
     /// <summary>
+    /// Money an operator dismissed is closed, not just hidden from the queue: it must not pay for the
+    /// next cart.
+    /// </summary>
+    /// <remarks>
+    /// Dismissal is what keeps the unallocated worklist readable — a test capture, a transfer from
+    /// before the payer registered — and its reason says the money is real and will never be placed.
+    /// The balance is the other half of that promise: a dismissed capture that still counted here
+    /// would let the very next checkout settle from the money the operator had just closed, which is
+    /// exactly the test money a QA account holds.
+    /// </remarks>
+    [Fact]
+    public async Task Money_an_operator_dismissed_does_not_pay_for_a_cart()
+    {
+        var userId = await SeedAsync();
+        var dismissed = await SeedHeldMoneyAsync(userId, BasketTotal);
+        await DismissAsync(dismissed, userId);
+
+        var acquirer = new CountingAcquirer();
+        using var context = CreateContext();
+
+        var response = await CartHandler(context, acquirer).HandleAsync(CartCommand(userId));
+
+        response.AlreadyPaid.Should().BeFalse("the operator said this money would never be placed");
+        acquirer.InvoicesCreated.Should().Be(1, "with the closed transfer out of the balance, the sale is the acquirer's again");
+
+        (await context.Orders.AsNoTracking().FirstAsync(o => o.Id == response.OrderIds.Single()))
+            .Status.Should().Be(OrderStatus.PendingPayment);
+        (await context.PaymentAllocations.AsNoTracking().CountAsync())
+            .Should().Be(0, "nothing may be drawn on money a person closed on purpose");
+        (await PaymentBalance.AvailableAsync(context, userId))
+            .Should().BeEmpty("a dismissed transfer is not the customer's balance");
+    }
+
+    /// <summary>
     /// One declared transfer, two sales. The case the ruling was about: finance says 1 000,00 ₴ arrived
     /// for this customer, the customer buys twice, and the account cannot answer the second order.
     /// </summary>
@@ -511,6 +545,23 @@ public sealed class HeldMoneyPaysForTheCheckoutTests : IClassFixture<TestDatabas
         context.Payments.Add(payment);
         await context.SaveChangesAsync();
         return payment.Id;
+    }
+
+    /// <summary>
+    /// The panel's dismissal, written the way its handler writes it: the three columns move together
+    /// and the money itself — amount, status, journal, statement row — is untouched.
+    /// </summary>
+    private async Task DismissAsync(Guid paymentId, Guid byUserId)
+    {
+        using var context = CreateContext();
+        var payment = await context.Payments.AsTracking().SingleAsync(p => p.Id == paymentId);
+
+        payment.DismissedAtUtc = TestClock.UtcNow;
+        payment.DismissedReason = "a test capture";
+        payment.DismissedByUserId = byUserId;
+        payment.UpdatedAtUtc = TestClock.UtcNow;
+
+        await context.SaveChangesAsync();
     }
 
     /// <summary>
