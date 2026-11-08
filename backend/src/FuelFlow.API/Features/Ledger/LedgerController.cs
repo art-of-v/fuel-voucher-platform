@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Features.Ledger.GetTrialBalance;
 using FuelFlow.Features.Ledger.ManualEntries;
+using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Time;
@@ -30,15 +31,18 @@ public sealed class LedgerController : ControllerBase
     private readonly GetTrialBalanceQueryHandler _trialBalance;
     private readonly BookUnappliedReceiptsCommandHandler _bookUnapplied;
     private readonly PostManualJournalEntryCommandHandler _manualEntries;
+    private readonly ReleaseVatOutsideThePerimeterCommandHandler _vatRelease;
 
     public LedgerController(
         GetTrialBalanceQueryHandler trialBalance,
         BookUnappliedReceiptsCommandHandler bookUnapplied,
-        PostManualJournalEntryCommandHandler manualEntries)
+        PostManualJournalEntryCommandHandler manualEntries,
+        ReleaseVatOutsideThePerimeterCommandHandler vatRelease)
     {
         _trialBalance = trialBalance;
         _bookUnapplied = bookUnapplied;
         _manualEntries = manualEntries;
+        _vatRelease = vatRelease;
     }
 
     /// <summary>The close check as JSON. Defaults to the current calendar month.</summary>
@@ -158,6 +162,43 @@ public sealed class LedgerController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Re-drives the VAT release a delivery performs: the part of the receipt's carve on 643 that the
+    /// stock went out on outside the tax perimeter is cancelled against 704, for one order.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The settlement job asks this as the delivery completes and never revisits an order it has
+    /// already fulfilled, so every sale delivered before the release existed (PR #1731) still carries
+    /// its carve. This is the operator's way to ask the same question of such an order: the same
+    /// handler, the same per-order key, the same entry the delivery would have written - a correction
+    /// the books can show beside the carve, not a hand-composed number.
+    /// </para>
+    /// <para>
+    /// Zero is an answer, not a refusal: the order may have no delivery, may have gone out entirely
+    /// inside the perimeter (where the receipt was right), or may be a promo order, which books
+    /// nothing at all. A zero for an order that should have released is the signal to read the log,
+    /// which names the reason. A replay returns the amount that is already booked and posts nothing.
+    /// </para>
+    /// </remarks>
+    [HttpPost("vat-release")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
+    [ProducesResponseType(typeof(ReleaseVatOutsideThePerimeterResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReleaseVatOutsideThePerimeter(
+        [FromBody] ReleaseVatOutsideThePerimeterRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || request.OrderId == Guid.Empty)
+        {
+            return ApiError.BadRequest("A release needs the order whose VAT it corrects.");
+        }
+
+        var released = await _vatRelease.HandleAsync(
+            new ReleaseVatOutsideThePerimeterCommand { OrderId = request.OrderId }, cancellationToken);
+
+        return Ok(new ReleaseVatOutsideThePerimeterResponse(request.OrderId, released));
+    }
+
     private Guid? CurrentUserId()
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
@@ -166,3 +207,9 @@ public sealed class LedgerController : ControllerBase
 }
 
 public sealed record BookUnappliedReceiptsRequest(DateOnly? From, DateOnly? To);
+
+/// <summary>The order whose delivered VAT the operator is asking the books to release.</summary>
+public sealed record ReleaseVatOutsideThePerimeterRequest(Guid OrderId);
+
+/// <summary>What came off 643; zero means nothing did, and the log says why.</summary>
+public sealed record ReleaseVatOutsideThePerimeterResponse(Guid OrderId, decimal ReleasedUah);
