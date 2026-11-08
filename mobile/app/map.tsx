@@ -33,7 +33,7 @@ import { DEFAULT_FUEL } from '../src/features/stations/lib/fuelLabels';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
-import { isMarkerPressEcho } from '../src/features/stations/lib/selection';
+import { isMarkerPressEcho, MARKER_PRESS_WINDOW_MS } from '../src/features/stations/lib/selection';
 import {
   assignToSlots,
   isRegionCoveredByBox,
@@ -227,8 +227,24 @@ export default function MapScreen() {
 
   // A marker hands its slot's station here. An empty slot gets no handler at all, and being
   // transparent it is not hit-tested either.
+  //
+  // One iOS tap reaches the marker twice: MapKit's native selection (`onSelect`) and the marker's
+  // own gesture (`onPress`). Both are wired in `StationMarker` because only `onPress` fires on
+  // Android, and on iOS it is the fallback for re-tapping a pin MapKit still has selected. The
+  // second delivery of the same tap is dropped here; the map-level echo of a marker tap is dropped
+  // in the map's `onPress` below.
+  const lastPressedId = React.useRef<string | null>(null);
   const pressMarker = React.useCallback((node: StationNode) => {
-    lastMarkerPressAt.current = Date.now();
+    const now = Date.now();
+    if (
+      lastPressedId.current === node.id &&
+      lastMarkerPressAt.current != null &&
+      now - lastMarkerPressAt.current < MARKER_PRESS_WINDOW_MS
+    ) {
+      return;
+    }
+    lastPressedId.current = node.id;
+    lastMarkerPressAt.current = now;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelectedStation(node);
   }, []);
