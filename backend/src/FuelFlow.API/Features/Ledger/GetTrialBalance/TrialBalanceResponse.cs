@@ -1,5 +1,6 @@
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Orders.RefundOrder;
 
 namespace FuelFlow.Features.Ledger.GetTrialBalance;
 
@@ -22,6 +23,8 @@ namespace FuelFlow.Features.Ledger.GetTrialBalance;
 /// still unposted and decide it.</param>
 /// <param name="UnbookedCaptures">Acquirer money with no payment row - the receipts the books are
 /// short of until someone books them.</param>
+/// <param name="UnbookedRefunds">Acquirer-confirmed refunds the ledger does not hold - money that
+/// went back to a customer while the books still show it as never returned.</param>
 public sealed record TrialBalanceResponse(
     DateOnly FromDate,
     DateOnly ToDate,
@@ -31,7 +34,8 @@ public sealed record TrialBalanceResponse(
     BankCheck Bank,
     VatCheck Vat,
     StockCheck Stock,
-    IReadOnlyList<UnbookedCapture> UnbookedCaptures)
+    IReadOnlyList<UnbookedCapture> UnbookedCaptures,
+    IReadOnlyList<UnbookedRefund> UnbookedRefunds)
 {
     /// <summary>
     /// Everything the close asks of the books, in one flag.
@@ -40,15 +44,18 @@ public sealed record TrialBalanceResponse(
     /// <see cref="TrialBalanceTotals.Balanced"/> alone is not enough: a book can be balanced and
     /// still be missing the bank's money, which is exactly the state #780 was opened in. A draft is
     /// the third way to be unfinished - revenue composed but not confirmed is revenue the month's
-    /// result cannot count, so a month with drafts in it is not closed either. The last two are the
+    /// result cannot count, so a month with drafts in it is not closed either. The next two are the
     /// accounts whose balance means something only if the other side was posted at all
     /// (planning #787): VAT carried in from an earlier period and still unsettled, and inventory
-    /// that has been credited without ever being received.
+    /// that has been credited without ever being received. The last one is money that moved and the
+    /// books did not: a refund the acquirer confirmed leaves the customer out of pocket while every
+    /// operational screen says it completed.
     /// </remarks>
     public bool ReadyToClose
         => Totals.Balanced
            && Bank.Matches
            && UnbookedCaptures.Count == 0
+           && UnbookedRefunds.Count == 0
            && Drafts.Count == 0
            && Vat.Settled
            && Stock.Complete;

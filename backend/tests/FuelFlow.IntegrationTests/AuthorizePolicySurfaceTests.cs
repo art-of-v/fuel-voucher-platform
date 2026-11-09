@@ -180,6 +180,9 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         // Corrects the books: releases the VAT a delivery took outside the perimeter for an order
         // fulfilled before the release existed, and posts the same entry the delivery would have.
         ["POST /api/admin/ledger/vat-release"] = AuthPolicies.MoneyMovement,
+        // Writes the two legs of a refund the confirmation path could not book. The money already
+        // moved; this is the operator asking the poster again, so it carries the money capability.
+        ["POST /api/admin/ledger/refund-posting"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/orders/{id}/refund"] = AuthPolicies.MoneyMovement,
         ["POST /api/admin/payments/{id:guid}/attach"] = AuthPolicies.MoneyMovement,
         // Closes a money question rather than moving money: the payment, its journal entry and its

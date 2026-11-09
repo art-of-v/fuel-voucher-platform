@@ -45,10 +45,11 @@ namespace FuelFlow.Features.Orders.SettlePaidOrder;
 /// first and divided once, exactly as D2 requires ("the split is taken per payment … not taken per
 /// line, per voucher"), because a VAT per voucher added up is the re-splitting defect that produced
 /// October's three-kopeck difference between the books and the drafts. What this one does read off
-/// the books is the ceiling — the amount the receipt actually carved — so a rounding difference can
-/// leave the release a kopeck short of it, and that residual stays on 643 where the close check sees
-/// it, which is the same treatment D2 gives the revenue residual on 681. It may never be a kopeck
-/// over, and it may never release what was never asserted.
+/// the books is the ceiling — what remains of the amount the receipt actually carved after the
+/// order's other corrections, so a refund and this release together cannot divide the same carve
+/// into a kopeck more than the receipt put there. That residual stays on 643 where the close check
+/// sees it, which is the same treatment D2 gives the revenue residual on 681. It may never release
+/// what was never asserted.
 /// </para>
 /// <para>
 /// <b>What it refuses to guess at.</b> A delivery that names no order line cannot be valued, and
@@ -71,11 +72,6 @@ public sealed class ReleaseVatOutsideThePerimeterCommandHandler
 {
     /// <summary>The event, and the key its two accounts are mapped under.</summary>
     public const string ReleaseEvent = "payment.received.vat.out_of_perimeter";
-
-    /// <summary>
-    /// The event whose entry this one releases — the name <c>PostReceiptToJournalAsync</c> writes.
-    /// </summary>
-    private const string ReceiptVatEvent = "payment.received.vat";
 
     private readonly ApplicationDbContext _context;
     private readonly JournalPostingService _journal;
@@ -102,6 +98,19 @@ public sealed class ReleaseVatOutsideThePerimeterCommandHandler
         ReleaseVatOutsideThePerimeterCommand command,
         CancellationToken cancellationToken = default)
     {
+        // A replay is answered before the delivery is read again: the entry is the fact, and an order
+        // whose vouchers were later taken back would otherwise report a release that is already booked
+        // as nothing at all. This is also the answer the operator endpoint promises on a second press.
+        var alreadyReleased = await CarvedVat.PostedAmountAsync(
+            _context, ReleaseEvent, JournalSourceType.Payment, command.OrderId, cancellationToken);
+        if (alreadyReleased > 0m)
+        {
+            _logger.LogInformation(
+                "VAT PERIMETER: order {OrderId} already released {Release:0.00} of the VAT its receipt "
+                + "carved; not releasing it again.", command.OrderId, alreadyReleased);
+            return alreadyReleased;
+        }
+
         // Not IncludingSoftDeleted: an order that was taken out of view after its money arrived is a
         // case for the refund and repair paths, and releasing its VAT here would edit the same books
         // from a second direction that has no idea what the first one already did to them.
@@ -182,30 +191,26 @@ public sealed class ReleaseVatOutsideThePerimeterCommandHandler
         if (outsideGross <= 0m)
             return 0m;
 
-        // What the receipt actually asserted, read off its own entry rather than recomputed from the
-        // price: the release is a correction of that figure, so the figure it may correct is the most
-        // authoritative one there is, and a hand-edited book cannot be made to go negative by a job.
+        // What the receipt actually asserted and what still stands of it, read off its own entry
+        // rather than recomputed from the price: the release is a correction of that figure, so the
+        // figure it may correct is the most authoritative one there is, and a hand-edited book cannot
+        // be made to go negative by a job.
         //
-        // The engine puts the debit on line 1 of every posting, so line 1 of the carve is the amount —
-        // which is also why no account code is named here. The chart is the only place an account is
-        // decided (docs/ACQUISITION_CHANNELS.md §4 and the mapping rule's own purpose), and a class
-        // that said "643" would be a second copy of a decision the accountant owns.
-        var carveLines = await (
-            from line in _context.JournalLines.AsNoTracking()
-            join entry in _context.JournalEntries.AsNoTracking() on line.EntryId equals entry.Id
-            where entry.SourceEvent == ReceiptVatEvent && entry.SourceId == command.OrderId
-                 && line.LineNo == 1
-            select line.DebitUah)
-            .ToListAsync(cancellationToken);
-
-        var carved = carveLines.Sum();
+        // The account the carve sits on comes from the carve's own credit line, and nothing here names
+        // one. The chart is the only place an account is decided (docs/ACQUISITION_CHANNELS.md §4 and
+        // the mapping rule's own purpose), and a class that said "643" would be a second copy of a
+        // decision the accountant owns.
+        var carve = await CarvedVat.ForOrderAsync(_context, command.OrderId, cancellationToken);
+        var carved = carve.CarvedUah;
 
         const decimal vatRate = VatCalculator.StandardRate;
 
         // The rate and the formula are written here as the receipt writes them, so that a sale which
         // stops being standard-rated changes both call sites together and the release cannot disagree
-        // with its own carve.
-        var release = Math.Min(VatCalculator.VatFromGross(outsideGross, vatRate), carved);
+        // with its own carve. The ceiling is what remains, not the whole carve: a refund of the same
+        // order may already have released its share, and the divisions of the halves can round a
+        // kopeck past the single division the receipt made.
+        var release = Math.Min(VatCalculator.VatFromGross(outsideGross, vatRate), carve.RemainingUah);
 
         if (release <= 0m)
         {
@@ -231,6 +236,17 @@ public sealed class ReleaseVatOutsideThePerimeterCommandHandler
                     + "perimeter, but no VAT of its own is booked against it ({Carved:0.00}), so nothing "
                     + "was released. The receipt is missing, not the release.",
                     command.OrderId, outsideGross, carved);
+            }
+            else
+            {
+                // The correction is legitimate, but every hryvnia of this order's carve is already
+                // off the liability - another release for the same order, or a refund of it, got
+                // there first.
+                _logger.LogInformation(
+                    "VAT PERIMETER: order {OrderId} delivered {Outside:0.00} on the route outside the "
+                    + "perimeter, but its carve ({Carved:0.00} UAH) is already released "
+                    + "({Taken:0.00} UAH); nothing was booked.",
+                    command.OrderId, outsideGross, carved, carve.TakenUah);
             }
 
             return 0m;

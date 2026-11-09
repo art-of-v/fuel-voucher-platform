@@ -199,6 +199,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var order = await race.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             var poster = new RefundJournalPoster(
                 new JournalPostingService(race, NullLogger<JournalPostingService>.Instance),
+                race,
                 NullLogger<RefundJournalPoster>.Instance);
 
             var again = await poster.BookConfirmedRefundAsync(refund, order);
@@ -1003,6 +1004,41 @@ private static Payment SeedRefundPayment(
 
         seed(context);
         await context.SaveChangesAsync();
+
+        // These fixtures fabricate the paid capture row instead of driving the settle. The refund
+        // mirrors the receipt, and its VAT leg is capped by the carve that receipt booked
+        // (CarvedVat) - so the receipt the settle would have written is written here, or a refund
+        // would be asking to give back VAT no entry ever asserted.
+        foreach (var order in context.Orders.ToList())
+        {
+            if (order.Price <= 0m)
+                continue;
+
+            var journal = TestJournal.For(context);
+            var (netUah, vatUah) = VatCalculator.Split(order.Price, VatCalculator.StandardRate);
+            var entryDate = DateOnly.FromDateTime(order.CreatedAtUtc);
+
+            await journal.PostAsync(new PostJournalEntryRequest
+            {
+                SourceEvent = "payment.received",
+                SourceType = JournalSourceType.Payment,
+                SourceId = order.Id,
+                EntryDate = entryDate,
+                AmountUah = netUah + vatUah,
+                Description = $"Оплата замовлення {order.Id}",
+                PostedByUserId = order.UserId,
+            });
+            await journal.PostAsync(new PostJournalEntryRequest
+            {
+                SourceEvent = "payment.received.vat",
+                SourceType = JournalSourceType.Payment,
+                SourceId = order.Id,
+                EntryDate = entryDate,
+                AmountUah = vatUah,
+                Description = $"ПДВ з оплати замовлення {order.Id}",
+                PostedByUserId = order.UserId,
+            });
+        }
     }
 
     private ApplicationDbContext CreateContext()

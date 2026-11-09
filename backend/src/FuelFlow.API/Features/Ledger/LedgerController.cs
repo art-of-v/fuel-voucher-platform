@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Features.Ledger.GetTrialBalance;
 using FuelFlow.Features.Ledger.ManualEntries;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Errors;
@@ -32,17 +33,20 @@ public sealed class LedgerController : ControllerBase
     private readonly BookUnappliedReceiptsCommandHandler _bookUnapplied;
     private readonly PostManualJournalEntryCommandHandler _manualEntries;
     private readonly ReleaseVatOutsideThePerimeterCommandHandler _vatRelease;
+    private readonly ReDriveRefundPostingCommandHandler _refundPosting;
 
     public LedgerController(
         GetTrialBalanceQueryHandler trialBalance,
         BookUnappliedReceiptsCommandHandler bookUnapplied,
         PostManualJournalEntryCommandHandler manualEntries,
-        ReleaseVatOutsideThePerimeterCommandHandler vatRelease)
+        ReleaseVatOutsideThePerimeterCommandHandler vatRelease,
+        ReDriveRefundPostingCommandHandler refundPosting)
     {
         _trialBalance = trialBalance;
         _bookUnapplied = bookUnapplied;
         _manualEntries = manualEntries;
         _vatRelease = vatRelease;
+        _refundPosting = refundPosting;
     }
 
     /// <summary>The close check as JSON. Defaults to the current calendar month.</summary>
@@ -199,6 +203,55 @@ public sealed class LedgerController : ControllerBase
         return Ok(new ReleaseVatOutsideThePerimeterResponse(request.OrderId, released));
     }
 
+    /// <summary>
+    /// Books the two legs of a refund the acquirer confirmed but the confirmation path never wrote:
+    /// the gross onto 681 / 311 and the VAT onto 643 / 704, through the same poster.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The sync books a refund when the confirmation arrives and leaves a refusal to a person, because
+    /// the money has already moved. Nothing picks such a refund up again - it is no longer Pending -
+    /// so this is the door that asks the poster a second time. It is the designed path, not a
+    /// hand-composed correction: the same keys, the same figures, the same cap on the VAT leg.
+    /// </para>
+    /// <para>
+    /// Idempotent on the refund's id: pressing it twice books one fact and answers with what is
+    /// booked. A payment that is not a refund, or a refund the acquirer has not confirmed, is a 400 -
+    /// the confirmation is the fact being repaired, not something this endpoint may anticipate.
+    /// </para>
+    /// </remarks>
+    [HttpPost("refund-posting")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
+    [ProducesResponseType(typeof(ReDriveRefundPostingResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ReDriveRefundPosting(
+        [FromBody] ReDriveRefundPostingRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null || request.RefundPaymentId == Guid.Empty)
+        {
+            return ApiError.BadRequest("A refund posting needs the refund payment it books.");
+        }
+
+        try
+        {
+            var result = await _refundPosting.HandleAsync(
+                new ReDriveRefundPostingCommand(request.RefundPaymentId), cancellationToken);
+            return Ok(result);
+        }
+        catch (LedgerPeriodClosedException exception)
+        {
+            return ApiError.BadRequest(exception.Message, LedgerPeriodClosedException.Code);
+        }
+        catch (LedgerUnmappedEventException exception)
+        {
+            return ApiError.BadRequest(exception.Message, LedgerUnmappedEventException.Code);
+        }
+        catch (LedgerPostingException exception)
+        {
+            return ApiError.BadRequest(exception.Message, LedgerPostingException.Code);
+        }
+    }
+
     private Guid? CurrentUserId()
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
@@ -213,3 +266,6 @@ public sealed record ReleaseVatOutsideThePerimeterRequest(Guid OrderId);
 
 /// <summary>What came off 643; zero means nothing did, and the log says why.</summary>
 public sealed record ReleaseVatOutsideThePerimeterResponse(Guid OrderId, decimal ReleasedUah);
+
+/// <summary>The confirmed refund whose missing legs the operator is asking the books to write.</summary>
+public sealed record ReDriveRefundPostingRequest(Guid RefundPaymentId);

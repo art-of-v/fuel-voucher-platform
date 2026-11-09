@@ -2,6 +2,7 @@ using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Logging;
 
@@ -43,11 +44,16 @@ public sealed class RefundJournalPoster
     public const string RefundedVatEvent = "payment.refunded.vat";
 
     private readonly JournalPostingService _journal;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<RefundJournalPoster> _logger;
 
-    public RefundJournalPoster(JournalPostingService journal, ILogger<RefundJournalPoster> logger)
+    public RefundJournalPoster(
+        JournalPostingService journal,
+        ApplicationDbContext context,
+        ILogger<RefundJournalPoster> logger)
     {
         _journal = journal;
+        _context = context;
         _logger = logger;
     }
 
@@ -116,15 +122,20 @@ public sealed class RefundJournalPoster
     /// Dr 643 / Cr 704, the exact mirror of <c>payment.received.vat</c>.
     /// </summary>
     /// <remarks>
-    /// The amount is recomputed from the refunded gross with the same formula and the same rate the
-    /// receipt used, never read off the receipt's entry. That is what keeps a refund from disagreeing
-    /// with how its own sale was booked, and it is why the rate is written where the receipt writes it:
-    /// today every sale is standard-rated, and if that stops being true both call sites change together.
     /// <para>
-    /// The cost of recomputing rather than apportioning: two half-refunds of one sale can round to one
-    /// kopeck more than the single carve-out they release. It lands on 704 and 643 as a kopeck that the
-    /// close check sees; a proportional split with the residual going to the last refund would need the
-    /// receipt's entry here and a rule saying which refund is last.
+    /// The amount starts as the refunded gross with the same formula and the same rate the receipt
+    /// used, never read off the receipt's entry. That is what keeps a refund from disagreeing with how
+    /// its own sale was booked, and it is why the rate is written where the receipt writes it: today
+    /// every sale is standard-rated, and if that stops being true both call sites change together.
+    /// </para>
+    /// <para>
+    /// That division can round a kopeck past the carve when it is not the only correction on the
+    /// order: two halves of a 1 724.00 ₴ payment each divide to 143.67, while the receipt carved
+    /// 287.33 once. The last correction to run therefore takes only what remains of the carve - and a
+    /// correction that runs after everything is released takes nothing, which is also the answer for a
+    /// sale whose receipt booked no VAT at all (a promo order books nothing by decision).
+    /// <see cref="CarvedVat"/> reads both figures from the books, so this cannot manufacture a credit
+    /// against a liability the receipt never asserted.
     /// </para>
     /// </remarks>
     private async Task BookVatReleaseAsync(
@@ -134,11 +145,47 @@ public sealed class RefundJournalPoster
         Guid postedByUserId,
         CancellationToken cancellationToken)
     {
-        var vatUah = VatCalculator.VatFromGross(refund.AmountUah, VatCalculator.StandardRate);
-        if (vatUah <= 0m)
+        // A retried sync or a replayed webhook asks this again for a refund that is already booked.
+        // The engine would return the existing entry anyway, but its amount is the booked one, and the
+        // cap below would otherwise report a zero release for a leg that exists.
+        var already = await CarvedVat.PostedAmountAsync(
+            _context, RefundedVatEvent, JournalSourceType.Refund, refund.Id, cancellationToken);
+        if (already > 0m)
+        {
+            _logger.LogInformation(
+                "REFUND LEDGER: the VAT release for refund {RefundId} is already booked as {Vat} UAH; "
+                + "not posting it again.", refund.Id, already);
+            return;
+        }
+
+        var computed = VatCalculator.VatFromGross(refund.AmountUah, VatCalculator.StandardRate);
+        if (computed <= 0m)
         {
             // A zero is not a posting - the engine refuses it - and an exempt advance carried no VAT
             // to release.
+            return;
+        }
+
+        var carve = await CarvedVat.ForOrderAsync(_context, order.Id, cancellationToken);
+        if (carve.CarvedUah <= 0m)
+        {
+            // No carve means no liability to take anything off. A promo sale is that by decision; an
+            // order whose receipt was never booked is a hole for a person, not a credit to invent.
+            _logger.LogWarning(
+                "REFUND LEDGER: refund {RefundId} carries {Computed:0.00} UAH of VAT, but the receipt "
+                + "of order {OrderId} booked no VAT of its own; the release was not booked.",
+                refund.Id, computed, order.Id);
+            return;
+        }
+
+        // The cap is what closes 643 at zero: the last correction takes the kopeck the divisions left.
+        var vatUah = Math.Min(computed, carve.RemainingUah);
+        if (vatUah <= 0m)
+        {
+            _logger.LogInformation(
+                "REFUND LEDGER: refund {RefundId} carries {Computed:0.00} UAH of VAT, but the carve of "
+                + "order {OrderId} ({Carved:0.00} UAH) is already released ({Taken:0.00} UAH); nothing "
+                + "was booked.", refund.Id, computed, order.Id, carve.CarvedUah, carve.TakenUah);
             return;
         }
 
@@ -158,7 +205,8 @@ public sealed class RefundJournalPoster
             cancellationToken);
 
         _logger.LogInformation(
-            "REFUND LEDGER: released {Vat} UAH of VAT for refund {RefundId}.",
-            vatUah, refund.Id);
+            "REFUND LEDGER: released {Vat} UAH of VAT for refund {RefundId} ({Computed} UAH divided, "
+            + "the rest of the order's carve was already released).",
+            vatUah, refund.Id, computed);
     }
 }
