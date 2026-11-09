@@ -4,6 +4,8 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Ledger;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
@@ -305,6 +307,78 @@ public sealed class ASaleDeliveredOutsideThePerimeterReleasesItsVatTests : IClas
         (await ReleaseCountAsync(verify, orderId)).Should().Be(0);
     }
 
+    /// <summary>
+    /// The two corrections on one order are two divisions of one carve, and two divisions of the
+    /// halves can round a kopeck past the single division the receipt made: 1 724.00 ₴ carves 287.33,
+    /// while 862.00 ₴ returned and 862.00 ₴ delivered each divide to 143.67. Whichever runs second
+    /// takes what remains, so 643 closes at zero instead of carrying a kopeck of a liability that was
+    /// never asserted.
+    /// </summary>
+    [Fact]
+    public async Task AReturnedUnitAndADeliveredUnit_CloseTheCarveExactly()
+    {
+        var (orderId, userId, lineId) = Outfit();
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            AddPaidOrder(seed, orderId, userId, lineId, quantity: 2, delivered: false);
+            AddAvailableStock(seed, userId, AcquisitionSources.Partner, dueInDays: 30);
+            AddAvailableStock(seed, userId, AcquisitionSources.Partner, dueInDays: 60);
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var context = CreateContext())
+            await SettleAsync(context, orderId);
+
+        // One voucher was never delivered: the customer was refunded for it, and the acquirer
+        // confirmed the money went back before the other unit was handed over.
+        await using (var returned = CreateContext())
+            await BookConfirmedRefundAsync(returned, orderId, userId, UnitPrice);
+
+        await using (var context = CreateContext())
+            await FulfilAsync(context);
+
+        await using var verify = CreateContext();
+
+        (await VatStillOwedAsync(verify, orderId)).Should().Be(0m,
+            "the refund divided 143.67 and the release took the remaining 143.66 of the 287.33 carve");
+        (await ReleaseAmountAsync(verify, orderId)).Should().Be(143.66m,
+            "the last correction takes what remains, not its own division of the half");
+    }
+
+    /// <summary>
+    /// The other side of the cap: a return on an order whose receipt booked no VAT releases nothing.
+    /// One refund per order is a schema fact (<c>ux_payments_one_refund_per_order</c>), so the
+    /// two-divisions-of-one-carve case is a refund plus a delivery, not two refund rows. This is the
+    /// case where there is no carve at all - a promo sale books nothing by decision - and the refund
+    /// must not manufacture a credit against a liability the receipt never asserted.
+    /// </summary>
+    [Fact]
+    public async Task ARefundOnAnOrderWhoseReceiptAssertedNoVat_BooksNoVatLeg()
+    {
+        var (orderId, userId, lineId) = Outfit();
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            AddPaidOrder(seed, orderId, userId, lineId, quantity: 1, delivered: false);
+            await seed.SaveChangesAsync();
+        }
+
+        // No settle: the receipt this order would have posted was never booked, so 643 holds
+        // nothing of this order's money.
+        await using (var returned = CreateContext())
+            await BookConfirmedRefundAsync(returned, orderId, userId, UnitPrice);
+
+        await using var verify = CreateContext();
+
+        (await RefundVatAmountsAsync(verify, orderId)).Should().BeEmpty(
+            "the refund divides 143.67, but there is no carve on 643 to take it from");
+        (await VatStillOwedAsync(verify, orderId)).Should().Be(0m,
+            "the books end where they began, instead of carrying a credit nobody asserted");
+    }
+
     // ---------------------------------------------------------------- fixtures
 
     private static (Guid OrderId, Guid UserId, Guid LineId) Outfit()
@@ -443,9 +517,49 @@ public sealed class ASaleDeliveredOutsideThePerimeterReleasesItsVatTests : IClas
         result.Settled.Should().BeTrue(result.Reason ?? "the money on the order pays for it");
     }
 
-    private static async Task FulfilAsync(ApplicationDbContext context)
+    /// <summary>
+    /// The confirmation path the sync runs: a refund the acquirer reported as returned, booked
+    /// through the poster the sync itself calls.
+    /// </summary>
+    private static async Task BookConfirmedRefundAsync(
+        ApplicationDbContext context, Guid orderId, Guid userId, decimal amountUah)
     {
-        var monobankMock = new Mock<IMonobankClient>();
+        var captureId = await context.Payments.AsNoTracking()
+            .Where(p => p.OrderId == orderId && p.Kind == PaymentKind.Capture)
+            .Select(p => p.Id)
+            .FirstAsync();
+
+        var refund = new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            OrderId = orderId,
+            UserId = userId,
+            Kind = PaymentKind.Refund,
+            ParentPaymentId = captureId,
+            Provider = "monobank",
+            AmountUah = amountUah,
+            AmountKopecks = (int)(amountUah * 100m),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
+        };
+
+        context.Payments.Add(refund);
+        await context.SaveChangesAsync();
+
+        var order = await context.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
+        var poster = new RefundJournalPoster(
+            new JournalPostingService(context, NullLogger<JournalPostingService>.Instance),
+            context,
+            NullLogger<RefundJournalPoster>.Instance);
+
+        await poster.BookConfirmedRefundAsync(refund, order);
+    }
+
+    private static async Task FulfilAsync(ApplicationDbContext context)
+    {        var monobankMock = new Mock<IMonobankClient>();
         monobankMock
             .Setup(m => m.CancelInvoiceAsync(
                 It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(),
@@ -483,15 +597,40 @@ public sealed class ASaleDeliveredOutsideThePerimeterReleasesItsVatTests : IClas
 
     /// <summary>
     /// What the order still leaves owed on 643: credits less debits, so the answer is the figure a
-    /// VAT return would carry for it.
+    /// VAT return would carry for it. The order's refunds are part of that figure - their legs are
+    /// keyed on the refund row, not on the order - which is why this reads both.
     /// </summary>
     private static async Task<decimal> VatStillOwedAsync(ApplicationDbContext context, Guid orderId)
+    {
+        var refundIds = await context.Payments
+            .AsNoTracking()
+            .Where(p => p.OrderId == orderId && p.Kind == PaymentKind.Refund)
+            .Select(p => p.Id)
+            .ToListAsync();
+
+        return await (from line in context.JournalLines.AsNoTracking()
+                      join entry in context.JournalEntries.AsNoTracking() on line.EntryId equals entry.Id
+                      join account in context.ChartOfAccounts.AsNoTracking() on line.AccountId equals account.Id
+                      where (entry.SourceId == orderId
+                             || (entry.SourceId != null && refundIds.Contains(entry.SourceId.Value)))
+                            && account.Code == VatAccountCode
+                      select line.CreditUah - line.DebitUah)
+                     .SumAsync();
+    }
+
+    /// <summary>What each of the order's refunds released on 643, in booking order.</summary>
+    private static async Task<List<decimal>> RefundVatAmountsAsync(
+        ApplicationDbContext context, Guid orderId)
         => await (from line in context.JournalLines.AsNoTracking()
                   join entry in context.JournalEntries.AsNoTracking() on line.EntryId equals entry.Id
-                  join account in context.ChartOfAccounts.AsNoTracking() on line.AccountId equals account.Id
-                  where entry.SourceId == orderId && account.Code == VatAccountCode
-                  select line.CreditUah - line.DebitUah)
-                 .SumAsync();
+                  where entry.SourceEvent == RefundJournalPoster.RefundedVatEvent
+                        && entry.SourceId != null
+                        && context.Payments.Any(p => p.Id == entry.SourceId
+                                                  && p.OrderId == orderId
+                                                  && p.Kind == PaymentKind.Refund)
+                  orderby entry.EntryNo
+                  select line.DebitUah)
+                 .ToListAsync();
 
     /// <summary>Which routes the vouchers actually handed over came in on.</summary>
     private static async Task<List<string>> DeliveredRoutesAsync(ApplicationDbContext context, Guid orderId)

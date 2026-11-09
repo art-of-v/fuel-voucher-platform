@@ -1,6 +1,7 @@
 using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Orders.RefundOrder;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Time;
@@ -84,6 +85,9 @@ public sealed class GetTrialBalanceQueryHandler
         var unbooked = await UnappliedReceipts.FindAsync(
             _context, MonobankMerchant.Live, fromUtc, toUtc, cancellationToken);
 
+        var unbookedRefunds = await UnbookedRefunds.FindAsync(
+            _context, fromUtc, toUtc, cancellationToken);
+
         return new TrialBalanceResponse(
             from,
             to,
@@ -104,7 +108,8 @@ public sealed class GetTrialBalanceQueryHandler
                 difference == 0m && unbooked.Count == 0),
             BuildVatCheck(accounts),
             BuildStockCheck(accounts),
-            unbooked);
+            unbooked,
+            unbookedRefunds);
     }
 
     /// <summary>

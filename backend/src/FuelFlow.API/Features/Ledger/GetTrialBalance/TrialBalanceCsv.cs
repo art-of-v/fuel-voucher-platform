@@ -36,6 +36,7 @@ public static class TrialBalanceCsv
         sb.AppendLine("VAT carried in is settled," + Yes(report.Vat.Settled));
         sb.AppendLine("Stock buy side is complete," + Yes(report.Stock.Complete));
         sb.AppendLine("Unbooked captures," + report.UnbookedCaptures.Count.ToString(CultureInfo.InvariantCulture));
+        sb.AppendLine("Confirmed refunds with no posted legs," + report.UnbookedRefunds.Count.ToString(CultureInfo.InvariantCulture));
         sb.AppendLine("Ready to close," + Yes(report.ReadyToClose));
         sb.AppendLine();
 
@@ -84,6 +85,24 @@ public static class TrialBalanceCsv
                     Q(capture.PaidAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
                     capture.StatementRows.ToString(CultureInfo.InvariantCulture),
                     Q(capture.Rrn)
+                }));
+            }
+
+            sb.AppendLine();
+        }
+
+        if (report.UnbookedRefunds.Count > 0)
+        {
+            sb.AppendLine("Confirmed refunds the books do not hold");
+            sb.AppendLine("PaymentId,OrderId,Amount,PaidAt");
+            foreach (var refund in report.UnbookedRefunds)
+            {
+                sb.AppendLine(string.Join(',', new[]
+                {
+                    Q(refund.PaymentId.ToString()),
+                    Q(refund.OrderId?.ToString()),
+                    N(refund.AmountUah),
+                    Q(refund.PaidAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))
                 }));
             }
 

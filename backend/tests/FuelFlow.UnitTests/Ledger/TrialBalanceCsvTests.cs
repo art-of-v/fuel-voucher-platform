@@ -67,5 +67,6 @@ public class TrialBalanceCsvTests
         Bank: new BankCheck("FUEL FLOW", 10m, 1, 10m, 0m, 10m, 0m, true),
         Vat: new VatCheck(0m, 0m, 0m, 0m, 0m, 0m, true),
         Stock: new StockCheck(0m, null, 0m, true),
-        UnbookedCaptures: [capture]);
+        UnbookedCaptures: [capture],
+        UnbookedRefunds: []);
 }

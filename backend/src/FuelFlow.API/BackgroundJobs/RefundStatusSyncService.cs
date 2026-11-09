@@ -48,6 +48,7 @@ private readonly ApplicationDbContext _context;
                notifications,
                new RefundJournalPoster(
                    new JournalPostingService(context, NullLogger<JournalPostingService>.Instance),
+                   context,
                    NullLogger<RefundJournalPoster>.Instance))
        {
        }

@@ -3,7 +3,9 @@ using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Acquiring.UnappliedReceipts;
 using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.GetTrialBalance;
+using FuelFlow.Features.Ledger.ManualEntries;
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
@@ -199,6 +201,133 @@ public sealed class LedgerCloseCheckTests : IClassFixture<TestDatabaseFixture>, 
     }
 
     // ---------------------------------------------------------------- the close check itself
+
+    /// <summary>
+    /// A refund the acquirer confirmed is money that went back to a customer. If the confirmation
+    /// path could not book it, the month is not closeable until someone does - that is the difference
+    /// between a balanced book and a true one, which is what this report exists to name.
+    /// </summary>
+    [Fact]
+    public async Task A_Confirmed_Refund_The_Books_Do_Not_Hold_Keeps_The_Month_Open()
+    {
+        var (_, refundId) = await SeedConfirmedRefundAsync(862.00m);
+
+        var before = await _report.HandleAsync(new TrialBalanceQuery { FromDate = From, ToDate = To });
+
+        before.UnbookedRefunds.Should().ContainSingle();
+        before.UnbookedRefunds[0].PaymentId.Should().Be(refundId);
+        before.UnbookedRefunds[0].AmountUah.Should().Be(862.00m);
+        before.ReadyToClose.Should().BeFalse(
+            "money went back to a customer and the books still show it as never returned");
+
+        // The operator drives the poster again, which is the designed path for this refund.
+        await _journal.PostAsync(new PostJournalEntryRequest
+        {
+            SourceEvent = "payment.refunded",
+            SourceType = JournalSourceType.Refund,
+            SourceId = refundId,
+            EntryDate = From,
+            AmountUah = 862.00m,
+            Description = "returned advance",
+            PostedByUserId = _operatorId,
+        });
+
+        var after = await _report.HandleAsync(new TrialBalanceQuery { FromDate = From, ToDate = To });
+
+        after.UnbookedRefunds.Should().BeEmpty();
+        after.ReadyToClose.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// The historical shape: before the posting path existed a confirmed refund was booked by hand,
+    /// and the entry that did it named the refund in its description. Calling that refund unbooked
+    /// would invite a re-drive that books it twice, so a posted adjustment naming the refund counts
+    /// exactly like the key does.
+    /// </summary>
+    [Fact]
+    public async Task A_Refund_Booked_By_A_Hand_Adjustment_That_Names_It_Is_Held()
+    {
+        var (_, refundId) = await SeedConfirmedRefundAsync(862.00m);
+
+        var manual = new PostManualJournalEntryCommandHandler(_context, _journal);
+        await manual.HandleAsync(
+            new PostManualJournalEntryRequest
+            {
+                EntryDate = From,
+                Reference = $"refund-{refundId}",
+                Description = $"Повернення за платіж-повернення {refundId}, підтверджене еквайром.",
+                Lines =
+                [
+                    new ManualJournalLineRequest { AccountCode = "681", DebitUah = 862.00m },
+                    new ManualJournalLineRequest { AccountCode = "311", CreditUah = 862.00m },
+                ],
+            },
+            _operatorId);
+
+        var report = await _report.HandleAsync(new TrialBalanceQuery { FromDate = From, ToDate = To });
+
+        report.UnbookedRefunds.Should().BeEmpty(
+            "a person booked the refund by hand and wrote its id into the entry");
+        report.ReadyToClose.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// A confirmed refund and the order it returns: an order row the payment names, and the way the
+    /// acquirer's confirmation leaves it - Succeeded, with the acquirer's date on it.
+    /// </summary>
+    private async Task<(Guid OrderId, Guid RefundId)> SeedConfirmedRefundAsync(decimal amountUah)
+    {
+        var orderId = Guid.CreateVersion7();
+        var captureId = Guid.CreateVersion7();
+        var refundId = Guid.CreateVersion7();
+
+        _context.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = _operatorId,
+            Price = amountUah * 2,
+            Status = OrderStatus.PendingPayment,
+            CreatedAtUtc = InPeriod,
+            UpdatedAtUtc = InPeriod,
+        });
+
+        // A refund is defined by what it reverses: ck_payments_refund_shape refuses one without a
+        // parent capture.
+        _context.Payments.Add(new Payment
+        {
+            Id = captureId,
+            OrderId = orderId,
+            UserId = _operatorId,
+            Kind = PaymentKind.Capture,
+            Provider = WebhookEventIdentity.Monobank,
+            AmountUah = amountUah * 2,
+            AmountKopecks = amountUah * 200m,
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = InPeriod,
+            CreatedAtUtc = InPeriod,
+            UpdatedAtUtc = InPeriod,
+        });
+
+        _context.Payments.Add(new Payment
+        {
+            Id = refundId,
+            OrderId = orderId,
+            UserId = _operatorId,
+            Kind = PaymentKind.Refund,
+            ParentPaymentId = captureId,
+            Provider = WebhookEventIdentity.Monobank,
+            AmountUah = amountUah,
+            AmountKopecks = amountUah * 100m,
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = InPeriod,
+            CreatedAtUtc = InPeriod,
+            UpdatedAtUtc = InPeriod,
+        });
+
+        await _context.SaveChangesAsync();
+
+        return (orderId, refundId);
+    }
 
     [Fact]
     public async Task The_Bank_Is_Two_Hryvnia_Above_The_Books_Until_The_Unbooked_Captures_Are_Booked()
