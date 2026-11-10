@@ -352,6 +352,7 @@ public class MetricNameContractTests
     [InlineData("fuelflow_auth_refresh_events_total")]
     [InlineData("fuelflow_payments_stuck_pending_payment")]
     [InlineData("fuelflow_fuel_prices_last_sync_age_seconds")]
+    [InlineData("fuelflow_telegram_feedback_webhook_missing")]
     public void AlertTargetedMetrics_KeepTheirExportedNames(string expectedName)
     {
         GetExportedMetricNames().Should().Contain(expectedName);

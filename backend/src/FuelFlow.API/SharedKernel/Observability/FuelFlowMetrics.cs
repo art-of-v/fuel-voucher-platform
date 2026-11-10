@@ -58,6 +58,10 @@ public sealed class FuelFlowMetrics : IDisposable
     // in NoData, which is honest for the first hour after a start and wrong once a pass has run.
     private int _unbookedCaptures = -1;
 
+    // Telegram feedback
+    // -1 is "the webhook check has not reported since this process started", for the same reason.
+    private int _feedbackWebhookMissing = -1;
+
     // Hangfire
     private readonly Counter<long> _jobSucceeded;
     private readonly Counter<long> _jobFailed;
@@ -167,6 +171,11 @@ public sealed class FuelFlowMetrics : IDisposable
             "fuelflow.payments.unbooked_captures",
             ObserveUnbookedCaptures,
             description: "Received LIVE-merchant statement captures that no payment row holds, as of the last statement pass.");
+
+        _meter.CreateObservableGauge(
+            "fuelflow.telegram.feedback_webhook_missing",
+            ObserveFeedbackWebhookMissing,
+            description: "1 when the feedback bot is switched on but Telegram holds no webhook URL for it, so a customer's message is kept by Telegram and never reaches the API. 0 when a webhook is registered, or when the feature is off. Set by the periodic webhook check.");
 
         _jobSucceeded = _meter.CreateCounter<long>(
             "fuelflow.jobs.succeeded", "jobs",
@@ -363,6 +372,26 @@ public sealed class FuelFlowMetrics : IDisposable
     {
         var count = Volatile.Read(ref _unbookedCaptures);
         return count >= 0 ? [new Measurement<int>(count)] : [];
+    }
+
+    /// <summary>
+    /// Records what the periodic webhook check found: whether the feedback bot has anywhere to
+    /// deliver a customer's message.
+    /// </summary>
+    /// <remarks>
+    /// Measured on 2026-11-10: rotating <c>TELEGRAM_FEEDBACK_BOT_TOKEN</c> through BotFather's
+    /// <c>/revoke</c> left the bot with no webhook URL, and every message a customer sent it stayed
+    /// in Telegram's queue until it expired. Nothing in the API noticed - the endpoint it serves was
+    /// healthy the whole time, Telegram had simply stopped calling it. The gauge turns that silence
+    /// into a number the alerting layer can threshold.
+    /// </remarks>
+    public void FeedbackWebhookMissing(bool missing) =>
+        Volatile.Write(ref _feedbackWebhookMissing, missing ? 1 : 0);
+
+    private IEnumerable<Measurement<int>> ObserveFeedbackWebhookMissing()
+    {
+        var missing = Volatile.Read(ref _feedbackWebhookMissing);
+        return missing >= 0 ? [new Measurement<int>(missing)] : [];
     }
 
     public void RecordWebhookLag(double lagSeconds) => _monobankWebhookLag.Record(lagSeconds);

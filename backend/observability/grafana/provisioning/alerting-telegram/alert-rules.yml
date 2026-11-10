@@ -773,6 +773,53 @@ groups:
                 - evaluator: { type: gt, params: [3600] }
 
   - orgId: 1
+    name: fuelflow-telegram
+    folder: FuelFlow
+    interval: 1m
+    rules:
+      # 2026-11-10: rotating TELEGRAM_FEEDBACK_BOT_TOKEN at BotFather left the bot with no webhook
+      # URL at all. getWebhookInfo answered `"url": ""`, the two messages a customer sent sat in
+      # Telegram's queue and would have been dropped after 24 hours, and nothing on our side could
+      # see it: the endpoint answered correctly the whole time, Telegram had simply stopped calling
+      # it. Registration is manual and one-time - no deploy repeats it - so a rotation is exactly
+      # when it goes missing.
+      #
+      # No `or vector(0)`: the gauge is written by the five-minute check, and "the check has not
+      # reported" is not a healthy zero - it is the same silence this alarm exists to end (the
+      # PriceSyncStale argument). Ten minutes of NoData covers the first check after a restart.
+      - uid: fuelflow-feedback-webhook-missing
+        title: FeedbackWebhookMissing
+        condition: C
+        for: 10m
+        noDataState: Alerting
+        execErrState: Alerting
+        annotations:
+          summary: "The customer feedback bot has no webhook, so nobody's message reaches us"
+          description: "Telegram holds no webhook URL for the feedback bot. Every message a customer sends it stays in Telegram's queue and is dropped after 24 hours. A rotated bot token leaves the webhook empty - re-register it from the admin Settings screen or with setWebhook using the current token and secret, then confirm with getWebhookInfo."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-prometheus
+            model:
+              refId: A
+              expr: fuelflow_telegram_feedback_webhook_missing
+              instant: false
+              range: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+  - orgId: 1
     name: fuelflow-security
     folder: FuelFlow
     interval: 5m
