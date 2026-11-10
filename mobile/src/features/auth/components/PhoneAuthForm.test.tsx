@@ -190,3 +190,22 @@ describe('PhoneAuthForm - the code clock', () => {
     expect(screen.queryByText('phoneAuth.codeExpired')).toBeNull();
   });
 });
+
+describe('PhoneAuthForm - the consent row', () => {
+  beforeEach(() => {
+    mockUseLogin.mockReset();
+  });
+
+  it('is a real checkbox that toggles before any code can be sent', () => {
+    // Consent gates account creation, so it has to be a genuine, tappable checkbox and
+    // not caption text beside a decorative square. Low-vision users in particular need
+    // to find it and hit it, which is why it is now a card-sized target over 44pt.
+    mockLoginAt('phone');
+
+    render(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.getByRole('checkbox').props.accessibilityState).toEqual({ checked: false });
+    fireEvent.press(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox').props.accessibilityState).toEqual({ checked: true });
+  });
+});

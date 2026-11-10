@@ -139,9 +139,24 @@ export function PhoneAuthForm({
             */}
             {error ? <InlineFeedback kind="danger" message={error} /> : null}
 
+            {/*
+              Consent is a legal gate a low-vision user has to find and hit: a 28pt box
+              beside 15px high-contrast body text, on a bordered surface that reads as one
+              thing to tap — so the one agreement the account cannot be created without is
+              not also the smallest thing on the screen.
+            */}
             <PressableScale
               onPress={() => setConsented((v) => !v)}
-              style={styles.consentRow}
+              style={[
+                styles.consentRow,
+                {
+                  backgroundColor: tokens.colors.surface,
+                  borderColor: tokens.colors.border,
+                  borderRadius: tokens.radius.md,
+                  padding: tokens.spacing.md,
+                },
+              ]}
+              pressedStyle={{ backgroundColor: tokens.colors.surfaceElevated }}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: consented }}
             >
@@ -149,23 +164,22 @@ export function PhoneAuthForm({
                 style={[
                   styles.consentBox,
                   {
-                    borderColor: consented
-                      ? tokens.colors.primary
-                      : (tokens.colors.border ?? tokens.colors.text.muted),
+                    borderColor: consented ? tokens.colors.primary : tokens.colors.borderStrong,
                     backgroundColor: consented ? tokens.colors.primary : 'transparent',
                     borderRadius: tokens.radius.sm,
                   },
                 ]}
               >
                 {consented ? (
-                  <Check size={16} color={tokens.colors.text.onPrimary} strokeWidth={3} />
+                  <Check size={20} color={tokens.colors.text.onPrimary} strokeWidth={3} />
                 ) : null}
               </View>
-              <Text role="caption" tone="secondary" style={styles.consentText}>
+              <Text role="body" style={styles.consentText}>
                 {t('phoneAuth.consentPrefix')}{' '}
                 <Text
-                  role="caption"
-                  style={{ color: tokens.colors.primary, textDecorationLine: 'underline' }}
+                  role="body"
+                  tone="accent"
+                  style={styles.consentLink}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     void Linking.openURL(PRIVACY_POLICY_URL);
@@ -368,19 +382,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    // The box is 22pt; the row is the target, so it carries the 44pt minimum.
+    borderWidth: 1,
+    // The 28pt box plus the row padding clear the 44pt floor, but the row keeps it
+    // explicit so a later tweak cannot shrink the target back under it.
     minHeight: 44,
   },
   consentBox: {
-    width: 22,
-    height: 22,
-    borderWidth: 1.5,
+    width: 28,
+    height: 28,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 1,
   },
   consentText: {
     flex: 1,
-    lineHeight: 20,
+  },
+  consentLink: {
+    textDecorationLine: 'underline',
   },
 });
