@@ -80,6 +80,14 @@ jest.mock('../src/features/stations/lib/basemap', () => ({
 
 let mockNodes: Record<string, unknown>[] = [];
 
+/** The corners the mocked map reports: central Kyiv, 0.1° tall and 0.2° wide. */
+const KYIV_BOUNDARIES = {
+  northEast: { latitude: 50.5, longitude: 30.6 },
+  southWest: { latitude: 50.4, longitude: 30.4 },
+};
+
+let mockBoundaries = KYIV_BOUNDARIES;
+
 jest.mock('../src/features/stations/hooks/useStationNodes', () => ({
   useStationNodes: () => ({ data: mockNodes, isLoading: false, error: null }),
 }));
@@ -125,10 +133,9 @@ jest.mock('react-native-maps', () => {
     fitToCoordinates: jest.fn(),
     fitToSuppliedMarkers: jest.fn(),
     getCamera: jest.fn(() => ({ center: { latitude: 0, longitude: 0 }, zoom: 1 })),
-    getMapBoundaries: jest.fn(() => ({
-      northEast: { latitude: 50.5, longitude: 30.6 },
-      southWest: { latitude: 50.4, longitude: 30.4 },
-    })),
+    // Kept in a variable: the screen asks the map what it is showing before it picks its pins, and
+    // a test that opens the map somewhere other than Kyiv says so here.
+    getMapBoundaries: jest.fn(() => mockBoundaries),
     setMapPadding: jest.fn(),
     pointForCoordinate: jest.fn(() => ({ x: 0, y: 0 })),
     coordinateForPoint: jest.fn(() => ({ latitude: 0, longitude: 0 })),
@@ -367,7 +374,7 @@ describe('MapScreen', () => {
       expect(screen.getByTestId('tile')).toHaveTextContent(/voyager/);
     });
 
-    it('mounts the overlay after the markers, so a late key appends instead of re-indexing', () => {
+    it('mounts the overlay after the markers, so a late key appends instead of re-indexing', async () => {
       // The array the interop layer replays mounts into is the map's own list of children, and a
       // child that appears after mount is only harmless at the end of it. `resolveCartoApiKey` can
       // answer late in a native build — it reads `Constants.expoConfig`, which is not there for the
@@ -383,7 +390,9 @@ describe('MapScreen', () => {
         lng: 30.52,
       }));
       renderScreen();
-      act(() => {
+      // The map is asked what it shows before the pool is built, so the answer arrives a
+      // microtask after the event.
+      await act(async () => {
         fireEvent(screen.getByTestId('map'), 'mapReady');
       });
       mockNodes = [];
@@ -490,7 +499,7 @@ describe('MapScreen', () => {
       mockNodes = [];
     });
 
-    it('mounts the pool once the map has rendered, already carrying its pins', () => {
+    it('mounts the pool once the map has rendered, already carrying its pins', async () => {
       // Two facts, both from the interop layer this build ships. A `Marker` is a legacy view manager
       // hosted by a Fabric interop component, and inserting or removing one replays a child-index
       // change into the map's own array of subviews — when that array and the shadow tree disagree
@@ -504,7 +513,7 @@ describe('MapScreen', () => {
       const map = screen.getByTestId('map');
       expect(screen.queryAllByTestId('marker')).toHaveLength(0);
 
-      act(() => {
+      await act(async () => {
         fireEvent(map, 'mapReady');
       });
 
@@ -532,7 +541,7 @@ describe('MapScreen', () => {
       expect(pinsShown()).toBeLessThanOrEqual(MAX_MOUNTED_MARKERS);
     });
 
-    it('keeps the ranking sheet standing through a map pan', () => {
+    it('keeps the ranking sheet standing through a map pan', async () => {
       // `GestureDetector` keys its native handler on the gesture object, so a gesture built
       // during render is disposed and re-attached on every re-render — and a map pan
       // re-renders the screen the sheet sits in. RNGH documents the object as stable for
@@ -543,7 +552,7 @@ describe('MapScreen', () => {
       // The map is taken before the sheet opens: the sheet is `accessibilityViewIsModal`, so
       // once it is up the map is outside what queries can see — the same thing VoiceOver does.
       const map = screen.getByTestId('map');
-      act(() => {
+      await act(async () => {
         fireEvent(map, 'mapReady');
       });
       fireEvent.press(screen.getByRole('button', { name: 'map.networkRanking' }));
@@ -602,7 +611,7 @@ describe('MapScreen - tapping a pin', () => {
     // Taken before the card opens: it is `accessibilityViewIsModal`, so once it is up the map
     // is outside what queries can see - the same thing VoiceOver does.
     const map = screen.getByTestId('map');
-    act(() => {
+    await act(async () => {
       fireEvent(map, 'mapReady');
     });
     const pin = pinFor(name);
@@ -616,7 +625,7 @@ describe('MapScreen - tapping a pin', () => {
   it('swaps the card to the neighbouring station in the same tap', async () => {
     mockNodes = [A, B];
     renderScreen();
-    act(() => {
+    await act(async () => {
       fireEvent(screen.getByTestId('map'), 'mapReady');
     });
     const first = pinFor('KLO A');
@@ -700,5 +709,68 @@ describe('MapScreen - tapping a pin', () => {
     await openStation('KLO A');
 
     expect(__mapApi.animateCamera).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Which pins the map loads, from the person's side.
+ *
+ * The screen opens on Kyiv and centres on the user as soon as a position arrives - which, on a
+ * phone whose position is ready before the map has drawn, MapKit applies without reporting a
+ * region: the native module drops every region change until it has started rendering. A pool
+ * chosen for the region the map was *opened* on is then a pool of АЗК nobody can see, and the map
+ * stays empty until the first pan finally reports a region - the "the pins never load" report.
+ */
+describe('MapScreen - the pins the map picks', () => {
+  const STATION = { brandId: 'b-klo', brandSlug: 'klo', address: 'вулиця Тестова, 1' };
+  const KYIV_PIN = { ...STATION, id: 'kyiv', name: 'KLO KYIV', lat: 50.45, lng: 30.52 };
+  const DNIPRO_PIN = { ...STATION, id: 'dnipro', name: 'KLO DNIPRO', lat: 48.4647, lng: 35.0462 };
+
+  const DNIPRO_BOUNDARIES = {
+    northEast: { latitude: 48.6, longitude: 35.2 },
+    southWest: { latitude: 48.3, longitude: 34.9 },
+  };
+
+  /** The accessible names of the pins currently showing a station. */
+  const shownNames = () =>
+    screen
+      .getAllByTestId('marker')
+      .filter((pin) => pin.props.opacity === 1)
+      .map((pin) => String(pin.props.accessibilityLabel ?? ''));
+
+  afterEach(() => {
+    mockBoundaries = KYIV_BOUNDARIES;
+    mockNodes = [];
+  });
+
+  it('mounts the pins of the view the map reports, not the one it was opened on', async () => {
+    mockBoundaries = DNIPRO_BOUNDARIES;
+    mockNodes = [KYIV_PIN, DNIPRO_PIN];
+    renderScreen();
+
+    await act(async () => {
+      fireEvent(screen.getByTestId('map'), 'mapReady');
+    });
+
+    const names = shownNames();
+    expect(names.some((name) => name.startsWith('KLO DNIPRO'))).toBe(true);
+    expect(names.some((name) => name.startsWith('KLO KYIV'))).toBe(false);
+  });
+
+  it('falls back to the region it was opened on when the map cannot say what it shows', async () => {
+    // A map with no size yet reports a collapsed box. Mounting pins for it would leave the map
+    // empty for good; the region it was opened on is the answer that still puts pins on screen.
+    mockBoundaries = {
+      northEast: { latitude: 0, longitude: 0 },
+      southWest: { latitude: 0, longitude: 0 },
+    };
+    mockNodes = [KYIV_PIN];
+    renderScreen();
+
+    await act(async () => {
+      fireEvent(screen.getByTestId('map'), 'mapReady');
+    });
+
+    expect(shownNames().some((name) => name.startsWith('KLO KYIV'))).toBe(true);
   });
 });

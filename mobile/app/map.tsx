@@ -41,6 +41,7 @@ import {
 import {
   assignToSlots,
   isRegionCoveredByBox,
+  regionFromBoundaries,
   type MapRegion,
 } from '../src/features/stations/lib/viewport';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
@@ -162,6 +163,27 @@ export default function MapScreen() {
   const [mapIsReady, setMapIsReady] = React.useState(false);
   const [slots, setSlots] = React.useState<(StationNode | null)[] | null>(null);
 
+  // The box above starts as a guess — the region the map is *opened* on — and the map is under no
+  // obligation to stay there: the screen asks it to centre on the user as soon as a position
+  // arrives, which commonly happens before the map has drawn. MapKit applies that silently (the
+  // native module drops every region change until it has started rendering), so the screen would
+  // keep choosing pins for Kyiv while the camera sits in another city: an empty map whose pins
+  // appear only once a gesture finally reports a region. The map is asked what it is showing
+  // instead, at the moment it is about to draw, and the pool is built for that.
+  const handleMapReady = React.useCallback(async () => {
+    const map = mapRef.current;
+    if (map) {
+      try {
+        const viewport = regionFromBoundaries(await map.getMapBoundaries());
+        if (viewport) setMarkerBox(viewport);
+      } catch {
+        // A map that cannot describe itself keeps the region it was opened on, which is what the
+        // box already holds.
+      }
+    }
+    setMapIsReady(true);
+  }, []);
+
   React.useEffect(() => {
     // Both halves of the gate, and the second is not redundant: an all-empty pool would be a hundred
     // and twenty markers mounted only to be updated one frame later.
@@ -259,9 +281,10 @@ export default function MapScreen() {
     if (!map || node.lat == null || node.lng == null) return;
     try {
       const [camera, bounds] = await Promise.all([map.getCamera(), map.getMapBoundaries()]);
-      const span = bounds.northEast.latitude - bounds.southWest.latitude;
-      if (!(span > 0)) return;
-      const fraction = (bounds.northEast.latitude - node.lat) / span;
+      const viewport = regionFromBoundaries(bounds);
+      if (!viewport) return;
+      const span = viewport.latitudeDelta;
+      const fraction = (viewport.latitude + span / 2 - node.lat) / span;
       if (fraction <= REVEAL_MAX_FRACTION) return;
       map.animateCamera(
         {
@@ -365,7 +388,7 @@ export default function MapScreen() {
                 setSelectedStation(null);
               }, MAP_TAP_SETTLE_MS);
             }}
-            onMapReady={() => setMapIsReady(true)}
+            onMapReady={() => void handleMapReady()}
             onRegionChangeComplete={(region) => {
               if (isRegionCoveredByBox(region, markerBox)) return;
               setMarkerBox(region);

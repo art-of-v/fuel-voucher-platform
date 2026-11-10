@@ -8,6 +8,38 @@ export type MapRegion = {
   longitudeDelta: number;
 };
 
+/** The pair of corners `MapView.getMapBoundaries()` resolves with. */
+export type MapCorners = {
+  northEast: { latitude: number; longitude: number };
+  southWest: { latitude: number; longitude: number };
+};
+
+/**
+ * The region the map is actually showing, from the corners it reports.
+ *
+ * MapKit never announces the camera it opens on: `initialRegion` is applied before the map has
+ * drawn, the events it fires while it is still setting itself up are dropped by the native module
+ * (`hasStartedRendering`), and the first region a pan reports is the first region JS hears about at
+ * all. So a screen that picks its pins for a *guessed* region can hold pins that are nowhere near
+ * the camera — an empty map that fills in on the first gesture, which reads as pins that never
+ * loaded. Asking the map what it shows is the only answer that is true by construction.
+ *
+ * `null` for a map that cannot describe itself yet: a zero-sized view reports a nonsense box, and
+ * every caller's fallback is better than mounting pins for it.
+ */
+export function regionFromBoundaries(bounds: MapCorners): MapRegion | null {
+  const latitudeDelta = bounds.northEast.latitude - bounds.southWest.latitude;
+  const longitudeDelta = bounds.northEast.longitude - bounds.southWest.longitude;
+  if (!(latitudeDelta > 0) || !(longitudeDelta > 0)) return null;
+  if (!Number.isFinite(latitudeDelta) || !Number.isFinite(longitudeDelta)) return null;
+  return {
+    latitude: (bounds.northEast.latitude + bounds.southWest.latitude) / 2,
+    longitude: (bounds.northEast.longitude + bounds.southWest.longitude) / 2,
+    latitudeDelta,
+    longitudeDelta,
+  };
+}
+
 /**
  * How much wider than the visible region we keep markers for, as a fraction of each delta.
  *
