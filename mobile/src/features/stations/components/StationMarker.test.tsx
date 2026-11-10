@@ -279,6 +279,19 @@ describe('StationMarker - a recycled slot', () => {
   });
 });
 
+describe('StationMarker - the tap target', () => {
+  it('pads the container so the native hit zone clears the 44pt minimum', () => {
+    // MapKit hit-tests the annotation view's frame, which is this child's layout size; Android
+    // snapshots it at the same size. The 34pt disc alone missed most taps, so the haptic and the
+    // selection ring never fired. Transparent padding is the hit zone, not decoration.
+    renderMarker({ logo: undefined });
+
+    const child: any = markerProps[0].children;
+    const flat = Object.assign({}, ...[child.props.style].flat());
+    expect(34 + flat.padding * 2).toBeGreaterThanOrEqual(44);
+  });
+});
+
 describe('StationMarker - pressing', () => {
   it('hands the pin the tap handler it was given', () => {
     const { onPress } = renderMarker({ logo: undefined });
