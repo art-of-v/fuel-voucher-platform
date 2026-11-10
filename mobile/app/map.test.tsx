@@ -266,10 +266,10 @@ jest.mock('expo-blur', () => ({
  * mocking the token object would have to invent a hundred paths.
  *
  * It ignores the theme it is handed and uses `mockTheme`, because `useDesignTokens`
- * always passes the store's value (defaulting to `lemberg`), which would make the
+ * always passes the store's value (defaulting to `obsidian`), which would make the
  * argument win and leave the test on the default palette.
  */
-let mockTheme = 'lemberg';
+let mockTheme = 'obsidian';
 
 jest.mock('../src/core/design/tokens', () => {
   const actual = jest.requireActual('../src/core/design/tokens');
@@ -284,7 +284,7 @@ function renderInTheme(theme: string) {
   try {
     return renderScreen();
   } finally {
-    mockTheme = 'lemberg';
+    mockTheme = 'obsidian';
   }
 }
 
@@ -343,10 +343,10 @@ describe('MapScreen', () => {
     });
 
     it('serves dark tiles for a dark theme', () => {
-      // `lemberg` is the default and is a dark theme (`isDark: true` in themes.ts). A
+      // `obsidian` is the default and is a dark theme (`isDark: true` in themes.ts). A
       // dark theme with light tiles inverts the map against the rest of the app at
       // night, which is worse than no overlay at all.
-      renderInTheme('lemberg');
+      renderInTheme('obsidian');
       expect(screen.getByTestId('tile')).toHaveTextContent(/dark_all/);
     });
 
