@@ -7,12 +7,12 @@ import { Button } from './Button';
 
 /**
  * The primary fill is the loudest colour on a screen, so it is the one place a frozen
- * palette is most visible. It was pinned to the default theme's green hex in September
- * 2026, which painted a green CTA on the four themes whose primary is not green — a
- * purple screen with a green button, for one.
+ * palette is most visible. It was pinned to a single hex — the then-default theme's
+ * green — in September 2026, which painted a green CTA on every theme whose primary is
+ * not green. The fill must follow the active theme, never the default's.
  */
 
-let mockTheme: ThemeType = 'lemberg';
+let mockTheme: ThemeType = 'obsidian';
 
 jest.mock('../hooks/useTheme', () => {
   const { getTokens } = jest.requireActual<typeof import('../design/tokens')>('../design/tokens');
@@ -38,20 +38,21 @@ function fillOf(label: string): string {
 }
 
 describe('Button — the primary fill', () => {
-  it('is the active theme’s primary, not the default theme’s green', () => {
-    mockTheme = 'obsidian';
-    render(<Button label="Build route" onPress={() => {}} />);
-
-    expect(fillOf('Build route')).toBe(getTokens('obsidian').colors.primary);
-    // The regression this pins: the old constant happened to equal lemberg's primary,
-    // so a test that only checked lemberg would have passed throughout the bug.
-    expect(fillOf('Build route')).not.toBe(getTokens('lemberg').colors.primary);
-  });
-
-  it('still matches the primary on the default theme', () => {
+  it('is the active theme’s primary, not the default theme’s', () => {
     mockTheme = 'lemberg';
     render(<Button label="Build route" onPress={() => {}} />);
 
     expect(fillOf('Build route')).toBe(getTokens('lemberg').colors.primary);
+    // The regression this pins: a constant frozen to the default (obsidian) primary
+    // would paint purple on this green theme, so a test that only checked the default
+    // would have passed throughout the bug.
+    expect(fillOf('Build route')).not.toBe(getTokens('obsidian').colors.primary);
+  });
+
+  it('still matches the primary on the default theme', () => {
+    mockTheme = 'obsidian';
+    render(<Button label="Build route" onPress={() => {}} />);
+
+    expect(fillOf('Build route')).toBe(getTokens('obsidian').colors.primary);
   });
 });

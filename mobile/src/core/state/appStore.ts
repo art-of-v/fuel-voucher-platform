@@ -46,7 +46,9 @@ interface AppStore {
 export const useStore = create<AppStore>()(
   persist(
     (set) => ({
-      theme: 'lemberg',
+      // Fresh-install default. `persist` rehydrates a saved choice over this, so
+      // existing installs keep whatever theme they already picked.
+      theme: 'obsidian',
       setTheme: (theme) => set({ theme }),
 
       isAuthenticated: false,

@@ -350,7 +350,7 @@ export const themes: Record<ThemeType, ThemeColors> = {
 
 /** Resolved status roles for a theme. See `palette.ts`. */
 export function getThemeStatus(themeType: ThemeType): StatusPalette {
-  const theme = themes[themeType] ?? themes.lemberg;
+  const theme = themes[themeType] ?? themes.obsidian;
   return getStatusPalette(theme.isDark, theme.status);
 }
 
