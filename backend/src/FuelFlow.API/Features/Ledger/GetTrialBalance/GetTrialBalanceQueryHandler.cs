@@ -39,6 +39,10 @@ public sealed class GetTrialBalanceQueryHandler
     /// <summary>Stock on the shelf; an asset, so a credit balance here is a missing buy side.</summary>
     internal const string InventoryAccountCode = "281";
 
+    /// <summary>The books: every entry a person stood behind, including the ones later corrected.</summary>
+    private static readonly JournalEntryStatus[] BookStatuses =
+        [JournalEntryStatus.Posted, JournalEntryStatus.Reversed];
+
     private readonly ApplicationDbContext _context;
 
     public GetTrialBalanceQueryHandler(ApplicationDbContext context)
@@ -53,8 +57,7 @@ public sealed class GetTrialBalanceQueryHandler
         var (from, to) = ResolvePeriod(query);
         var toExclusive = to.AddDays(1);
 
-        var accounts = await AggregateAsync(
-            [JournalEntryStatus.Posted, JournalEntryStatus.Reversed], from, toExclusive, cancellationToken);
+        var accounts = await AggregateAsync(BookStatuses, from, toExclusive, cancellationToken);
         var drafts = await AggregateAsync(
             [JournalEntryStatus.Draft], from, toExclusive, cancellationToken);
 
@@ -79,7 +82,7 @@ public sealed class GetTrialBalanceQueryHandler
             .ToList();
 
         var statementTotal = receivedRows.Sum(r => r.AmountKopecks ?? 0m) / 100m;
-        var ledgerDebit = bank?.Debit ?? 0m;
+        var ledgerDebit = await MoneyInPostedToTheBankAsync(from, toExclusive, cancellationToken);
         var difference = statementTotal - ledgerDebit;
 
         var unbooked = await UnappliedReceipts.FindAsync(
@@ -110,6 +113,55 @@ public sealed class GetTrialBalanceQueryHandler
             BuildStockCheck(accounts),
             unbooked,
             unbookedRefunds);
+    }
+
+    /// <summary>
+    /// Money in on the bank account: the debits a receipt event posted, not every debit the account took.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The acquirer's statement is a list of money received, so the side of the books it is compared
+    /// against has to be the receipts. A counter-entry that cancels a duplicate refund credits the bank
+    /// account and then debits it back to undo the booking - a debit the bank never showed. Counting it
+    /// made the November 2026 close of production report 862.00 ₴ missing that had never been missing:
+    /// a refund already booked by hand (#75) was undone by hand (#81), the pair nets to zero, and the
+    /// account's own closing balance had said so all along.
+    /// </para>
+    /// <para>
+    /// Which events are receipts comes from <c>ledger_mapping_rules</c>, the table the posting engine
+    /// resolves accounts from, so a receipt event added later is counted without this file being taught
+    /// its name. A manual adjustment is deliberately not one of them: its accounts are an operator's
+    /// decision, and a person correcting the books is not money arriving.
+    /// </para>
+    /// </remarks>
+    private async Task<decimal> MoneyInPostedToTheBankAsync(
+        DateOnly periodStart,
+        DateOnly periodEndExclusive,
+        CancellationToken cancellationToken)
+    {
+        var receiptEvents = await _context.LedgerMappingRules
+            .AsNoTracking()
+            .Where(rule => rule.Side == NormalBalance.Debit && rule.Account!.Code == BankAccountCode)
+            .Select(rule => rule.SourceEvent)
+            .ToListAsync(cancellationToken);
+
+        if (receiptEvents.Count == 0)
+            return 0m;
+
+        var total = await (
+            from line in _context.JournalLines.AsNoTracking()
+            join entry in _context.JournalEntries.AsNoTracking() on line.EntryId equals entry.Id
+            join account in _context.ChartOfAccounts.AsNoTracking() on line.AccountId equals account.Id
+            where account.Code == BankAccountCode
+               && line.DebitUah > 0m
+               && entry.EntryDate >= periodStart
+               && entry.EntryDate < periodEndExclusive
+               && BookStatuses.Contains(entry.Status)
+               && receiptEvents.Contains(entry.SourceEvent)
+            select (decimal?)line.DebitUah)
+            .SumAsync(cancellationToken);
+
+        return total ?? 0m;
     }
 
     /// <summary>

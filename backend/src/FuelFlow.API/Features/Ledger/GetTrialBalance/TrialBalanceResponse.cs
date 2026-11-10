@@ -84,10 +84,13 @@ public sealed record TrialBalanceAccount(
 public sealed record TrialBalanceTotals(decimal Debit, decimal Credit, bool Balanced);
 
 /// <summary>
-/// The acquirer's received money for the period against what account 311 recorded.
+/// The acquirer's received money for the period against the receipts the books posted to account 311.
 /// </summary>
 /// <param name="StatementReceivedUah">Gross received, from the Live merchant's statement rows.</param>
-/// <param name="Ledger311DebitUah">Money in, per the bank account in the books.</param>
+/// <param name="Ledger311DebitUah">Money in, per the bank account in the books: the debits receipt
+/// events posted to 311. Not the account's whole debit turnover - a counter-entry that cancels a
+/// duplicate refund debits the account without money arriving, and comparing that against a statement
+/// of receipts reported missing money that was never missing.</param>
 /// <param name="Ledger311ClosingUah">The bank account's closing balance, all time to the period end.</param>
 /// <param name="DifferenceUah">Statement minus ledger. Positive means the bank holds money the
 /// books do not.</param>

@@ -48,7 +48,7 @@ public static class TrialBalanceCsv
         sb.AppendLine("Merchant," + report.Bank.Merchant);
         sb.AppendLine("Statement received UAH," + N(report.Bank.StatementReceivedUah));
         sb.AppendLine("Statement rows," + report.Bank.StatementRowCount.ToString(CultureInfo.InvariantCulture));
-        sb.AppendLine("Ledger 311 debit UAH," + N(report.Bank.Ledger311DebitUah));
+        sb.AppendLine("Receipts posted to 311 UAH," + N(report.Bank.Ledger311DebitUah));
         sb.AppendLine("Ledger 311 credit UAH," + N(report.Bank.Ledger311CreditUah));
         sb.AppendLine("Ledger 311 closing UAH," + N(report.Bank.Ledger311ClosingUah));
         sb.AppendLine("Difference UAH," + N(report.Bank.DifferenceUah));
