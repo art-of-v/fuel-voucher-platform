@@ -23,8 +23,8 @@ export default function StationDetailScreen() {
   };
 
   const sortedFuels = ((station as any).fuels || []).slice().sort((a: any, b: any) => {
-    const getPriority = (name: string) => {
-      const n = name.toUpperCase();
+    const getPriority = (name?: string) => {
+      const n = (name ?? '').toUpperCase();
       if (n.includes('ДП')) return 1;
       if (n.includes('ГАЗ') || n.includes('LPG')) return 3;
       if (n.includes('ADBLUE')) return 4;
