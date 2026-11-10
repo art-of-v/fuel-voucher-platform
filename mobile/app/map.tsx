@@ -33,7 +33,11 @@ import { DEFAULT_FUEL } from '../src/features/stations/lib/fuelLabels';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
-import { isMarkerPressEcho, MARKER_PRESS_WINDOW_MS } from '../src/features/stations/lib/selection';
+import {
+  isMarkerPressEcho,
+  MAP_TAP_SETTLE_MS,
+  MARKER_PRESS_WINDOW_MS,
+} from '../src/features/stations/lib/selection';
 import {
   assignToSlots,
   isRegionCoveredByBox,
@@ -59,6 +63,16 @@ const KYIV_REGION: MapRegion = {
   latitudeDelta: 0.15,
   longitudeDelta: 0.15,
 };
+
+/**
+ * Where a tapped pin has to be on screen, as a fraction of the map's height, for the station
+ * card to leave it visible. The card sits at the bottom and covers roughly the lower 40% of the
+ * map, so a pin below `REVEAL_MAX_FRACTION` is behind it: the card opens over the pin the person
+ * just tapped and there is no way to tell which АЗК it describes - or whether the tap landed at
+ * all. Such a pin is moved to `REVEAL_TARGET_FRACTION`, comfortably above the card.
+ */
+const REVEAL_MAX_FRACTION = 0.55;
+const REVEAL_TARGET_FRACTION = 0.35;
 
 /**
  * The network map and its price radar.
@@ -95,6 +109,17 @@ export default function MapScreen() {
   const lastMarkerPressAt = React.useRef<number | null>(null);
   const mapRef = React.useRef<MapView | null>(null);
   const sheetRef = React.useRef<BottomSheetHandle>(null);
+
+  // A map press that closes the card is held for MAP_TAP_SETTLE_MS, because on iOS it can arrive
+  // before MapKit reports the pin it was actually on. See the constant for what that race did.
+  const pendingClear = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPendingClear = React.useCallback(() => {
+    if (pendingClear.current) {
+      clearTimeout(pendingClear.current);
+      pendingClear.current = null;
+    }
+  }, []);
+  React.useEffect(() => cancelPendingClear, [cancelPendingClear]);
 
   // The tab bar is a sibling of this scene inside the navigator, so it paints over
   // anything the screen draws at the bottom whatever z-index the sheet carries.
@@ -225,6 +250,35 @@ export default function MapScreen() {
     void requestLocation();
   }, [requestLocation]);
 
+  // Lift the map when the tapped pin would end up behind the card, and only then: a pin that is
+  // already in the visible part of the map is where the person left it, and moving the ground
+  // under their finger for no reason is worse than no move at all. The pan keeps the current
+  // zoom - only the centre changes - so a tap does not reset how far the map is zoomed out.
+  const revealStation = React.useCallback(async (node: StationNode) => {
+    const map = mapRef.current;
+    if (!map || node.lat == null || node.lng == null) return;
+    try {
+      const [camera, bounds] = await Promise.all([map.getCamera(), map.getMapBoundaries()]);
+      const span = bounds.northEast.latitude - bounds.southWest.latitude;
+      if (!(span > 0)) return;
+      const fraction = (bounds.northEast.latitude - node.lat) / span;
+      if (fraction <= REVEAL_MAX_FRACTION) return;
+      map.animateCamera(
+        {
+          ...camera,
+          center: {
+            latitude: node.lat + span * (REVEAL_TARGET_FRACTION - fraction),
+            longitude: node.lng,
+          },
+        },
+        { duration: 300 },
+      );
+    } catch {
+      // The card is already opening; a camera this map will not report is not a reason to
+      // fail the tap, and the pin stays where it was.
+    }
+  }, []);
+
   // A marker hands its slot's station here. An empty slot gets no handler at all, and being
   // transparent it is not hit-tested either.
   //
@@ -234,20 +288,27 @@ export default function MapScreen() {
   // second delivery of the same tap is dropped here; the map-level echo of a marker tap is dropped
   // in the map's `onPress` below.
   const lastPressedId = React.useRef<string | null>(null);
-  const pressMarker = React.useCallback((node: StationNode) => {
-    const now = Date.now();
-    if (
-      lastPressedId.current === node.id &&
-      lastMarkerPressAt.current != null &&
-      now - lastMarkerPressAt.current < MARKER_PRESS_WINDOW_MS
-    ) {
-      return;
-    }
-    lastPressedId.current = node.id;
-    lastMarkerPressAt.current = now;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSelectedStation(node);
-  }, []);
+  const pressMarker = React.useCallback(
+    (node: StationNode) => {
+      const now = Date.now();
+      if (
+        lastPressedId.current === node.id &&
+        lastMarkerPressAt.current != null &&
+        now - lastMarkerPressAt.current < MARKER_PRESS_WINDOW_MS
+      ) {
+        return;
+      }
+      lastPressedId.current = node.id;
+      lastMarkerPressAt.current = now;
+      // This tap is a selection, not a dismissal: whatever close the map press scheduled for the
+      // same touch is cancelled, so the previous station's card never flashes away first.
+      cancelPendingClear();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setSelectedStation(node);
+      void revealStation(node);
+    },
+    [cancelPendingClear, revealStation],
+  );
 
   // A route needs a real position: a node without coordinates used to deep-link to
   // 0,0 — Null Island in the Atlantic — so the button reports that instead.
@@ -298,7 +359,11 @@ export default function MapScreen() {
             initialRegion={KYIV_REGION}
             onPress={() => {
               if (isMarkerPressEcho(lastMarkerPressAt.current, Date.now())) return;
-              setSelectedStation(null);
+              cancelPendingClear();
+              pendingClear.current = setTimeout(() => {
+                pendingClear.current = null;
+                setSelectedStation(null);
+              }, MAP_TAP_SETTLE_MS);
             }}
             onMapReady={() => setMapIsReady(true)}
             onRegionChangeComplete={(region) => {
