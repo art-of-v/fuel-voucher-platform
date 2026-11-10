@@ -738,8 +738,9 @@ groups:
       #
       # Healthy here is a NUMBER, not an empty result: the gauge reports the age in seconds for every
       # brand that has live fuels, so the usual `or vector(0)` would turn "the gauge could not be
-      # read" into a healthy zero - the one case this alarm must not swallow. That is why it is the
-      # only Prometheus rule whose noDataState alerts.
+      # read" into a healthy zero - the one case this alarm must not swallow. That is why it is one
+      # of only two Prometheus rules whose noDataState alerts; the other is FeedbackWebhookMissing,
+      # for the same reason.
       - uid: fuelflow-price-sync-stale
         title: PriceSyncStale
         condition: C
