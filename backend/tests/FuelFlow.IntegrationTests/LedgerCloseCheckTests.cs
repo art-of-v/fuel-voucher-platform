@@ -393,6 +393,106 @@ public sealed class LedgerCloseCheckTests : IClassFixture<TestDatabaseFixture>, 
         advance.ClosingBalance.Should().Be(13_794m, "every hryvnia collected is still an advance");
     }
 
+    /// <summary>
+    /// The November 2026 shape in production: a refund already booked was booked a second time by hand,
+    /// then undone by hand. The counter-entry (Dr 311) is a debit of the bank account that no money came
+    /// through, and the check compared it against a statement of receipts - reporting 862.00 ₴ missing
+    /// that had never been missing.
+    /// </summary>
+    [Fact]
+    public async Task A_Counter_Entry_That_Undoes_A_Duplicate_Refund_Is_Not_Money_In()
+    {
+        // 13 792.00 of sales, and 862.00 returned to a customer.
+        await _journal.PostAsync(new PostJournalEntryRequest
+        {
+            SourceEvent = "payment.received",
+            SourceType = JournalSourceType.Payment,
+            SourceId = Guid.NewGuid(),
+            EntryDate = From,
+            AmountUah = 13_792m,
+            Description = "order payments",
+            PostedByUserId = _operatorId,
+        });
+
+        await _journal.PostAsync(new PostJournalEntryRequest
+        {
+            SourceEvent = "payment.refunded",
+            SourceType = JournalSourceType.Refund,
+            SourceId = Guid.NewGuid(),
+            EntryDate = From,
+            AmountUah = 862.00m,
+            Description = "returned advance",
+            PostedByUserId = _operatorId,
+        });
+
+        var manual = new PostManualJournalEntryCommandHandler(_context, _journal);
+
+        // Entries #75 and #81 of production on 2026-11-08: the same refund credited a second time,
+        // then the counter-entry that took it back out. Both are manual adjustments, and neither is a
+        // payment from the bank.
+        await manual.HandleAsync(
+            new PostManualJournalEntryRequest
+            {
+                EntryDate = From,
+                Reference = "duplicate-refund",
+                Description = "the same refund booked a second time",
+                Lines =
+                [
+                    new ManualJournalLineRequest { AccountCode = "681", DebitUah = 862.00m },
+                    new ManualJournalLineRequest { AccountCode = "311", CreditUah = 862.00m },
+                ],
+            },
+            _operatorId);
+
+        await manual.HandleAsync(
+            new PostManualJournalEntryRequest
+            {
+                EntryDate = From,
+                Reference = "undo-duplicate-refund",
+                Description = "the duplicate refund taken back out",
+                Lines =
+                [
+                    new ManualJournalLineRequest { AccountCode = "311", DebitUah = 862.00m },
+                    new ManualJournalLineRequest { AccountCode = "681", CreditUah = 862.00m },
+                ],
+            },
+            _operatorId);
+
+        // The checkout wrote this capture when it issued the invoice, so the statement row is known and
+        // does not appear as an unbooked capture - the difference under test is the bank one, not that.
+        _context.Payments.Add(new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            Kind = PaymentKind.Capture,
+            Provider = WebhookEventIdentity.Monobank,
+            ProviderInvoiceId = "INV-NOVEMBER",
+            AmountUah = 13_792m,
+            AmountKopecks = 1_379_200m,
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = InPeriod,
+            CreatedAtUtc = InPeriod,
+            UpdatedAtUtc = InPeriod,
+        });
+        await _context.SaveChangesAsync();
+
+        SeedStatement("INV-NOVEMBER", 1_379_200m);
+
+        var report = await _report.HandleAsync(new TrialBalanceQuery { FromDate = From, ToDate = To });
+
+        var bankAccount = report.Accounts.Single(a => a.Code == "311");
+        bankAccount.Debit.Should().Be(14_654m, "the account really did take the counter-entry's debit");
+        bankAccount.Credit.Should().Be(1_724m);
+        bankAccount.ClosingBalance.Should().Be(12_930m,
+            "the duplicate and its counter-entry cancel, so the balance never moved");
+
+        report.Bank.StatementReceivedUah.Should().Be(13_792m);
+        report.Bank.Ledger311DebitUah.Should().Be(13_792m,
+            "a correction that runs the bank account back up is not money the acquirer sent");
+        report.Bank.DifferenceUah.Should().Be(0m);
+        report.Bank.Matches.Should().BeTrue();
+        report.ReadyToClose.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Drafts_Are_Reported_Apart_From_The_Books()
     {
