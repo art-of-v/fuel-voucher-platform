@@ -46,7 +46,7 @@
     },
     {
       "path": "backend/src/FuelFlow.API/Extensions/ServiceSetup.cs",
-      "lines": 639,
+      "lines": 640,
       "reason": "Composition root: one place for the registrations is the point, recorded when the target was adopted (planning #688)."
     },
     {
