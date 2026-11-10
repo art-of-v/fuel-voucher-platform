@@ -7,6 +7,7 @@ import {
   isRegionCoveredByBox,
   markersForRegion,
   pointsInRegion,
+  regionFromBoundaries,
   type MapRegion,
 } from './viewport';
 
@@ -278,5 +279,54 @@ describe('assignToSlots', () => {
 
     expect(second[0]?.id).toBe(a.id);
     expect(second[0]).not.toBe(first[0]);
+  });
+});
+
+describe('regionFromBoundaries', () => {
+  it('turns the corners the map reports into the region it is showing', () => {
+    // The only camera MapKit is willing to describe: its own. `initialRegion` and anything the
+    // screen asks for before the map has drawn are applied without an event, so this is what keeps
+    // the pins on the same ground as the camera.
+    const region = regionFromBoundaries({
+      northEast: { latitude: 50.5, longitude: 30.6 },
+      southWest: { latitude: 50.4, longitude: 30.4 },
+    });
+
+    expect(region).not.toBeNull();
+    expect(region!.latitude).toBeCloseTo(50.45, 10);
+    expect(region!.longitude).toBeCloseTo(30.5, 10);
+    expect(region!.latitudeDelta).toBeCloseTo(0.1, 10);
+    expect(region!.longitudeDelta).toBeCloseTo(0.2, 10);
+  });
+
+  it('is null for a map that has no size to describe yet', () => {
+    // A collapsed box is not a region: mounting the pool for it would put its 120 markers on nothing
+    // and leave the map empty until the next gesture.
+    expect(
+      regionFromBoundaries({
+        northEast: { latitude: 0, longitude: 0 },
+        southWest: { latitude: 0, longitude: 0 },
+      }),
+    ).toBeNull();
+  });
+
+  it('is null when the corners come back unreadable', () => {
+    expect(
+      regionFromBoundaries({
+        northEast: { latitude: Number.NaN, longitude: 30.6 },
+        southWest: { latitude: 50.4, longitude: 30.4 },
+      }),
+    ).toBeNull();
+  });
+
+  it('describes a viewport the box gate accepts as covered', () => {
+    // The measured region is the box the pins were computed for, so the first region event after it
+    // must not throw the pool away and build it again.
+    const measured = regionFromBoundaries({
+      northEast: { latitude: 50.5, longitude: 30.6 },
+      southWest: { latitude: 50.4, longitude: 30.4 },
+    }) as MapRegion;
+
+    expect(isRegionCoveredByBox(measured, measured)).toBe(true);
   });
 });
