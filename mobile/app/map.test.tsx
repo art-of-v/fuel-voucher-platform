@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { MARKER_POOL_SIZE, MAX_MOUNTED_MARKERS } from '../src/features/stations/lib/viewport';
+import { MAP_TAP_SETTLE_MS } from '../src/features/stations/lib/selection';
 import MapScreen from './map';
 
 /**
@@ -110,23 +111,33 @@ jest.mock('react-native-maps', () => {
   const { View, Text } = require('react-native');
 
   /**
-   * The screen drives the map imperatively (`mapRef.current?.animateToRegion`), so the
-   * mock has to expose those methods on its ref. Without them the render dies inside a
-   * mount effect, several frames from the missing method.
+   * The screen drives the map imperatively (`mapRef.current?.animateToRegion`,
+   * `getMapBoundaries`, `animateCamera`), so the mock has to expose those methods on its
+   * ref. Without them the render dies inside a mount effect, several frames from the
+   * missing method.
+   *
+   * The object is shared rather than rebuilt per render so a test can assert on the calls
+   * the screen made; `__mapApi` is where those spies are reachable from the suite.
    */
+  const mapApi = {
+    animateToRegion: jest.fn(),
+    animateCamera: jest.fn(),
+    fitToCoordinates: jest.fn(),
+    fitToSuppliedMarkers: jest.fn(),
+    getCamera: jest.fn(() => ({ center: { latitude: 0, longitude: 0 }, zoom: 1 })),
+    getMapBoundaries: jest.fn(() => ({
+      northEast: { latitude: 50.5, longitude: 30.6 },
+      southWest: { latitude: 50.4, longitude: 30.4 },
+    })),
+    setMapPadding: jest.fn(),
+    pointForCoordinate: jest.fn(() => ({ x: 0, y: 0 })),
+    coordinateForPoint: jest.fn(() => ({ latitude: 0, longitude: 0 })),
+  };
+
   const MapView = React2.forwardRef((props: Record<string, any>, ref: unknown) => {
-    React2.useImperativeHandle(ref, () => ({
-      animateToRegion: jest.fn(),
-      animateCamera: jest.fn(),
-      fitToCoordinates: jest.fn(),
-      fitToSuppliedMarkers: jest.fn(),
-      getCamera: jest.fn(() => ({ center: { latitude: 0, longitude: 0 }, zoom: 1 })),
-      setMapPadding: jest.fn(),
-      pointForCoordinate: jest.fn(() => ({ x: 0, y: 0 })),
-      coordinateForPoint: jest.fn(() => ({ latitude: 0, longitude: 0 })),
-    }));
+    React2.useImperativeHandle(ref, () => mapApi, []);
     return (
-      <View testID="map" onMapReady={props.onMapReady}>
+      <View testID="map" onMapReady={props.onMapReady} onPress={props.onPress}>
         {props.children}
       </View>
     );
@@ -141,6 +152,7 @@ jest.mock('react-native-maps', () => {
     Marker: (props: Record<string, any>) => <View testID="marker" {...props} />,
     Circle: () => null,
     Polyline: () => null,
+    __mapApi: mapApi,
   };
 });
 
@@ -548,5 +560,145 @@ describe('MapScreen', () => {
       expect(mockGestures.length).toBeGreaterThanOrEqual(2);
       expect(new Set(mockGestures).size).toBe(1);
     });
+  });
+});
+
+/**
+ * What a tap on a pin has to do, from the person's side.
+ *
+ * The two failures pinned here were both "the tap did something, just not what it looked
+ * like": tapping a neighbouring АЗК closed the open card and opened nothing (the map's own
+ * press was allowed to clear the selection before MapKit reported the new one), and the card
+ * opened over the pin, so a tap that landed read the same as a tap that missed.
+ */
+describe('MapScreen - tapping a pin', () => {
+  const STATION = {
+    brandId: 'b-klo',
+    brandSlug: 'klo',
+    address: 'вулиця Тестова, 1',
+  };
+
+  const A = { ...STATION, id: 'a', name: 'KLO A', lat: 50.45, lng: 30.52 };
+  const B = { ...STATION, id: 'b', name: 'KLO B', lat: 50.452, lng: 30.53 };
+
+  /** The markers currently showing a pin, in pool order. */
+  const pins = () => screen.getAllByTestId('marker').filter((pin) => pin.props.opacity === 1);
+
+  /** The pin whose accessibility label names `name`; the pool's slot order is not the input order. */
+  const pinFor = (name: string) =>
+    pins().find((pin) => String(pin.props.accessibilityLabel ?? '').startsWith(name));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    mockNodes = [];
+    jest.useRealTimers();
+  });
+
+  async function openStation(name: string) {
+    renderScreen();
+    // Taken before the card opens: it is `accessibilityViewIsModal`, so once it is up the map
+    // is outside what queries can see - the same thing VoiceOver does.
+    const map = screen.getByTestId('map');
+    act(() => {
+      fireEvent(map, 'mapReady');
+    });
+    const pin = pinFor(name);
+    expect(pin).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(pin!);
+    });
+    return map;
+  }
+
+  it('swaps the card to the neighbouring station in the same tap', async () => {
+    mockNodes = [A, B];
+    renderScreen();
+    act(() => {
+      fireEvent(screen.getByTestId('map'), 'mapReady');
+    });
+    const first = pinFor('KLO A');
+    const second = pinFor('KLO B');
+    expect(first && second).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(first!);
+    });
+    expect(screen.getByText('KLO A')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(second!);
+    });
+
+    // The new station replaces the old one in one state change: no frame in which the
+    // previous card has closed and nothing has opened yet.
+    expect(screen.getByText('KLO B')).toBeTruthy();
+    expect(screen.queryByText('KLO A')).toBeNull();
+  });
+
+  it('closes the card on a tap on empty map, after the settle window', async () => {
+    jest.useFakeTimers();
+    mockNodes = [A];
+    const map = await openStation('KLO A');
+    expect(screen.getByText('KLO A')).toBeTruthy();
+
+    // A second later, not in the same tick: this tap is not the echo of the pin press, and the
+    // fake clock has to move too, or `Date.now()` still reads the moment the card opened.
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    fireEvent(map, 'press');
+    // The settle window exists because this same press can arrive before the pin's own
+    // selection on iOS; closing inside it is what lost the neighbouring tap.
+    expect(screen.getByText('KLO A')).toBeTruthy();
+
+    act(() => {
+      jest.advanceTimersByTime(MAP_TAP_SETTLE_MS);
+    });
+    expect(screen.queryByText('KLO A')).toBeNull();
+  });
+
+  it('does not close a card the same tap opened', async () => {
+    // The iOS echo: marker press first, then the map press for the same touch. The map press
+    // must not cancel the card it is an echo of.
+    mockNodes = [A];
+    const map = await openStation('KLO A');
+
+    act(() => {
+      fireEvent(map, 'press');
+    });
+    act(() => {
+      jest.advanceTimersByTime(MAP_TAP_SETTLE_MS);
+    });
+
+    expect(screen.getByText('KLO A')).toBeTruthy();
+  });
+
+  it('lifts the map when the pin would be behind the card', async () => {
+    // Bounds are 50.4-50.5 (a 0.1 degree span), so 50.44 sits at 60% of the height - under a
+    // card that owns the bottom of the screen.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- the mock's spies live on the module it returns
+    const { __mapApi } = require('react-native-maps');
+    mockNodes = [{ ...A, lat: 50.44 }];
+
+    await openStation('KLO A');
+
+    expect(__mapApi.animateCamera).toHaveBeenCalledTimes(1);
+    const [camera] = __mapApi.animateCamera.mock.calls[0];
+    expect(camera.center.latitude).toBeLessThan(50.44);
+    expect(camera.center.longitude).toBeCloseTo(30.52, 5);
+  });
+
+  it('leaves the map alone when the pin is already in view', async () => {
+    // 50.47 is 30% of the height - nothing is covering it.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- the mock's spies live on the module it returns
+    const { __mapApi } = require('react-native-maps');
+    mockNodes = [{ ...A, lat: 50.47 }];
+
+    await openStation('KLO A');
+
+    expect(__mapApi.animateCamera).not.toHaveBeenCalled();
   });
 });
