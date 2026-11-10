@@ -80,8 +80,8 @@ const surfaceShape = {
   accentWidth: 3,
 };
 
-export function getTokens(themeType: ThemeType = 'lemberg') {
-  const themeColors = themes[themeType] || themes.lemberg;
+export function getTokens(themeType: ThemeType = 'obsidian') {
+  const themeColors = themes[themeType] || themes.obsidian;
   const status = getThemeStatus(themeType);
 
   return {
@@ -154,4 +154,4 @@ export function getTokens(themeType: ThemeType = 'lemberg') {
 }
 
 export type DesignTokens = ReturnType<typeof getTokens>;
-export const defaultTokens = getTokens('lemberg');
+export const defaultTokens = getTokens('obsidian');
