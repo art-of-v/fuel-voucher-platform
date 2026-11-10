@@ -1,6 +1,6 @@
 import React from 'react';
 import { TextInput } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { PhoneAuthForm } from './PhoneAuthForm';
 import type { AuthStep } from '../types';
@@ -138,5 +138,24 @@ describe('PhoneAuthForm - the code field', () => {
     expect(screen.queryByText('phoneAuth.twoFactorCodeLabel')).toBeNull();
     expect(screen.getByText('phoneAuth.changePhone')).toBeTruthy();
     expect(screen.queryByText('phoneAuth.startOver')).toBeNull();
+  });
+});
+
+describe('PhoneAuthForm - the consent row', () => {
+  beforeEach(() => {
+    mockUseLogin.mockReset();
+  });
+
+  it('is a real checkbox that toggles before any code can be sent', () => {
+    // Consent gates account creation, so it has to be a genuine, tappable checkbox and
+    // not caption text beside a decorative square. Low-vision users in particular need
+    // to find it and hit it, which is why it is now a card-sized target over 44pt.
+    mockLoginAt('phone');
+
+    render(<PhoneAuthForm onSuccess={jest.fn()} />);
+
+    expect(screen.getByRole('checkbox').props.accessibilityState).toEqual({ checked: false });
+    fireEvent.press(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox').props.accessibilityState).toEqual({ checked: true });
   });
 });
