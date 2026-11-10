@@ -208,6 +208,13 @@ export function StationMarker({
 const styles = StyleSheet.create({
   markerContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    // The container's layout size IS the native tap target: MapKit hit-tests the annotation view's
+    // frame (the React layout size of this child), and Android snapshots it at the same size. The
+    // 34pt disc alone is below the 44pt minimum, so most taps missed it and neither the haptic nor
+    // the selection ring ever fired. Transparent padding grows the hit zone to 50pt without moving
+    // the drawn pin, which stays centred on its coordinate.
+    padding: 8,
   },
   pin: {
     width: 34,
