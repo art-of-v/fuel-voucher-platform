@@ -4,6 +4,7 @@ using FuelFlow.API.Services;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Auth.Security;
 using FuelFlow.Features.ErrorLogs.Logging;
+using FuelFlow.Features.Feedback;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Errors;
@@ -288,6 +289,16 @@ try
         schedule.Add<VoucherStockMonitor>(
             "check-voucher-stock",
             service => service.CheckLowStockAsync(CancellationToken.None),
+            "*/5 * * * *");
+
+        // Whether the feedback bot still has a webhook, every five minutes. Telegram keeps the
+        // binding per bot, and a token rotation at BotFather can leave it empty: the endpoint here
+        // stays healthy and is simply never called, so every customer message expires in Telegram's
+        // queue (measured on 2026-11-10, three days of silence). One getWebhookInfo per five minutes
+        // is nothing; the alert waits ten, so a Telegram API blip does not page anyone.
+        schedule.Add<FeedbackWebhookHealthMonitor>(
+            "check-feedback-webhook",
+            service => service.CheckWebhookAsync(CancellationToken.None),
             "*/5 * * * *");
 
         // Nightly garbage-collection of abandoned orders (soft-deleted + Cancelled, aged past the

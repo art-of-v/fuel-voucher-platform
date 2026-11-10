@@ -542,6 +542,7 @@ var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
         // Scoped rather than singleton: the router writes through the request-scoped DbContext.
         services.AddScoped<FeedbackUpdateRouter>();
         services.AddScoped<FeedbackTriageService>();
+        services.AddScoped<FeedbackWebhookHealthMonitor>();
     }
 
     /// <summary>

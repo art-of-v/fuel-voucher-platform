@@ -175,7 +175,9 @@ public class AlertRuleNoDataContractTests
     {
         RuleBlocks().Should().ContainKey("fuelflow-price-sync-stale");
 
-        var rule = RuleBlocks()["fuelflow-price-sync-stale"];
+        // Without its comments: the group that follows this rule introduces itself with a note that
+        // says why it does NOT use `or vector(0)`, and that note lands in this block.
+        var rule = WithoutComments(RuleBlocks()["fuelflow-price-sync-stale"]);
 
         rule.Should().Contain("$labels.brand",
             "the gauge carries one series per brand, and the notification has to say which one stopped");
@@ -184,5 +186,29 @@ public class AlertRuleNoDataContractTests
             "state, and is exactly the nineteen hours of silence issue #777 exists to end");
         rule.Should().NotContain("or vector(0)",
             "a zero fallback would report 'fresh' whenever the gauge could not be read");
+    }
+
+    /// <summary>
+    /// The feedback-webhook rule is the second one whose absence is not a healthy zero.
+    /// <para>
+    /// Measured on 2026-11-10: rotating the bot token left the bot with no webhook URL and three days
+    /// of customer messages expired in Telegram's queue. The gauge is written by a five-minute check,
+    /// so no series means the check has not reported - the same silence the alarm exists to end. An
+    /// `or vector(0)` would turn that into the healthy answer, and a NoData that resolves quietly
+    /// would make the guard useless on the one day it matters.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TheFeedbackWebhookRule_TreatsNoDataAsUnverifiable()
+    {
+        RuleBlocks().Should().ContainKey("fuelflow-feedback-webhook-missing");
+
+        var rule = WithoutComments(RuleBlocks()["fuelflow-feedback-webhook-missing"]);
+
+        rule.Should().Contain("expr: fuelflow_telegram_feedback_webhook_missing");
+        rule.Should().Contain("noDataState: Alerting",
+            "no series means the check itself has not run, which is not evidence that a webhook exists");
+        rule.Should().NotContain("or vector(0)",
+            "a zero fallback would report 'registered' whenever the check could not be read");
     }
 }
