@@ -169,6 +169,32 @@ describe('StationMarker - what the pin carries', () => {
   });
 });
 
+describe('StationMarker - the selection the map reports', () => {
+  it('hands the screen both the press and the deselection', () => {
+    // One iOS tap is reported by the marker's own gesture and by MapKit's selection, and the
+    // screen drops the second report; the deselection is how it learns the map no longer holds
+    // a pin, which is what lets a later map press dismiss the card.
+    const onPress = jest.fn();
+    const onDeselect = jest.fn();
+    renderMarker({ onPress, onDeselect });
+
+    expect(markerProps[0].onPress).toBe(onPress);
+    expect(markerProps[0].onSelect).toBe(onPress);
+    expect(markerProps[0].onDeselect).toBe(onDeselect);
+  });
+
+  it('keeps the deselection wired on an empty slot', () => {
+    // The pool re-points a slot instead of replacing its marker, so the annotation that is
+    // selected now can be the one handed another station - or none - a frame later. A handler
+    // that vanished with the station would leave the screen believing a pin is still selected,
+    // and no map tap would close a card again.
+    const onDeselect = jest.fn();
+    renderMarker({ point: null, onDeselect });
+
+    expect(markerProps[0].onDeselect).toBe(onDeselect);
+  });
+});
+
 describe('StationMarker - which view MapKit displays', () => {
   /**
    * `-[AIRMapMarker shouldUsePinView]` answers `reactSubviews.count == 0 && !self.imageSrc`, MapKit keeps

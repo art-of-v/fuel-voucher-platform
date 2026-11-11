@@ -34,11 +34,7 @@ import { DEFAULT_FUEL } from '../src/features/stations/lib/fuelLabels';
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
-import {
-  isMarkerPressEcho,
-  MAP_TAP_SETTLE_MS,
-  MARKER_PRESS_WINDOW_MS,
-} from '../src/features/stations/lib/selection';
+import { MAP_TAP_SETTLE_MS, MARKER_TAP_DUPLICATE_MS } from '../src/features/stations/lib/selection';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { MapSearchDeck } from '../src/features/stations/components/MapSearchDeck';
 import {
@@ -83,14 +79,20 @@ export default function MapScreen() {
   const [showNavigatorPicker, setShowNavigatorPicker] = React.useState(false);
   const [selectedBrand, setSelectedBrand] = React.useState<string | null>(null);
 
-  // The tap that opens a station also reaches the map's press handler on iOS - see
-  // isMarkerPressEcho.
+  // The pin MapKit (or Google Maps) currently has selected, as the native map reports it. This is
+  // the only answer to "did this touch land on a pin" that does not depend on how busy JS is: a
+  // marker reports its tap at touch-up, the map reports the same touch after its double-tap
+  // recogniser gives up, and on a cold start that gap is long enough to outlive any fixed window.
+  // A marker press sets it; the map's own deselect clears it.
+  const pinIsSelected = React.useRef(false);
+  // Which pin reported a press, and when - the same touch reaches this screen twice on iOS.
+  const lastPressedId = React.useRef<string | null>(null);
   const lastMarkerPressAt = React.useRef<number | null>(null);
   const mapRef = React.useRef<MapView | null>(null);
   const sheetRef = React.useRef<BottomSheetHandle>(null);
 
-  // A map press that closes the card is held for MAP_TAP_SETTLE_MS, because on iOS it can arrive
-  // before MapKit reports the pin it was actually on. See the constant for what that race did.
+  // A map press that closes the card is held for MAP_TAP_SETTLE_MS: the press can arrive before
+  // the deselection it belongs to, and a marker press cancels it outright. See the constant.
   const pendingClear = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelPendingClear = React.useCallback(() => {
     if (pendingClear.current) {
@@ -198,27 +200,25 @@ export default function MapScreen() {
     void requestLocation();
   }, [requestLocation]);
 
-  // A marker hands its slot's station here. An empty slot gets no handler at all, and being
+  // A marker hands its slot's station here. An empty slot gets no press handler, and being
   // transparent it is not hit-tested either.
   //
-  // One iOS tap reaches the marker twice: MapKit's native selection (`onSelect`) and the marker's
-  // own gesture (`onPress`). Both are wired in `StationMarker` because only `onPress` fires on
-  // Android, and on iOS it is the fallback for re-tapping a pin MapKit still has selected. The
-  // second delivery of the same tap is dropped here; the map-level echo of a marker tap is dropped
-  // in the map's `onPress` below.
-  const lastPressedId = React.useRef<string | null>(null);
+  // One iOS tap reaches the marker twice - its own gesture and MapKit's selection - so the second
+  // report of the same touch is dropped. The map's own press, which arrives later, is handled
+  // below and never closes a card whose pin is still selected.
   const pressMarker = React.useCallback(
     (node: StationNode) => {
       const now = Date.now();
       if (
         lastPressedId.current === node.id &&
         lastMarkerPressAt.current != null &&
-        now - lastMarkerPressAt.current < MARKER_PRESS_WINDOW_MS
+        now - lastMarkerPressAt.current < MARKER_TAP_DUPLICATE_MS
       ) {
         return;
       }
       lastPressedId.current = node.id;
       lastMarkerPressAt.current = now;
+      pinIsSelected.current = true;
       // This tap is a selection, not a dismissal: whatever close the map press scheduled for the
       // same touch is cancelled, so the previous station's card never flashes away first.
       cancelPendingClear();
@@ -228,6 +228,13 @@ export default function MapScreen() {
     },
     [cancelPendingClear, reveal],
   );
+
+  // The map no longer has a pin selected: MapKit deselects on the touch that leaves one, whether
+  // it lands on empty map or on another pin, and Google Maps does the same on a map click. From
+  // here a map press is a dismissal rather than the echo of a pin tap.
+  const releaseMarker = React.useCallback(() => {
+    pinIsSelected.current = false;
+  }, []);
 
   // A route needs a real position: a node without coordinates used to deep-link to
   // 0,0 — Null Island in the Atlantic — so the button reports that instead.
@@ -277,10 +284,15 @@ export default function MapScreen() {
             style={StyleSheet.absoluteFill}
             initialRegion={KYIV_REGION}
             onPress={() => {
-              if (isMarkerPressEcho(lastMarkerPressAt.current, Date.now())) return;
+              // The map reports this press after its double-tap recogniser gives up, so the touch
+              // that selected a pin arrives here hundreds of milliseconds later - on a cold start
+              // late enough that no fixed window recognises it. What is trustworthy is the map's
+              // own selection: the close is deferred, and it fires only when nothing on the map is
+              // selected any more.
               cancelPendingClear();
               pendingClear.current = setTimeout(() => {
                 pendingClear.current = null;
+                if (pinIsSelected.current) return;
                 setSelectedStation(null);
               }, MAP_TAP_SETTLE_MS);
             }}
@@ -306,6 +318,7 @@ export default function MapScreen() {
                 }
                 selected={point != null && selectedStation?.id === point.id}
                 onPress={point ? () => pressMarker(point) : undefined}
+                onDeselect={releaseMarker}
               />
             ))}
 

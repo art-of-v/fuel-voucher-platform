@@ -619,7 +619,7 @@ describe('MapScreen - tapping a pin', () => {
     await act(async () => {
       fireEvent.press(pin!);
     });
-    return map;
+    return { map, pin: pin! };
   }
 
   it('swaps the card to the neighbouring station in the same tap', async () => {
@@ -650,17 +650,17 @@ describe('MapScreen - tapping a pin', () => {
   it('closes the card on a tap on empty map, after the settle window', async () => {
     jest.useFakeTimers();
     mockNodes = [A];
-    const map = await openStation('KLO A');
+    const { map, pin } = await openStation('KLO A');
     expect(screen.getByText('KLO A')).toBeTruthy();
 
-    // A second later, not in the same tick: this tap is not the echo of the pin press, and the
-    // fake clock has to move too, or `Date.now()` still reads the moment the card opened.
+    // The tap that leaves a pin reaches the screen twice: MapKit deselects the pin on the touch
+    // itself (`didDeselectAnnotationView:`), and the map reports the press once its double-tap
+    // recogniser gives up. Google Maps reports them in the same order (`MapView.java:357-359`).
     act(() => {
-      jest.advanceTimersByTime(1000);
+      fireEvent(pin, 'deselect');
     });
     fireEvent(map, 'press');
-    // The settle window exists because this same press can arrive before the pin's own
-    // selection on iOS; closing inside it is what lost the neighbouring tap.
+    // The press is still held: it can arrive before the deselection it belongs to.
     expect(screen.getByText('KLO A')).toBeTruthy();
 
     act(() => {
@@ -669,12 +669,18 @@ describe('MapScreen - tapping a pin', () => {
     expect(screen.queryByText('KLO A')).toBeNull();
   });
 
-  it('does not close a card the same tap opened', async () => {
-    // The iOS echo: marker press first, then the map press for the same touch. The map press
-    // must not cancel the card it is an echo of.
+  it('does not close a card the same tap opened, however late the map reports the tap', async () => {
+    // The marker reports its tap at touch-up; the map reports the press only after its double-tap
+    // recogniser gives up, and on a fresh launch the JS thread delays that report past any fixed
+    // window. Timed against one, every one of the first taps after a launch opened the card and
+    // had it dismissed again; the answer that does not drift is the map's own selection.
+    jest.useFakeTimers();
     mockNodes = [A];
-    const map = await openStation('KLO A');
+    const { map } = await openStation('KLO A');
 
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
     act(() => {
       fireEvent(map, 'press');
     });

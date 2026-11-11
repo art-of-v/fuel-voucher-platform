@@ -106,12 +106,14 @@ export function StationMarker({
   logo,
   selected = false,
   onPress,
+  onDeselect,
 }: {
   point: StationNode | null;
   brandColor: string;
   logo?: ImageSourcePropType;
   selected?: boolean;
   onPress?: () => void;
+  onDeselect?: () => void;
 }) {
   const tokens = useDesignTokens();
   const t = useI18n((s) => s.t);
@@ -143,14 +145,20 @@ export function StationMarker({
       }
       opacity={point ? 1 : 0}
       image={{ uri: STOCK_PIN_GUARD }}
-      // A custom marker (one MapKit draws instead of its own pin) stops answering its own `onPress`
-      // gesture reliably under Fabric: the tap mostly loses the race to MapKit's selection. `onSelect`
-      // *is* that selection (`didSelectAnnotationView:` → `onSelect`), so it fires on every tap; the
-      // marker keeps `onPress` as well because it is the only one Android fires, and on iOS it covers
-      // a re-tap of a pin MapKit already has selected. The map screen de-duplicates the one iOS tap
-      // that reaches both.
+      // A tap is reported twice: the marker's own gesture (`onPress`, installed on every marker —
+      // `AIRMapMarkerManager.m:28` on iOS, the marker click at `MapView.java:291-301` on Android)
+      // and the map's selection (`onSelect`). Both are wired because a re-tap of a pin MapKit still
+      // has selected reports only the gesture, and the map screen drops the second report of one
+      // touch.
+      //
+      // `onDeselect` is the other half of that pair, and it is what tells the screen the map no
+      // longer has a pin selected: MapKit deselects on a tap that leaves the pin, whether it lands
+      // on empty map or on another pin (`didDeselectAnnotationView:`), and Google Maps does the
+      // same on a map click (`MapView.java:359`). It stays wired on an empty slot too, because a
+      // slot can be handed a different station or none while its annotation is still selected.
       onPress={onPress}
       onSelect={onPress}
+      onDeselect={onDeselect}
       tracksViewChanges={tracks || selected}
       accessibilityLabel={
         point ? `${point.name}, ${formatShortAddress(point) || t('map.noAddress')}` : undefined
