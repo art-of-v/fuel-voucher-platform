@@ -1,35 +1,21 @@
 /**
- * On iOS a tap on a marker reaches the map view's own press handler as well: react-native-maps
- * installs both recognisers with `cancelsTouchesInView = NO`, so the same tap that selects a
- * station also fires `MapView onPress`, and clearing the selection there closed the station panel
- * in the frame it opened (planning #756). The marker stamps the moment it handled the tap; a map
- * press inside this window is that same tap, not a new one.
- */
-export const MARKER_PRESS_WINDOW_MS = 350;
-
-/**
  * How long a map press waits before it closes the open station card.
  *
- * On iOS the same tap that selects a pin can reach the map view *before* MapKit reports the
- * selection. Closing the card there is not just a flash: the card's state change re-renders
- * every marker in the pool while MapKit is still resolving that tap's selection, and the
- * selection of the new pin is lost - so tapping a neighbouring АЗК closed the previous card
- * and opened nothing. A marker press cancels the pending close, which makes replacing one
- * station with another a single state change; a tap on empty map still closes, 250 ms later.
+ * The press and the pin's own selection are the same touch, but they do not arrive together. A
+ * marker reports its tap at touch-up; the map reports the press only after its double-tap
+ * recogniser gives up, and on a cold start the JS thread is slow enough that the report lands a
+ * good half-second later. That delay is not a constant anyone can time against — it shrinks as
+ * the app warms up — so the close waits for the press to settle and then asks the map whether
+ * anything on it is still selected. A pin press cancels the wait outright, which makes replacing
+ * one station with another a single state change.
  */
 export const MAP_TAP_SETTLE_MS = 250;
 
 /**
- * True when a map press arrives close enough after a marker press to be the marker's echo.
- * A press that arrives *before* the marker's (the map handler ran first) is not an echo - the
- * selection it cleared is written again by the marker in the same tap.
+ * How close together two reports of one touch have to be to count as one tap.
+ *
+ * A pin tap is delivered twice on both platforms: the marker's own press and its selection
+ * report it together, at touch-up. Only the second report of the same touch is dropped; a
+ * deliberate re-tap of the same pin arrives later than this.
  */
-export function isMarkerPressEcho(
-  lastMarkerPressAt: number | null,
-  now: number,
-  windowMs: number = MARKER_PRESS_WINDOW_MS,
-): boolean {
-  if (lastMarkerPressAt === null) return false;
-  const elapsed = now - lastMarkerPressAt;
-  return elapsed >= 0 && elapsed <= windowMs;
-}
+export const MARKER_TAP_DUPLICATE_MS = 350;
