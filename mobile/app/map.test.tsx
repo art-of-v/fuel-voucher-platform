@@ -647,6 +647,40 @@ describe('MapScreen - tapping a pin', () => {
     expect(screen.queryByText('KLO A')).toBeNull();
   });
 
+  it('keeps the neighbouring pin open when the map press arrives after the swap', async () => {
+    // What the phone reports for a tap on a neighbouring pin, in order: the pin's own press, the
+    // deselection of the pin it replaces, the new pin's selection - and, hundreds of milliseconds
+    // later, the map's press for the same touch. The screen has to end up believing a pin is
+    // selected, or that last press reads as a tap on empty map and closes the card it belongs to.
+    jest.useFakeTimers();
+    mockNodes = [A, B];
+    renderScreen();
+    const map = screen.getByTestId('map');
+    await act(async () => {
+      fireEvent(map, 'mapReady');
+    });
+    const first = pinFor('KLO A');
+    const second = pinFor('KLO B');
+    expect(first && second).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(first!);
+    });
+
+    act(() => {
+      fireEvent.press(second!);
+      fireEvent(first!, 'deselect');
+      fireEvent(second!, 'select');
+    });
+    act(() => {
+      jest.advanceTimersByTime(5000);
+      fireEvent(map, 'press');
+      jest.advanceTimersByTime(MAP_TAP_SETTLE_MS);
+    });
+
+    expect(screen.getByText('KLO B')).toBeTruthy();
+  });
+
   it('closes the card on a tap on empty map, after the settle window', async () => {
     jest.useFakeTimers();
     mockNodes = [A];

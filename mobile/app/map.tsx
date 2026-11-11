@@ -208,6 +208,10 @@ export default function MapScreen() {
   // below and never closes a card whose pin is still selected.
   const pressMarker = React.useCallback(
     (node: StationNode) => {
+      // Recorded before the duplicate check, because the first report of a tap on a neighbouring
+      // pin is followed by the deselection of the previous one and then by the second report: the
+      // flag has to end up set, and the report that sets it is the one that gets de-duplicated.
+      pinIsSelected.current = true;
       const now = Date.now();
       if (
         lastPressedId.current === node.id &&
@@ -218,7 +222,6 @@ export default function MapScreen() {
       }
       lastPressedId.current = node.id;
       lastMarkerPressAt.current = now;
-      pinIsSelected.current = true;
       // This tap is a selection, not a dismissal: whatever close the map press scheduled for the
       // same touch is cancelled, so the previous station's card never flashes away first.
       cancelPendingClear();
