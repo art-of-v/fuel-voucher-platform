@@ -4,6 +4,7 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 
 import { StationMarker, BrandLogoChip } from './StationMarker';
+import { PIN_BOX, PIN_GUARD_IMAGE } from '../lib/pinGuard';
 
 /**
  * The two map-pin components, extracted from `app/map.tsx`.
@@ -65,7 +66,8 @@ jest.mock('../lib/radar', () => ({
   formatShortAddress: (s: any) => s.address ?? '',
 }));
 
-const { Image, View } = jest.requireActual<typeof import('react-native')>('react-native');
+const { Image, View, PixelRatio, StyleSheet } =
+  jest.requireActual<typeof import('react-native')>('react-native');
 
 const SHELL = {
   id: 'n-1',
@@ -205,40 +207,58 @@ describe('StationMarker - which view MapKit displays', () => {
    * is why the empty slots carry it too: the pool never adds a marker again, so a slot born without the
    * image is Apple's pin for as long as it lives, including the day it is handed a station.
    *
-   * The payload is decoded rather than compared as a string because an unreadable image is the failure
-   * mode here: the flag would still be set, and every marker in the pool would carry a request that dies
-   * in the image loader.
+   * That same image is the tap target, because MapKit sizes the annotation view from it. The geometry
+   * lives in `pinGuard.test.ts`; what is asserted here is that the marker actually receives it, empty
+   * slot included, and that the container which draws the pin is that same size.
    */
   function guardImage(point: typeof SHELL | null) {
     markerProps.length = 0;
     renderMarker({ point: point as any });
     // The mock records what `StationMarker` hands `Marker`, which is the `{uri}` wrapper — the library
     // unwraps it to the string on its way to the view manager (`MapMarker.js:82-85`).
-    return markerProps[0].image as { uri: string };
+    return markerProps[0].image as { uri: string } | undefined;
   }
 
   it('hands every slot the same image, station or none', () => {
     const withStation = guardImage(SHELL);
     const empty = guardImage(null);
 
-    expect(withStation.uri).toMatch(/^data:image\/png;base64,/);
-    expect(empty.uri).toBe(withStation.uri);
+    expect(withStation).toBe(PIN_GUARD_IMAGE);
+    expect(empty).toBe(withStation);
   });
 
-  it('is a one-by-one fully transparent PNG', () => {
-    const image = guardImage(SHELL).uri;
-    const png = Buffer.from(image.slice('data:image/png;base64,'.length), 'base64');
+  it('is small enough to be a pin and large enough to be tapped', () => {
+    const image = guardImage(SHELL);
+    // Android gets no image — the bitmap would only pad its snapshot — so the guard is an iOS
+    // mechanism and the rest of the assertion has nothing to look at there.
+    if (image == null) {
+      expect(PIN_GUARD_IMAGE).toBeUndefined();
+      return;
+    }
 
+    const png = Buffer.from(image.uri.slice('data:image/png;base64,'.length), 'base64');
     expect(png.subarray(1, 4).toString('ascii')).toBe('PNG');
     expect(png.subarray(12, 16).toString('ascii')).toBe('IHDR');
-    expect(png.readUInt32BE(16)).toBe(1);
-    expect(png.readUInt32BE(20)).toBe(1);
-    expect(png[24]).toBe(8); // bits per channel
-    expect(png[25]).toBe(6); // RGBA, so the alpha byte below is real
+    // Pixels, not points: the loader decodes at the screen scale, so the point size is the box.
+    const scale = Math.min(3, Math.max(1, Math.round(PixelRatio.get())));
+    expect(png.readUInt32BE(16)).toBe(PIN_BOX.width * scale);
+    expect(png.readUInt32BE(20)).toBe(PIN_BOX.height * scale);
 
     const idatLength = png.readUInt32BE(33);
-    const scanline = inflateSync(png.subarray(41, 41 + idatLength));
-    expect(scanline).toEqual(Buffer.from([0, 0, 0, 0, 0])); // filter byte, then a transparent pixel
+    const data = inflateSync(png.subarray(41, 41 + idatLength));
+    // Filter type 0 on every row and an alpha-0 pixel behind each pixel of the pin.
+    expect(data.some((byte) => byte !== 0)).toBe(false);
+  });
+
+  it('draws the pin in a child of exactly that size', () => {
+    // MapKit hit-tests the annotation view's bounds, and `AIRMapMarker.reactSetFrame:` asks them of
+    // the image — so a container of another size is a container that disagrees with the target.
+    renderMarker({ point: SHELL });
+
+    expect(StyleSheet.flatten(markerProps[0].children.props.style)).toMatchObject({
+      width: PIN_BOX.width,
+      height: PIN_BOX.height,
+    });
   });
 });
 

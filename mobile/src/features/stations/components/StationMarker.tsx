@@ -5,6 +5,7 @@ import { Marker } from 'react-native-maps';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
 import { formatShortAddress } from '../lib/radar';
+import { PIN_BOX, PIN_GUARD_IMAGE } from '../lib/pinGuard';
 import type { StationNode } from '../../../core/types/api';
 
 /**
@@ -13,36 +14,6 @@ import type { StationNode } from '../../../core/types/api';
  * enough to see the Gulf of Guinea, where the pool's empty markers would otherwise sit in it.
  */
 const PARKED = { latitude: 0, longitude: 0 };
-
-/**
- * A transparent 1×1 PNG, handed to `Marker` as its `image` so MapKit never reaches for its own pin.
- *
- * `-[AIRMapMarker shouldUsePinView]` (AIRMapMarker.m:321-323) answers `reactSubviews.count == 0 &&
- * !self.imageSrc`, and MapKit asks once per annotation and keeps that view for its whole life. Under
- * Fabric a marker is *always* childless when it joins the map: `RCTMountingManager.mm:82-89` applies
- * the new child's props and runs its `finalizeUpdates:` before handing it to the parent's
- * `mountChildComponentView:`, and the marker's own child is a separate, later mutation of the same
- * transaction. So `addAnnotation:` (AIRMap.m:138) always sees zero subviews, and if the map is already
- * drawing, MapKit answers there and then with a stock `MKMarkerAnnotationView` — the React pin lands in
- * a view MapKit never displays. Mounting the pool inside the map's own commit hands MapKit a map that is
- * not on screen yet, so the question is only deferred a frame — long enough for the children to arrive,
- * which is why badges used to appear. That is a race being won, not a property holding.
- *
- * `setImageSrc:` stores the string before it asks the image loader (AIRMapMarker.m:331-339) and props
- * land before insertion, so `image` settles the answer at prop time — whatever the mounting order does
- * afterwards. Nothing else reads it: `self.image` matters only to `reactSetFrame:`, which Fabric never
- * calls (that is Paper's `RCTUIManager.mm:758`; Fabric sets `center` and `bounds` itself, and
- * `reactSetFrame` appears nowhere under `React/Fabric`), and Android composites the bitmap behind the
- * view snapshot at the snapshot's own size (`MapMarker.java:getIcon`). The pixels are invisible on both.
- *
- * It is given as `{uri}` because that is the shape the library's own type allows, and `MapMarker.js:82-85`
- * unwraps it back to the string before sending it — which is what the manager wants
- * (`RCT_REMAP_VIEW_PROPERTY(image, imageSrc, NSString)`). An object reaching the native side would be
- * dropped by `RCTConvert`, and the guard would silently do nothing.
- */
-const STOCK_PIN_GUARD =
-  'data:image/png;base64,' +
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=';
 
 /**
  * The round brand badge used in the ranking list and the station sheet. Pure
@@ -90,9 +61,9 @@ export function BrandLogoChip({ logo, size }: { logo: ImageSourcePropType; size:
  *
  * The marker keeps one child view even when it shows nothing. That child *is* the pin — the white disc,
  * the brand logo, the stem — and MapKit agrees to display `AIRMapMarker` itself, rather than its own
- * pin, only because of {@link STOCK_PIN_GUARD}. What goes *inside* that child is ordinary Fabric and
- * free to come and go, and the pin subtree is keyed by the station so a recycled slot builds it the way
- * a fresh marker would.
+ * pin, only because of the `image` above. What goes *inside* that child is ordinary Fabric and free to
+ * come and go, and the pin subtree is keyed by the station so a recycled slot builds it the way a
+ * fresh marker would.
  *
  * `tracksViewChanges` is read by the Android marker manager; the iOS MapKit marker has no such
  * prop. There a custom-view marker is rasterised once, so tracking stays on until the logo
@@ -144,7 +115,9 @@ export function StationMarker({
         point ? { latitude: point.lat as number, longitude: point.lng as number } : PARKED
       }
       opacity={point ? 1 : 0}
-      image={{ uri: STOCK_PIN_GUARD }}
+      // Settles which view MapKit displays *and* how big it is, which is what a tap lands on. The
+      // mechanism lives in `lib/pinGuard`; the box below is pinned to the same size.
+      image={PIN_GUARD_IMAGE}
       // A tap is reported twice: the marker's own gesture (`onPress`, installed on every marker —
       // `AIRMapMarkerManager.m:28` on iOS, the marker click at `MapView.java:291-301` on Android)
       // and the map's selection (`onSelect`). Both are wired because a re-tap of a pin MapKit still
@@ -215,13 +188,15 @@ export function StationMarker({
 
 const styles = StyleSheet.create({
   markerContainer: {
+    // Fixed, and equal to PIN_BOX, because on iOS the annotation view's bounds are taken from the
+    // guard image's size (`lib/pinGuard`) — so a container that grew by a point when the pin was
+    // selected would only ever have disagreed with what MapKit hit-tests. The 34pt disc alone is
+    // below the 44pt minimum; the transparent padding is what lifts the tap target to 50×57 without
+    // moving the drawn pin, which stays at the bottom edge of the box as it always has.
+    width: PIN_BOX.width,
+    height: PIN_BOX.height,
     alignItems: 'center',
-    justifyContent: 'center',
-    // The container's layout size IS the native tap target: MapKit hit-tests the annotation view's
-    // frame (the React layout size of this child), and Android snapshots it at the same size. The
-    // 34pt disc alone is below the 44pt minimum, so most taps missed it and neither the haptic nor
-    // the selection ring ever fired. Transparent padding grows the hit zone to 50pt without moving
-    // the drawn pin, which stays centred on its coordinate.
+    justifyContent: 'flex-end',
     padding: 8,
   },
   pin: {
