@@ -60,6 +60,20 @@
          Newtonsoft.Json 13.x. Remove this pin once Hangfire.Core resolves Newtonsoft.Json
          >= 13 itself. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <!-- Fido2 5.0.0-preview.8 (the App Attest verifier) resolves System.Formats.Cbor 9.0.0
+         transitively, which GHSA-vmv3-wvjp-wqpj / CVE-2026-118747 covers: colliding CBOR map keys
+         hash-flood the uniqueness check, so a small payload costs quadratic time (High, 7.5). The
+         path is live - the attestation middleware hands Fido2 CBOR that a client sent - and the
+         1.2.0 mobile build is the first one that sends any.
+         This pin only moves the NuGet graph, and something has to: pruning already keeps the
+         package out of this project's own report (the ASP.NET Core shared framework carries the
+         assembly), but the test projects resolve the 9.0.0 through the ProjectReference, which is
+         where CI's advisory scan failed. Pruning neuters a direct reference - IncludeAssets=none -
+         so it ships no assemblies: the copy that runs is the one inside the runtime image, which
+         is why the Dockerfile digest is bumped in the same change. NU1510 says "likely
+         unnecessary"; it is necessary for the audit, hence the reference-local NoWarn. Remove the
+         pin once Fido2 resolves >= 9.0.24 itself. -->
+    <PackageReference Include="System.Formats.Cbor" Version="10.0.15" NoWarn="NU1510" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
