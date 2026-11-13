@@ -6,8 +6,17 @@ type SslPinningModule = typeof import('react-native-ssl-public-key-pinning');
 
 /**
  * SPKI pins for the production API. The leaf is deliberately absent: it rotates whenever the
- * certificate is renewed, while the intermediate and the roots below are stable. Two independent
- * chains are pinned so a CA migration does not brick old installs.
+ * certificate is renewed. Two independent chains are pinned so a CA migration does not brick old
+ * installs, and at least one hash here has to appear in the chain the server sends — a list that
+ * matches nothing blocks every request the shipped build makes, which no test on this side can
+ * notice.
+ *
+ * The intermediate is not the stable layer it was once described as: on 2026-11-13 the chain
+ * served was `CN=api.palne.shop` <- `CN=YE1` <- `CN=Root YE` <- `CN=ISRG Root X2` <-
+ * `CN=ISRG Root X1`, so the `CN=YE2` entry had matched nothing since the CA's own renewal. Both
+ * intermediates are listed (the old one for a full certificate lifetime, per the rotation order in
+ * the app repo's `docs/APP_ATTESTATION_AND_PINNING_RUNBOOK.md`); the roots are what outlive a
+ * renewal, and they are the reason pinning still passed while the new intermediate was missing.
  *
  * `expirationDate` is the dead-man switch: if a bad pin ships and an OTA update cannot reach the
  * device, pinning stops being enforced on that date instead of cutting the app off forever. Rotate
@@ -17,7 +26,9 @@ export const PINNED_DOMAINS: PinningOptions = {
   'api.palne.shop': {
     includeSubdomains: true,
     publicKeyHashes: [
-      // CN=YE2, the current intermediate.
+      // CN=YE1, the intermediate the API has served since 2026-10-29 (measured 2026-11-13).
+      'brzvtCELCIZUo4sD/qPX0ccRtPsd3DY6RfmxpOU9oB4=',
+      // CN=YE2, the intermediate it replaced. Kept until a full certificate lifetime has passed.
       's/tdAOmUzd8syaTuqfgGvFcn6DzA5Cmb+Vby1ST+U3Y=',
       // CN=Root YE, the current private root.
       'sCkq5UWXjg+7mKu9lMhhYF5bGLsy7VI/UNW3tccdR7w=',

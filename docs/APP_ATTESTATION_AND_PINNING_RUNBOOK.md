@@ -311,10 +311,17 @@ The current pins:
 
 | Pin | Role |
 |---|---|
-| `s/tdAOmUzd8syaTuqfgGvFcn6DzA5Cmb+Vby1ST+U3Y=` | `CN=YE2` intermediate |
+| `brzvtCELCIZUo4sD/qPX0ccRtPsd3DY6RfmxpOU9oB4=` | `CN=YE1` intermediate, served since 2026-10-29 |
+| `s/tdAOmUzd8syaTuqfgGvFcn6DzA5Cmb+Vby1ST+U3Y=` | `CN=YE2` intermediate it replaced, kept for a lifetime |
 | `sCkq5UWXjg+7mKu9lMhhYF5bGLsy7VI/UNW3tccdR7w=` | `CN=Root YE` |
 | `diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=` | `CN=ISRG Root X2` |
 | `C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=` | `CN=ISRG Root X1` |
+
+Measured 2026-11-13: the chain served by `api.palne.shop` was `CN=api.palne.shop` <- `CN=YE1` <-
+`CN=Root YE` <- `CN=ISRG Root X2` <- `CN=ISRG Root X1`, and three of the five hashes above appeared
+in it. The intermediate had already rotated from `YE2` to `YE1` without the list changing, so this
+table is worth re-running before every store build: a list that matches nothing blocks every request,
+and nothing on the client side notices.
 
 Rotation order:
 
