@@ -31,8 +31,11 @@ RUN echo "=== Native binaries in publish output ===" && \
 RUN test -s /app/out/pdfium.so \
     || { echo "pdfium.so missing from publish output:"; ls -la /app/out/; exit 1; }
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:7644f992230d35cf230017189d4038c0ae0f7388b13f4f7ae1900a155bafb597
+# Runtime stage. The digest is pinned to the 10.0.15 framework build (2026-11-10): the previous pin
+# carried ASP.NET Core 10.0.9, whose System.Formats.Cbor is covered by CVE-2026-118747. The package
+# pin in FuelFlow.API.csproj cannot fix that - pruning strips the assembly from the publish output,
+# so the running copy is the one baked into this image.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:bfd912c83295ce66d4b706ebb8541b9f14259b0e76fbb88b2751f58ce2399d2e
 WORKDIR /app
 
 # Install native libraries required by PDFium on Debian/Linux
