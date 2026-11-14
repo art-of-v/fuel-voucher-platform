@@ -311,7 +311,7 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
         fuel.UpdatedAtUtc = TestClock.UtcNow;
 
         // The size has to exist in the seller's pool, or the package cannot be resolved.
-        var pool = DataKinds.Real;
+        var pool = DataKinds.ForPool(isTestAccount: false);
         var nominalExists = await context.FuelNominals
             .AnyAsync(n => n.FuelTypeId == fuel.Id && n.DataKind == pool && n.Liters == Liters);
         if (!nominalExists)

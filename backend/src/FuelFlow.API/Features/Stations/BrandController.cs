@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FuelFlow.Features.Brands.GetPublicFuelTypes;
 using FuelFlow.Features.Brands.GetPublicBrands;
 using Microsoft.AspNetCore.Authorization;
@@ -34,5 +35,15 @@ public sealed class BrandController : ControllerBase
     [HttpGet("fuel-types")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetFuelTypes(CancellationToken ct) =>
-        Ok(await _fuelTypesHandler.HandleAsync(new GetPublicFuelTypesQuery(), ct));
-}
+        Ok(await _fuelTypesHandler.HandleAsync(new GetPublicFuelTypesQuery(CallerUserId()), ct));
+    /// <summary>
+    /// Who is asking, so the fuel list can say whether each fuel can be bought BY THIS CALLER - the
+    /// stock a QA account sees is the rehearsal pool, and the two are legitimately different.
+    /// </summary>
+    private Guid? CallerUserId()
+    {
+        var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? User.FindFirst("sub")?.Value;
+
+        return Guid.TryParse(raw, out var id) ? id : null;
+    }}

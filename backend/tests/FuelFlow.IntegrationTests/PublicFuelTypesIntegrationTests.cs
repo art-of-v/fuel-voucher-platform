@@ -128,7 +128,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             context,
             new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
         var handler = new GetPublicFuelTypesQueryHandler(context, stock);
-        return await handler.HandleAsync(new GetPublicFuelTypesQuery());
+        return await handler.HandleAsync(new GetPublicFuelTypesQuery(null));
     }
 
     [Fact]

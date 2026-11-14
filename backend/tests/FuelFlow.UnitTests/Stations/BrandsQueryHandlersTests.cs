@@ -178,7 +178,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var package = result.Should().ContainSingle().Subject;
         package.Price.Should().Be(929.00m, "the column price is the price we can show until we have a cost");
@@ -197,7 +197,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().HaveCount(2);
     }
@@ -216,7 +216,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle("a rehearsal package reaching the store front is purchasable");
         result[0].Id.Should().Be(PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m));
@@ -236,7 +236,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1)));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
         result.Should().ContainSingle();
         result[0].Id.Should().Be(PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m));
@@ -253,7 +253,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1)));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
         result.Should().HaveCount(2);
         result.Should().OnlyContain(p => p.BrandId == BrandId(1));
@@ -279,7 +279,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var pkg = result.Should().ContainSingle().Which;
 // The id is derived from the fuel, the pool and the size, because a package is not a row
@@ -316,7 +316,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var pkg = result.Should().ContainSingle().Which;
         pkg.OriginalPrice.Should().Be(500);   // == sale price → no saving shown
@@ -338,7 +338,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
 result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the catalog");
     var inStock = PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m);
@@ -361,7 +361,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle().Which.IsAvailable.Should().BeFalse();
     }
@@ -380,7 +380,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle().Which.IsAvailable.Should().BeFalse();
     }
@@ -397,7 +397,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle().Which.IsAvailable.Should().BeTrue();
     }
@@ -412,7 +412,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle().Which.IsAvailable.Should().BeFalse();
     }
@@ -433,7 +433,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
         var handler = new GetPublicPackagesQueryHandler(_context, Stock(
             new Dictionary<string, string?> { ["VoucherExpiration:Enabled"] = "false" }));
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle().Which.IsAvailable.Should().BeTrue();
     }
@@ -453,7 +453,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
 
         var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1)));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
 result.Should().HaveCount(2);
     var inStock = PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m);

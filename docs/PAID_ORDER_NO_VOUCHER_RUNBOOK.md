@@ -18,17 +18,16 @@ planning repo's `docs/VOUCHER_LIFECYCLE.md`, `docs/STOCK_TOPUP.md`.
 | `brand` | the order line's brand, exact text |
 | `fuel_type_id` | the grade's id — not its name, not a "compatible" grade |
 | `liters` | the pack size; **a 10 L line cannot be filled from a 20 L voucher** |
-| `data_kind` | `real`, for every buyer — the QA test account included |
+| `data_kind` | `real` for a paying customer, `qa` for the QA test account |
 | `supplier_expiration_date` | today or later (unless `VoucherExpiration:Enabled` is off) |
 | `is_deleted` | false |
 
 The candidates are then claimed in expiry order by a compare-and-swap `UPDATE`, so two orders never
 take the same voucher.
 
-A total across sizes, or a count that includes `data_kind = qa` rows, is **not** this answer. That
-is exactly how #781 happened: the brand/fuel total read healthy while the size the customer had
-ordered was empty. The pool metric and the low-stock alert now report the same grain this query
-does — brand, fuel,
+A total across sizes, or a count that includes QA stock, is **not** this answer. That is exactly how
+#781 happened: the brand/fuel total read healthy while the size the customer had ordered was empty.
+The pool metric and the low-stock alert now report the same grain this query does — brand, fuel,
 size, real stock.
 
 ## The alerts that should speak first

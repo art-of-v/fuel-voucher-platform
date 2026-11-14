@@ -7,10 +7,9 @@ namespace FuelFlow.Features.Brands;
 /// <remarks>
 /// <para>
 /// This is <b>not</b> the read-side band-aid it looks like. The catalogue filter for rehearsal rows
-/// is the <c>data_kind = real</c> match in <c>GetPublicPackagesQueryHandler</c> plus
-/// <c>FuelPackage.IsTestData</c>, and that is correct. This exists because the flag is optional:
-/// nothing in the API forces a creator to set it, and it defaults to <c>false</c>, which means
-/// "sell this".
+/// is the pool match in <c>GetPublicPackagesQueryHandler</c> plus <c>FuelPackage.IsTestData</c>, and
+/// that is correct. This exists because the flag is optional: nothing in the API forces a creator to
+/// set it, and it defaults to <c>false</c>, which means "sell this".
 /// </para>
 /// <para>
 /// Production has absorbed two rows that way — <c>QA-CHECK-95</c> at 1 UAH, and
@@ -20,7 +19,7 @@ namespace FuelFlow.Features.Brands;
 /// </para>
 /// <para>
 /// The tokens are this repository's own seeds' convention plus what an operator typed by hand:
-/// the retired QA seeds wrote ids like <c>qa-pkg-&lt;id&gt;</c> and names like
+/// the retired QA SQL seeds wrote ids like <c>qa-pkg-&lt;id&gt;</c> and names like
 /// <c>&lt;fuel&gt;(QA)</c>, and their rows may still be in a database. Word-ish forms are listed
 /// alongside bare prefixes so a legitimate fuel whose name merely contains a token as a substring is
 /// not caught.

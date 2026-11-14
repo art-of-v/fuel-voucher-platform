@@ -35,6 +35,8 @@ The counts are exact; update them in the same change that adds or removes a call
 | --- | --- | --- | --- |
 | `backend/src/FuelFlow.API/BackgroundJobs/DataRetentionService.cs` | `IncludingSoftDeleted` | 1 | The QR reference check must see a deleted voucher, or the purge removes a row a voucher still points at. |
 | `backend/src/FuelFlow.API/BackgroundJobs/DeletedUnpaidOrderCleanupService.cs` | `IncludingSoftDeleted` | 1 | Every candidate is a deleted order by definition; the query-wide scope also lets the voucher and refund guards see deleted rows. |
+| `backend/src/FuelFlow.API/BackgroundJobs/FulfillmentService.PurchaseFulfillment.cs` | `IncludingSoftDeleted` | 1 | The QA flag is read from the owner even when that account is deleted, matching the raw-SQL claim predicate. |
+| `backend/src/FuelFlow.API/BackgroundJobs/FulfillmentService.Renewal.cs` | `IncludingSoftDeleted` | 1 | The QA flag is read from the owner even when that account is deleted, matching the raw-SQL claim predicate. |
 | `backend/src/FuelFlow.API/BackgroundJobs/FulfillmentService.Renewal.cs` | `IncludingReleasedFulfilments` | 1 | A released delivery still counts as applied when deciding whether a renewal line is owed. |
 | `backend/src/FuelFlow.API/BackgroundJobs/FulfillmentService.RenewalStock.cs` | `IncludingReleasedFulfilments` | 1 | A released delivery still counts as applied when deciding whether a renewal line is owed. |
 | `backend/src/FuelFlow.API/BackgroundJobs/MonobankReconciliationService.cs` | `IncludingSoftDeleted` | 1 | A customer can delete an unpaid checkout while its invoice stays live and payable. |
