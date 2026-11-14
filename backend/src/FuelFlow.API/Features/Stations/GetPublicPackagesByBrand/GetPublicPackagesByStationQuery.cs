@@ -1,6 +1,4 @@
 namespace FuelFlow.Features.Brands.GetPublicPackagesByBrand;
 
-/// <summary>
-/// The public package list for one brand. Every caller sees the same real catalogue.
-/// </summary>
-public sealed record GetPublicPackagesByBrandQuery(Guid BrandId);
+/// <param name="CallerUserId">The signed-in caller, or null — see <see cref="GetPublicPackagesQuery.CallerUserId"/>.</param>
+public sealed record GetPublicPackagesByBrandQuery(Guid BrandId, Guid? CallerUserId);

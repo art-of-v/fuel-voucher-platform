@@ -56,7 +56,8 @@ public sealed class MonobankOptions
     /// decides where real money is routed is the exact thing to avoid.
     /// <see cref="FuelFlow.Features.Users.User.IsQaAccount"/> is honoured as a second,
     /// admin-set signal for the same routing decision (a flagged account must not pay live money
-    /// just because its phone is missing here), alongside the QA sign-in gate.
+    /// just because its phone is missing here), in addition to its older uses (test stock, the
+    /// QA gate).
     /// </para>
     /// </remarks>
     public string? QaPhones { get; set; }

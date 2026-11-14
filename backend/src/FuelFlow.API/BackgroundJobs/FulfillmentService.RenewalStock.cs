@@ -70,23 +70,26 @@ public partial class FulfillmentService
         FuelVoucher source,
         DateOnly promisedExpiration,
         List<Guid> usedStockIds,
+        bool isTestAccount,
         CancellationToken cancellationToken)
     {
         // Same brand/fuel/nominal as the source, valid at least until the promise we owe the
         // customer (their leftover term + what they just paid for), not already claimed in this run.
         // Oldest-eligible first, so the SHORTEST qualifying voucher goes out and Fuel Flow's near-expiry
         // stock is preserved for the tiers that actually need it — a shorter voucher that still covers the
-        // promise is strictly better than a longer one. Only real stock is sellable, and the claim
-        // re-asserts that atomically (TryAssignReplacementVoucherAsync).
+        // promise is strictly better than a longer one. A QA account draws only from test stock and a real
+        // account only from real stock, re-asserted atomically at the claim (TryAssignReplacementVoucherAsync).
         // AsNoTracking for the same reason as FindMatchingVoucherAsync (#246): a decision whose row is
         // claimed by a raw UPDATE two lines later, never a write in its own right.
+        var pool = DataKinds.ForPool(isTestAccount);
+
         return await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Brand == source.Brand
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
-                     && v.DataKind == DataKinds.Real
+                     && v.DataKind == pool
                      && v.SupplierExpirationDate >= promisedExpiration
                      && !usedStockIds.Contains(v.Id))
             .OrderBy(v => v.SupplierExpirationDate)
@@ -128,10 +131,10 @@ public partial class FulfillmentService
         // supplier_expiration_date >= promise, so the promise always fits and never needs clamping —
         // whatever real life is left above it is a hidden reserve the customer can extend again.
         //
-        // Only real stock is sellable, re-asserted atomically here rather than trusted from the
-        // SELECT.
+        // Same QA/test segregation as the buy claim: the replacement must come from the owner's pool
+        // (test for a QA account, real otherwise), re-asserted atomically here against the owning user.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND data_kind = {DataKinds.Real}""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
             cancellationToken);
     }
 

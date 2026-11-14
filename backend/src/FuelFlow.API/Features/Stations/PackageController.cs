@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FuelFlow.Features.Brands.GetPublicPackages;
 using FuelFlow.Features.Brands.GetPublicPackagesByBrand;
 using Microsoft.AspNetCore.Authorization;
@@ -14,10 +15,9 @@ namespace FuelFlow.Features.Brands;
 // response would show users a price different from what checkout actually charges.
 //
 // [AllowAnonymous] relaxes AUTHORIZATION, not AUTHENTICATION: a bearer token that arrives is still
-// validated and still populates User. The answer no longer depends on the caller — every caller,
-// including the QA account, gets the one real catalogue — so a cache would be safe here. It is still
-// not added, because prices change from the admin panel and a stale price is exactly what this
-// controller must never serve.
+// validated and still populates User, which is what lets IsAvailable reflect the caller's own stock
+// pool. A signed-in QA account is only ever served test vouchers, so a cached-or-anonymous answer would
+// advertise stock the shop then refuses to sell them.
 [Route("api/packages")]
 public sealed class PackageController : ControllerBase
 {
@@ -35,10 +35,23 @@ public sealed class PackageController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
-        Ok(await _getAll.HandleAsync(new GetPublicPackagesQuery(), ct));
+        Ok(await _getAll.HandleAsync(new GetPublicPackagesQuery(CallerUserId()), ct));
 
     [HttpGet("{brandId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByBrand([FromRoute] Guid BrandId, CancellationToken ct) =>
-        Ok(await _getByBrand.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId), ct));
+        Ok(await _getByBrand.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId, CallerUserId()), ct));
+
+    /// <summary>
+    /// The caller, or null when nobody is signed in. Same claim lookup the purchase controller uses, and
+    /// deliberately forgiving: an unparseable claim is treated as anonymous rather than as an error,
+    /// because this endpoint is browsable and must stay that way.
+    /// </summary>
+    private Guid? CallerUserId()
+    {
+        var raw = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? User.FindFirst("sub")?.Value;
+
+        return Guid.TryParse(raw, out var id) ? id : null;
+    }
 }

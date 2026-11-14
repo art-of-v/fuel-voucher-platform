@@ -1,10 +1,10 @@
--- Removes the QA pool: legacy `data_kind = 'qa'` catalogue rows left behind by the retired QA
--- seeding scripts, together with the stock behind them and the emulation chain that holds them
--- (orders, batches, imports, supplier).
+-- Removes the QA pool: the `data_kind = 'qa'` catalogue rows, together with the stock behind them
+-- and the emulation chain that holds them (orders, batches, imports, supplier).
 --
--- The app no longer sells from this pool at all: every buyer, including the App Store QA account,
--- reads `data_kind = 'real'`. Running this is now legacy cleanup rather than a prerequisite for a
--- review, and nothing can be re-seeded into the pool.
+-- This pool is sold to the QA account only - every other buyer reads `data_kind = 'real'` - and it
+-- is stocked on demand by `POST /api/admin/qa-catalogue/seed`, so clearing it is a deliberate
+-- decommissioning rather than a routine step. It cannot be seeded from SQL: `qr_payload` is AES-GCM
+-- ciphertext and only the API holds `QR_CIPHER_KEY`.
 --
 -- Nothing here can reach a real customer, and nothing here can reach a real voucher: every DELETE is
 -- keyed on the QA pool, either on `data_kind = 'qa'` or on the emulated chain's own markers
@@ -67,9 +67,9 @@
 --   # one brand only:
 --   ... -v brand=okko -f - < scripts/remove-qa-catalogue.sql
 --
--- There is no matching seed any more. The QA account is an ordinary customer: the app sells only
--- from data_kind = real, so a QA pool would never be shown or fulfilled. This exists to clear the
--- inert rows the retired seeds left behind.
+-- Re-stocking afterwards is `POST /api/admin/qa-catalogue/seed` as an Admin or ProductOwner, not a
+-- SQL script: `qr_payload` is encrypted by the model's value converter, so only the API can write a
+-- voucher the wallet can read.
 
 \set ON_ERROR_STOP on
 
@@ -347,6 +347,6 @@ UNION ALL SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_ki
 \echo 'Orders that mix pools and were therefore left alone - inspect by hand, not an error:'
 SELECT id, status FROM qa_mixed_orders ORDER BY id;
 
-\echo 'The QA pool is retired: the app sells only from data_kind = real, so there is nothing to re-seed.'
+\echo 'The QA pool is empty. Re-stock it with POST /api/admin/qa-catalogue/seed as Admin/ProductOwner.'
 
 COMMIT;

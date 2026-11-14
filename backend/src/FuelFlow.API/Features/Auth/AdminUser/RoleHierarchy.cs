@@ -15,8 +15,8 @@ namespace FuelFlow.Features.Auth.AdminUser;
 /// <b>The retired `QA` staff role.</b> It used to sit between Manager and User and admitted a
 /// tester to every endpoint the Staff policy covers, including the ones that move money. The
 /// owner ruled on 2026-10-21 that the QA identity the product needs is the client-side test
-/// account — an ordinary <c>User</c> row with <c>is_qa_account = true</c> and a sandboxed merchant
-/// — and that the staff role is unused. So the role is no longer staff:
+/// account — an ordinary <c>User</c> row with <c>is_qa_account = true</c>, a sandboxed merchant
+/// and the QA stock pool — and that the staff role is unused. So the role is no longer staff:
 /// <c>SeedRoles.IsStaff</c> answers "no", <c>CanAssignRole</c> refuses to hand it out, and every
 /// rule below refuses it as an actor. The <c>roles</c> row still exists; a name the code no
 /// longer knows would make a row the database may still carry unnameable.

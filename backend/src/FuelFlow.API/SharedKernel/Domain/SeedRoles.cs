@@ -23,8 +23,8 @@ internal static class SeedRoles
     /// <b>Why it is retired.</b> It used to sit between Manager and User and admitted a tester to
     /// every endpoint the Staff policy covers — including the ones that move money — while the
     /// QA identity the product actually needs is the client-side test account: an ordinary
-    /// <c>User</c> row with <c>is_qa_account = true</c> and a sandboxed merchant (see
-    /// <c>Features/Auth/QaTestAccess</c>). The owner confirmed on 2026-10-21 that no
+    /// <c>User</c> row with <c>is_qa_account = true</c>, a sandboxed merchant and the QA stock
+    /// pool (see <c>Features/Auth/QaTestAccess</c>). The owner confirmed on 2026-10-21 that no
     /// account holds the staff role, and that the two are not to be conflated.
     /// </para>
     /// <para>

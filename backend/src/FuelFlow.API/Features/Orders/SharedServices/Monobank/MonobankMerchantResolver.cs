@@ -68,10 +68,10 @@ public sealed class MonobankMerchantResolver : IMonobankMerchantResolver
     private bool IsQa(string? phoneNumber, bool isQaAccount)
     {
         // Either server-side signal routes to the sandbox. The allowlist (deploy config) is
-        // the primary authority; the profile flag (admin-set in the DB) is honoured too, so a
-        // flagged QA account can never pay live money just because someone forgot its phone in
-        // Monobank:QaPhones. Neither is self-service, which is the property that makes this safe
-        // - see the remarks on MonobankOptions.QaPhones.
+        // the primary authority; the profile flag (admin-set in the DB, the same signal that
+        // routes test stock) is honoured too, so a flagged QA account can never pay live money
+        // just because someone forgot its phone in Monobank:QaPhones. Neither is self-service,
+        // which is the property that makes this safe - see the remarks on MonobankOptions.QaPhones.
         var allowlisted = !string.IsNullOrWhiteSpace(phoneNumber)
             && _options.QaPhoneList.Contains(phoneNumber);
         return allowlisted || isQaAccount;
