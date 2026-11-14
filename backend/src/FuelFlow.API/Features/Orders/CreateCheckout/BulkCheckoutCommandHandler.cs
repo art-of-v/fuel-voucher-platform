@@ -3,10 +3,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Settings;
-using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Availability;
-using FuelFlow.Features.Vouchers.Renewal;
-using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Orders.SettlePaidOrder;
 using FuelFlow.SharedKernel;
@@ -26,8 +23,8 @@ public sealed class BulkCheckoutCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IMonobankClientFactory _monobankClientFactory;
-private readonly IMonobankMerchantResolver _merchantResolver;
-private readonly RuntimeSettingsService _runtimeSettings;
+    private readonly IMonobankMerchantResolver _merchantResolver;
+    private readonly RuntimeSettingsService _runtimeSettings;
     private readonly MonobankOptions _monobankOptions;
     private readonly ILogger<BulkCheckoutCommandHandler> _logger;
     private readonly NotificationDispatcher _notifications;
@@ -53,7 +50,6 @@ private readonly RuntimeSettingsService _runtimeSettings;
         _monobankOptions = monobankOptions.Value;
         _runtimeSettings = runtimeSettings;
         _notifications = notifications;
-        _monobankOptions = monobankOptions.Value;
         _logger = logger;
         _stock = stock;
         _metrics = metrics;
@@ -111,7 +107,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             .Where(f => BrandIds.Contains(f.BrandId) && fuelTypeIds.Contains(f.Id))
             .ToListAsync(cancellationToken);
 
-// Inactive accounts keep a read-only session but cannot pay.
+        // Inactive accounts keep a read-only session but cannot pay.
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Id == command.UserId.Value, cancellationToken);
 
@@ -124,12 +120,6 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // MonobankMerchantResolver's allowlist - so a QA account deleted and re-signed-up saw the QA
         // catalogue and was then stock-checked against the real pool. See CreateCheckoutCommandHandler.
         var isTestAccount = await _stock.IsTestAccountAsync(user.Id, cancellationToken);
-
-        // The resolved package rides along so the line can record what priced it. The order line stores the
-        // resulting price; pricing_basis stores the inputs behind it, which is the only thing that
-        // still answers "why was this 89.06?" once the contract and the fuel's pricing have moved on.
-        var itemPricing = new List<(CheckoutItem Item, SellablePackage Package, decimal DiscountPerLiter, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
-        var totalPrice = 0m;
 
         // Term-sale ladder, loaded once. Off by default, in which case every line below keeps the
         // undiscounted full-term behaviour exactly as before.
@@ -156,100 +146,24 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // twenty lines asked the database the same thing twenty times.
         var bestStockExpirations = await TermStockCoverage.BestStockExpirationsAsync(
             _context, wantedStock, cancellationToken);
-        foreach (var item in command.Items)
-        {
-            var fuelType = fuelTypes.FirstOrDefault(f =>
-                f.Id == item.FuelTypeId && f.BrandId == item.BrandId);
 
-            if (fuelType == null)
-                throw new ArgumentException(
-                    $"Invalid fuel type ID: {item.FuelTypeId} for Brand {item.BrandId}");
+        // Every line priced and every refusal raised before anything is written - an empty shelf, an
+        // unknown cost, a below-cost line or an unbackable term fails the whole bulk order.
+        var pricing = await BulkCheckoutPricer.PriceAsync(
+            new BulkCheckoutPricer.BulkPricingInput(
+                command.Items,
+                brandSlugs,
+                fuelTypes,
+                packages,
+                inStock,
+                bestStockExpirations,
+                termConfig,
+                command.UserId.Value),
+            _notifications,
+            _logger,
+            cancellationToken);
 
-            var package = packages.GetValueOrDefault(StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters));
-
-            if (package == null)
-                throw new ArgumentException(
-                    $"No pricing found for fuel type {item.FuelTypeId} at Brand {item.BrandId} for {item.Liters}L");
-
-            // Checked before the pricing guards below, and deliberately so: an empty shelf is the more
-            // fundamental answer, and refusing there means the below-cost alert is not fired for a sale
-            // that could never have completed anyway. One blocked line fails the whole bulk order, matching
-            // the below-cost behaviour — a customer who cannot buy one line cannot check out with it.
-            if (!inStock.Contains(StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters)))
-                throw new PackageOutOfStockException(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters);
-
-            var (discountPerLiter, termCode) = CheckoutTermResolver.Resolve(item, termConfig, command.UserId.Value, _logger);
-
-// Slice-3 hard block (safety net at checkout): refuse a below-cost line unless this
-            // supplier+fuel is opted in. One blocked item fails the whole bulk order.
-            // Evaluated against the DISCOUNTED figure: FuelPricing.IsBelowCost recomputes the price
-            // from cost + margin and would never see a term discount, letting a generous tier sell
-            // under cost while the guard reported the line was fine.
-            // TWO REFUSALS, and the second is the one that used to be missing. A fuel with NO
-            // recorded cost has nothing to compare the price against, so the answer is "cannot tell"
-            // - and a "cannot tell" that lets the sale through is not a guard. The catalogue import
-            // creates fuels with no cost on purpose (it knows the column price and nothing about
-            // what we pay), so this is every fuel the import has ever made, not a corner case.
-            var verdict = ServerPricing.TryGetBelowCostVerdict(package, discountPerLiter);
-            if (verdict == ServerPricing.BelowCostVerdict.UnknownCost)
-            {
-                throw new UnknownCostSaleBlockedException(item.FuelTypeId);
-            }
-
-            if (!fuelType.AllowBelowCost && verdict == ServerPricing.BelowCostVerdict.BelowCost)
-            {
-                // Same as the single-line path: a blocked basket tells nobody unless we say so.
-                // Throttled per fuel inside the dispatcher, so one customer's retry loop is one message.
-                await _notifications.BelowCostAsync(
-                    brandSlugs[item.BrandId!.Value], fuelType.Name,
-                    package.SupplierPricePerLiter ?? 0m, discountPerLiter, deliberate: false, cancellationToken);
-                throw new BelowCostSaleBlockedException(item.FuelTypeId);
-            }
-
-            // Defence in depth behind the picker's stock gate, and only after the cheaper below-cost
-            // check above. A term the ladder offered can still be unbackable by the time the cart is
-            // posted (stock sold, an admin raised the paper terms), and completing the sale would charge
-            // the long-term price for a validity fulfilment then clamps down to the stock's paper term.
-            // Refuse the stale term instead of silently downgrading it. Only a term that actually
-            // resolved is gated: a null termCode is the full-term sale (feature off, or no term asked
-            // for), which any stock satisfies.
-            if (termCode is not null
-                && VoucherRenewalTerms.TryFromCode(termCode, out var purchasedTerm))
-            {
-                var bestStockExpiration = bestStockExpirations.GetValueOrDefault(
-                    StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters));
-
-                if (!TermStockCoverage.CanHonour(bestStockExpiration, DateOnly.FromDateTime(SystemClock.UtcNow), purchasedTerm))
-                {
-                    throw new TermStockUnavailableException(item.FuelTypeId);
-                }
-            }
-
-            var unitPrice = ServerPricing.PackagePrice(package, item.Liters, discountPerLiter);
-
-            // checked: silent int wraparound here would decouple the amount we invoice from
-            // the vouchers we hand out. Overflow must fail the request, not wrap to a small total.
-            decimal lineTotal;
-            try
-            {
-                lineTotal = checked(unitPrice * item.Quantity);
-                totalPrice = checked(totalPrice + lineTotal);
-            }
-            catch (OverflowException)
-            {
-                throw new ArgumentException("Order total is too large", nameof(command));
-            }
-
-            if (item.Price != lineTotal)
-            {
-                _logger.LogWarning(
-                    "Client price {ClientPrice} does not match server price {ServerPrice} for user {UserId}, fuel {FuelTypeId}; using server price",
-                    item.Price, lineTotal, command.UserId, item.FuelTypeId);
-            }
-
-            itemPricing.Add((item, package, discountPerLiter, unitPrice, lineTotal,
-                ServerPricing.OriginalLineTotal(package, item.Liters, unitPrice, item.Quantity), termCode));
-        }
+        var totalPrice = pricing.TotalPrice;
 
         // The basket: the whole cart, normalized so that the same cart always keys alike, and
         // digested so that the key fits the column no matter how many lines the cart has.
@@ -400,25 +314,25 @@ private readonly RuntimeSettingsService _runtimeSettings;
             UpdatedAtUtc = SystemClock.UtcNow
         };
 
-        foreach (var (item, package, discountPerLiter, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
+        foreach (var line in pricing.Lines)
         {
             order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
-                Brand = brandSlugs[item.BrandId!.Value],
+                Brand = brandSlugs[line.Item.BrandId!.Value],
                 // The brand's key beside its name. The composite foreign key over (fuel, brand)
                 // is what checks the two against each other; until the readers move, both are
                 // written.
-                BrandId = package.BrandId,
-                FuelTypeId = item.FuelTypeId,
-                Liters = item.Liters,
-                Quantity = item.Quantity,
-                UnitPrice = unitPrice,
-                LineTotal = lineTotal,
-                OriginalLineTotal = originalLineTotal,
-                TermCode = termCode,
-                PricingBasis = OrderLinePricing.For(package, termCode, discountPerLiter)
+                BrandId = line.Package.BrandId,
+                FuelTypeId = line.Item.FuelTypeId,
+                Liters = line.Item.Liters,
+                Quantity = line.Item.Quantity,
+                UnitPrice = line.UnitPrice,
+                LineTotal = line.LineTotal,
+                OriginalLineTotal = line.OriginalLineTotal,
+                TermCode = line.TermCode,
+                PricingBasis = OrderLinePricing.For(line.Package, line.TermCode, line.DiscountPerLiter)
             });
         }
 
@@ -564,7 +478,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // invoice for this cart.
         await _context.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation(
+        _logger.LogInformation(
             "Bulk checkout created with {LineItemCount} line items, order {OrderId}, invoice {InvoiceId}",
             order.LineItems.Count, order.Id, invoiceResponse.InvoiceId);
 
