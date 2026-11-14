@@ -217,6 +217,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
 
         // ---- the QA test access ------------------------------------------------------
         ["PUT /api/admin/qa-test-access"] = AuthPolicies.QaTestAccess,
+        // Stocking the rehearsal shelf writes paper the reviewer will spend, and it writes it into
+        // the QA pool only. It sits with the switch that opens that pool, not with the catalogue
+        // tier that edits what customers buy.
+        ["POST /api/admin/qa-catalogue/seed"] = AuthPolicies.QaTestAccess,
 
         // ---- the promotion -----------------------------------------------------------
         // Granting a customer the promotion is not staff work and not account administration: it
