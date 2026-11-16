@@ -73,7 +73,7 @@
          is why the Dockerfile digest is bumped in the same change. NU1510 says "likely
          unnecessary"; it is necessary for the audit, hence the reference-local NoWarn. Remove the
          pin once Fido2 resolves >= 9.0.24 itself. -->
-    <PackageReference Include="System.Formats.Cbor" Version="10.0.15" NoWarn="NU1510" />
+    <PackageReference Include="System.Formats.Cbor" Version="11.0.0" NoWarn="NU1510" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
