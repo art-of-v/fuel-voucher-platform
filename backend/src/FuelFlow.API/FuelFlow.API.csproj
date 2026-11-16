@@ -32,7 +32,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="11.0.0" />
     <!-- The outbound HTTP clients: a timeout on every one, a circuit breaker on every one, and a
          retry with backoff on the ones that only read. The package is the official home of the
          resilience pipeline (Polly) for IHttpClientFactory - see
