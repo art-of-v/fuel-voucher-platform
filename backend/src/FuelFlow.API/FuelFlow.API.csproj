@@ -38,7 +38,7 @@
          resilience pipeline (Polly) for IHttpClientFactory - see
          SharedKernel/Resilience/OutboundHttpClient.cs for the policy and for why the acquirer
          is not retried. -->
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="11.0.0" />
     <PackageReference Include="Net.Codecrete.QrCodeGenerator" Version="2.1.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.18.0-rc.1" />
     <PackageReference Include="QuestPDF" Version="2026.9.1" />
