@@ -108,7 +108,7 @@
 
          Unlike the ImageSharp advisories the CI gate accepts, this is a patch bump inside the same
          major, so there is nothing to weigh against - just move. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
 
     <!-- Customer documents (per-order receipt, #119). QuestPDF ships no fonts of its own, so PT Sans
          is embedded below - see SharedKernel/Pdf/PdfFonts.cs for why the document must not depend on
