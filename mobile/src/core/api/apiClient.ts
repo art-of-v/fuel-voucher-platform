@@ -117,17 +117,17 @@ async function tryRefreshToken(): Promise<boolean> {
   return promise;
 }
 
-// /api/packages is not listed here even though the endpoint is anonymous. The answer no longer
-// depends on the caller — every caller, the QA account included, gets the one real catalogue — so
-// skipping the token would be harmless; leaving it attached keeps this list to the requests that
-// genuinely cannot carry a session. Pre-login browsing is unaffected either way.
+// Only the requests that genuinely cannot carry a session belong here. The catalogue endpoints
+// (/api/brands, /api/brands/fuel-types, /api/packages) are all readable anonymously, but their
+// answer is not the same for every caller: the stock gate counts the QA pool for a QA account and
+// the real shelf for everyone else, and the bearer token is the only thing that says which. Sending
+// them without it is how a signed-in reviewer got the empty real catalogue and a brand screen full
+// of "out of stock". Pre-login browsing still works: there is no stored token to attach.
 const PUBLIC_ENDPOINTS = [
   '/api/auth/send-code',
   '/api/auth/verify',
   '/api/auth/device/register',
   '/api/auth/device/challenge',
-  '/api/brands',
-  '/api/brands/fuel-types',
   '/api/logs',
 ];
 

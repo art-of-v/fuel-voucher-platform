@@ -321,10 +321,51 @@ describe('apiClient session lifetime', () => {
       .mockResolvedValueOnce(ok({ accessToken: 'fresh-token', refreshToken: 'rotated-token' }))
       .mockResolvedValueOnce(unauthorized);
 
-    const response = await apiFetch('/api/brands');
+    const response = await apiRequest('POST', '/api/auth/verify', {
+      phoneNumber: '+380110010203',
+      code: '000000',
+    });
 
     expect(response.status).toBe(401);
     expect(TokenStorage.clearTokens).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The catalogue is readable anonymously, but it does not answer the same thing to everyone: the
+   * stock gate counts the QA pool for a QA account and the real shelf for everybody else. The
+   * bearer token is the only place the caller's identity reaches those endpoints, so dropping it
+   * hands a signed-in reviewer the empty real catalogue — on 2026-11-16 that showed every package
+   * of a seeded brand as "out of stock" on the review build.
+   */
+  it('asks the catalogue as the signed-in account', async () => {
+    (TokenStorage.getAccessToken as jest.Mock).mockResolvedValue('session-token');
+    fetchMock.mockResolvedValue(ok([]));
+
+    await apiRequest('GET', '/api/brands');
+    await apiRequest('GET', '/api/brands/fuel-types?brandId=brand-1');
+    await apiRequest('GET', '/api/packages?brandId=brand-1&fuelTypeId=fuel-1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init.headers['Authorization']).toBe('Bearer session-token');
+    }
+  });
+
+  it('never sends a stored session on the sign-in steps', async () => {
+    (TokenStorage.getAccessToken as jest.Mock).mockResolvedValue('session-token');
+    fetchMock.mockResolvedValue(ok());
+
+    await apiRequest('POST', '/api/auth/send-code', { phoneNumber: '+380110010203' });
+    await apiRequest('POST', '/api/auth/verify', {
+      phoneNumber: '+380110010203',
+      code: '000000',
+    });
+    await apiRequest('POST', '/api/auth/device/challenge', { deviceId: 'device-1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init.headers['Authorization']).toBeUndefined();
+    }
   });
 
   it('leaves the session alone when the request carries a token of its own', async () => {
