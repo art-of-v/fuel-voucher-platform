@@ -118,7 +118,7 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "GET /api/brand-stations",
         "GET /api/brand-stations/{brandid}",
 
-        // Public contact form behind the /support page on palne.shop: a visitor with no account
+        // Public contact form behind the /support page on fuelflowmarketplace.com: a visitor with no account
         // must be able to reach support. Anonymous by design and spam-hardened at the endpoint
         // (per-IP named rate limit + global limiter + a "website" honeypot answered 204), see
         // SupportController. A reviewed decision, not a missing [Authorize].

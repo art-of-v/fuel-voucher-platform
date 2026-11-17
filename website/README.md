@@ -1,6 +1,6 @@
 # FuelFlow — marketing site
 
-Static export of the FuelFlow marketing site, served at `palne.shop`. Built with Next.js (App
+Static export of the FuelFlow marketing site, served at `fuelflowmarketplace.com`. Built with Next.js (App
 Router) + TypeScript.
 
 The `lf-` class prefix and the "Lemberg palette" name in `globals.css` are not a stale brand: they
@@ -96,6 +96,6 @@ are, and the header of `scripts/generate-brand-assets.mjs` for why this is not a
 ## Deployment
 
 `deploy/docker-compose.prod.yml` runs the `website/Dockerfile` image and `deploy/Caddyfile`
-reverse-proxies `palne.shop` and `www.palne.shop` to it; staging is
+reverse-proxies `fuelflowmarketplace.com` and `www.fuelflowmarketplace.com` to it; staging is
 `deploy/docker-compose.staging.yml` on the same pipeline. Both images are built by the CI job in
 `.github/workflows/ci.yml`, not by anything on the box.

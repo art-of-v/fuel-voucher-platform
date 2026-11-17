@@ -1,7 +1,7 @@
 # Caddy reverse proxy for FuelFlow.
 #
 # Caddy automatically requests and renews free HTTPS certificates from Let's Encrypt
-# for the two domains below. Requirements for that to work:
+# for the domains below. Requirements for that to work:
 #   1. DNS A records for both domains must already point at this server's IP
 #   2. Ports 80 and 443 must be open in the firewall
 # Certificates are stored in the `caddy_data` Docker volume, so they survive restarts.
@@ -58,7 +58,7 @@
 # `Expires` is mandatory and must be less than a year away. SecurityTxtGuardTests fails once it
 # is past, which is the renewal reminder rather than a silently expired promise.
 (security_txt) {
-	respond /.well-known/security.txt `Contact: https://palne.shop/support
+	respond /.well-known/security.txt `Contact: https://fuelflowmarketplace.com/support
 Expires: 2027-05-01T00:00:00.000Z
 Preferred-Languages: uk, en
 `
@@ -126,7 +126,11 @@ Preferred-Languages: uk, en
 }
 
 # --- Public API (mobile app + Monobank webhooks) ---
-{$API_DOMAIN} {
+# `api.palne.shop` is the legacy host baked into every installed app (the pinned TLS
+# host and the embedded OTA manifest URL). It stays in this block until a new app
+# release pins api.fuelflowmarketplace.com; dropping it earlier would 401 every
+# phone's checkout and break every update check.
+{$API_DOMAIN}, api.palne.shop {
 	import security_headers
 
 	encode zstd gzip
@@ -167,7 +171,7 @@ Preferred-Languages: uk, en
 # The support page posts to the API directly from the browser, so this domain
 # needs one allow-listed API path - exactly like the admin domain above. The
 # form's API origin is configured at build time via NEXT_PUBLIC_API_URL.
-palne.shop, www.palne.shop {
+fuelflowmarketplace.com, www.fuelflowmarketplace.com {
 	encode zstd gzip
 
 	# Deliberately NOT the admin security_headers snippet: its CSP assumes a Vite
@@ -187,7 +191,7 @@ palne.shop, www.palne.shop {
 		-Server
 	}
 
-	# Public contact form (palne.shop/support). Rate-limited in the API
+	# Public contact form (fuelflowmarketplace.com/support). Rate-limited in the API
 	# (5/h/IP named policy) and honeypot-guarded; CORS on the API must
 	# include this origin for the browser POST to pass.
 	@support_api path /api/support/messages
@@ -199,6 +203,27 @@ palne.shop, www.palne.shop {
 		respond @any_api 404
 		reverse_proxy fuelflow-website:5001
 	}
+}
+
+# --- Legacy domain redirects (301) ---
+# palne.shop -> fuelflowmarketplace.com: the old brand, printed material and the app's
+# deep links to /privacy/ and /support keep landing on the right pages. The .shop twin
+# is the defensive registration and redirects the same way. Both keep HSTS, so browsers
+# that cached it for palne.shop stay on https for the hop.
+#
+# The redirect targets are hardcoded, not {$ROOT_DOMAIN}: a deploy that recreates caddy
+# before deploy/.env.production is updated would otherwise redirect app.palne.shop to
+# itself and loop every admin session.
+palne.shop, www.palne.shop, fuelflowmarketplace.shop, www.fuelflowmarketplace.shop {
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	redir https://fuelflowmarketplace.com{uri} permanent
+}
+
+# The old admin origin. Staff bookmarks follow the redirect; the SPA itself is served
+# under {$ROOT_DOMAIN} (app.fuelflowmarketplace.com in production).
+app.palne.shop {
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	redir https://app.fuelflowmarketplace.com{uri} permanent
 }
 
 # ============================================================================

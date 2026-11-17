@@ -26,7 +26,7 @@ public sealed class SecurityTxtGuardTests
     [
         "{$ROOT_DOMAIN}",
         "{$API_DOMAIN}",
-        "palne.shop, www.palne.shop"
+        "fuelflowmarketplace.com, www.fuelflowmarketplace.com"
     ];
 
     [Fact]

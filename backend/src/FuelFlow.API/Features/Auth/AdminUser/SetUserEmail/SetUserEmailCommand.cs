@@ -5,7 +5,7 @@ namespace FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 /// verified change: the address is held pending until the recipient confirms via the emailed link.
 /// An empty/whitespace <paramref name="NewEmail"/> clears the address directly (no verification -
 /// staff simply fall back to SMS for OTP). <paramref name="ConfirmBaseUrl"/> is the public origin
-/// the confirmation link is built from (e.g. https://api.palne.shop), taken from the request.
+/// the confirmation link is built from (e.g. https://api.fuelflowmarketplace.com), taken from the request.
 /// </summary>
 public sealed record SetUserEmailCommand(
     Guid UserId,

@@ -1,6 +1,6 @@
 namespace FuelFlow.Features.Support.SharedModels;
 
-/// <summary>A message submitted through the public /support page on palne.shop.
+/// <summary>A message submitted through the public /support page on fuelflowmarketplace.com.
 /// Persisted before any delivery attempt so a SMTP outage never loses a
 /// customer message; EmailSentAtUtc stays null until the mail actually went out.</summary>
 public sealed class SupportMessage

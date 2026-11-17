@@ -7,7 +7,7 @@ import styles from './Support.module.css';
 
 type Status = 'idle' | 'sending' | 'sent' | 'error';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.palne.shop';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.fuelflowmarketplace.com';
 
 export default function SupportClient() {
   const [status, setStatus] = useState<Status>('idle');

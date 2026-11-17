@@ -6,7 +6,7 @@ import ScrollProgress from '@/components/ScrollProgress';
 // the Cyrillic subset away from the Latin one. See the comment there.
 import './globals.css';
 
-const siteUrl = 'https://palne.shop';
+const siteUrl = 'https://fuelflowmarketplace.com';
 
 export const viewport: Viewport = {
   themeColor: '#000000',

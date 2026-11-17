@@ -255,7 +255,7 @@ internal static class RateLimiterSetup
                         QueueLimit = 0
                     }));
 
-            // The public contact form on palne.shop/support is anonymous, so IP is the only
+            // The public contact form on fuelflowmarketplace.com/support is anonymous, so IP is the only
             // partition key available. Five messages per hour per IP is far above any real
             // person's need (they would call after two unanswered emails) while capping
             // automated abuse; the global 300/min/IP ceiling still applies on top.

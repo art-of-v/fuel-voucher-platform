@@ -191,7 +191,7 @@ public sealed class SupportMessageValidatorTests
     [Fact]
     public void Validate_EmailWithSurroundingWhitespace_Passes()
     {
-        // The form on palne.shop trims before it sends; a padded address is the same address.
+        // The form on fuelflowmarketplace.com trims before it sends; a padded address is the same address.
         var errors = CreateSupportMessageCommandValidator.Validate(
             new CreateSupportMessageCommand("  padded@example.com  ", "  padded message  ", null));
 
@@ -201,7 +201,7 @@ public sealed class SupportMessageValidatorTests
     [Fact]
     public void Validate_EmptyEmail_SaysTheSameThingThePageShows()
     {
-        // The message is what the visitor reads on palne.shop, so it is pinned here rather
+        // The message is what the visitor reads on fuelflowmarketplace.com, so it is pinned here rather
         // than left to a package's default wording.
         var errors = CreateSupportMessageCommandValidator.Validate(
             new CreateSupportMessageCommand("", "Hello", null));

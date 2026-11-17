@@ -35,7 +35,7 @@ public sealed class EdgeFrameGuardTests
         var production = blocks
             .Where(b => b.Address.Contains("{$ROOT_DOMAIN}", StringComparison.Ordinal)
                      || b.Address.Contains("{$API_DOMAIN}", StringComparison.Ordinal)
-                     || b.Address.Contains("palne.shop, www.palne.shop", StringComparison.Ordinal))
+                     || b.Address.Contains("fuelflowmarketplace.com, www.fuelflowmarketplace.com", StringComparison.Ordinal))
             .ToList();
 
         production.Should().HaveCount(3,

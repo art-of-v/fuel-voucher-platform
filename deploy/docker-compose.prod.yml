@@ -286,9 +286,12 @@ services:
       # filtering rejects the scrape with 400 and every metric panel shows no data.
       # It is not publicly reachable — external traffic arrives via Caddy as the
       # public domains above.
-      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};fuelflow-backend"
+      # `api.palne.shop` is the legacy API host baked into every installed app (TLS
+      # pin + embedded OTA manifest URL); it stays allowed until a new app release
+      # pins api.fuelflowmarketplace.com, then drops with the Caddyfile's legacy entry.
+      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};api.palne.shop;fuelflow-backend"
       Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
-      # The palne.shop support form POSTs cross-origin to the API (the static
+      # The marketing-site support form POSTs cross-origin to the API (the static
       # site has no server of its own). Without this origin the browser
       # preflight fails and every support submission dies before the API.
       Cors__AllowedOrigins__1: "https://${MARKETING_DOMAIN}"

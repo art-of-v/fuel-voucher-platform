@@ -26,7 +26,7 @@ export default function PrivacyPage() {
             <div className={styles.prose}>
               <p>
                 Ця політика описує, які персональні дані обробляє сервіс FuelFlow
-                (застосунок для мобільних пристроїв та сайт palne.shop, далі — «сервіс»),
+                (застосунок для мобільних пристроїв та сайт fuelflowmarketplace.com, далі — «сервіс»),
                 з якою метою, на якій підставі та як ви можете керувати своїми даними.
               </p>
 
@@ -118,7 +118,7 @@ export default function PrivacyPage() {
                 напишіть на{' '}
                 <a href="mailto:palne.shopua@gmail.com">palne.shopua@gmail.com</a> або
                 скористайтеся сторінкою{' '}
-                <a href="/support/">palne.shop/support</a> — відповімо протягом
+                <a href="/support/">fuelflowmarketplace.com/support</a> — відповімо протягом
                 робочого дня.
               </p>
 

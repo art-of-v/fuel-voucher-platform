@@ -115,10 +115,10 @@ docker compose --env-file .env.production -f docker-compose.prod.yml images
 echo
 echo "== waiting for health =="
 for _ in $(seq 1 24); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://api.palne.shop/health || echo 000)
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://api.fuelflowmarketplace.com/health || echo 000)
   if [[ "$code" == "200" ]]; then
-    echo "  api.palne.shop/health -> 200"
-    curl -s --max-time 10 https://api.palne.shop/health; echo
+    echo "  api.fuelflowmarketplace.com/health -> 200"
+    curl -s --max-time 10 https://api.fuelflowmarketplace.com/health; echo
     exit 0
   fi
   sleep 5
