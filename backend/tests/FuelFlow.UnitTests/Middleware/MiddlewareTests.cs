@@ -250,6 +250,51 @@ public sealed class MiddlewareTests : IDisposable
         nextCalled.Should().BeTrue();
     }
 
+    /// <summary>
+    /// An expired access token leaves the request unauthenticated but still carrying a token, and
+    /// [AllowAnonymous] reads answered it as if nobody had signed in: the stock-gated catalogue
+    /// returned the empty real shelf to a signed-in QA account, the app saw 200 and never took the
+    /// refresh path it already has. A 401 is what it acts on.
+    /// </summary>
+    [Fact]
+    public async Task InvokeAsync_ShouldReturn401_WhenTokenPresentButDidNotAuthenticate()
+    {
+        var context = CreateHttpContext(new ClaimsPrincipal());
+        context.Request.Path = "/api/brands/fuel-types";
+        context.Request.Headers.Authorization = "Bearer expired.token";
+
+        var nextCalled = false;
+        var middleware = new SessionValidationMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<SessionValidationMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context, _context);
+
+        nextCalled.Should().BeFalse();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    /// <summary>
+    /// The refresh call validates its own credential and carries no access token; refusing it for
+    /// an unauthenticated principal would break the only request that repairs an expired session.
+    /// </summary>
+    [Fact]
+    public async Task InvokeAsync_ShouldCallNext_WhenTokenPresentButNotAuthenticatedOnAuthEndpoint()
+    {
+        var context = CreateHttpContext(new ClaimsPrincipal());
+        context.Request.Path = "/api/auth/refresh";
+        context.Request.Headers.Authorization = "Bearer expired.token";
+
+        var nextCalled = false;
+        var middleware = new SessionValidationMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            NullLogger<SessionValidationMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context, _context);
+
+        nextCalled.Should().BeTrue();
+    }
+
     [Fact]
     public async Task InvokeAsync_ShouldCallNext_WhenDisabled()
     {
