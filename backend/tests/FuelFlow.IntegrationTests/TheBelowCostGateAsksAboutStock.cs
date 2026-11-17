@@ -95,6 +95,18 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
     }
 
     /// <summary>
+    /// Today, as the database sees it - the clock the precondition file itself compares against.
+    /// </summary>
+    private async Task<DateOnly> DatabaseTodayAsync()
+    {
+        await using var connection = new NpgsqlConnection(_fixture.ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand("SELECT CURRENT_DATE", connection);
+        return DateOnly.FromDateTime((DateTime)(await command.ExecuteScalarAsync())!);
+    }
+
+    /// <summary>
     /// The file's own SQL, run against this class's database, and the text it reported.
     /// </summary>
     /// <remarks>
@@ -208,6 +220,7 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
         var slug = $"slug-{Guid.NewGuid():N}"[..20];
         var stockedId = Guid.NewGuid();
         var bareId = Guid.NewGuid();
+        var today = await DatabaseTodayAsync();
 
         await using var context = CreateContext();
         context.Brands.Add(new Brand
@@ -257,11 +270,12 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
                 // The one value here that cannot come from TestClock: the file under test asks the
-                // database `supplier_expiration_date >= CURRENT_DATE`, and CURRENT_DATE is the real
-                // clock. On the frozen clock this was 2026-10-15 + a month, which went stale at the
-                // end of that month and made every stocked fuel read as out of stock - two tests
-                // failing on a calendar, not on the query.
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                // database `supplier_expiration_date >= CURRENT_DATE`, and CURRENT_DATE is the
+                // database's clock. On the frozen clock this was 2026-10-15 + a month, which went
+                // stale at the end of that month and made every stocked fuel read as out of stock -
+                // two tests failing on a calendar, not on the query. So the fixture asks the same
+                // clock the gate will ask.
+                SupplierExpirationDate = today,
                 VoucherNumber = $"V-{Guid.NewGuid():N}",
                 QrPayload = $"9018$500$;{Guid.NewGuid():N}",
                 CreatedAtUtc = TestClock.UtcNow,
