@@ -1,6 +1,6 @@
 {
   "level": "high",
-  "reviewedOn": "2026-10-31",
+  "reviewedOn": "2026-11-17",
   "note": "The advisories the JavaScript dependency gate accepts, each with the reason it is accepted. The gate (scripts/npm-audit-gate.mjs) fails the build on any advisory at or above the level above that is NOT listed here; the advisories below the level are listed as well, so the whole set of known advisories is on the record instead of a number. Every entry names the path the advisory reaches this repository through, the fix - or says there is none - and the reason the risk is accepted.",
   "advisories": {
     "GHSA-5p2g-fcmc-qvqq": {
@@ -50,6 +50,14 @@
       "path": "uuid 7.0.3 <- xcode <- @expo/config-plugins (the Expo plugin that edits the iOS Xcode project)",
       "fix": "11.1.1+, but xcode pins uuid ^7.0.3, so 11.x is a major bump.",
       "reason": "The vulnerable entry points are uuid's v3, v5 and v6 with a caller-supplied output buffer. xcode calls uuid.v4() only - pbxProject.generateUuid, to mint an object identifier - so the check that the advisory is about never runs."
+    },
+    "GHSA-fc5q-39xc-vjpf": {
+      "package": "picomatch",
+      "severity": "high",
+      "apps": ["admin", "mobile"],
+      "path": "admin: picomatch 4.0.7 <- tinyglobby <- vite (the dev server and the build; dev-only, the shipped admin is static files) and <- vitest. mobile: picomatch 4.0.7 <- tinyglobby / fdir <- Expo and Metro tooling, and 2.3.2 <- anymatch <- chokidar <- tailwindcss (the NativeWind stylesheet build), anymatch <- jest-haste-map, micromatch <- metro-file-map / jest / tailwindcss.",
+      "fix": "None published as of 2026-11-17: the advisory covers every version through 4.0.7 and 4.0.7 is the latest on npm (`first_patched_version` is null), so there is nothing to bump to and `npm audit fix` cannot clear it. npm's only suggestion is a parent major (vite 6.2.7 / tailwindcss 4.3.5), which is a toolchain migration rather than a hotfix and would not be the first patched picomatch. The entry goes when micromatch/picomatch#194 ships a release and the parents widen their ranges.",
+      "reason": "Build-time only, and the glob is ours. The ReDoS needs the attacker to control the pattern; in this tree every pattern is the repository's own configuration - Tailwind's content globs, Metro's source extensions and asset patterns, Vite's public-dir and module rules - matched against the repository's own file paths on a developer or CI machine. No glob comes from the network, a deep link or user input, and the code runs in the Node build step, not in the app bundle the customer installs."
     }
   }
 }
