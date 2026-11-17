@@ -103,7 +103,7 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
         await connection.OpenAsync();
 
         await using var command = new NpgsqlCommand("SELECT CURRENT_DATE", connection);
-        return DateOnly.FromDateTime((DateTime)(await command.ExecuteScalarAsync())!);
+        return (DateOnly)(await command.ExecuteScalarAsync())!;
     }
 
     /// <summary>
