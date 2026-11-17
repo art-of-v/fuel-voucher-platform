@@ -84,6 +84,25 @@ public sealed class SessionValidationMiddleware
         }
         else
         {
+            // A request that presents a token and still arrives unauthenticated is not anonymous:
+            // its session failed to validate (expired access token, rotated signing key, an
+            // unreadable token). Passing it on made every [AllowAnonymous] endpoint answer as if
+            // nobody had signed in - the stock-gated catalogue handed the real, empty shelf to a
+            // signed-in account, the app read 200, never refreshed, and stayed out of stock until
+            // the next launch. A 401 is the answer the client already knows: refresh once, retry.
+            //
+            // /api/auth stays exempt: refresh validates its own credential and carries no access
+            // token, so refusing it here would break the very call that fixes an expired session.
+            if (context.Request.Headers.Authorization.Count > 0 &&
+                !context.Request.Path.StartsWithSegments("/api/auth"))
+            {
+                _logger.LogInformation(
+                    "Session rejected: the presented token did not authenticate on {Path}",
+                    context.Request.Path.Value);
+                await Reject(context);
+                return;
+            }
+
             await _next(context);
         }
     }
