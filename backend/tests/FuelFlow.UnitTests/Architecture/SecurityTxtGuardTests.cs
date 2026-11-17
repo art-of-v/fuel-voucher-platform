@@ -25,7 +25,7 @@ public sealed class SecurityTxtGuardTests
     private static readonly string[] ProductionHosts =
     [
         "{$ROOT_DOMAIN}",
-        "{$API_DOMAIN}",
+        "{$API_DOMAIN}, api.palne.shop",
         "fuelflowmarketplace.com, www.fuelflowmarketplace.com"
     ];
 
