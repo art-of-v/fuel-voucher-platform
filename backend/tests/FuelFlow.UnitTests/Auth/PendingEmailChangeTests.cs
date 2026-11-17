@@ -27,7 +27,7 @@ public sealed class PendingEmailChangeTests
     [InlineData("   ")]
     public void ResolveConfirmBaseUrl_FallsBackToRequestOrigin_WhenUnconfigured(string? configured)
     {
-        var result = PendingEmailChange.ResolveConfirmBaseUrl(configured, "https", "api.palne.shop");
+        var result = PendingEmailChange.ResolveConfirmBaseUrl(configured, "https", "api.fuelflowmarketplace.com");
 
         result.Should().Be("https://api.fuelflowmarketplace.com");
     }
