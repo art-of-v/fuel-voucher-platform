@@ -256,7 +256,12 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
                 Liters = 10m,
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
-                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+                // The one value here that cannot come from TestClock: the file under test asks the
+                // database `supplier_expiration_date >= CURRENT_DATE`, and CURRENT_DATE is the real
+                // clock. On the frozen clock this was 2026-10-15 + a month, which went stale at the
+                // end of that month and made every stocked fuel read as out of stock - two tests
+                // failing on a calendar, not on the query.
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"V-{Guid.NewGuid():N}",
                 QrPayload = $"9018$500$;{Guid.NewGuid():N}",
                 CreatedAtUtc = TestClock.UtcNow,
