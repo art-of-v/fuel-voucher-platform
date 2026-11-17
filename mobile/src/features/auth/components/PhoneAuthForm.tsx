@@ -15,7 +15,7 @@ import {
 import { useLogin } from '../hooks/useLogin';
 import { TwoFactorSecretField } from './TwoFactorSecretField';
 
-const PRIVACY_POLICY_URL = 'https://palne.shop/privacy/';
+const PRIVACY_POLICY_URL = 'https://fuelflowmarketplace.com/privacy/';
 
 interface PhoneAuthFormProps {
   onSuccess: () => void;

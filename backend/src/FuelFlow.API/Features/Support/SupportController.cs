@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace FuelFlow.Features.Support;
 
 /// <summary>
-/// Public contact endpoint behind the /support page on palne.shop. Anonymous by
+/// Public contact endpoint behind the /support page on fuelflowmarketplace.com. Anonymous by
 /// design, which makes it a spam vector — it is therefore triple-guarded:
 /// a per-IP named rate limit, the global per-IP limiter, and a honeypot field
 /// ("website") that only bots fill in. Honeypot hits are answered 204 like

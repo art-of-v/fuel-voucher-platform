@@ -30,7 +30,7 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class RefreshOriginGuardIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    private const string AllowedOrigin = "https://app.palne.shop";
+    private const string AllowedOrigin = "https://app.fuelflowmarketplace.com";
     private const string HostileOrigin = "https://evil.example";
     private const string RefreshCookieName = "refresh_token";
 

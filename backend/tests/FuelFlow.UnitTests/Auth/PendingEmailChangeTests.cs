@@ -5,7 +5,7 @@ namespace FuelFlow.UnitTests.Auth;
 
 /// <summary>
 /// Covers the confirmation-link origin resolution behind planning #48: an admin-initiated email
-/// change built the confirm link from the request host (app.palne.shop), whose reverse proxy 404s
+/// change built the confirm link from the request host (app.fuelflowmarketplace.com), whose reverse proxy 404s
 /// /api/auth/email/confirm (that path is not on the admin origin's /api/* allow-list). The fix
 /// resolves a configured canonical API origin instead, falling back to the request host only when
 /// unconfigured (dev/local, single origin).
@@ -16,9 +16,9 @@ public sealed class PendingEmailChangeTests
     public void ResolveConfirmBaseUrl_UsesConfiguredOrigin_WhenSet()
     {
         var result = PendingEmailChange.ResolveConfirmBaseUrl(
-            "https://api.palne.shop", "https", "app.palne.shop");
+            "https://api.fuelflowmarketplace.com", "https", "app.fuelflowmarketplace.com");
 
-        result.Should().Be("https://api.palne.shop");
+        result.Should().Be("https://api.fuelflowmarketplace.com");
     }
 
     [Theory]
@@ -29,19 +29,19 @@ public sealed class PendingEmailChangeTests
     {
         var result = PendingEmailChange.ResolveConfirmBaseUrl(configured, "https", "api.palne.shop");
 
-        result.Should().Be("https://api.palne.shop");
+        result.Should().Be("https://api.fuelflowmarketplace.com");
     }
 
     [Fact]
     public void ConfirmUrl_FromConfiguredOrigin_LandsOnTheApiHost_NotTheAdminHost()
     {
-        // The admin dashboard request arrives on app.palne.shop, but the configured origin wins, so
+        // The admin dashboard request arrives on app.fuelflowmarketplace.com, but the configured origin wins, so
         // the emailed link points at the API host that actually serves the confirm endpoint.
         var baseUrl = PendingEmailChange.ResolveConfirmBaseUrl(
-            "https://api.palne.shop", "https", "app.palne.shop");
+            "https://api.fuelflowmarketplace.com", "https", "app.fuelflowmarketplace.com");
 
         var url = PendingEmailChange.BuildConfirmUrl(baseUrl, "TOKEN123");
 
-        url.Should().Be("https://api.palne.shop/api/auth/email/confirm?token=TOKEN123");
+        url.Should().Be("https://api.fuelflowmarketplace.com/api/auth/email/confirm?token=TOKEN123");
     }
 }

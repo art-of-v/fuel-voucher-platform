@@ -7,7 +7,7 @@ public sealed record UpdateUserCommand(
     string? LastName,
     DateOnly? Birthdate,
     string? ProfileImageUrl,
-    // Public origin the email-confirmation link is built from (e.g. https://api.palne.shop),
+    // Public origin the email-confirmation link is built from (e.g. https://api.fuelflowmarketplace.com),
     // taken from the request. Only used when Email is a change.
     string ConfirmBaseUrl = ""
 );

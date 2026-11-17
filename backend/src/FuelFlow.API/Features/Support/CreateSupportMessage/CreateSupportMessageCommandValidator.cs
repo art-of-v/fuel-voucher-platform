@@ -14,7 +14,7 @@ namespace FuelFlow.Features.Support.CreateSupportMessage;
 /// <para>
 /// The endpoint's answer is unchanged by the move: a broken field still comes back as a 400
 /// with the field named in the <c>errors</c> dictionary, which is what the support page on
-/// palne.shop reads.
+/// fuelflowmarketplace.com reads.
 /// </para>
 /// </summary>
 public static class CreateSupportMessageCommandValidator

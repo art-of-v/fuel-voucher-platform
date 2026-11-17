@@ -130,7 +130,7 @@ internal static class BrandedEmailLayout
         }
         sb.Append("<p style=\"margin:0;font-family:").Append(EmailBrand.FontStack)
           .Append(";font-size:12px;line-height:1.5;color:").Append(EmailBrand.TextMuted)
-          .Append(";text-align:center;\">FuelFlow &middot; palne.shop</p>")
+          .Append(";text-align:center;\">FuelFlow &middot; fuelflowmarketplace.com</p>")
           .Append("</td></tr></table></td></tr></table></body></html>");
 
         return sb.ToString();

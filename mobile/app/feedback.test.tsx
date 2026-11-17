@@ -125,7 +125,7 @@ describe('FeedbackScreen — the channel is offered', () => {
       fireEvent.press(fallback);
     });
 
-    expect(Linking.openURL).toHaveBeenCalledWith('https://palne.shop/support');
+    expect(Linking.openURL).toHaveBeenCalledWith('https://fuelflowmarketplace.com/support');
   });
 
   it('explains itself when Telegram refuses to open, instead of appearing to have worked', async () => {
@@ -157,7 +157,7 @@ describe('FeedbackScreen — when it cannot offer the channel', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('error-secondary'));
     });
-    expect(Linking.openURL).toHaveBeenCalledWith('https://palne.shop/support');
+    expect(Linking.openURL).toHaveBeenCalledWith('https://fuelflowmarketplace.com/support');
   });
 
   it('a network failure keeps the button and says the load failed', async () => {

@@ -42,7 +42,7 @@ export interface NetworkOffer {
   fuels: { fuelName: string; perLiter: number; saving: number | null }[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.palne.shop';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.fuelflowmarketplace.com';
 
 const NETWORK_NAMES: Record<string, string> = {
   okko: 'OKKO',

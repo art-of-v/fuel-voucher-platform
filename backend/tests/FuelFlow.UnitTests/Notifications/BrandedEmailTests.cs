@@ -40,7 +40,7 @@ public sealed class BrandedEmailTests
         message.HtmlBody.Should().Contain("FUELFLOW");
         message.HtmlBody.Should().Contain(EmailBrand.Canvas);
         message.HtmlBody.Should().Contain(EmailBrand.AccentBright);
-        message.HtmlBody.Should().Contain("palne.shop");
+        message.HtmlBody.Should().Contain("fuelflowmarketplace.com");
         message.HtmlBody.Should().Contain("Hello there");
         message.HtmlBody.Should().Contain("First paragraph.");
 

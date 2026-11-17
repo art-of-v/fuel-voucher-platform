@@ -32,7 +32,7 @@ public sealed class FeedbackWebhookHealthMonitorTests : IDisposable
     public async Task A_registered_webhook_reports_zero()
     {
         var bot = new StubFeedbackBot(new TelegramWebhookStatus(
-            "https://api.palne.shop/api/telegram/feedback/webhook", false, 0, null, null));
+            "https://api.fuelflowmarketplace.com/api/telegram/feedback/webhook", false, 0, null, null));
 
         await Monitor(bot, enabled: true).CheckWebhookAsync();
 

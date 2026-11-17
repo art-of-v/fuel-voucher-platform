@@ -86,7 +86,7 @@ export default function FeedbackScreen() {
     setTelegramMissing(!opened);
   };
 
-  const openWebForm = () => Linking.openURL('https://palne.shop/support');
+  const openWebForm = () => Linking.openURL('https://fuelflowmarketplace.com/support');
 
   if (loading) {
     return (

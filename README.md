@@ -77,7 +77,7 @@ FuelFlow/
 │   ├── app/                  # Expo Router screens (index, landing, packages, basket,
 │   │                         #   checkout, my-codes, map, profile, company/…)
 │   └── src/                  # components, hooks, features, core (api, i18n, store)
-├── website/                  # Next.js marketing site behind palne.shop (static export)
+├── website/                  # Next.js marketing site behind fuelflowmarketplace.com (static export)
 ├── deploy/                   # Production stack (compose, Caddyfile, backup/restore)
 ├── scripts/                  # Repository maintenance helpers
 ├── .github/                  # CI workflows

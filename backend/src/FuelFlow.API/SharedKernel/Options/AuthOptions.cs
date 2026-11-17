@@ -111,7 +111,7 @@ public sealed class AuthOptions
     public string StaffTotpIssuer { get; set; } = "FuelFlow";
 
     /// <summary>
-    /// Canonical public origin (scheme + host, e.g. <c>https://api.palne.shop</c>) that
+    /// Canonical public origin (scheme + host, e.g. <c>https://api.fuelflowmarketplace.com</c>) that
     /// email-change confirmation links are built from. The confirmation landing
     /// <c>GET /api/auth/email/confirm</c> is served only on the public API origin; the admin
     /// dashboard origin deliberately proxies just an allow-list of <c>/api/*</c> paths and 404s
