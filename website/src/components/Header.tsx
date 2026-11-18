@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { APP_STORE_URL } from '@/config/store';
 import { homeAnchor } from '@/lib/anchors';
+import BrandLockup from './BrandLockup';
 import styles from './Header.module.css';
 
 const navLinks = [
@@ -75,10 +76,9 @@ export default function Header() {
           <a
             href={homeAnchor(pathname, '#top')}
             className={styles.logo}
-            aria-label="FuelFlow — на головну"
+            aria-label="Fuel Flow — на головну"
           >
-            <span className={styles.logoMark} aria-hidden="true" />
-            <span className={styles.logoText}>FuelFlow</span>
+            <BrandLockup />
           </a>
 
           <nav

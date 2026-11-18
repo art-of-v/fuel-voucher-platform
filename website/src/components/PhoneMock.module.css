@@ -49,15 +49,10 @@
 }
 
 .brand {
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: var(--ink-soft);
-}
-
-.brandDot {
-  color: var(--accent);
+  display: flex;
+  align-items: center;
+  transform: scale(0.62);
+  transform-origin: left center;
 }
 
 .balance {

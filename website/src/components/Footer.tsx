@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { homeAnchor } from '@/lib/anchors';
+import BrandLockup from './BrandLockup';
 import styles from './Footer.module.css';
 
 const navLinks = [
@@ -22,9 +23,8 @@ export default function Footer() {
     <footer className={styles.footer}>
       <div className={`lf-container ${styles.container}`}>
         <div className={styles.brand}>
-          <a href={homeAnchor(pathname, '#top')} className={styles.logo} aria-label="FuelFlow — на головну">
-            <span className={styles.logoMark} aria-hidden="true" />
-            <span>FuelFlow</span>
+          <a href={homeAnchor(pathname, '#top')} className={styles.logo} aria-label="Fuel Flow — на головну">
+            <BrandLockup />
           </a>
           <p>Пальне під контролем — від оплати до колонки.</p>
         </div>

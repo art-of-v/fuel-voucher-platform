@@ -40,22 +40,6 @@
   flex-shrink: 0;
 }
 
-.logoMark {
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-  background: var(--accent);
-  -webkit-mask: url('/lion-mask.png') center / contain no-repeat;
-  mask: url('/lion-mask.png') center / contain no-repeat;
-}
-
-.logoText {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 680;
-  letter-spacing: -0.04em;
-}
-
 .nav {
   position: absolute;
   left: 50%;
@@ -309,13 +293,8 @@
     height: 68px;
   }
 
-  .logoText {
-    display: none;
-  }
-
-  .logoMark {
-    width: 40px;
-    height: 40px;
+  .logo {
+    max-width: 128px;
   }
 }
 

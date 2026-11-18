@@ -1,6 +1,7 @@
-import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import AppStoreBadge from './AppStoreBadge';
+import BrandLockup from './BrandLockup';
+import PhoneMock from './PhoneMock';
 import styles from './Hero.module.css';
 
 const STEP = 90;
@@ -9,18 +10,24 @@ const delay = (step: number) => ({ '--reveal-delay': `${step * STEP}ms` }) as CS
 export default function Hero() {
   return (
     <section className={styles.hero} id="top">
-      <picture className={styles.media}>
-        <Image
-          className={styles.bgImage}
-          src="/hero-station.jpg"
-          alt=""
-          width={1376}
-          height={768}
-          sizes="100vw"
-          priority
-        />
-      </picture>
-      <div className={styles.scrim} aria-hidden="true" />
+      <div className={styles.stage} aria-hidden="true">
+        <div className={styles.stageGrid} />
+        <div className={styles.stageBrand}>
+          <BrandLockup />
+        </div>
+        <div className={styles.phoneWrap}>
+          <PhoneMock />
+        </div>
+        <div className={styles.controlCard}>
+          <span>Fleet control</span>
+          <strong>12 500 л</strong>
+          <small>24 водії · 4 мережі</small>
+        </div>
+        <div className={styles.lockedCard}>
+          <span>Ціна зафіксована</span>
+          <strong>50,00 л</strong>
+        </div>
+      </div>
 
       <div className={`${styles.container} lf-container`}>
         <div className={styles.copy}>
