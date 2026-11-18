@@ -473,15 +473,33 @@ out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
 check "an unguarded switch may differ" 0 "$rc"
 cp "$GOOD_ENV" "$FIXTURE/.env.production"
 
-# The B2B form is the marketing site's primary conversion path. Production must
-# have a monitored sales destination, while staging deliberately permits an empty
-# sink so test enquiries are stored without reaching the real sales team.
-grep -Fq 'BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:?' \
+# The B2B form prefers its own sales destination. A box whose env file predates
+# the variable must still deploy and deliver to its already monitored support inbox.
+grep -Fq 'BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:-${SUPPORT_MAIL_TO_EMAIL:-}}' \
   "$SCRIPT_DIR/docker-compose.prod.yml"
-check "production requires a B2B sales inbox" 0 "$?"
+check "production business leads fall back to the support inbox" 0 "$?"
 grep -Fq 'BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:-}' \
   "$SCRIPT_DIR/docker-compose.staging.yml"
 check "staging keeps the B2B sales inbox optional" 0 "$?"
+
+# Render both production shapes: a box whose private env predates this variable,
+# and one that has moved B2B mail to a dedicated inbox. Compose interpolation is
+# the behaviour that failed the deploy, so inspect Compose's rendered value.
+legacy_env="$TMP/business-lead-legacy.env"
+dedicated_env="$TMP/business-lead-dedicated.env"
+cp "$GOOD_ENV" "$legacy_env"
+sed -i '/^BUSINESS_LEAD_MAIL_TO_EMAIL=/d;/^SUPPORT_MAIL_TO_EMAIL=/d' "$legacy_env"
+printf 'SUPPORT_MAIL_TO_EMAIL=support@example.com\n' >> "$legacy_env"
+out=$(docker compose --env-file "$legacy_env" -f "$SCRIPT_DIR/docker-compose.prod.yml" config 2>&1); rc=$?
+check "a legacy production env still renders" 0 "$rc"
+[[ "$out" == *"BusinessLeadMail__ToEmail: support@example.com"* ]]
+check "a legacy production env routes leads to support" 0 "$?"
+cp "$legacy_env" "$dedicated_env"
+printf 'BUSINESS_LEAD_MAIL_TO_EMAIL=sales@example.com\n' >> "$dedicated_env"
+out=$(docker compose --env-file "$dedicated_env" -f "$SCRIPT_DIR/docker-compose.prod.yml" config 2>&1); rc=$?
+check "a dedicated sales env still renders" 0 "$rc"
+[[ "$out" == *"BusinessLeadMail__ToEmail: sales@example.com"* ]]
+check "a dedicated sales inbox overrides support" 0 "$?"
 
 # Both marketing vhosts expose exactly the two anonymous form writes. The catch-all
 # below them still returns 404 for every other /api path.
