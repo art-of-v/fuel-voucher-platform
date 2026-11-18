@@ -158,8 +158,7 @@ internal static class ServiceSetup
         AddContractServices(services);
         AddAdminServices(services);
         AddNotificationServices(services, config);
-        AddSupportServices(services, config);
-        AddBusinessLeadServices(services, config);
+        AddContactServices(services, config);
         AddFeedbackServices(services, config);
         AddSettlementServices(services, config);
         AddBackgroundJobServices(services);
@@ -502,21 +501,13 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
             OutboundCallKind.Write);
     }
 
-    private static void AddSupportServices(IServiceCollection services, IConfiguration config)
+    private static void AddContactServices(IServiceCollection services, IConfiguration config)
     {
         services.Configure<SupportMailOptions>(config.GetSection(SupportMailOptions.SectionName));
         services.AddScoped<CreateSupportMessageCommandHandler>();
         services.AddScoped<ISupportMailSender, SupportMailSender>();
-        // Reuses the SupportMail SMTP connection for transactional mail (admin OTP).
         services.AddScoped<IEmailSender, SmtpEmailSender>();
-    }
-
-    private static void AddBusinessLeadServices(IServiceCollection services, IConfiguration config)
-    {
-        services.Configure<BusinessLeadMailOptions>(
-            config.GetSection(BusinessLeadMailOptions.SectionName));
-        services.AddScoped<FuelFlow.Features.BusinessLeads.IBusinessLeadMailSender,
-            FuelFlow.Features.BusinessLeads.BusinessLeadMailSender>();
+        services.AddBusinessLeadServices(config);
     }
 
     private static void AddFeedbackServices(IServiceCollection services, IConfiguration config)
