@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { APP_STORE_NAME, APP_STORE_QR_SRC } from '@/config/store';
 import styles from './StoreQrCard.module.css';
 
@@ -12,13 +13,12 @@ export default function StoreQrCard({ className }: { className?: string }) {
   return (
     <div className={`${styles.card} ${className ?? ''}`}>
       <div className={styles.qrPlate}>
-        <img
+        <Image
           src={APP_STORE_QR_SRC}
           alt={`QR-код для встановлення ${APP_STORE_NAME} з App Store`}
-          width={37}
-          height={37}
-          loading="lazy"
-          decoding="async"
+          width={152}
+          height={152}
+          sizes="152px"
         />
       </div>
       <div className={styles.copy}>

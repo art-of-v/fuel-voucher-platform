@@ -42,6 +42,7 @@ public	attestation_keys	SIUD	-	App Attest key registry; written by the attestati
 public	bank_accounts	SIUD	-	Customer payout accounts; ordinary product data.
 public	brand_stations	SIUD	-	Catalogue sync rewrites stations (insert + update + retire).
 public	brands	SIUD	-	Admin CRUD.
+public	business_leads	SIU	SD	Fuel Flow advances the sales pipeline; maintenance purges terminal leads after a year.
 public	chart_of_accounts	SIUD	-	Seeded at startup and editable by the admin surface.
 public	company_invitations	SIUD	-	Invitations are created, accepted (updated) and revoked (deleted).
 public	company_members	SIUD	-	Membership lifecycle; RLS-covered.

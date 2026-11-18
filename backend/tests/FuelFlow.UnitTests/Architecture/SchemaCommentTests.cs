@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Acquiring;
+using FuelFlow.Features.BusinessLeads.SharedModels;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -506,6 +507,22 @@ public sealed class SchemaCommentTests
             nameof(SupportMessage.EmailSentAtUtc),
             nameof(SupportMessage.SendError),
             nameof(SupportMessage.CreatedAtUtc)
+        ]),
+        (typeof(BusinessLead),
+        [
+            nameof(BusinessLead.CompanyName),
+            nameof(BusinessLead.ContactName),
+            nameof(BusinessLead.Phone),
+            nameof(BusinessLead.Email),
+            nameof(BusinessLead.FleetSize),
+            nameof(BusinessLead.Message),
+            nameof(BusinessLead.Status),
+            nameof(BusinessLead.UserAgent),
+            nameof(BusinessLead.IpAddress),
+            nameof(BusinessLead.EmailSentAtUtc),
+            nameof(BusinessLead.EmailSendError),
+            nameof(BusinessLead.CreatedAtUtc),
+            nameof(BusinessLead.UpdatedAtUtc)
         ]),
         (typeof(CompanyMember),
         [

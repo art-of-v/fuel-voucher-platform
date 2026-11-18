@@ -215,14 +215,39 @@ try {
   }
   await noJsPage.close();
 
-  /* ── Phase 3: does the background photo carry its own copy? ── */
+  /* ── Phase 2b: reduced motion renders the settled state immediately ── */
+  const reducedPage = await browser.newPage();
+  await reducedPage.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await reducedPage.setViewport({ width: 390, height: 900 });
+  await reducedPage.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
+  const reduced = await reducedPage.evaluate(() => {
+    const items = [...document.querySelectorAll('#top [class*="Hero_reveal"]')];
+    const image = document.querySelector('#top [class*="Hero_bgImage"]');
+    return {
+      count: items.length,
+      hidden: items.filter((element) => parseFloat(getComputedStyle(element).opacity) < 0.999).length,
+      animated: items.filter((element) => getComputedStyle(element).animationName !== 'none').length,
+      imageAnimated: image ? getComputedStyle(image).animationName !== 'none' : true,
+    };
+  });
+  if (!reduced.count || reduced.hidden || reduced.animated || reduced.imageAnimated) {
+    failures.push(`390px (reduced motion): hero is not settled (${JSON.stringify(reduced)})`);
+  }
+  rows.push(
+    `   390px (reduced motion)  reveals=${reduced.count}  hidden=${reduced.hidden}  animated=${reduced.animated}`,
+  );
+  await reducedPage.close();
+
+  /* ── Phase 3: does the hero photo carry its own copy? ── */
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
   const baked = await page.evaluate(async (band, rowPixels) => {
-    const url = /url\("?([^")]+)"?\)/.exec(
-      getComputedStyle(document.querySelector('#top [class*="Hero_bgImage"]')).backgroundImage,
-    )?.[1];
-    if (!url) return { error: 'the hero background has no background-image' };
+    const heroImage = document.querySelector('#top [class*="Hero_bgImage"]');
+    const backgroundUrl = heroImage
+      ? /url\("?([^")]+)"?\)/.exec(getComputedStyle(heroImage).backgroundImage)?.[1]
+      : null;
+    const url = heroImage?.currentSrc || heroImage?.src || backgroundUrl;
+    if (!url) return { error: 'the hero has no image asset' };
 
     const bmp = await createImageBitmap(await (await fetch(url, { cache: 'no-store' })).blob());
     const c = document.createElement('canvas');
@@ -255,7 +280,7 @@ try {
     return { url, size: `${W}x${H}`, longest, at };
   }, COPY_BAND, COPY_ROW_PIXELS);
 
-  console.log('\n=== hero background asset ===');
+  console.log('\n=== hero image asset ===');
   console.log(
     baked.error
       ? `  ${baked.error}`
@@ -266,7 +291,7 @@ try {
     failures.push(baked.error);
   } else if (baked.longest >= COPY_MIN_ROWS) {
     failures.push(
-      `the hero background (${baked.url}) has baked-in copy: ${baked.longest} consecutive rows of text-like` +
+      `the hero image (${baked.url}) has baked-in copy: ${baked.longest} consecutive rows of text-like` +
       ` pixels in the left ${Math.round(COPY_BAND * 100)}%, starting at y=${baked.at} of ${baked.size}.` +
       ' It is a finished advert, not a background - the live headline is painted on top of it.',
     );
@@ -285,5 +310,5 @@ if (failures.length) {
 report(
   'hero',
   failures,
-  `copy settles visible and unclipped across ${WIDTHS.length} widths, the CTA fits, and the background carries no baked-in copy.`,
+  `copy settles visible and unclipped across ${WIDTHS.length} widths, the CTA fits, and the hero image carries no baked-in copy.`,
 );

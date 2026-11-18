@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.BusinessLeads.SharedModels;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
@@ -58,6 +59,10 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.ErrorLogs.CountAsync()).Should().Be(1);
         (await verify.PushTokens.CountAsync()).Should().Be(1);
         (await verify.SupportMessages.CountAsync()).Should().Be(1);
+        (await verify.BusinessLeads.CountAsync()).Should().Be(2);
+        (await verify.BusinessLeads.AnyAsync(l => l.CompanyName == "eligible-terminal")).Should().BeFalse();
+        (await verify.BusinessLeads.AnyAsync(l => l.CompanyName == "ancient-active")).Should().BeTrue();
+        (await verify.BusinessLeads.AnyAsync(l => l.CompanyName == "recent-terminal")).Should().BeTrue();
         (await verify.SupportMessages.AllAsync(m => m.Message != "eligible")).Should().BeTrue();
 
         // Counts alone prove the right *number* went; the discriminator asserts prove the right
@@ -284,6 +289,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.AuditEventOutbox.CountAsync()).Should().Be(2);
         (await verify.Devices.CountAsync()).Should().Be(3);
         (await verify.SupportMessages.CountAsync()).Should().Be(2);
+        (await verify.BusinessLeads.CountAsync()).Should().Be(3);
     }
 
     /// <summary>
@@ -567,6 +573,12 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         seed.SupportMessages.Add(NewSupportMessage("eligible", now.AddDays(-400)));
         seed.SupportMessages.Add(NewSupportMessage("recent", now.AddDays(-10)));
 
+        // Sales enquiries age only after the pipeline is resolved. The ancient active row must stay,
+        // while terminal rows use UpdatedAtUtc so each gets a full year after its final decision.
+        seed.BusinessLeads.Add(NewBusinessLead("eligible-terminal", BusinessLeadStatus.Rejected, now.AddDays(-400)));
+        seed.BusinessLeads.Add(NewBusinessLead("ancient-active", BusinessLeadStatus.Qualified, now.AddDays(-400)));
+        seed.BusinessLeads.Add(NewBusinessLead("recent-terminal", BusinessLeadStatus.Converted, now.AddDays(-10)));
+
         // The admin change audit trail, aged only: a change two seasons old is pruned, last season's
         // is kept, and there is no "live" variant because a row here is not work waiting to happen -
         // it is a record of something a person already did.
@@ -658,6 +670,20 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         LoggedAtUtc = loggedAtUtc
     };
 
+    private static BusinessLead NewBusinessLead(
+        string company,
+        BusinessLeadStatus status,
+        DateTime updatedAtUtc) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        CompanyName = company,
+        ContactName = "Retention Contact",
+        Phone = "+380970011771",
+        Status = status,
+        CreatedAtUtc = updatedAtUtc.AddDays(-1),
+        UpdatedAtUtc = updatedAtUtc
+    };
+
     private static SupportMessage NewSupportMessage(string message, DateTime createdAtUtc) => new()
     {
         Id = Guid.NewGuid(),
@@ -692,7 +718,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         using var context = CreateContext();
         await context.Database.MigrateAsync();
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "support_messages", "app_settings", "users", "feedback_message_replies", "feedback_messages", "qr_parameters", "purchase_batches", "voucher_imports", "voucher_import_errors" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "support_messages", "business_leads", "app_settings", "users", "feedback_message_replies", "feedback_messages", "qr_parameters", "purchase_batches", "voucher_imports", "voucher_import_errors" RESTART IDENTITY CASCADE""");
         seed(context);
         await context.SaveChangesAsync();
     }

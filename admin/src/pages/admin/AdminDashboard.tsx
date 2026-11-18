@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  BriefcaseBusiness,
   Bug,
   Building,
   Handshake,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import AuditTab from "@/components/AuditTab";
+import BusinessLeadsTab from "@/components/BusinessLeadsTab";
 import BrandsTab from "@/components/BrandsTab";
 import ContractsTab from "@/components/ContractsTab";
 import CustomerRenewalTab from "@/components/CustomerRenewalTab";
@@ -24,6 +26,7 @@ import SuppliersTab from "@/components/SuppliersTab";
 import VoucherExchangeTab from "@/components/VoucherExchangeTab";
 import { StatementReconciliationPanel } from "@/components/StatementReconciliationPanel";
 import { apiRequest } from "@/lib/api-client";
+import { businessLeadKeys } from "@/components/business-leads";
 import { useI18n } from "@/lib/i18n";
 import { signOut as endSession } from "@/lib/session";
 import { useSession } from "@/lib/session-store";
@@ -44,6 +47,7 @@ import VouchersTab from "./VouchersTab";
  */
 const VALID_TABS = [
   "brands",
+  "businessLeads",
   "purchases",
   "users",
   "vouchers",
@@ -114,6 +118,18 @@ export default function AdminDashboard() {
     },
   });
 
+  const businessLeadAttention = useQuery<{ count: number }>({
+    queryKey: businessLeadKeys.attention,
+    enabled: !!user,
+    refetchInterval: 60_000,
+    queryFn: () =>
+      apiRequest<void, { count: number }>(
+        "GET",
+        "/api/admin/business-leads/attention/count",
+      ),
+  });
+  const businessLeadCount = businessLeadAttention.data?.count ?? 0;
+
   return (
     <Layout
       activeTab={activeTab}
@@ -123,6 +139,7 @@ export default function AdminDashboard() {
       }}
       user={user}
       badges={{
+        businessLeads: businessLeadCount,
         voucherExchange: exchangeAttentionCount,
         heldPayments: heldPaymentCount,
       }}
@@ -180,6 +197,16 @@ export default function AdminDashboard() {
               {t("nav.customerRenewal")}
             </h2>
             <CustomerRenewalTab />
+          </div>
+        )}
+
+        {activeTab === "businessLeads" && (
+          <div className="animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+              <BriefcaseBusiness className="w-6 h-6 text-primary" />
+              {t("businessLeads.title")}
+            </h2>
+            <BusinessLeadsTab />
           </div>
         )}
 

@@ -532,6 +532,107 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("verification_codes", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.BusinessLeads.SharedModels.BusinessLead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("company_name")
+                        .HasComment("The company or fleet asking Fuel Flow to contact it.");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contact_name")
+                        .HasComment("The person Fuel Flow should ask for when following up.");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the public business enquiry was accepted.");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email")
+                        .HasComment("Optional reply address supplied by the contact and validated at the public edge.");
+
+                    b.Property<string>("EmailSendError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("email_send_error")
+                        .HasComment("The latest sales-notification failure, truncated; NULL after success or when delivery was not attempted.");
+
+                    b.Property<DateTime?>("EmailSentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("email_sent_at_utc")
+                        .HasComment("NULL until the sales notification was handed to SMTP successfully.");
+
+                    b.Property<int?>("FleetSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("fleet_size")
+                        .HasComment("Optional number of vehicles the contact says the company operates.");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("ip_address")
+                        .HasComment("The submitting client IP after trusted proxy processing; retained only for abuse diagnostics.");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("message")
+                        .HasComment("Optional business need the contact wrote in their own words.");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone")
+                        .HasComment("The contact phone in explicit E.164 form, validated at the public edge.");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status")
+                        .HasComment("Where the sales enquiry stands: New, Contacted, Qualified, Converted or Rejected.");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When the lead last moved in the sales pipeline; terminal retention is measured from this time.");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("user_agent")
+                        .HasComment("The submitting browser User-Agent, truncated and retained only for abuse diagnostics.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "UpdatedAtUtc")
+                        .HasDatabaseName("ix_business_leads_status_updated_at_utc");
+
+                    b.HasIndex("Status", "CreatedAtUtc", "Id")
+                        .HasDatabaseName("ix_business_leads_status_created_at_utc_id");
+
+                    b.ToTable("business_leads", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_business_lead_fleet_size", "fleet_size IS NULL OR fleet_size > 0");
+
+                            t.HasCheckConstraint("ck_business_lead_status", "status IN ('New', 'Contacted', 'Qualified', 'Converted', 'Rejected')");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Company.SharedModels.CompanyInvitation", b =>
                 {
                     b.Property<Guid>("Id")

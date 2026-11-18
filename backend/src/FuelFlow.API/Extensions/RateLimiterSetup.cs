@@ -24,6 +24,7 @@ internal static class RateLimiterSetup
     internal const string CompanyInvitePolicy = "company-invite";
     internal const string MonobankWebhookPolicy = "monobank-webhook";
     internal const string SupportMessagePolicy = "support-message";
+    internal const string BusinessLeadPolicy = "business-lead";
     internal const string TelegramFeedbackWebhookPolicy = "telegram-feedback-webhook";
 
     /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
@@ -262,6 +263,20 @@ internal static class RateLimiterSetup
             options.AddPolicy(SupportMessagePolicy, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     partitionKey: $"support:{GetIp(context)}",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromHours(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
+            // Public business enquiries are another low-volume anonymous form. A separate partition
+            // prevents an urgent support request from consuming the sales form's allowance (or vice
+            // versa), while the same five-per-hour ceiling keeps one host from filling the pipeline.
+            options.AddPolicy(BusinessLeadPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: $"business-lead:{GetIp(context)}",
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 5,

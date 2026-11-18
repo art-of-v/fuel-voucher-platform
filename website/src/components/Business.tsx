@@ -1,107 +1,65 @@
-'use client';
-
-import { useEffect, useRef } from 'react';
-import SectionIndex from './SectionIndex';
+import Image from 'next/image';
 import styles from './Business.module.css';
 
-const features = [
+const capabilities = [
   {
-    title: 'Паливний пул компанії',
-    body: 'Купуйте літри за оптовими цінами — весь обсяг зберігається в одному пулі на вашому екрані.',
+    title: 'Видавайте пальне, а не гроші',
+    body: 'Водій отримує призначений йому талон у FuelFlow без доступу до бюджету компанії.',
   },
   {
-    title: 'Видача водіям у два дотики',
-    body: 'Подаруйте ваучер водієві напряму в застосунку. Він бачить лише свій QR — без доступу до грошей компанії.',
+    title: 'Повертайте невикористаний ресурс',
+    body: 'Відкличте талон — невикористані літри повернуться у паливний пул компанії.',
   },
   {
-    title: 'Відкликання одним дотиком',
-    body: 'Водія звільнено — відкличте ваучер, і він просто перестане працювати. Літри повертаються в пул.',
-  },
-  {
-    title: 'Акт звірки без розбіжностей',
-    // "Повний пакет документів з ПДВ" was here. The reconciliation act is real
-    // (it is generated from Monobank statements); a VAT claim is a tax promise
-    // the site cannot make on its own, so it is gone rather than softened.
-    body: 'Отримано = видано + повернено. Акт звірки формується автоматично — без Excel і ручних звірок.',
+    title: 'Зводьте рух без таблиць',
+    body: 'Отримано, видано й повернено зводяться в акті звірки автоматично.',
   },
 ];
 
+const flow = ['Компанія', 'Паливний пул', 'Водій', 'QR', 'Пальне'];
+
 export default function Business() {
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
-    );
-    items.forEach((item) => {
-      item.classList.add('lf-reveal');
-      observer.observe(item);
-    });
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section className={`lf-section lf-section--deep ${styles.section}`} id="business" ref={ref}>
+    <section className={`lf-section ${styles.section}`} id="business">
       <div className={`lf-container ${styles.container}`}>
-        <header className={styles.head}>
-          <div>
-            <span className="lf-eyebrow lf-eyebrow--accent">Компаніям і автопаркам</span>
-            <h2 className={styles.title}>
-              Дай водіям пальне. Не гроші компанії.
-            </h2>
-            <p className={styles.intro}>
-              Компанія → паливний пул → водії → QR → пальне.
-              Кожен літр під контролем — від закупівлі до колонки.
-            </p>
-          </div>
-          <div className={styles.headRight}>
-            <SectionIndex current={7} total={10} label="Бізнес" />
-          </div>
-        </header>
-
-        <div className={`${styles.flow} ${styles.reveal}`} aria-hidden="true">
-          {['Компанія', 'Паливний пул', 'Водії', 'QR', 'Пальне'].map((step, i) => (
-            <span className={styles.flowItem} key={step}>
-              <span className={styles.flowStep}>{step}</span>
-              {i < 4 && <span className={styles.flowArrow} />}
-            </span>
-          ))}
+        <div className={styles.copy}>
+          <p className="lf-eyebrow">Для компаній і автопарків</p>
+          <h2 className={styles.title}>Один пул. Кожен літр на своєму місці.</h2>
+          <p className={styles.intro}>
+            Купуйте пальне для всієї команди й вирішуйте, хто, коли та скільки
+            отримає. FuelFlow лишає контроль у компанії, а водієві — простий талон.
+          </p>
+          <a href="#business-lead" className="lf-btn lf-btn--primary">
+            Обговорити автопарк
+          </a>
         </div>
 
-        <div className={styles.grid}>
-          {features.map((f, i) => (
-            <article
-              key={f.title}
-              className={`${styles.card} ${styles.reveal}`} data-glow
-              style={{ transitionDelay: `${i * 50}ms` }}
-            >
-              <span className={styles.cardIndex}>
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <h3 className={styles.cardTitle}>{f.title}</h3>
-              <p className={styles.cardBody}>{f.body}</p>
+        <figure className={styles.media}>
+          <Image
+            src="/station-night.jpg"
+            alt="Нічна паливна станція мережі-партнера"
+            width={1600}
+            height={1067}
+            sizes="(max-width: 900px) 100vw, 50vw"
+          />
+        </figure>
+
+        <ol className={styles.flow} aria-label="Шлях пального в компанії">
+          {flow.map((step, index) => (
+            <li key={step} className={styles.flowStep}>
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <strong>{step}</strong>
+            </li>
+          ))}
+        </ol>
+
+        <div className={styles.capabilities}>
+          {capabilities.map((item) => (
+            <article key={item.title}>
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
             </article>
           ))}
-        </div>
-
-        <div className={`${styles.ctaRow} ${styles.reveal}`}>
-          <a href="#contact" className={`lf-btn lf-btn--primary ${styles.cta}`}>
-            Підключити компанію
-          </a>
-          <span className={styles.ctaNote}>
-            Видавай · відкликай · контролюй — усе в застосунку
-          </span>
         </div>
       </div>
     </section>

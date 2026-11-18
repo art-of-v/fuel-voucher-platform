@@ -1,64 +1,45 @@
-'use client';
-
-import { useEffect, useRef } from 'react';
+import Image from 'next/image';
 import AppStoreBadge from './AppStoreBadge';
 import PhoneMock from './PhoneMock';
 import StoreQrCard from './StoreQrCard';
 import styles from './Final.module.css';
 
 export default function Final() {
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
-    );
-    items.forEach((item) => {
-      item.classList.add('lf-reveal');
-      observer.observe(item);
-    });
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section className={styles.section} id="download" ref={ref}>
-      <div className="lf-grid-bg" aria-hidden="true" />
+    <section className={styles.section} id="download">
+      <Image
+        className={styles.media}
+        src="/road-journey.jpg"
+        alt="Дорога попереду з салону автомобіля"
+        width={1600}
+        height={1067}
+        sizes="100vw"
+      />
+      <div className={styles.scrim} aria-hidden="true" />
       <div className={`lf-container ${styles.container}`}>
         <div className={styles.copy}>
-          <span className={`lf-eyebrow lf-eyebrow--accent ${styles.reveal}`}>
-            FuelFlow
-          </span>
-          <h2 className={`${styles.title} ${styles.reveal}`}>
-            Готовий заправлятися
-            <br />
-            по-новому?
-          </h2>
-          <p className={`${styles.lead} ${styles.reveal}`}>
-            Купуй сьогодні. Фіксуй ціну. Заправляйся за QR.
+          <p className="lf-eyebrow">Для особистих поїздок</p>
+          <h2 className={styles.title}>Ваше пальне вже у телефоні.</h2>
+          <p className={styles.lead}>
+            Купуйте пакет за актуальною ціною, зберігайте талон у FuelFlow і
+            заправляйтеся у мережі-партнері, коли потрібно.
           </p>
-          <div className={`${styles.actions} ${styles.reveal}`}>
+          <div className={styles.actions}>
             <AppStoreBadge />
-            <a href="#business" className={`lf-btn lf-btn--ghost ${styles.cta}`} data-magnetic>
-              Для бізнесу →
+            <a href="#business-lead" className="lf-btn lf-btn--ghost">
+              Для автопарку
             </a>
           </div>
-          <StoreQrCard className={`${styles.qr} ${styles.reveal}`} />
-        </div>
-        <div className={styles.phoneWrap}>
-          <div data-tilt>
-            <PhoneMock className={styles.reveal} />
+          <div className={styles.contacts}>
+            <a href="tel:+380970011771">+380 97 001 1771</a>
+            <a href="/support/">Підтримка</a>
+            <span>Львів · вул. Городоцька, 128а</span>
           </div>
+        </div>
+
+        <div className={styles.product}>
+          <PhoneMock />
+          <StoreQrCard className={styles.qr} />
         </div>
       </div>
     </section>

@@ -1,0 +1,3 @@
+namespace FuelFlow.Features.BusinessLeads.GetBusinessLeadAttentionCount;
+
+public sealed record GetBusinessLeadAttentionCountQuery;

@@ -1,5 +1,6 @@
 using FuelFlow.Features.Attestation.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.BusinessLeads.SharedModels;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Feedback.SharedModels;
@@ -160,6 +161,7 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<LedgerMappingRule> LedgerMappingRules => Set<LedgerMappingRule>();
     public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
+    public DbSet<BusinessLead> BusinessLeads => Set<BusinessLead>();
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     public DbSet<FeedbackMessage> FeedbackMessages => Set<FeedbackMessage>();
     public DbSet<FeedbackMessageReply> FeedbackMessageReplies => Set<FeedbackMessageReply>();

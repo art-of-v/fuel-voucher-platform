@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   Archive,
   BarChart3,
+  BriefcaseBusiness,
   Building,
   ShoppingCart,
   Users,
@@ -124,6 +125,11 @@ const Sidebar = ({
 
   const navItems = [
     { id: "brands", label: t("nav.brands"), icon: Building },
+    {
+      id: "businessLeads",
+      label: t("nav.businessLeads"),
+      icon: BriefcaseBusiness,
+    },
     { id: "purchases", label: t("nav.purchases"), icon: ShoppingCart },
     { id: "users", label: t("nav.users"), icon: Users },
     { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },

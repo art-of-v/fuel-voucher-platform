@@ -279,6 +279,9 @@ services:
       SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
       SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
+      # B2B leads use the same SMTP transport but a separate sales destination.
+      # A missing destination is a deployment error: the form is the site's primary CTA.
+      BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:?set BUSINESS_LEAD_MAIL_TO_EMAIL in .env.production (monitored sales inbox)}
 
       # --- Allowed hosts + CORS (admin is same-origin, so CORS is mostly a safety net) ---
       # `fuelflow-backend` is the in-network service name Prometheus scrapes as
@@ -291,9 +294,9 @@ services:
       # pins api.fuelflowmarketplace.com, then drops with the Caddyfile's legacy entry.
       AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};api.palne.shop;fuelflow-backend"
       Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
-      # The marketing-site support form POSTs cross-origin to the API (the static
-      # site has no server of its own). Without this origin the browser
-      # preflight fails and every support submission dies before the API.
+      # Marketing-site forms POST cross-origin to the API (the static site has no
+      # server of its own). Without these origins, support and B2B submissions
+      # fail at the browser preflight before they reach the API.
       Cors__AllowedOrigins__1: "https://${MARKETING_DOMAIN}"
       Cors__AllowedOrigins__2: "https://www.${MARKETING_DOMAIN}"
 

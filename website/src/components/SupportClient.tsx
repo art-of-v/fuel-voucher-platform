@@ -179,7 +179,8 @@ export default function SupportClient() {
                       </svg>
                     </button>
                     <p className={styles.terms}>
-                      Натискаючи, ви погоджуєтесь з обробкою персональних даних.
+                      Надсилаючи форму, ви погоджуєтеся з{' '}
+                      <a href="/privacy/">політикою конфіденційності</a>.
                     </p>
                   </div>
                 </form>

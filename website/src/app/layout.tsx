@@ -1,15 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import Effects from '@/components/Effects';
-import ScrollProgress from '@/components/ScrollProgress';
-// The typefaces are declared by hand at the top of globals.css, not through
-// next/font: next/font/local cannot express unicode-range, which is what splits
-// the Cyrillic subset away from the Latin one. See the comment there.
 import './globals.css';
 
 const siteUrl = 'https://fuelflowmarketplace.com';
 
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#030403',
   width: 'device-width',
   initialScale: 1,
 };
@@ -17,23 +12,23 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'FuelFlow — Купуй паливо сьогодні. Зафіксуй ціну.',
+    default: 'FuelFlow — пальне для компаній і автопарків',
     template: '%s — FuelFlow',
   },
   description:
-    'Цифровий паливний гаманець. Купуй літри за сьогоднішньою ціною, зберігай у телефоні, заправляйся за QR на OKKO, WOG, KLO, UPG.',
+    'Керуйте паливним пулом компанії, видавайте талони водіям і контролюйте кожен літр. Для водіїв — пальне за зафіксованою ціною у застосунку FuelFlow.',
   keywords: [
     'FuelFlow',
+    'пальне для бізнесу',
+    'паливо для автопарку',
+    'паливний пул компанії',
     'паливні талони',
     'цифровий паливний гаманець',
     'фіксована ціна пального',
-    'заправка за QR',
     'OKKO',
     'WOG',
     'KLO',
     'UPG',
-    'пальне за фіксованою ціною',
-    'паливо для компаній',
   ],
   authors: [{ name: 'FuelFlow' }],
   creator: 'FuelFlow',
@@ -44,31 +39,23 @@ export const metadata: Metadata = {
     locale: 'uk_UA',
     url: siteUrl,
     siteName: 'FuelFlow',
-    title: 'FuelFlow — Купуй паливо сьогодні. Зафіксуй ціну.',
+    title: 'FuelFlow — пальне під контролем',
     description:
-      'Пальне вже у твоєму телефоні. Купуй літри за сьогоднішньою ціною і заправляйся за QR.',
+      'Паливний пул, видача водіям і контроль витрат для компаній. Цифрові талони та зафіксована ціна — для кожної поїздки.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FuelFlow — Купуй паливо сьогодні. Зафіксуй ціну.',
+    title: 'FuelFlow — пальне під контролем',
     description:
-      'Пальне вже у твоєму телефоні. Купуй літри за сьогоднішньою ціною і заправляйся за QR.',
+      'Паливний пул, видача водіям і контроль витрат для компаній та автопарків.',
   },
   robots: { index: true, follow: true },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="uk">
       <head>
-        {/* The Cyrillic subsets carry every heading and most body copy, so they
-            are the ones worth fetching before first paint. Latin waits for the
-            browser to ask — next/font used to preload it, which is the one
-            nicety lost by declaring the faces by hand. */}
         <link
           rel="preload"
           href="/fonts/InterTight-cyrillic.woff2"
@@ -84,11 +71,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body>
-        <ScrollProgress />
-        <Effects />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

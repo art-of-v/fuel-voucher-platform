@@ -1,16 +1,12 @@
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
-import How from '@/components/How';
-import Numbers from '@/components/Numbers';
+import Business from '@/components/Business';
 import AppShowcase from '@/components/AppShowcase';
 import Prices from '@/components/Prices';
-import Partners from '@/components/Partners';
-import Business from '@/components/Business';
-import Gallery from '@/components/Gallery';
-import Manifesto from '@/components/Manifesto';
+import Contact from '@/components/Contact';
+import How from '@/components/How';
 import FAQ from '@/components/FAQ';
 import Final from '@/components/Final';
-import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
 
 export default function Home() {
@@ -19,17 +15,13 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
-        <How />
-        <Numbers />
+        <Business />
         <AppShowcase />
         <Prices />
-        <Partners />
-        <Business />
-        <Gallery />
-        <Manifesto />
+        <Contact />
+        <How />
         <FAQ />
         <Final />
-        <Contact />
       </main>
       <Footer />
     </>

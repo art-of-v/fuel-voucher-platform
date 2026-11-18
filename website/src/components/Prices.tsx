@@ -1,30 +1,38 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import SectionIndex from './SectionIndex';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import PhoneMock from './PhoneMock';
 import styles from './Prices.module.css';
 import {
   fetchCatalogue,
-  formatMoney,
   formatLiters,
+  formatMoney,
   groupByNetwork,
+  pickReferencePackage,
   type NetworkOffer,
+  type PublicPackage,
 } from '../lib/catalogue';
 
 type State =
   | { status: 'loading' }
-  | { status: 'ready'; networks: NetworkOffer[] }
+  | { status: 'ready'; networks: NetworkOffer[]; reference: PublicPackage | null }
   | { status: 'error' };
 
 export default function Prices() {
   const [state, setState] = useState<State>({ status: 'loading' });
-  const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let alive = true;
     fetchCatalogue()
       .then((rows) => {
-        if (alive) setState({ status: 'ready', networks: groupByNetwork(rows) });
+        if (alive) {
+          setState({
+            status: 'ready',
+            networks: groupByNetwork(rows),
+            reference: pickReferencePackage(rows),
+          });
+        }
       })
       .catch(() => {
         if (alive) setState({ status: 'error' });
@@ -34,128 +42,113 @@ export default function Prices() {
     };
   }, []);
 
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
-    );
-    items.forEach((item) => {
-      item.classList.add('lf-reveal');
-      observer.observe(item);
-    });
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section className={`lf-section ${styles.section}`} id="prices" ref={ref}>
+    <section className={`lf-section ${styles.section}`} id="prices">
+      <span id="numbers" className={styles.anchor} aria-hidden="true" />
+      <span id="networks" className={styles.anchor} aria-hidden="true" />
       <div className={`lf-container ${styles.container}`}>
         <header className={styles.head}>
           <div>
-            <span className="lf-eyebrow">Ціна зафіксована</span>
-            <h2 className={styles.title}>
-              Сьогоднішня ціна = завтрашнє пальне.
-            </h2>
-            <p className={styles.intro}>
-              Ціна фіксується в момент оплати й не змінюється до заправки.
-              Нижче — актуальний каталог пакетів, які зараз є в наявності: він
-              читається з нашого сервера, а не зі сторінки, тож не може
-              розійтися з тим, що ти побачиш у застосунку.
-            </p>
+            <p className="lf-eyebrow">Живий каталог</p>
+            <h2 className={styles.title}>Ціна фіксується. Пальне лишається вашим.</h2>
           </div>
-          <div className={styles.headRight}>
-            <SectionIndex current={5} total={10} label="Ціни" />
-          </div>
+          <p className={styles.intro}>
+            Тут немає вручну набраних тарифів. Сторінка читає той самий каталог,
+            який бачить застосунок FuelFlow.
+          </p>
         </header>
 
-        {state.status === 'loading' && (
-          <p className={styles.note}>Завантажуємо актуальні ціни…</p>
-        )}
+        <div className={styles.stage}>
+          <div className={styles.visual}>
+            <Image
+              src="/fuel-nozzle.jpg"
+              alt="Паливний пістолет на заправній колонці"
+              width={1600}
+              height={1067}
+              sizes="(max-width: 1050px) 100vw, 42vw"
+            />
+            <div className={styles.reference} aria-live="polite">
+              <span>Орієнтир каталогу</span>
+              <strong>
+                {state.status === 'ready' && state.reference
+                  ? state.reference.finalPricePerLiter.toFixed(2).replace('.', ',')
+                  : '—'}
+              </strong>
+              <small>грн / літр</small>
+              {state.status === 'ready' && state.reference ? (
+                <p>
+                  {state.reference.brandSlug.toUpperCase()} · {state.reference.fuelName}
+                </p>
+              ) : null}
+            </div>
+          </div>
 
-        {state.status === 'error' && (
-          <p className={styles.note}>
-            Не вдалося завантажити каталог прямо зараз. Актуальні ціни завжди
-            видно в застосунку — або зателефонуйте нам, і ми підкажемо.
-          </p>
-        )}
+          <div className={styles.ledger}>
+            {state.status === 'loading' ? (
+              <p className={styles.state} role="status">Завантажуємо актуальний каталог…</p>
+            ) : null}
 
-        {state.status === 'ready' && (
-          <>
-            <div className={styles.grid}>
-              {state.networks.map((offer, i) => (
-                <article
-                  key={offer.brandSlug}
-                  className={`${styles.card} ${styles.reveal}`}
-                  data-glow
-                  style={{ transitionDelay: `${i * 50}ms` }}
-                >
-                  <div className={styles.cardHead}>
-                    <span className={styles.cardIndex}>
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className={styles.cardName}>{offer.name}</span>
-                  </div>
+            {state.status === 'error' ? (
+              <div className={styles.state} role="status">
+                <strong>Каталог тимчасово недоступний.</strong>
+                <p>Актуальні ціни залишаються доступними у застосунку FuelFlow.</p>
+              </div>
+            ) : null}
 
-                  <div className={styles.heroPrice}>
-                    <span className={styles.heroLabel}>
-                      Від · {offer.cheapestFuel}
-                    </span>
-                    <div className={styles.heroValue}>
-                      {offer.fromPerLiter.toFixed(2).replace('.', ',')}
+            {state.status === 'ready' && state.networks.length === 0 ? (
+              <div className={styles.state} role="status">
+                <strong>Доступні пакети оновлюються.</strong>
+                <p>Перевірте каталог у застосунку трохи пізніше.</p>
+              </div>
+            ) : null}
+
+            {state.status === 'ready'
+              ? state.networks.map((offer) => (
+                  <article key={offer.brandSlug} className={styles.network}>
+                    <div className={styles.networkName}>
+                      <h3>{offer.name}</h3>
+                      <p>{offer.cheapestFuel}</p>
                     </div>
-                    <span className={styles.heroUnit}>грн / літр</span>
-                  </div>
-
-                  <ul className={styles.fuelList}>
-                    {offer.fuels.map((fuel) => (
-                      <li key={fuel.fuelName} className={styles.fuelRow}>
-                        <span className={styles.fuelName}>{fuel.fuelName}</span>
-                        <span className={styles.fuelValue}>
-                          {fuel.perLiter.toFixed(2).replace('.', ',')}
-                          {fuel.saving !== null && (
-                            <span className={styles.fuelSaving}>
-                              {' '}
-                              · {formatMoney(fuel.saving)} дешевше за колонку
-                            </span>
+                    <div className={styles.networkPrice}>
+                      <strong>{offer.fromPerLiter.toFixed(2).replace('.', ',')}</strong>
+                      <span>грн / л</span>
+                    </div>
+                    <div className={styles.networkMeta}>
+                      <span>{formatLiters(offer.volumes)} л</span>
+                      {offer.fuels.some((fuel) => fuel.saving !== null) ? (
+                        <span>
+                          економія до{' '}
+                          {formatMoney(
+                            Math.max(...offer.fuels.map((fuel) => fuel.saving ?? 0)),
                           )}
                         </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className={styles.cardFoot}>
-                    <span className={styles.cardNote}>
-                      Обсяги: {formatLiters(offer.volumes)} л
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
+                      ) : (
+                        <span>актуальна ціна FuelFlow</span>
+                      )}
+                    </div>
+                  </article>
+                ))
+              : null}
 
             <p className={styles.note}>
-              * Ціни — за літр, для найдешевшого пакета цієї мережі. Обсяги
-              відрізняються від мережі до мережі: одна й та сама мережа може
-              мати 2 і 50 л, а інша — лише 10 і 20. Порівняння «дешевше за
-              колонку» показується тільки там, де ми знаємо ціну на колонці
-              цієї позиції; решта цін — це наша ціна, без вигаданої вигоди.
+              Ціна вказана за літр у найдешевшому доступному пакеті мережі.
+              Порівняння з колонкою показується лише там, де сервер має актуальну
+              ціну на АЗС.
             </p>
-          </>
-        )}
+          </div>
+        </div>
 
-        <p className={styles.cta}>
-          <a href="#contact" className={styles.cardLink}>
-            Купити літри →
-          </a>
-        </p>
+        <div className={styles.phoneBand}>
+          <div>
+            <p className="lf-eyebrow">Для водія</p>
+            <h3>Талон, ціна й мережа — в одному місці.</h3>
+            <p>
+              Оберіть пакет у каталозі, оплатіть через Monobank і відкрийте талон
+              у своєму гаманці FuelFlow.
+            </p>
+          </div>
+          <PhoneMock />
+        </div>
       </div>
     </section>
   );
