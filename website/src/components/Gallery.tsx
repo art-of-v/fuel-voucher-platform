@@ -49,8 +49,8 @@ export default function Gallery() {
             <img
               src="/driver-interior.jpg"
               alt="FuelFlow — водій за кермом у місті"
-              width={918}
-              height={1026}
+              width={896}
+              height={1200}
             />
           </figure>
           <figure className={`${styles.card} ${styles.reveal}`} data-glow style={{ transitionDelay: '80ms' }}>
