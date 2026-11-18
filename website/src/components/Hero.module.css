@@ -44,6 +44,18 @@
   z-index: 2;
 }
 
+.stationLogo {
+  position: absolute;
+  top: 32.5%;
+  right: 15.5%;
+  z-index: 1;
+  width: clamp(92px, 10vw, 152px);
+  height: auto;
+  object-fit: cover;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
+  transform: rotate(-0.8deg);
+}
+
 .container {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -168,6 +180,10 @@
 }
 
 @media (max-width: 900px) {
+  .stationLogo {
+    display: none;
+  }
+
   .hero {
     min-height: max(720px, 100svh);
     padding-top: 132px;

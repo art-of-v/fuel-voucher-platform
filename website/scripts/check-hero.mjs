@@ -296,6 +296,16 @@ try {
       ' It is a finished advert, not a background - the live headline is painted on top of it.',
     );
   }
+
+  const branding = await page.evaluate(() => ({
+    logos: document.querySelectorAll('#top img[src*="fuelflow-prototype-logo"]').length,
+    lions: [...document.querySelectorAll('#top span')]
+      .filter((element) => getComputedStyle(element).maskImage.includes('lion-mask')).length,
+    stationLogo: Boolean(document.querySelector('#top img[class*="stationLogo"]')),
+  }));
+  if (branding.logos !== 2) failures.push(`hero has ${branding.logos} prototype logos instead of 2`);
+  if (branding.lions !== 1) failures.push(`hero has ${branding.lions} lions instead of 1`);
+  if (!branding.stationLogo) failures.push('hero has no logo on the AZK canopy');
 } finally {
   await browser.close();
   site.close();
