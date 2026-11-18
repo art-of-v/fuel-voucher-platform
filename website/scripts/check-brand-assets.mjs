@@ -93,12 +93,12 @@ if (!existsSync(SOURCE)) {
 
 const failures = [];
 const rows = [];
-const marketingMark = resolve(root, 'public/fuelflow-mark.svg');
+const marketingMark = resolve(root, 'public/fuelflow-prototype-logo.webp');
 const marketingLockup = resolve(root, 'src/components/BrandLockup.tsx');
 if (!existsSync(marketingMark)) {
   failures.push(`the marketing Fuel Flow mark is not committed (${marketingMark})`);
 } else if (!existsSync(marketingLockup)
-  || !readFileSync(marketingLockup, 'utf8').includes('/fuelflow-mark.svg')) {
+  || !readFileSync(marketingLockup, 'utf8').includes('/fuelflow-prototype-logo.webp')) {
   failures.push(`the marketing Fuel Flow mark is committed but the brand lockup does not load it`);
 }
 let built;

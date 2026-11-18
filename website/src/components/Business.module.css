@@ -12,7 +12,7 @@
 }
 
 .copy {
-  grid-column: 1 / span 6;
+  grid-column: 1 / span 8;
   position: relative;
   z-index: 1;
   padding-top: clamp(12px, 5vw, 88px);
@@ -31,23 +31,6 @@
   color: var(--ink-soft);
   font-size: clamp(16px, 1.2vw, 20px);
   line-height: 1.55;
-}
-
-.media {
-  grid-column: 7 / -1;
-  margin: 0;
-  min-height: clamp(520px, 64vw, 900px);
-  overflow: hidden;
-  background: var(--bg-2);
-}
-
-.media img {
-  width: 100%;
-  height: 100%;
-  min-height: inherit;
-  object-fit: cover;
-  object-position: 58% center;
-  filter: saturate(0.72) contrast(1.08) brightness(0.78);
 }
 
 .flow {
@@ -136,7 +119,6 @@
 
 @media (max-width: 900px) {
   .copy,
-  .media,
   .flow,
   .capabilities {
     grid-column: 1 / -1;
@@ -144,10 +126,6 @@
 
   .copy {
     padding-top: 0;
-  }
-
-  .media {
-    min-height: 540px;
   }
 
   .flow {
@@ -185,10 +163,5 @@
 @media (max-width: 640px) {
   .title {
     font-size: clamp(48px, 15vw, 76px);
-  }
-
-  .media {
-    min-height: 440px;
-    margin-inline: calc(-1 * var(--gutter));
   }
 }

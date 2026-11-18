@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Gate: the hero must remain visible across every responsive boundary and carry
- * the approved Fuel Flow product-stage branding rather than the retired station photo.
+ * Gate: the hero must actually be visible, and the photo behind it must be a
+ * background rather than a second, already-finished advert.
  *
  * Both failures shipped as a page that looked fine in review and in the DOM.
  *
@@ -22,11 +22,14 @@
  *    being right; all three have failed here, and none is visible in review
  *    because the DOM is correct and the copy is simply not painted.
  *
- * 2. VISUAL REGRESSION. A previous hero used an AI-generated marketing mockup
- *    with baked-in copy, then a generic station photo replaced it. The approved
- *    prototype is product-led instead: it carries the new Fuel Flow mark, the
- *    wallet phone and fleet-control information as live interface elements.
- *    Phase 3 pins that composition and refuses the retired station-photo hero.
+ * 2. COPY BAKED INTO THE PHOTO. The hero background shipped as an AI-generated
+ *    marketing mockup with its own headline, subhead, body line and CTA
+ *    composited into the pixels, sitting underneath a live HTML headline saying
+ *    the same things. At desktop widths the live copy covered it. At 502px
+ *    `background-size: cover` re-crops the photo, the baked copy slid out from
+ *    under the live headline and its tail - the "ВО" of "ПАЛИВО" - landed on top
+ *    of the App Store badge. No DOM node contains that text, so no DOM
+ *    assertion can see it; it has to be measured in the pixels of the asset.
  *
  * Runs against the built export, because hashed CSS and static export paths are
  * properties of the shipped output.
@@ -39,6 +42,18 @@ const WIDTHS = [1920, 1440, 1366, 1024, 812, 769, 768, 623, 540, 481, 480, 430, 
 
 /** The reveal must be finished this long after load, or it has stalled. */
 const SETTLE_TIMEOUT = 5000;
+
+/**
+ * A run of consecutive rows that each carry at least this many bright, low
+ * saturation pixels in the strip the live headline occupies. Measured on the
+ * shipped photo: the baked copy produced 120-283 such pixels per row, and every
+ * clean row in the same strip produced at most 25. The gap is wide enough that
+ * a bright window or a headlight cannot trip this.
+ */
+const COPY_ROW_PIXELS = 80;
+const COPY_MIN_ROWS = 8;
+/** Only the left band is checked: that is where the live headline is painted. */
+const COPY_BAND = 0.55;
 
 const puppeteer = await requireBrowser();
 const site = await serveOut();
@@ -207,15 +222,15 @@ try {
   await reducedPage.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
   const reduced = await reducedPage.evaluate(() => {
     const items = [...document.querySelectorAll('#top [class*="Hero_reveal"]')];
-    const visual = document.querySelector('#top [class*="Hero_phoneWrap"]');
+    const image = document.querySelector('#top [class*="Hero_bgImage"]');
     return {
       count: items.length,
       hidden: items.filter((element) => parseFloat(getComputedStyle(element).opacity) < 0.999).length,
       animated: items.filter((element) => getComputedStyle(element).animationName !== 'none').length,
-      visualAnimated: visual ? getComputedStyle(visual).animationName !== 'none' : true,
+      imageAnimated: image ? getComputedStyle(image).animationName !== 'none' : true,
     };
   });
-  if (!reduced.count || reduced.hidden || reduced.animated || reduced.visualAnimated) {
+  if (!reduced.count || reduced.hidden || reduced.animated || reduced.imageAnimated) {
     failures.push(`390px (reduced motion): hero is not settled (${JSON.stringify(reduced)})`);
   }
   rows.push(
@@ -223,29 +238,63 @@ try {
   );
   await reducedPage.close();
 
-  /* ── Phase 3: approved brand/product stage, no retired station photo ── */
+  /* ── Phase 3: does the hero photo carry its own copy? ── */
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
-  const stage = await page.evaluate(() => {
-    const hero = document.querySelector('#top');
-    const logo = hero?.querySelector('img[src*="fuelflow-mark"]');
-    const phone = hero?.querySelector('[class*="Hero_phoneWrap"]');
-    const oldPhoto = hero?.querySelector('img[src*="hero-station"], [class*="Hero_bgImage"]');
-    return {
-      logo: Boolean(logo),
-      phone: Boolean(phone),
-      oldPhoto: Boolean(oldPhoto),
-      text: hero?.textContent || '',
-    };
-  });
+  const baked = await page.evaluate(async (band, rowPixels) => {
+    const heroImage = document.querySelector('#top [class*="Hero_bgImage"]');
+    const backgroundUrl = heroImage
+      ? /url\("?([^")]+)"?\)/.exec(getComputedStyle(heroImage).backgroundImage)?.[1]
+      : null;
+    const url = heroImage?.currentSrc || heroImage?.src || backgroundUrl;
+    if (!url) return { error: 'the hero has no image asset' };
 
-  console.log('\n=== hero product stage ===');
-  console.log(`  logo=${stage.logo}  phone=${stage.phone}  retiredPhoto=${stage.oldPhoto}`);
-  if (!stage.logo) failures.push('the hero does not carry the approved Fuel Flow mark');
-  if (!stage.phone) failures.push('the hero does not carry the product phone stage');
-  if (stage.oldPhoto) failures.push('the retired station-photo hero is still present');
-  if (!stage.text.includes('Fleet control') || !stage.text.includes('Ціна зафіксована')) {
-    failures.push('the fleet-control product stage is incomplete');
+    const bmp = await createImageBitmap(await (await fetch(url, { cache: 'no-store' })).blob());
+    const c = document.createElement('canvas');
+    c.width = bmp.width;
+    c.height = bmp.height;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bmp, 0, 0);
+    const { data, width: W, height: H } = ctx.getImageData(0, 0, c.width, c.height);
+    const bandX = Math.floor(W * band);
+
+    let run = 0;
+    let longest = 0;
+    let at = -1;
+    for (let y = 0; y < H; y++) {
+      let bright = 0;
+      for (let x = 0; x < bandX; x++) {
+        const i = (y * W + x) * 4;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        const sat = mx ? (mx - mn) / mx : 0;
+        const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        if (L > 150 && sat < 0.16) bright++;
+      }
+      run = bright >= rowPixels ? run + 1 : 0;
+      if (run > longest) {
+        longest = run;
+        at = y - run + 1;
+      }
+    }
+    return { url, size: `${W}x${H}`, longest, at };
+  }, COPY_BAND, COPY_ROW_PIXELS);
+
+  console.log('\n=== hero image asset ===');
+  console.log(
+    baked.error
+      ? `  ${baked.error}`
+      : `  ${baked.url.split('/').pop()}  ${baked.size}  longest text-like run=${baked.longest} rows (fails at ${COPY_MIN_ROWS})`,
+  );
+
+  if (baked.error) {
+    failures.push(baked.error);
+  } else if (baked.longest >= COPY_MIN_ROWS) {
+    failures.push(
+      `the hero image (${baked.url}) has baked-in copy: ${baked.longest} consecutive rows of text-like` +
+      ` pixels in the left ${Math.round(COPY_BAND * 100)}%, starting at y=${baked.at} of ${baked.size}.` +
+      ' It is a finished advert, not a background - the live headline is painted on top of it.',
+    );
   }
 } finally {
   await browser.close();
@@ -256,10 +305,10 @@ console.log('\n[hero] reveal ladder');
 for (const r of rows) console.log(r);
 
 if (failures.length) {
-  console.error('\nSee the responsive and motion rules in website/src/components/Hero.module.css.');
+  console.error('\nSee the reveal rules in website/src/components/Hero.module.css and the mount effect in Hero.tsx.');
 }
 report(
   'hero',
   failures,
-  `copy settles visible and unclipped across ${WIDTHS.length} widths, the CTA fits, and the approved brand/product stage is present.`,
+  `copy settles visible and unclipped across ${WIDTHS.length} widths, the CTA fits, and the hero image carries no baked-in copy.`,
 );
