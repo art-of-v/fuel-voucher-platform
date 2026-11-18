@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { registerForPushNotifications } from './push';
+import { registerForPushNotifications, ensurePushPermission } from './push';
 import { registerPushToken } from '../../features/notifications/api/pushTokensApi';
 
 // The native module cannot load under Jest, so mock the SDK surface we call.
@@ -108,5 +108,47 @@ describe('registerForPushNotifications', () => {
     expect(a).toBe(TOKEN);
     expect(b).toBe(TOKEN);
     expect(getPermissions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ensurePushPermission', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getPermissions.mockResolvedValue({ status: 'granted' });
+    requestPermissions.mockResolvedValue({ status: 'granted' });
+  });
+
+  it('answers true without prompting when the permission is already granted', async () => {
+    await expect(ensurePushPermission()).resolves.toBe(true);
+    expect(requestPermissions).not.toHaveBeenCalled();
+  });
+
+  it('prompts on an undetermined permission - the state a fresh install is in', async () => {
+    getPermissions.mockResolvedValue({ status: 'undetermined' });
+
+    await expect(ensurePushPermission()).resolves.toBe(true);
+    expect(requestPermissions).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers false on a refused prompt', async () => {
+    getPermissions.mockResolvedValue({ status: 'undetermined' });
+    requestPermissions.mockResolvedValue({ status: 'denied' });
+
+    await expect(ensurePushPermission()).resolves.toBe(false);
+  });
+
+  it('does not re-prompt a permission the person already refused', async () => {
+    // iOS never asks twice: a second request resolves "denied" without showing anything, so
+    // asking again would only cost the person a tap they cannot make.
+    getPermissions.mockResolvedValue({ status: 'denied' });
+
+    await expect(ensurePushPermission()).resolves.toBe(false);
+    expect(requestPermissions).not.toHaveBeenCalled();
+  });
+
+  it('answers false when the permission API throws', async () => {
+    getPermissions.mockRejectedValue(new Error('native module missing'));
+
+    await expect(ensurePushPermission()).resolves.toBe(false);
   });
 });

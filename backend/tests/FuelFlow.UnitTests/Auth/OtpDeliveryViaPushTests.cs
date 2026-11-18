@@ -211,6 +211,29 @@ public sealed class OtpDeliveryViaPushTests : IDisposable
     }
 
     [Fact]
+    public async Task SendCode_WhenTheDeviceSaysItCannotShowAPush_UsesSms_EvenWithALiveToken()
+    {
+        // The iOS case the channel could not see: notifications were never enabled for the app,
+        // Expo still accepts the push (status ok) and the OS drops it without a banner. The
+        // person waits for digits that never appear while the server believes it delivered them.
+        await SeedUserAsync(Phone, tokenActive: true);
+
+        var sms = new Mock<ISmsService>();
+        var push = new Mock<IExpoPushSender>();
+
+        var handler = BuildHandler(sms, push, pushChannelOn: true);
+
+        await handler.HandleAsync(new SendCodeCommand(Phone, PushUnavailable: true), CancellationToken.None);
+
+        sms.Verify(
+            x => x.SendVerificationCodeAsync(Phone, It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        push.Verify(
+            p => p.SendAsync(It.IsAny<IReadOnlyList<ExpoPushMessage>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task SendCode_WithThePushChannelOff_UsesSms_EvenWhenTheAccountHasADevice()
     {
         await SeedUserAsync(Phone, tokenActive: true);

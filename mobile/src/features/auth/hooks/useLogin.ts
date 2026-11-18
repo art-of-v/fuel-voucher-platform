@@ -9,6 +9,7 @@ import { useStore } from '../../../core/state/appStore';
 import { useI18n } from '../../../core/i18n';
 import { Haptics } from '../../../core/utils/haptics';
 import { reportError } from '../../../core/observability/sentry';
+import { ensurePushPermission } from '../../../core/notifications/push';
 import { sendVerificationCode } from '../api/sendCode';
 import { verifyPhoneCode } from '../api/verifyCode';
 import { verifyTwoFactor } from '../api/verifyTwoFactor';
@@ -146,6 +147,22 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     }
   };
 
+  /**
+   * Asks for the notification permission (once, before the first code) and reports whether a
+   * push can actually be shown here.
+   *
+   * <p>
+   * Both the grant and the refusal change how the code must be sent, so this runs before the
+   * request, not in parallel with it: a code pushed while the permission prompt is still on
+   * screen is a code the OS drops. Best-effort by contract - a permission API that fails answers
+   * "no", which only means the SMS path carries the code.
+   * </p>
+   */
+  const resolvePushAvailability = async (): Promise<boolean> => {
+    const granted = await ensurePushPermission();
+    return !granted;
+  };
+
   const handleSendCode = async () => {
     if (!phone.trim() || phone.length < 10) {
       setError(t('phoneAuth.invalidPhone'));
@@ -158,7 +175,8 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     Keyboard.dismiss();
 
     try {
-      const sent = await sendVerificationCode(phone);
+      const pushUnavailable = await resolvePushAvailability();
+      const sent = await sendVerificationCode(phone, pushUnavailable);
       // The number worked: remember it, so the next sign-in on this device starts from the
       // number instead of asking for it again. It survives the logout on purpose.
       setLastPhone(phone);
@@ -197,7 +215,8 @@ export function useLogin(onSuccess: () => void, options?: UseLoginOptions): UseL
     Keyboard.dismiss();
 
     try {
-      const sent = await sendVerificationCode(phone);
+      const pushUnavailable = await resolvePushAvailability();
+      const sent = await sendVerificationCode(phone, pushUnavailable);
       setCodeState('');
       startCodeClock(sent?.expiresInSeconds);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

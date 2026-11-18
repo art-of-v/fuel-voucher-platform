@@ -7,6 +7,7 @@ import { verifyPhoneCode } from '../api/verifyCode';
 import { verifyTwoFactor } from '../api/verifyTwoFactor';
 import { SecurityService, DeviceSecurityError } from '../../../core/api/securityService';
 import { useStore } from '../../../core/state/appStore';
+import { ensurePushPermission } from '../../../core/notifications/push';
 
 // The network boundary is mocked: the sign-in flow is what is under test, not the transport.
 jest.mock('../api/sendCode', () => ({
@@ -69,10 +70,17 @@ jest.mock('../../../core/api/apiClient', () => ({
   BASE_URL: 'http://localhost',
 }));
 
+// The notification permission belongs to the OS; the hook only decides WHEN to ask and what to
+// tell the server. Its own behaviour is covered in core/notifications/push.test.ts.
+jest.mock('../../../core/notifications/push', () => ({
+  ensurePushPermission: jest.fn(),
+}));
+
 const sendVerificationCodeMock = sendVerificationCode as jest.Mock;
 const verifyPhoneCodeMock = verifyPhoneCode as jest.Mock;
 const verifyTwoFactorMock = verifyTwoFactor as jest.Mock;
 const setupDeviceSecurityMock = SecurityService.setupDeviceSecurity as jest.Mock;
+const ensurePushPermissionMock = ensurePushPermission as jest.Mock;
 
 const REMEMBERED = '+380991234567';
 
@@ -107,6 +115,8 @@ describe('useLogin', () => {
   beforeEach(async () => {
     sendVerificationCodeMock.mockReset();
     sendVerificationCodeMock.mockResolvedValue({});
+    ensurePushPermissionMock.mockReset();
+    ensurePushPermissionMock.mockResolvedValue(true);
     await waitForHydration();
     await act(async () => {
       useStore.setState({ lastPhone: null });
@@ -164,8 +174,49 @@ describe('useLogin', () => {
       await result.current.handleSendCode();
     });
 
-    expect(sendVerificationCodeMock).toHaveBeenCalledWith(REMEMBERED);
+    expect(sendVerificationCodeMock).toHaveBeenCalledWith(REMEMBERED, false);
     expect(useStore.getState().lastPhone).toBe(REMEMBERED);
+  });
+
+  it('tells the server the code cannot come by push when the device refused notifications', async () => {
+    // Expo accepts a push for a device whose notification permission was never granted and the
+    // OS drops it silently, so a device that knows it cannot show a banner has to say so before
+    // the code goes out - otherwise the server counts a delivery nobody saw and never sends SMS.
+    ensurePushPermissionMock.mockResolvedValue(false);
+
+    const { result } = renderLogin();
+
+    act(() => {
+      result.current.setPhone(REMEMBERED);
+    });
+    await act(async () => {
+      await result.current.handleSendCode();
+    });
+
+    expect(sendVerificationCodeMock).toHaveBeenCalledWith(REMEMBERED, true);
+  });
+
+  it('asks for the notification permission before the code is requested', async () => {
+    const order: string[] = [];
+    ensurePushPermissionMock.mockImplementation(async () => {
+      order.push('permission');
+      return true;
+    });
+    sendVerificationCodeMock.mockImplementation(async () => {
+      order.push('send');
+      return {};
+    });
+
+    const { result } = renderLogin();
+
+    act(() => {
+      result.current.setPhone(REMEMBERED);
+    });
+    await act(async () => {
+      await result.current.handleSendCode();
+    });
+
+    expect(order).toEqual(['permission', 'send']);
   });
 
   it('does not remember a number whose code was not sent', async () => {
@@ -309,7 +360,7 @@ describe('useLogin', () => {
       expect(result.current.code).toBe('');
       expect(result.current.codeExpired).toBe(false);
       expect(result.current.secondsLeft).toBe(300);
-      expect(sendVerificationCodeMock).toHaveBeenCalledWith(REMEMBERED);
+      expect(sendVerificationCodeMock).toHaveBeenCalledWith(REMEMBERED, false);
     });
 
     it('surfaces the rate limit on a resend exactly as the first send does', async () => {
