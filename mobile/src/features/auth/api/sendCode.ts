@@ -10,8 +10,25 @@ export interface SendCodeResult {
   expiresInSeconds?: number;
 }
 
-export async function sendVerificationCode(phoneNumber: string): Promise<SendCodeResult> {
-  const response = await apiRequest('POST', '/api/auth/send-code', { phoneNumber });
+/**
+ * Requests a code for the number.
+ *
+ * <p>
+ * `pushUnavailable` says this device cannot display a push (the permission was never granted or
+ * was refused), so the server must not count a push to the account's devices as delivery - the
+ * code would be accepted by Expo and then silently dropped by the OS, and the person would wait
+ * for digits that never appear. With the flag the server sends the code the way this device can
+ * still receive it: SMS (or the staff email break-glass).
+ * </p>
+ */
+export async function sendVerificationCode(
+  phoneNumber: string,
+  pushUnavailable = false,
+): Promise<SendCodeResult> {
+  const response = await apiRequest('POST', '/api/auth/send-code', {
+    phoneNumber,
+    ...(pushUnavailable ? { pushUnavailable: true } : {}),
+  });
   if (!response.ok) {
     // A 429 is the per-phone / per-IP OTP rate limit, not a transport failure. Tag it so
     // the caller can show "too many attempts, wait a minute" instead of a generic network

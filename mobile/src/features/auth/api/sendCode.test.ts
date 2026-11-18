@@ -58,4 +58,21 @@ describe('sendVerificationCode', () => {
 
     await expect(sendVerificationCode('+380991110001')).resolves.toEqual({});
   });
+
+  it('says the device cannot show a push only when the caller knows so', async () => {
+    // Absent, not false: an older server ignores unknown fields either way, and the body stays
+    // the documented one for every device that can display a notification.
+    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+
+    await sendVerificationCode('+380991110001');
+    expect(mockApiRequest).toHaveBeenLastCalledWith('POST', '/api/auth/send-code', {
+      phoneNumber: '+380991110001',
+    });
+
+    await sendVerificationCode('+380991110001', true);
+    expect(mockApiRequest).toHaveBeenLastCalledWith('POST', '/api/auth/send-code', {
+      phoneNumber: '+380991110001',
+      pushUnavailable: true,
+    });
+  });
 });

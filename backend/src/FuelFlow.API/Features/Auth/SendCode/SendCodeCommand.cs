@@ -18,7 +18,17 @@ using System.Text.Json;
 
 namespace FuelFlow.Features.Auth.SendCode;
 
-public sealed record SendCodeCommand(string PhoneNumber);
+/// <summary>
+/// A request for a sign-in code.
+/// <para>
+/// <paramref name="PushUnavailable"/> is set by a client that knows this device cannot display a
+/// push - the notification permission was never granted or was refused. Expo accepts such a push
+/// (<c>status: ok</c>) and iOS drops it without a banner, so counting it as delivery leaves the
+/// person waiting for digits that cannot appear. The hint only says "do not rely on the screen in
+/// my hand"; it changes the channel, never what the response reveals.
+/// </para>
+/// </summary>
+public sealed record SendCodeCommand(string PhoneNumber, bool PushUnavailable = false);
 
 /// <summary>
 /// The answer to a send-code call. <paramref name="ExpiresInSeconds"/> is the code's lifetime,
@@ -134,7 +144,7 @@ public sealed class SendCodeCommandHandler
         _context.VerificationCodes.Add(verificationCode);
         await _context.SaveChangesAsync(cancellationToken);
 
-        await DeliverCodeAsync(phoneNumber, code, cancellationToken);
+        await DeliverCodeAsync(phoneNumber, code, command.PushUnavailable, cancellationToken);
 
         return new SendCodeResponse(true, CodeTtlSeconds);
     }
@@ -149,15 +159,33 @@ public sealed class SendCodeCommandHandler
     /// always receives their code. IsActive gates only voucher purchase, never OTP delivery,
     /// so it is not consulted here.
     /// </summary>
-    private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
+    /// <param name="pushUnavailable">
+    /// The requesting client reports that this device cannot display a push (permission never
+    /// granted or refused). A push to the account's devices would then be accepted by Expo and
+    /// silently suppressed by the OS, so the channel is skipped instead of being counted as a
+    /// delivery nobody sees.
+    /// </param>
+    private async Task DeliverCodeAsync(
+        string phoneNumber,
+        string code,
+        bool pushUnavailable,
+        CancellationToken cancellationToken)
     {
         // Push before the break-glass: when both are available the push is the stronger channel
         // (device-bound, free) and the mailbox is neither, so the acknowledged-weaker path stays
         // for accounts with no registered device.
-        if (_authOptions.Value.OtpDeliveryViaPush
+        if (!pushUnavailable
+            && _authOptions.Value.OtpDeliveryViaPush
             && await TryDeliverViaPushAsync(phoneNumber, code, cancellationToken))
         {
             return;
+        }
+
+        if (pushUnavailable)
+        {
+            _logger.LogInformation(
+                "Push skipped for {PhoneNumber}: the requesting device reported it cannot show a notification",
+                SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
         }
 
         if (BreakGlassIsOpen() && _emailSender.IsConfigured)

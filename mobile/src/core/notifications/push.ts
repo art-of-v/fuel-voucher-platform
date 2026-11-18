@@ -41,15 +41,36 @@ function resolveProjectId(): string | undefined {
   return typeof fromExtra === 'string' && fromExtra ? fromExtra : undefined;
 }
 
-async function doRegister(): Promise<string | null> {
+/**
+ * Asks for the notification permission, if it has never been decided yet, and reports whether
+ * this device can display a push right now.
+ *
+ * Sign-in needs this BEFORE the code is requested, not after it. The first code a person ever
+ * asks for is delivered by push to the account's own devices, and iOS keeps that push off a
+ * screen it was never granted: a freshly installed app whose permission prompt only appears
+ * *after* a successful sign-in has no way to receive the very code that would get it there.
+ * Registration still happens post-auth (the backend binds a token to a user), but the
+ * permission has to be decided by then.
+ *
+ * Never throws and never blocks: a denied permission is an answer, not a failure.
+ */
+export async function ensurePushPermission(): Promise<boolean> {
   try {
     const existing = await Notifications.getPermissionsAsync();
-    let granted = existing.status === 'granted';
-    if (!granted) {
-      const requested = await Notifications.requestPermissionsAsync();
-      granted = requested.status === 'granted';
-    }
-    if (!granted) return null;
+    if (existing.status === 'granted') return true;
+    // `undetermined` is the only state a prompt can change. `denied` is final for this install
+    // (iOS never asks twice), so asking again would only flash a no-op.
+    if (existing.status !== 'undetermined') return false;
+    const requested = await Notifications.requestPermissionsAsync();
+    return requested.status === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+async function doRegister(): Promise<string | null> {
+  try {
+    if (!(await ensurePushPermission())) return null;
 
     const projectId = resolveProjectId();
     if (!projectId) return null;
