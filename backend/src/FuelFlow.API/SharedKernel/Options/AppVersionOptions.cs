@@ -10,11 +10,11 @@ public sealed class AppVersionOptions
     /// drifted copy is the one nobody reads.
     /// </summary>
     /// <remarks>
-    /// Bumped to 1.1.0 on 2026-10-16, once 1.1.0 was live in the App Store. It tracks the real floor,
-    /// not the one the project would like: a fallback below the configured floor is a silent
-    /// downgrade for any deployment that drops the <c>AppVersion</c> section.
+    /// Bumped to 1.2.0 on 2026-11-18, once 1.2.0 (build 238) was live in the App Store. It tracks the
+    /// real floor, not the one the project would like: a fallback below the configured floor is a
+    /// silent downgrade for any deployment that drops the <c>AppVersion</c> section.
     /// </remarks>
-    public const string DefaultMinimumVersion = "1.1.0";
+    public const string DefaultMinimumVersion = "1.2.0";
 
     /// <summary>
     /// Hard floor, not a suggestion. <c>mobile/app/_layout.tsx</c> reads <c>/api/app-version</c> on

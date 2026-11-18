@@ -35,26 +35,27 @@ namespace FuelFlow.IntegrationTests;
 public class AppVersionFloorTests
 {
     /// <summary>
-    /// The marketing version the stores actually serve right now. Bumping <c>mobile/app.json</c> does
-    /// not change this - only a submitted build does - and forgetting that is what put a
-    /// non-existent version behind the wall on 2026-10-12. Update it in the same PR that ships the
-    /// build, never the one that prepares it.
-    /// </summary>
-    /// <remarks>
-    /// 1.1.0 reached the public <b>iOS</b> App Store on 2026-10-16, which is what made the floor 1.1.0
-    /// safe. Android is a different story and this constant cannot express it: no Android build has
-    /// ever been produced from this tree and none is on Play, so a floor of 1.1.0 walls every Android
-    /// build below it and points it at a listing that cannot serve the version. That is the lockout
-    /// this file exists to prevent - it just cannot happen through Play, because there is nothing on
-    /// Play. It is currently clear, and the place to re-check it is not this constant but the fleet:
-    /// every sub-1.1.0 device on 2026-10-16 was iOS (<c>SELECT app_version, device_model FROM devices
-    /// WHERE app_version &lt;&gt; '1.1.0'</c>). Re-run it before raising the floor again.
-    /// </remarks>
-    /// <summary>
     /// The version each store actually serves, per store, and <c>null</c> for a store nothing has
     /// ever been published to.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The marketing version the store serves right now. Bumping <c>mobile/app.json</c> does not
+    /// change this - only a submitted build does - and forgetting that is what put a non-existent
+    /// version behind the wall on 2026-10-12. Update it in the same PR that ships the build, never
+    /// the one that prepares it.
+    /// </para>
+    /// <para>
+    /// 1.2.0 (build 238) reached the public <b>iOS</b> App Store on 2026-11-18, which is what made the
+    /// floor 1.2.0 safe. Android is a different story and this constant cannot express it: nothing is
+    /// published to Play, so a floor walls every Android build below it and points it at a listing
+    /// that cannot serve the version. That is the lockout this file exists to prevent - it just
+    /// cannot happen through Play, because there is nothing on Play. The place to re-check it is the
+    /// fleet, not this constant: on 2026-11-18 the census had one Android device (SM-A065F) and it
+    /// runs a locally built 1.2.0, at the floor; everything else was iOS. Re-run
+    /// <c>SELECT app_version, device_model FROM devices WHERE app_version &lt;&gt; '1.2.0'</c> before
+    /// raising the floor again.
+    /// </para>
     /// <para>
     /// This used to be one constant called <c>PublishedInStores</c> reading <c>"1.1.0"</c>. That was
     /// a claim about <em>both</em> stores, and it was true of exactly one: iOS shipped 1.1.0 on
@@ -69,18 +70,18 @@ public class AppVersionFloorTests
     /// </para>
     /// <para>
     /// <b>Why Play is still a constant and not an observation.</b> Apple publishes a free, unauthenticated
-    /// lookup endpoint that returns the live version, so <see cref="AppVersionFloorLiveTests"/> can
-    /// watch iOS for real. Google has no equivalent, and reaching the Play Console needs credentials
-    /// this repository deliberately does not hold. So the honest thing for Play is to make "nothing
-    /// published" <em>expressible</em> — which it is not while the value is a non-null string — and to
-    /// catch the real risk from the fleet instead, which
-    /// <see cref="AppVersionFloorLiveTests.Floor_DoesNotWallAnyDeviceActuallyInUse"/> does.
+    /// lookup endpoint that returns the live version
+    /// (<c>https://itunes.apple.com/lookup?id=6759175079</c>), and that lookup answering <c>1.2.0</c>
+    /// is how this constant was checked before it moved. Google has no equivalent, and reaching the
+    /// Play Console needs credentials this repository deliberately does not hold. So the honest thing
+    /// for Play is to make "nothing published" <em>expressible</em> - which it is not while the value
+    /// is a non-null string - and to catch the real risk from the fleet instead.
     /// </para>
     /// <para>
     /// Bump a store's entry in the same PR that submits the build, never the one that prepares it.
     /// </para>
     /// </remarks>
-    private const string? PublishedOnAppStore = "1.1.0";
+    private const string? PublishedOnAppStore = "1.2.0";
 
     /// <summary>
     /// Nothing has ever been published to Google Play from this tree, and that is a fact rather than
