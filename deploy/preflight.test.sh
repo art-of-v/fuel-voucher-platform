@@ -484,19 +484,23 @@ check "staging keeps the B2B sales inbox optional" 0 "$?"
 
 # Render both production shapes: a box whose private env predates this variable,
 # and one that has moved B2B mail to a dedicated inbox. Compose interpolation is
-# the behaviour that failed the deploy, so inspect Compose's rendered value.
-legacy_env="$TMP/business-lead-legacy.env"
-dedicated_env="$TMP/business-lead-dedicated.env"
+# the behaviour that failed the deploy, so inspect Compose's rendered value. Each
+# fixture file is named `.env.production`, preserving the stack's key-source invariant.
+legacy_dir="$TMP/business-lead-legacy"
+dedicated_dir="$TMP/business-lead-dedicated"
+mkdir -p "$legacy_dir" "$dedicated_dir"
+legacy_env="$legacy_dir/.env.production"
+dedicated_env="$dedicated_dir/.env.production"
 cp "$GOOD_ENV" "$legacy_env"
 sed -i '/^BUSINESS_LEAD_MAIL_TO_EMAIL=/d;/^SUPPORT_MAIL_TO_EMAIL=/d' "$legacy_env"
 printf 'SUPPORT_MAIL_TO_EMAIL=support@example.com\n' >> "$legacy_env"
-out=$(docker compose --env-file "$legacy_env" -f "$SCRIPT_DIR/docker-compose.prod.yml" config 2>&1); rc=$?
+out=$(docker compose --env-file "$legacy_dir/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" config 2>&1); rc=$?
 check "a legacy production env still renders" 0 "$rc"
 [[ "$out" == *"BusinessLeadMail__ToEmail: support@example.com"* ]]
 check "a legacy production env routes leads to support" 0 "$?"
 cp "$legacy_env" "$dedicated_env"
 printf 'BUSINESS_LEAD_MAIL_TO_EMAIL=sales@example.com\n' >> "$dedicated_env"
-out=$(docker compose --env-file "$dedicated_env" -f "$SCRIPT_DIR/docker-compose.prod.yml" config 2>&1); rc=$?
+out=$(docker compose --env-file "$dedicated_dir/.env.production" -f "$SCRIPT_DIR/docker-compose.prod.yml" config 2>&1); rc=$?
 check "a dedicated sales env still renders" 0 "$rc"
 [[ "$out" == *"BusinessLeadMail__ToEmail: sales@example.com"* ]]
 check "a dedicated sales inbox overrides support" 0 "$?"
