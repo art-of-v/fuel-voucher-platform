@@ -70,6 +70,17 @@ export function isTestPackage(pkg: PublicPackage): boolean {
   return isTestArtefact(pkg);
 }
 
+/**
+ * Fuels the business does not trade. The catalogue still carries gas, propane
+ * and AdBlue packages, but the site sells petrol and diesel only, so they must
+ * not reach the price band. A denylist, not an octane allowlist, on purpose: an
+ * allowlist would hide a petrol grade it did not anticipate (А-98), while a
+ * category that is genuinely new will at worst show up and be noticed.
+ */
+function isNotTradedFuel(name: string): boolean {
+  return /газ|lpg|propane|пропан|adblue|адблю/i.test(name);
+}
+
 let inFlight: Promise<PublicPackage[]> | null = null;
 
 /**
@@ -88,7 +99,10 @@ export function fetchCatalogue(): Promise<PublicPackage[]> {
         ? rows.filter(
             // A package the API prices without a per-litre figure cannot be
             // shown or compared, and the DTO types it decimal? - drop it at the boundary.
-            (r) => !isTestArtefact(r) && Number.isFinite(r.finalPricePerLiter)
+            (r) =>
+              !isTestArtefact(r) &&
+              !isNotTradedFuel(r.fuelName) &&
+              Number.isFinite(r.finalPricePerLiter)
           )
         : []
     )
