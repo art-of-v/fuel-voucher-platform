@@ -24,7 +24,7 @@ export default function PhoneMock({ className }: { className?: string }) {
   const [reference, setReference] = useState<{
     perLiter: number;
     fuelName: string;
-    stationId: string;
+    brandSlug: string;
   } | null>(null);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function PhoneMock({ className }: { className?: string }) {
           setReference({
             perLiter: found.finalPricePerLiter,
             fuelName: found.fuelName,
-            stationId: found.stationId.toUpperCase(),
+            brandSlug: found.brandSlug.toUpperCase(),
           });
         }
       })
@@ -80,7 +80,7 @@ export default function PhoneMock({ className }: { className?: string }) {
                 : '—'}
             </span>
             <span className={styles.chip}>
-              {reference ? `${reference.stationId}` : 'OKKO'}
+              {reference ? `${reference.brandSlug}` : 'OKKO'}
             </span>
           </div>
         </div>

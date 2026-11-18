@@ -21,7 +21,8 @@
 
 export interface PublicPackage {
   id: string;
-  stationId: string;
+  /** The network, keyed by the brand slug the API sends ("okko", "wog", ...). */
+  brandSlug: string;
   fuelTypeId: string;
   fuelName: string;
   liters: number;
@@ -31,7 +32,7 @@ export interface PublicPackage {
 }
 
 export interface NetworkOffer {
-  stationId: string;
+  brandSlug: string;
   name: string;
   /** Cheapest package per litre in this network - the headline number. */
   fromPerLiter: number;
@@ -82,7 +83,15 @@ export function fetchCatalogue(): Promise<PublicPackage[]> {
       if (!res.ok) throw new Error(`packages responded ${res.status}`);
       return res.json() as Promise<PublicPackage[]>;
     })
-    .then((rows) => (Array.isArray(rows) ? rows.filter((r) => !isTestArtefact(r)) : []))
+    .then((rows) =>
+      Array.isArray(rows)
+        ? rows.filter(
+            // A package the API prices without a per-litre figure cannot be
+            // shown or compared, and the DTO types it decimal? - drop it at the boundary.
+            (r) => !isTestArtefact(r) && Number.isFinite(r.finalPricePerLiter)
+          )
+        : []
+    )
     .catch((err) => {
       // Let the next mount retry instead of caching the failure forever.
       inFlight = null;
@@ -92,15 +101,15 @@ export function fetchCatalogue(): Promise<PublicPackage[]> {
 }
 
 export function groupByNetwork(packages: PublicPackage[]): NetworkOffer[] {
-  const byStation = new Map<string, PublicPackage[]>();
+  const byBrand = new Map<string, PublicPackage[]>();
   for (const pkg of packages) {
-    const list = byStation.get(pkg.stationId);
+    const list = byBrand.get(pkg.brandSlug);
     if (list) list.push(pkg);
-    else byStation.set(pkg.stationId, [pkg]);
+    else byBrand.set(pkg.brandSlug, [pkg]);
   }
 
-  return [...byStation.entries()]
-    .map(([stationId, rows]) => {
+  return [...byBrand.entries()]
+    .map(([brandSlug, rows]) => {
       const perFuel = new Map<string, { perLiter: number; saving: number | null }>();
       for (const row of rows) {
         const saving = row.originalPrice > row.price ? row.originalPrice - row.price : null;
@@ -120,8 +129,8 @@ export function groupByNetwork(packages: PublicPackage[]): NetworkOffer[] {
         .sort((a, b) => a.perLiter - b.perLiter);
 
       return {
-        stationId,
-        name: NETWORK_NAMES[stationId.toLowerCase()] ?? stationId.toUpperCase(),
+        brandSlug,
+        name: NETWORK_NAMES[brandSlug.toLowerCase()] ?? brandSlug.toUpperCase(),
         fromPerLiter: fuels[0]?.perLiter ?? 0,
         cheapestFuel: fuels[0]?.fuelName ?? '',
         volumes: [...new Set(rows.map((r) => r.liters))].sort((a, b) => a - b),
@@ -163,7 +172,7 @@ export function pickReferencePackage(
       p.finalPricePerLiter < best.finalPricePerLiter ? p : best
     );
 
-  const okko = packages.filter((p) => p.stationId.toLowerCase() === 'okko');
+  const okko = packages.filter((p) => p.brandSlug.toLowerCase() === 'okko');
   const anchor = okko.length > 0 ? okko : packages;
 
   // Cheapest within the grade, not the first one that matches. The catalogue is

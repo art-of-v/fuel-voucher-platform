@@ -47,14 +47,14 @@ export default function Numbers() {
         const reel = [
           ...new Set(
             rows
-              .filter((r) => r.stationId === reference.stationId)
+              .filter((r) => r.brandSlug === reference.brandSlug)
               .map((r) => r.finalPricePerLiter)
           ),
         ].sort((a, b) => a - b);
 
         setStats({
           perLiter: reference.finalPricePerLiter,
-          networks: new Set(rows.map((r) => r.stationId)).size,
+          networks: new Set(rows.map((r) => r.brandSlug)).size,
           reel: reel.length > 1 ? reel : [reference.finalPricePerLiter],
         });
       })
