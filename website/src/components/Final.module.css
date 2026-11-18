@@ -6,8 +6,31 @@
   overflow: hidden;
 }
 
+/* Cinematic road photograph — fades in from the right on wide screens.
+   Hidden below 768px so the stacked phone mock takes that role instead. */
+.section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/road-journey.jpg');
+  background-size: cover;
+  background-position: center left;
+  opacity: 0.14;
+  mask-image: linear-gradient(90deg, transparent 0%, transparent 45%, black 75%, black 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 45%, black 75%, black 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (max-width: 768px) {
+  .section::after {
+    display: none;
+  }
+}
+
 .container {
   position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1.3fr 0.7fr;
   gap: 64px;

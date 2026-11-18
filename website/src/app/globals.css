@@ -77,15 +77,16 @@
   --line: rgba(255, 255, 255, 0.12);
   --line-subtle: rgba(255, 255, 255, 0.07);
   --line-strong: rgba(255, 255, 255, 0.22);
-  --accent: #00e85f;
-  --accent-pressed: #00c351;
-  --accent-subtle: rgba(0, 232, 95, 0.1);
-  --accent-border: rgba(0, 232, 95, 0.32);
-  --accent-on: #052e14;
-  /* Electric purple — the digital/app signal. Use with discipline. */
+  /* Electric-lime — matches the reference landing page art direction exactly. */
+  --accent: #c5ff00;
+  --accent-pressed: #aee000;
+  --accent-subtle: rgba(197, 255, 0, 0.1);
+  --accent-border: rgba(197, 255, 0, 0.32);
+  --accent-on: #1a2a00;
+  /* Muted secondary — kept for internal use only, not surfaced in UI. */
   --accent-2: #8b5cf6;
-  --accent-2-subtle: rgba(139, 92, 246, 0.14);
-  --accent-2-border: rgba(139, 92, 246, 0.45);
+  --accent-2-subtle: rgba(139, 92, 246, 0.08);
+  --accent-2-border: rgba(139, 92, 246, 0.3);
 --status-danger: #ff5d5d;
 
   /* ── One shape hierarchy, identical on every screen. */
@@ -430,7 +431,7 @@ p {
   border-radius: inherit;
   background: radial-gradient(
     360px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(0, 232, 95, 0.07),
+    rgba(197, 255, 0, 0.07),
     transparent 65%
   );
   opacity: 0;

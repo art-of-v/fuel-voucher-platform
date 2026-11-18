@@ -47,18 +47,18 @@ export default function Gallery() {
         <div className={styles.grid}>
           <figure className={`${styles.card} ${styles.reveal}`} data-glow>
             <img
-              src="/brand-1.jpg"
-              alt="Брендинг FuelFlow — фірмовий дизайн"
-              width={1200}
-              height={1800}
+              src="/driver-interior.jpg"
+              alt="FuelFlow — водій за кермом у місті"
+              width={918}
+              height={1026}
             />
           </figure>
           <figure className={`${styles.card} ${styles.reveal}`} data-glow style={{ transitionDelay: '80ms' }}>
             <img
-              src="/brand-2.jpg"
-              alt="Брендинг FuelFlow — фірмові матеріали"
-              width={1200}
-              height={1200}
+              src="/premium-car.jpg"
+              alt="FuelFlow — преміальне авто на заправці"
+              width={1600}
+              height={960}
             />
           </figure>
         </div>
