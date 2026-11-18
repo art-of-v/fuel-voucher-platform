@@ -197,6 +197,38 @@ were never loaded, and this session did not ask the running Grafana whether the 
 Read the panel before deciding on the number, and if it is absent the first question is provisioning, not
 attestation.
 
+### The registration 503: measured 2026-11-19, fixed in the cache
+
+The first store build that actually attests was build 238 (`FuelFlow/238 …` in the request log). It issued
+a challenge, called `POST /api/attestation/apple/register`, and got **503** `ATTESTATION_UNAVAILABLE`
+with the detail "The attestation challenge store is unavailable." That was not Apple's answer and not a
+transient: **24 of the 28 registration attempts in the seven days to 2026-11-18 were that 503**, no
+attempt ever returned 200, `attestation_keys` was empty, and the only verdicts the metric had ever
+recorded were `missing` (0 `valid`).
+
+The cause was the cache's storage shape. `RedisCacheService` wrote plain entries through
+`IDistributedCache`, which stores each entry as a Redis **hash** (`absexp`/`sldexp`/`data`), and consumed
+one-time challenges with `GETDEL`, which is a **string** command. `GETDEL` on a missing key answers nil, so
+a consume of a challenge that was never issued looked normal; `GETDEL` on the key that existed answered
+`WRONGTYPE`, and `AttestationChallengeService.ConsumeAsync` wraps every store failure as
+`ATTESTATION_UNAVAILABLE`. Reproduce it on the box:
+
+```bash
+# A real challenge: 503 The attestation challenge store is unavailable.
+C=$(curl -sS https://api.palne.shop/api/attestation/challenge -H 'Content-Type: application/json' \
+  -H 'X-Device-Id: probe' -d '{"action":"apple-attest"}' | jq -r .challenge)
+docker exec fuelflow-redis sh -c "redis-cli TYPE attestation:challenge:$C"   # hash, not string
+
+# A challenge that was never issued: 400 ATTESTATION_CHALLENGE_INVALID - the bug hid here.
+```
+
+The fix stores every key as a string through the multiplexer, so `GETDEL` and `SET … NX` are valid against
+exactly the keys the cache writes; `RedisCacheServiceTests` exercises the round trip against a real Redis,
+including the issue→consume path the registration runs. **Until that fix is deployed, no iOS device can
+register a key, so `ATTESTATION_MODE=Enforce` would refuse every 1.2.0 install.** Re-run the two curls
+after deploying: the real challenge must now reach Apple and answer a 4xx code about the attestation
+object (400 `APPLE_ATTESTATION_INVALID` for a garbage one), not 503.
+
 ## Android Play and Google Cloud setup
 
 This is the one-time bootstrap that must exist before an Android proof can be `Valid`.
