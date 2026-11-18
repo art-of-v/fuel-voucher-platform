@@ -33,17 +33,18 @@
 .bgImage {
   position: absolute;
   inset: 0;
-  background-image: url('/hero-clean.jpg');
+  background-image: url('/hero-station.jpg');
   background-size: cover;
-  background-position: center;
-  filter: brightness(1.02) contrast(1.02);
+  background-position: center 20%;
+  filter: brightness(0.88) contrast(1.08) saturate(1.0);
 }
 
 .bgScrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.05) 45%, rgba(0, 0, 0, 0.72) 100%);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.05) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.0) 50%, rgba(0, 0, 0, 0.65) 100%);
 }
 
 .container {

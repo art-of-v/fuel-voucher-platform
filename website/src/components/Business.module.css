@@ -1,9 +1,29 @@
 .section {
   background: var(--bg);
   border-top: 1px solid var(--line-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Cinematic station photograph — bleeds to the right, heavily masked so text
+   on the left remains fully legible. Never decorative noise, always a scene. */
+.section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/station-night.jpg');
+  background-size: cover;
+  background-position: center right;
+  opacity: 0.12;
+  mask-image: linear-gradient(90deg, transparent 0%, transparent 35%, black 70%, black 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 35%, black 70%, black 100%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .container {
+  position: relative;
+  z-index: 1;
 }
 
 .head {
