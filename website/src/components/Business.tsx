@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import styles from './Business.module.css';
 
 const capabilities = [
@@ -33,16 +32,6 @@ export default function Business() {
             Обговорити автопарк
           </a>
         </div>
-
-        <figure className={styles.media}>
-          <Image
-            src="/station-night.jpg"
-            alt="Нічна паливна станція мережі-партнера"
-            width={1600}
-            height={1067}
-            sizes="(max-width: 900px) 100vw, 50vw"
-          />
-        </figure>
 
         <ol className={styles.flow} aria-label="Шлях пального в компанії">
           {flow.map((step, index) => (
