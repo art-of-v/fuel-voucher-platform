@@ -1,0 +1,36 @@
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.mark {
+  width: 38px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 620;
+  font-style: italic;
+  letter-spacing: -0.07em;
+  line-height: 1;
+}
+
+.compact {
+  gap: 8px;
+}
+
+.compact .mark {
+  width: 31px;
+  height: 20px;
+}
+
+.compact .wordmark {
+  font-size: 21px;
+}

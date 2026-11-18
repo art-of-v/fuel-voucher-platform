@@ -60,7 +60,6 @@ const TARGETS = [
     file: resolve(root, 'public/lion-mask.png'),
     key: 'mask',
     copiedTo: resolve(outDir, 'lion-mask.png'),
-    referencedBy: { file: resolve(root, 'src/components/Header.module.css'), needle: 'lion-mask.png' },
   },
   {
     what: 'the admin UI lion mask',
@@ -94,6 +93,14 @@ if (!existsSync(SOURCE)) {
 
 const failures = [];
 const rows = [];
+const marketingMark = resolve(root, 'public/fuelflow-mark.svg');
+const marketingLockup = resolve(root, 'src/components/BrandLockup.tsx');
+if (!existsSync(marketingMark)) {
+  failures.push(`the marketing Fuel Flow mark is not committed (${marketingMark})`);
+} else if (!existsSync(marketingLockup)
+  || !readFileSync(marketingLockup, 'utf8').includes('/fuelflow-mark.svg')) {
+  failures.push(`the marketing Fuel Flow mark is committed but the brand lockup does not load it`);
+}
 let built;
 
 try {
@@ -157,6 +164,5 @@ if (failures.length) {
 report(
   'brand',
   failures,
-  'every lion the repository ships - both tab icons, both UI masks, the home-screen icon and the' +
-  ' Android foreground - is derived from the source, and something loads each one.',
+  'the marketing site loads its approved Fuel Flow lockup, while every lion used by app/admin icons remains derived from the canonical source.',
 );

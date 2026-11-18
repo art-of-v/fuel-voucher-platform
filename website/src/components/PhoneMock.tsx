@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { fetchCatalogue, pickReferencePackage } from '../lib/catalogue';
+import BrandLockup from './BrandLockup';
 import styles from './PhoneMock.module.css';
 
 const modules = [
@@ -54,7 +55,7 @@ export default function PhoneMock({ className }: { className?: string }) {
       <div className={styles.screen}>
         <div className={styles.topBar}>
           <span className={styles.brand}>
-            FUELFLOW<span className={styles.brandDot}>.</span>
+            <BrandLockup compact />
           </span>
           <span className={styles.chip}>Гаманець</span>
         </div>
