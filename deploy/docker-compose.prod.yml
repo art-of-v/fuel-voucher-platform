@@ -279,9 +279,9 @@ services:
       SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
       SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
-      # B2B leads use the same SMTP transport but a separate sales destination.
-      # A missing destination is a deployment error: the form is the site's primary CTA.
-      BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:?set BUSINESS_LEAD_MAIL_TO_EMAIL in .env.production (monitored sales inbox)}
+      # B2B leads prefer a dedicated sales destination. Existing installations fall
+      # back to the already monitored support inbox until the new variable is added.
+      BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:-${SUPPORT_MAIL_TO_EMAIL:-}}
 
       # --- Allowed hosts + CORS (admin is same-origin, so CORS is mostly a safety net) ---
       # `fuelflow-backend` is the in-network service name Prometheus scrapes as
