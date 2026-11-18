@@ -172,6 +172,57 @@ try {
       `  minTarget=${menu.smallestTarget}`,
     );
   }
+
+  /* ── Phase 3: keyboard focus and inert closed state ── */
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
+  await page.evaluate(() => document.fonts.ready);
+
+  const closed = await page.evaluate(() => {
+    const panel = document.querySelector('#site-menu');
+    const burger = document.querySelector('button[aria-controls="site-menu"]');
+    return {
+      inert: panel.inert,
+      hidden: panel.getAttribute('aria-hidden'),
+      expanded: burger.getAttribute('aria-expanded'),
+    };
+  });
+  if (!closed.inert || closed.hidden !== 'true' || closed.expanded !== 'false') {
+    failures.push(`390x844: closed menu is still interactive (${JSON.stringify(closed)})`);
+  }
+
+  await page.focus('button[aria-controls="site-menu"]');
+  await page.keyboard.press('Enter');
+  await new Promise((r) => setTimeout(r, 100));
+  const opened = await page.evaluate(() => {
+    const panel = document.querySelector('#site-menu');
+    return {
+      inert: panel.inert,
+      hidden: panel.getAttribute('aria-hidden'),
+      activeInside: panel.contains(document.activeElement),
+    };
+  });
+  if (opened.inert || opened.hidden !== 'false' || !opened.activeInside) {
+    failures.push(`390x844: opened menu did not receive keyboard focus (${JSON.stringify(opened)})`);
+  }
+
+  await page.keyboard.press('Escape');
+  await new Promise((r) => setTimeout(r, 100));
+  const escaped = await page.evaluate(() => {
+    const panel = document.querySelector('#site-menu');
+    const burger = document.querySelector('button[aria-controls="site-menu"]');
+    return {
+      inert: panel.inert,
+      hidden: panel.getAttribute('aria-hidden'),
+      expanded: burger.getAttribute('aria-expanded'),
+      focusRestored: document.activeElement === burger,
+    };
+  });
+  if (!escaped.inert || escaped.hidden !== 'true' || escaped.expanded !== 'false' || !escaped.focusRestored) {
+    failures.push(`390x844: Escape did not close the menu and restore focus (${JSON.stringify(escaped)})`);
+  }
+
+  rows.push('  390x844  keyboard=opens  Escape=closes  focus=restored  closed=inert');
 } finally {
   await browser.close();
   site.close();
@@ -186,5 +237,5 @@ if (failures.length) {
 report(
   'header',
   failures,
-  `nav holds to ${NAV_FLOOR}px across ${WIDTHS.length} widths, and the menu is reachable on all ${PHONES.length} phone viewports.`,
+  `nav holds to ${NAV_FLOOR}px across ${WIDTHS.length} widths, the menu is reachable on all ${PHONES.length} phone viewports, and its keyboard focus is contained.`,
 );

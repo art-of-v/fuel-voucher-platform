@@ -5,54 +5,49 @@ import { homeAnchor } from '@/lib/anchors';
 import styles from './Footer.module.css';
 
 const navLinks = [
+  { name: 'Для бізнесу', href: '#business' },
   { name: 'Застосунок', href: '#app' },
-  { name: 'Процес', href: '#how' },
   { name: 'Ціни', href: '#prices' },
-  { name: 'FAQ', href: '#faq' },
+  { name: 'Як це працює', href: '#how' },
   { name: 'Підтримка', href: '/support/' },
-  { name: 'Контакти', href: '#contact' },
 ];
 
 export default function Footer() {
   const year = new Date().getFullYear();
   const pathname = usePathname();
+  const hrefFor = (href: string) =>
+    href.startsWith('#') ? homeAnchor(pathname, href) : href;
+
   return (
     <footer className={styles.footer}>
       <div className={`lf-container ${styles.container}`}>
-        <div className={styles.top}>
-          <a href={homeAnchor(pathname, '#top')} className={styles.logo}>
-            <span className={styles.logoMark} role="presentation" aria-hidden="true" />
-            <span className={styles.logoText}>FuelFlow</span>
+        <div className={styles.brand}>
+          <a href={homeAnchor(pathname, '#top')} className={styles.logo} aria-label="FuelFlow — на головну">
+            <span className={styles.logoMark} aria-hidden="true" />
+            <span>FuelFlow</span>
           </a>
+          <p>Пальне під контролем — від оплати до колонки.</p>
+        </div>
 
-          <nav className={styles.nav} aria-label="Додаткова навігація">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={
-                  link.href.startsWith('#')
-                    ? homeAnchor(pathname, link.href)
-                    : link.href
-                }
-              >
-                {link.name}
-              </a>
-            ))}
-          </nav>
+        <nav className={styles.nav} aria-label="Додаткова навігація">
+          {navLinks.map((link) => (
+            <a key={link.href} href={hrefFor(link.href)}>
+              {link.name}
+            </a>
+          ))}
+        </nav>
+
+        <div className={styles.contact}>
+          <a href="tel:+380970011771">+380 97 001 1771</a>
+          <span>Пн–Пт · 09:00–18:00</span>
+          <span>79023, Львів · вул. Городоцька, 128а</span>
         </div>
 
         <div className={styles.bottom}>
-          <div className={styles.copy}>
-            © {year} FuelFlow. Всі права захищено.
-          </div>
-          <div className={styles.legal}>
+          <span>© {year} FuelFlow</span>
+          <div>
             <a href="/terms/">Публічна оферта</a>
-            <span className={styles.legalDot}>·</span>
             <a href="/privacy/">Політика конфіденційності</a>
-          </div>
-          <div className={styles.meta}>
-            <span className={styles.metaDot} />
-            Львів · вул. Городоцька, 128а
           </div>
         </div>
       </div>

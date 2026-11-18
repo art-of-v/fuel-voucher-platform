@@ -20,7 +20,6 @@ export default function AppStoreBadge({
       target="_blank"
       rel="noopener noreferrer"
       className={`${styles.badge} ${className ?? ''}`}
-      data-magnetic
     >
       <AppleGlyph size={26} className={styles.mark} />
       <span className={styles.copy}>

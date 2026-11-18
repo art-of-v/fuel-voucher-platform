@@ -1,0 +1,3 @@
+namespace FuelFlow.Features.BusinessLeads.GetAdminBusinessLeadFacets;
+
+public sealed record GetAdminBusinessLeadFacetsQuery;

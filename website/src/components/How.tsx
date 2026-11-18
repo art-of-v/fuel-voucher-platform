@@ -1,97 +1,71 @@
-'use client';
-
-import { useEffect, useRef } from 'react';
-import SectionIndex from './SectionIndex';
+import Image from 'next/image';
 import styles from './How.module.css';
 
 const steps = [
   {
-    code: '01',
-    title: 'Купуй',
-    body: 'Обери пакет — від 2 до 50 літрів. Пакет це порція пального, яку мережа випустила як один ваучер на одну заправку: А-95, ДП або газ, на станціях OKKO, WOG, KLO, UPG.',
-    meta: '2 · 3 · 5 · 10 · 20 · 50 л',
+    title: 'Обрати',
+    body: 'Виберіть мережу, пальне й пакет від 2 до 50 літрів. Доступні обсяги залежать від мережі.',
+    meta: 'Каталог у застосунку',
   },
   {
-    code: '02',
-    title: 'Фіксуй',
-    body: 'Ціна фіксується в момент оплати й більше не змінюється. Скільки б пальне не коштувало на колонці — ти платиш стільки, скільки заплатив.',
-    meta: 'Price locked',
+    title: 'Оплатити',
+    body: 'Ціна фіксується в момент оплати через Monobank і більше не змінюється для цього талона.',
+    meta: 'Ціна зафіксована',
   },
   {
-    code: '03',
-    title: 'Зберігай',
-    body: 'Ваучер — це не папірець, а цифровий актив у телефоні: QR-код, підписаний твоїм пристроєм. Його не можна підробити або переслати як картку.',
-    meta: 'FuelFlow wallet',
+    title: 'Отримати',
+    body: 'Цифровий талон зʼявляється у вашому гаманці FuelFlow разом із мережею, обсягом і строком дії.',
+    meta: 'Талон у телефоні',
   },
   {
-    code: '04',
-    title: 'Показуй',
-    body: 'Зупинився на станції — відкрив ваучер і показав QR-код сканеру. Одним дотиком.',
-    meta: 'QR voucher',
+    title: 'Показати',
+    body: 'Відкрийте талон на станції та покажіть QR-код працівнику або сканеру мережі.',
+    meta: 'OKKO · WOG · KLO · UPG',
   },
   {
-    code: '05',
-    title: 'Заправляйся',
-    body: 'Колонка працює, ваучер витрачено. Один пакет — одна заправка: якщо потрібно менше, бери менший пакет, якщо більше — більший.',
-    meta: 'Fuel',
+    title: 'Заправитися',
+    body: 'Один пакет — одна заправка. Обирайте пакет під потрібний обсяг пального.',
+    meta: 'Одна поїздка',
   },
 ];
 
 export default function How() {
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
-    );
-    items.forEach((item) => {
-      item.classList.add('lf-reveal');
-      observer.observe(item);
-    });
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section className={`lf-section lf-section--deep ${styles.section}`} id="how" ref={ref}>
-      <div className="lf-grid-bg" aria-hidden="true" />
+    <section className={`lf-section ${styles.section}`} id="how">
       <div className={`lf-container ${styles.container}`}>
         <header className={styles.head}>
-          <div>
-            <span className="lf-eyebrow">Як це працює</span>
-            <h2 className={styles.title}>
-              П&apos;ять кроків.
-              <br />
-              Нуль паперу.
-            </h2>
-          </div>
-          <div className={styles.headRight}>
-            <SectionIndex current={2} total={10} label="Продукт" />
-          </div>
+          <p className="lf-eyebrow">Для водіїв</p>
+          <h2 className={styles.title}>Від каталогу до колонки — пʼять кроків.</h2>
+          <p className={styles.intro}>
+            Без пластикової картки й паперових талонів. Потрібний пакет зберігається
+            у FuelFlow до заправки.
+          </p>
         </header>
 
-        <ol className={styles.steps}>
-          {steps.map((step) => (
-            <li key={step.code} className={styles.step}>
-              <span className={styles.stepCode}>{step.code}</span>
-              <h3 className={styles.stepTitle}>{step.title}</h3>
-              <p className={styles.stepBody}>{step.body}</p>
-              <span className={styles.stepTime}>
-                <span className={styles.stepTimeLabel}>{step.meta}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <div className={styles.body}>
+          <figure className={styles.media}>
+            <Image
+              src="/driver-interior.jpg"
+              alt="Водій у салоні автомобіля"
+              width={896}
+              height={1200}
+              sizes="(max-width: 1000px) 100vw, 42vw"
+            />
+          </figure>
+
+          <ol className={styles.steps}>
+            {steps.map((step, index) => (
+              <li key={step.title} className={styles.step}>
+                <span className={styles.number}>{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                </div>
+                <small>{step.meta}</small>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </section>
   );

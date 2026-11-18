@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { brands } from "./locales/brands";
+import { businessLeads } from "./locales/businessLeads";
 import { brandRefusals } from "./locales/brandRefusals";
 import { common } from "./locales/common";
 import { contracts } from "./locales/contracts";
@@ -28,6 +29,7 @@ export const languages: { code: Language; name: string; flag: string }[] = [
 
 const localeModules = [
   brands,
+  businessLeads,
   brandRefusals,
   common,
   contracts,

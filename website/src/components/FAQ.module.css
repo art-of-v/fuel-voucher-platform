@@ -4,169 +4,137 @@
 }
 
 .container {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 52px 24px;
 }
 
 .head {
-  display: grid;
-  grid-template-columns: 1.4fr auto;
-  gap: 40px;
-  align-items: start;
-  margin-bottom: 56px;
+  grid-column: 1 / span 5;
+  position: sticky;
+  top: 110px;
+  align-self: start;
 }
 
 .title {
-  font-family: var(--font-display);
-  font-size: clamp(48px, 7vw, 96px);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-weight: 600;
-  margin: 24px 0 24px;
+  margin-bottom: 28px;
+  font-size: clamp(48px, 6vw, 96px);
+  line-height: 0.9;
 }
 
 .intro {
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.55;
+  max-width: 430px;
   color: var(--ink-soft);
-  max-width: 480px;
-}
-
-.headRight {
-  align-self: end;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .list {
-  border-top: 1px solid var(--line);
+  grid-column: 7 / -1;
+  border-top: 1px solid var(--line-strong);
 }
 
 .item {
-  border-bottom: 1px solid var(--line-subtle);
-  transition: background var(--motion-fast) var(--easing);
-}
-
-.itemOpen {
-  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
 }
 
 .trigger {
   display: grid;
-  grid-template-columns: 80px 1fr 32px;
+  grid-template-columns: 1fr 24px;
   gap: 24px;
   align-items: center;
   width: 100%;
-  background: none;
-  border: none;
-  padding: 24px 8px;
-  text-align: left;
+  min-height: 96px;
+  padding: 22px 0;
   color: var(--ink);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  transition: color var(--motion-fast) var(--easing);
+  background: transparent;
+  border: 0;
+  text-align: left;
 }
 
-.trigger:hover {
-  color: var(--accent);
-}
-
-.triggerIndex {
+.trigger > span:first-child {
   font-family: var(--font-display);
-  font-size: 12px;
-  color: var(--ink-mute);
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  font-size: clamp(20px, 2.2vw, 32px);
+  font-weight: 560;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
 }
 
-.triggerText {
-  font-family: var(--font-display);
-  font-size: clamp(20px, 2.2vw, 28px);
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-}
-
-.triggerIcon {
+.icon {
   position: relative;
   width: 18px;
   height: 18px;
   justify-self: end;
 }
 
-.iconBar {
+.icon::before,
+.icon::after {
+  content: '';
   position: absolute;
   background: var(--ink-mute);
-  transition: transform var(--motion-normal) var(--easing),
+  transition: opacity var(--motion-normal) var(--easing),
+    transform var(--motion-normal) var(--easing),
     background var(--motion-fast) var(--easing);
 }
 
-.iconBar:nth-child(1) {
+.icon::before {
   top: 8px;
   left: 0;
-  right: 0;
-  height: 1.5px;
+  width: 18px;
+  height: 1px;
 }
 
-.iconBarAlt {
-  top: 0 !important;
-  bottom: 0 !important;
+.icon::after {
+  top: 0;
   left: 8px;
-  right: auto !important;
-  width: 1.5px;
-  height: auto !important;
+  width: 1px;
+  height: 18px;
 }
 
-.itemOpen .iconBar {
+.itemOpen .icon::before,
+.itemOpen .icon::after {
   background: var(--accent);
 }
 
-.iconBarHidden {
+.itemOpen .icon::after {
   opacity: 0;
   transform: rotate(90deg);
 }
 
-.content {
-  display: grid;
-  transition: grid-template-rows var(--motion-normal) var(--easing);
-}
-
-.contentInner {
-  overflow: hidden;
-  min-height: 0;
-}
-
-.answer {
-  padding: 0 8px 24px 112px;
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.55;
+.content p {
+  max-width: 720px;
+  padding: 0 52px 30px 0;
   color: var(--ink-soft);
-  max-width: 760px;
-}
-
-.reveal {
+  font-size: 16px;
+  line-height: 1.65;
 }
 
 @media (max-width: 900px) {
-  .head {
-    grid-template-columns: 1fr;
-    gap: 24px;
-    margin-bottom: 40px;
+  .head,
+  .list {
+    grid-column: 1 / -1;
   }
-  .headRight {
-    justify-self: start;
+
+  .head {
+    position: static;
+  }
+
+  .title {
+    max-width: 760px;
   }
 }
 
 @media (max-width: 640px) {
   .trigger {
-    grid-template-columns: 48px 1fr 24px;
-    gap: 12px;
-    padding: 18px 0;
+    min-height: 78px;
   }
-  .triggerText {
-    font-size: 17px;
+
+  .trigger > span:first-child {
+    font-size: 20px;
   }
-  .answer {
-    padding: 0 0 18px 60px;
+
+  .content p {
+    padding-right: 0;
     font-size: 15px;
   }
 }

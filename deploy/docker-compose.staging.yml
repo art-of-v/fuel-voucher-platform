@@ -144,6 +144,9 @@ services:
       SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
       SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
+      # Optional staging sink for B2B leads. Empty keeps the durable DB record
+      # without sending test enquiries to the production sales team.
+      BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:-}
 
       # Settlement bot: opt-in, with a staging-only token/chat, never production's.
       # CSV is a scalar, not one Int64 collection slot; registration parses it as a whole.

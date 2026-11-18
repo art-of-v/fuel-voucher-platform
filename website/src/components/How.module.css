@@ -4,132 +4,153 @@
 }
 
 .container {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(48px, 7vw, 104px);
 }
 
 .head {
   display: grid;
-  grid-template-columns: 1.4fr auto;
-  gap: 40px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 24px;
   align-items: end;
-  margin-bottom: 64px;
+}
+
+.head > :first-child {
+  grid-column: 1 / -1;
 }
 
 .title {
-  font-family: var(--font-display);
-  font-size: clamp(48px, 7vw, 96px);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-weight: 600;
-  margin: 24px 0 0;
+  grid-column: 1 / span 8;
+  max-width: 1120px;
+  font-size: clamp(52px, 7.2vw, 120px);
+  line-height: 0.88;
 }
 
-.headRight {
-  align-self: end;
+.intro {
+  grid-column: 9 / -1;
+  max-width: 430px;
+  padding-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(300px, 5fr) minmax(0, 7fr);
+  gap: 0;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.media {
+  min-height: 820px;
+  margin: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+
+.media img {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  object-fit: cover;
+  object-position: center 35%;
+  filter: saturate(0.72) contrast(1.08) brightness(0.75);
 }
 
 .steps {
-  list-style: none;
-  padding: 0;
   margin: 0;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  padding: 0;
+  list-style: none;
 }
 
 .step {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 36px;
-  background: var(--bg-2);
-  transition: background var(--motion-fast) var(--easing);
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) minmax(120px, 0.4fr);
+  gap: 24px;
+  align-items: start;
+  min-height: 164px;
+  padding: 28px 0 26px 32px;
+  border-bottom: 1px solid var(--line);
 }
 
-.step:hover {
-  background: var(--bg-3);
+.step:last-child {
+  border-bottom: 0;
 }
 
-.stepCode {
-  font-family: var(--font-display);
-  font-size: clamp(40px, 5vw, 64px);
-  font-weight: 600;
-  color: var(--ink);
-  letter-spacing: -0.03em;
-  line-height: 1;
+.number {
+  color: var(--ink-mute);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.stepTitle {
-  font-family: var(--font-display);
-  font-size: clamp(22px, 2.2vw, 30px);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.15;
-  margin: 0;
+.step h3 {
+  margin-bottom: 12px;
+  font-size: clamp(26px, 2.7vw, 42px);
 }
 
-.stepBody {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.55;
+.step p {
+  max-width: 56ch;
   color: var(--ink-soft);
-  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
-.stepTime {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-display);
+.step small {
+  justify-self: end;
+  padding-right: 4px;
+  color: var(--ink-mute);
   font-size: 11px;
-  letter-spacing: 0.18em;
-  color: var(--ink-mute);
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  width: fit-content;
-  margin-top: auto;
-  text-transform: uppercase;
+  text-align: right;
 }
 
-.stepTimeLabel {
-  color: var(--ink-mute);
-}
-
-.stepTimeValue {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.reveal {
-}
-
-@media (max-width: 900px) {
-  .head {
-    grid-template-columns: 1fr;
-    gap: 24px;
-    margin-bottom: 48px;
+@media (max-width: 1000px) {
+  .title,
+  .intro {
+    grid-column: 1 / -1;
   }
-  .headRight {
-    justify-self: start;
+
+  .intro {
+    max-width: var(--reading);
   }
-  .steps {
+
+  .body {
     grid-template-columns: 1fr;
   }
-}
 
-@media (min-width: 901px) and (max-width: 1200px) {
-  .steps {
-    grid-template-columns: repeat(3, 1fr);
+  .media {
+    min-height: 620px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
+  .title {
+    font-size: clamp(46px, 14vw, 72px);
+  }
+
+  .body {
+    margin-inline: calc(-1 * var(--gutter));
+  }
+
+  .media {
+    min-height: 520px;
+  }
+
   .step {
-    padding: 28px 24px;
+    grid-template-columns: 38px 1fr;
+    min-height: auto;
+    gap: 14px;
+    padding: 22px var(--gutter);
+  }
+
+  .step small {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
   }
 }

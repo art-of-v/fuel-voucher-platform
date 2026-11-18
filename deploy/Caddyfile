@@ -168,9 +168,9 @@ Preferred-Languages: uk, en
 # export built from the repo's website/ on every deploy - same pipeline as the
 # admin dashboard; nothing is hand-copied to the host any more).
 #
-# The support page posts to the API directly from the browser, so this domain
-# needs one allow-listed API path - exactly like the admin domain above. The
-# form's API origin is configured at build time via NEXT_PUBLIC_API_URL.
+# The support and business-lead forms post to the API directly from the browser,
+# so this domain needs two exact allow-listed API paths - like the admin domain
+# above. Their API origin is configured at website build time.
 fuelflowmarketplace.com, www.fuelflowmarketplace.com {
 	encode zstd gzip
 
@@ -191,15 +191,15 @@ fuelflowmarketplace.com, www.fuelflowmarketplace.com {
 		-Server
 	}
 
-	# Public contact form (fuelflowmarketplace.com/support). Rate-limited in the API
-	# (5/h/IP named policy) and honeypot-guarded; CORS on the API must
-	# include this origin for the browser POST to pass.
-	@support_api path /api/support/messages
+	# The support and business-lead forms are the marketing site's only public API
+	# writes. Both are rate-limited and honeypot-guarded in the API; every other
+	# /api path on this host remains an explicit 404.
+	@marketing_forms_api path /api/support/messages /api/business-leads
 	@any_api path /api /api/*
 
 	route {
 		import security_txt
-		reverse_proxy @support_api fuelflow-backend:8080
+		reverse_proxy @marketing_forms_api fuelflow-backend:8080
 		respond @any_api 404
 		reverse_proxy fuelflow-website:5001
 	}
@@ -321,11 +321,11 @@ app.palne.shop {
 		-Server
 	}
 
-	@support_api path /api/support/messages
+	@marketing_forms_api path /api/support/messages /api/business-leads
 	@any_api path /api /api/*
 
 	route {
-		reverse_proxy @support_api fuelflow-staging-backend:8080
+		reverse_proxy @marketing_forms_api fuelflow-staging-backend:8080
 		respond @any_api 404
 		reverse_proxy staging-website:5001
 	}

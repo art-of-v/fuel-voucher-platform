@@ -473,6 +473,22 @@ out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
 check "an unguarded switch may differ" 0 "$rc"
 cp "$GOOD_ENV" "$FIXTURE/.env.production"
 
+# The B2B form is the marketing site's primary conversion path. Production must
+# have a monitored sales destination, while staging deliberately permits an empty
+# sink so test enquiries are stored without reaching the real sales team.
+grep -Fq 'BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:?' \
+  "$SCRIPT_DIR/docker-compose.prod.yml"
+check "production requires a B2B sales inbox" 0 "$?"
+grep -Fq 'BusinessLeadMail__ToEmail: ${BUSINESS_LEAD_MAIL_TO_EMAIL:-}' \
+  "$SCRIPT_DIR/docker-compose.staging.yml"
+check "staging keeps the B2B sales inbox optional" 0 "$?"
+
+# Both marketing vhosts expose exactly the two anonymous form writes. The catch-all
+# below them still returns 404 for every other /api path.
+marketing_matchers="$(grep -Fc '@marketing_forms_api path /api/support/messages /api/business-leads' "$SCRIPT_DIR/Caddyfile")"
+[[ "$marketing_matchers" -eq 2 ]]
+check "production and staging allow only the two marketing forms" 0 "$?"
+
 echo
 echo "  $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

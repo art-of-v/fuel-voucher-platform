@@ -1,127 +1,83 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import SectionIndex from './SectionIndex';
+import { useState } from 'react';
 import styles from './FAQ.module.css';
 
 const faqItems = [
   {
     q: 'Що таке FuelFlow?',
-    a: 'Це цифровий паливний гаманець. Ви купуєте пакет пальна за сьогоднішньою ціною — він зберігається у телефоні як цифровий ваучер. Заправляєтеся, коли потрібно, пред’явивши QR-код на станції.',
+    a: 'Це цифровий паливний гаманець для водіїв і компаній. Ви купуєте пакет пального за актуальною ціною, зберігаєте талон у застосунку й використовуєте його на станції мережі-партнера.',
   },
   {
     q: 'Що таке «пакет»?',
-    a: 'Це порція пального, яку мережа випустила як один ваучер: певна кількість літрів одного палива в одній мережі. Куплений пакет = один ваучер = одна заправка. Обсяги бувають від 2 до 50 літрів, і набір залежить від мережі — точний перелік показує застосунок і розділ «Ціни» на цій сторінці.',
+    a: 'Пакет — це визначена кількість літрів одного пального в одній мережі. Один куплений пакет дорівнює одному талону й одній заправці. Набір обсягів залежить від мережі.',
   },
   {
-    q: 'Скільки дійсний ваучер?',
-    a: 'Термін задає мережа: він надрукований на самому ваучері. Ми зчитуємо його при імпорті, тож у застосунку видно саме той строк, який дав постачальник. Якщо термін добігає, а пально ще не використано — зверніться в підтримку, розберемося.',
+    q: 'Скільки дійсний талон?',
+    a: 'Строк задає мережа-постачальник. FuelFlow показує у гаманці саме той строк, який має виданий талон. Якщо він добігає, зверніться у підтримку.',
   },
   {
     q: 'Де можна заправитися?',
-    a: 'На станціях мереж-партнерів: OKKO, WOG, KLO, UPG. Карта найближчих станцій вбудована в застосунок.',
+    a: 'На станціях мереж-партнерів OKKO, WOG, KLO та UPG. Карта найближчих станцій доступна у застосунку.',
   },
   {
     q: 'Що буде, якщо ціна на пальне зміниться?',
-    a: 'Нічого. Пакет оплачено за зафіксованою ціною. Скільки б пальне не коштувало на колонці — ви платите стільки, скільки заплатили. Різниця — ваша економія.',
+    a: 'Ціна вашого пакета вже зафіксована в момент оплати й не зміниться до його використання.',
   },
   {
-    q: 'А якщо ваучер не надійшов після оплати?',
-    // "повертається на вашу картку без жодних заяв" promised an automatic
-    // refund. What the system does is raise an alert to staff, who issue the
-    // refund - so the promise is kept, the automation claim is not.
-    a: 'Замовлення обробляється автоматично протягом хвилин. Якщо ваучерів обраної мережі немає в наявності, ми повертаємо кошти на картку, з якої було оплачено.',
+    q: 'Що робити, якщо талон не надійшов?',
+    a: 'Замовлення обробляється автоматично протягом хвилин. Якщо видати талон неможливо, команда FuelFlow оформить повернення на картку, з якої було сплачено.',
   },
   {
-    q: 'Як компанія забезпечує паливом водіїв?',
-    a: 'Власник створює паливний пул компанії, купує літри за оптовими цінами і роздає ваучери водіям у два дотики. Водія звільнено — ваучер відкликано, і він просто перестає працювати. Акт звірки формується автоматично.',
+    q: 'Як компанія забезпечує водіїв пальним?',
+    a: 'Власник купує пальне в пул компанії й видає талони конкретним водіям. Невикористаний талон можна відкликати, а рух літрів — перевірити в акті звірки.',
   },
   {
-    q: 'Чи безпечно це?',
-    a: 'Так. Оплата проходить через Monobank із криптографічним підписом кожного платежу. Вхід — за номером телефону з SMS-кодом, а кожна покупка підтверджується підписом вашого пристрою. Жоден ваучер не можна використати двічі.',
+    q: 'Як захищені операції?',
+    a: 'Вхід підтверджується SMS-кодом, оплата відбувається через Monobank, а критичні операції застосунку захищені підписом пристрою.',
   },
 ];
 
 export default function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -10% 0px' }
-    );
-    items.forEach((item) => {
-      item.classList.add('lf-reveal');
-      observer.observe(item);
-    });
-    return () => observer.disconnect();
-  }, []);
 
   return (
-    <section className={`lf-section ${styles.section}`} id="faq" ref={ref}>
+    <section className={`lf-section ${styles.section}`} id="faq">
       <div className={`lf-container ${styles.container}`}>
         <header className={styles.head}>
-          <div>
-            <span className="lf-eyebrow">FAQ</span>
-            <h2 className={styles.title}>
-              Поширені питання.
-            </h2>
-            <p className={styles.intro}>
-              Якщо відповіді немає — залиште заявку, і ми передзвонимо
-              протягом 15 хвилин у робочий час.
-            </p>
-          </div>
-          <div className={styles.headRight}>
-            <SectionIndex current={10} total={10} label="FAQ" />
-          </div>
+          <p className="lf-eyebrow">Питання і відповіді</p>
+          <h2 className={styles.title}>Коротко про те, що важливо до першої заправки.</h2>
+          <p className={styles.intro}>
+            Не знайшли відповіді? Напишіть у підтримку — команда відповість протягом робочого дня.
+          </p>
         </header>
 
         <div className={styles.list}>
-          {faqItems.map((item, i) => {
-            const isOpen = open === i;
+          {faqItems.map((item, index) => {
+            const isOpen = open === index;
+            const triggerId = `faq-trigger-${index}`;
+            const panelId = `faq-panel-${index}`;
             return (
-              <div
-                key={i}
-                className={`${styles.item} ${isOpen ? styles.itemOpen : ''} ${styles.reveal}`}
-              >
+              <div key={item.q} className={`${styles.item} ${isOpen ? styles.itemOpen : ''}`}>
                 <button
+                  id={triggerId}
+                  type="button"
                   className={styles.trigger}
-                  onClick={() => setOpen(isOpen ? null : i)}
                   aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  onClick={() => setOpen(isOpen ? null : index)}
                 >
-                  <span className={styles.triggerIndex}>
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className={styles.triggerText}>{item.q}</span>
-                  <span className={styles.triggerIcon} aria-hidden="true">
-                    <span className={styles.iconBar} />
-                    <span
-                      className={`${styles.iconBar} ${styles.iconBarAlt} ${
-                        isOpen ? styles.iconBarHidden : ''
-                      }`}
-                    />
-                  </span>
+                  <span>{item.q}</span>
+                  <span className={styles.icon} aria-hidden="true" />
                 </button>
                 <div
+                  id={panelId}
                   className={styles.content}
-                  style={{
-                    gridTemplateRows: isOpen ? '1fr' : '0fr',
-                  }}
+                  role="region"
+                  aria-labelledby={triggerId}
+                  hidden={!isOpen}
                 >
-                  <div className={styles.contentInner}>
-                    <p className={styles.answer}>{item.a}</p>
-                  </div>
+                  <p>{item.a}</p>
                 </div>
               </div>
             );

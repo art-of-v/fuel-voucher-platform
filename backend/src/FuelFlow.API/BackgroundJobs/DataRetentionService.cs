@@ -1,4 +1,5 @@
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.BusinessLeads.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
@@ -77,6 +78,12 @@ public class DataRetentionService
     /// </para>
     /// </summary>
     public const int SupportMessageRetentionDays = 365;
+
+    /// <summary>
+    /// Resolved sales enquiries retain a one-year follow-up/audit window. Active pipeline rows have
+    /// no age-only purge: a lead is kept until somebody resolves it, however long that takes.
+    /// </summary>
+    public const int BusinessLeadTerminalRetentionDays = 365;
 
     /// <summary>
     /// Customer feedback from the Telegram bot. Shorter than <see cref="SupportMessageRetentionDays"/>
@@ -171,6 +178,7 @@ public class DataRetentionService
         var voucherImportCutoff = now.AddDays(-VoucherImportRetentionDays);
         var qrParametersCutoff = now.AddDays(-QrParametersRetentionDays);
         var supportMessageCutoff = now.AddDays(-SupportMessageRetentionDays);
+        var businessLeadCutoff = now.AddDays(-BusinessLeadTerminalRetentionDays);
         var feedbackMessageCutoff = now.AddDays(-FeedbackMessageRetentionDays);
 
         // Devices are purged by TWO predicates rather than the one
@@ -305,8 +313,17 @@ public class DataRetentionService
             // Contact-form submissions past the window. Ordered last so it is the newest policy in the
             // list, and nothing cascades into it - it references no user, so no other table depends on
             // the row surviving.
-            ("support_messages", await PurgeAsync("support_messages", 
+            ("support_messages", await PurgeAsync("support_messages",
                 _context.SupportMessages.Where(m => m.CreatedAtUtc < supportMessageCutoff),
+                dryRun, cancellationToken)),
+
+            // A live sales pipeline has no age-only expiry: New, Contacted and Qualified remain until
+            // a person resolves them. Only terminal rows age out, from the last status change rather
+            // than the original enquiry date, so a long-running lead still gets the full terminal window.
+            ("business_leads", await PurgeAsync("business_leads",
+                _context.BusinessLeads.Where(l =>
+                    (l.Status == BusinessLeadStatus.Converted || l.Status == BusinessLeadStatus.Rejected)
+                    && l.UpdatedAtUtc < businessLeadCutoff),
                 dryRun, cancellationToken)),
 
             // Bot feedback: replies first, because the FK from replies to messages is Restrict and

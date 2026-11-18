@@ -1,230 +1,137 @@
 .hero {
   position: relative;
-  min-height: 100vh;
+  min-height: max(760px, 100svh);
   display: flex;
-  align-items: center;
-  padding-top: 180px;
-  padding-bottom: 100px;
-  overflow: hidden;
+  align-items: flex-end;
   isolation: isolate;
+  overflow: hidden;
+  padding: 168px 0 54px;
+  background: var(--bg);
 }
 
-/* Cinematic load-in: bg zooms down from 1.12, scrim fades */
-@keyframes heroBgIn {
-  from {
-    transform: scale(1.12);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Background layers — just the photo + scrim. No scanlines, no neon brackets. */
-.bg {
+.media,
+.scrim {
   position: absolute;
   inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  animation: heroBgIn 1.6s var(--easing) both;
+  z-index: -2;
+}
+
+.media {
+  overflow: hidden;
 }
 
 .bgImage {
-  position: absolute;
-  inset: 0;
-  background-image: url('/hero-station.jpg');
-  background-size: cover;
-  background-position: center 20%;
-  filter: brightness(0.88) contrast(1.08) saturate(1.0);
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center 22%;
+  filter: saturate(0.72) contrast(1.08) brightness(0.82);
+  animation: heroImageIn 1.35s var(--easing) both;
 }
 
-.bgScrim {
-  position: absolute;
-  inset: 0;
+.scrim {
+  z-index: -1;
   background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.05) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.0) 50%, rgba(0, 0, 0, 0.65) 100%);
+    linear-gradient(90deg, rgba(3, 4, 3, 0.92) 0%, rgba(3, 4, 3, 0.58) 48%, rgba(3, 4, 3, 0.06) 82%),
+    linear-gradient(180deg, rgba(3, 4, 3, 0.18) 0%, rgba(3, 4, 3, 0.05) 48%, rgba(3, 4, 3, 0.82) 100%);
 }
 
 .container {
-  position: relative;
-  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: end;
+  gap: 24px;
 }
 
-.left {
-  display: flex;
-  flex-direction: column;
-  max-width: 880px;
+.copy {
+  grid-column: 1 / span 8;
+  max-width: 1060px;
 }
 
-.meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-display);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.kicker {
+  margin-bottom: 32px;
   color: var(--ink-soft);
-  margin-bottom: 40px;
-  width: fit-content;
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.metaDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.metaLabel {
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 550;
 }
 
 .title {
-  font-family: var(--font-display);
-  margin: 0 0 36px;
-  line-height: 0.95;
-  letter-spacing: -0.025em;
   display: flex;
   flex-direction: column;
-  gap: 0.05em;
+  margin-bottom: 34px;
+  font-size: clamp(70px, 10vw, 168px);
+  font-weight: 570;
+  line-height: 0.83;
+  letter-spacing: -0.065em;
 }
 
-.titleMain {
-  font-size: clamp(56px, 9vw, 144px);
-  font-weight: 600;
-  color: var(--ink);
-  letter-spacing: -0.03em;
-}
-
-.titleSub {
-  font-size: clamp(24px, 3.4vw, 48px);
-  font-weight: 500;
-  color: var(--ink-soft);
-  letter-spacing: -0.015em;
-}
-
-.titleAccent {
-  color: var(--accent);
-  font-weight: 600;
-  margin-left: 6px;
-}
-
-.titleLine2 {
-  font-size: clamp(28px, 3.8vw, 56px);
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: -0.015em;
-  margin-top: 0.12em;
+.titleLine {
+  display: block;
 }
 
 .lead {
-  font-family: var(--font-sans);
-  font-size: clamp(16px, 1.3vw, 19px);
-  line-height: 1.55;
+  max-width: 590px;
+  margin-bottom: 38px;
   color: var(--ink-soft);
-  font-weight: 400;
-  max-width: 580px;
-  margin: 0 0 48px;
+  font-size: clamp(17px, 1.3vw, 21px);
+  line-height: 1.5;
 }
 
 .actions {
   display: flex;
-  gap: 14px;
   flex-wrap: wrap;
-  margin-bottom: 64px;
+  align-items: center;
+  gap: 12px;
 }
 
-.cta {
-  font-size: 14px;
-}
-
-.spec {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  max-width: 720px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.specRow {
+.facts {
+  grid-column: 9 / -1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 20px 22px;
-  background: rgba(0, 0, 0, 0.55);
+  margin: 0;
+  border-top: 1px solid var(--line-strong);
 }
 
-.specLabel {
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.facts > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.7fr) 1.3fr;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.facts dt,
+.facts dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.facts dt {
   color: var(--ink-mute);
 }
 
-.specValue {
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 600;
+.facts dd {
   color: var(--ink);
-  letter-spacing: -0.025em;
+  font-weight: 550;
 }
 
-.scroll {
-  position: absolute;
-  bottom: 32px;
-  right: var(--gutter);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  color: var(--ink-soft);
-}
-
-.scrollLabel {
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-}
-
-.scrollLine {
-  width: 1px;
-  height: 56px;
-  background: var(--line-strong);
-}
-
-/* The entrance is a plain CSS animation and the per-step delay is an inline
-   custom property, so the whole thing is in the server-rendered HTML and starts
-   on first paint. Crucially the hidden start state lives in the keyframe's
-   `from`, NOT in the rule below: if the animation never runs - JavaScript off,
-   animations disabled, an old engine - the copy is simply visible. The hero is
-   the LCP, so it must never be able to depend on script in order to exist. */
-@keyframes lfHeroRise {
+@keyframes heroImageIn {
   from {
     opacity: 0;
-    transform: translateY(24px);
+    transform: scale(1.06);
   }
 }
 
-@keyframes lfHeroTitleClip {
+@keyframes heroRise {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+@keyframes heroClip {
   from {
     clip-path: inset(-10% 0 110% 0);
   }
@@ -234,61 +141,105 @@
 }
 
 .reveal {
-  animation: lfHeroRise var(--motion-slow) var(--easing) both;
+  animation: heroRise 0.72s var(--easing) both;
   animation-delay: var(--reveal-delay, 0ms);
 }
 
-/* Title lines slide out from a mask - editorial reveal. Declared as a second
-   animation rather than a second rule so the stagger stays one value. Both
-   `to` states match the resting appearance, so nothing shifts when they end. */
-.titleMain,
-.titleSub,
-.titleLine2 {
-  animation:
-    lfHeroRise var(--motion-slow) var(--easing) both,
-    lfHeroTitleClip 0.9s var(--easing) both;
+.titleLine {
+  animation: heroRise 0.72s var(--easing) both, heroClip 0.95s var(--easing) both;
   animation-delay: var(--reveal-delay, 0ms), var(--reveal-delay, 0ms);
 }
 
-@media (max-width: 768px) {
-  .hero {
-    padding-top: 120px;
-    min-height: auto;
+@media (max-width: 1100px) {
+  .copy {
+    grid-column: 1 / span 9;
   }
-  .spec {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .scroll {
-    display: none;
+
+  .facts {
+    grid-column: 9 / -1;
   }
 }
 
-@media (max-width: 480px) {
-  .titleMain {
-    font-size: clamp(46px, 14vw, 76px);
+@media (max-width: 900px) {
+  .hero {
+    min-height: max(720px, 100svh);
+    padding-top: 132px;
   }
-  .titleSub {
-    font-size: clamp(20px, 6vw, 32px);
+
+  .container {
+    grid-template-columns: 1fr;
+    gap: 48px;
   }
-  .specRow {
-    padding: 16px 18px;
+
+  .copy,
+  .facts {
+    grid-column: auto;
   }
-  .specValue {
-    font-size: 22px;
+
+  .copy {
+    max-width: 760px;
+  }
+
+  .facts {
+    max-width: 620px;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    min-height: 100svh;
+    align-items: flex-end;
+    padding: 116px 0 30px;
+  }
+
+  .bgImage {
+    object-position: 66% center;
+  }
+
+  .scrim {
+    background:
+      linear-gradient(90deg, rgba(3, 4, 3, 0.9), rgba(3, 4, 3, 0.34)),
+      linear-gradient(180deg, rgba(3, 4, 3, 0.2) 0%, rgba(3, 4, 3, 0.34) 46%, rgba(3, 4, 3, 0.94) 100%);
+  }
+
+  .title {
+    margin-bottom: 26px;
+    font-size: clamp(54px, 18vw, 92px);
+    line-height: 0.87;
+  }
+
+  .kicker {
+    margin-bottom: 22px;
+  }
+
+  .lead {
+    margin-bottom: 28px;
+    font-size: 16px;
+  }
+
+  .actions {
+    align-items: stretch;
+  }
+
+  .actions > * {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .facts {
+    gap: 0;
+  }
+
+  .facts > div {
+    grid-template-columns: 90px 1fr;
+    padding: 12px 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* No entrance animation at all, which leaves every rule's own values - and
-   * those are the visible ones. Nothing here needs to restate a final state,
-   * because there is no `from` to hold the copy back. */
-  .bg {
-    animation: none;
-  }
+  .bgImage,
   .reveal,
-  .titleMain,
-  .titleSub,
-  .titleLine2 {
+  .titleLine {
     animation: none;
   }
 }

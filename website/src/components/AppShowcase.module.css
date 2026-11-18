@@ -1,75 +1,54 @@
 .section {
   background: var(--bg-2);
   border-top: 1px solid var(--line-subtle);
-  position: relative;
-  /* Same reason as Partners: the rail is full-bleed and masked, and a masked
-     element is not reliably overflow-clipped on iOS. See the note there. */
   overflow-x: clip;
-}
-
-/* Fuel-nozzle close-up — anchored top-right, heavily faded.
-   Gives the section a physical texture that ties the app UI to real hardware. */
-.section::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 50%;
-  height: 100%;
-  background-image: url('/fuel-nozzle.jpg');
-  background-size: cover;
-  background-position: center left;
-  opacity: 0.07;
-  mask-image: linear-gradient(90deg, transparent 0%, black 60%);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 60%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.container {
-  position: relative;
-  z-index: 1;
 }
 
 .head {
   display: grid;
-  grid-template-columns: 1.4fr auto;
-  gap: 40px;
-  align-items: end;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px 24px;
   margin-bottom: 56px;
 }
 
-.title {
-  font-family: var(--font-display);
-  font-size: clamp(40px, 5.5vw, 76px);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-weight: 600;
-  margin: 24px 0 0;
+.head > :first-child {
+  grid-column: 1 / -1;
 }
 
-.headRight {
+.title {
+  grid-column: 1 / span 8;
+  max-width: 1100px;
+  font-size: clamp(52px, 7vw, 118px);
+  line-height: 0.9;
+}
+
+.intro {
+  grid-column: 9 / -1;
   align-self: end;
+  max-width: 430px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.6;
 }
 
 .railWrap {
-  position: relative;
-  z-index: 1;
-  margin: 0 calc(-1 * var(--gutter));
-  padding: 0 var(--gutter);
+  width: 100%;
+  padding-inline: var(--gutter);
 }
 
 .rail {
   display: flex;
-  gap: 24px;
+  gap: clamp(14px, 2vw, 28px);
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding: 2px 0 10px;
+  cursor: grab;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
-  -ms-overflow-style: none;
-  cursor: grab;
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
-  mask-image: linear-gradient(90deg, transparent, black 6%, black 94%, transparent);
+  touch-action: pan-x;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
 }
 
 .rail.dragging {
@@ -77,65 +56,54 @@
   scroll-snap-type: none;
 }
 
-.rail::-webkit-scrollbar {
-  display: none;
-}
-
 .device {
-  margin: 0;
   flex: 0 0 auto;
-  width: clamp(240px, 24vw, 330px);
-  scroll-snap-align: center;
-  border: 1px solid var(--line);
-  border-radius: 32px;
+  width: clamp(220px, 22vw, 348px);
+  margin: 0;
   overflow: hidden;
+  scroll-snap-align: center;
   background: var(--bg);
-  transition: border-color var(--motion-fast) var(--easing),
-    transform var(--motion-normal) var(--easing);
-}
-
-.device:hover {
-  border-color: var(--accent-border);
-  transform: translateY(-6px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
 }
 
 .device img {
   width: 100%;
-  display: block;
+  height: auto;
   aspect-ratio: 588 / 1280;
   object-fit: cover;
-  transition: transform 0.6s var(--easing);
   pointer-events: none;
-}
-
-.device:hover img {
-  transform: scale(1.05);
+  user-select: none;
 }
 
 .hint {
-  display: block;
-  text-align: center;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  margin-top: 18px;
   color: var(--ink-mute);
-  margin-top: 24px;
-}
-
-.reveal {
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {
+  .title,
+  .intro {
+    grid-column: 1 / -1;
+  }
+
+  .intro {
+    max-width: var(--reading);
+  }
+}
+
+@media (max-width: 640px) {
   .head {
-    grid-template-columns: 1fr;
-    gap: 24px;
-    margin-bottom: 40px;
+    margin-bottom: 38px;
   }
-  .headRight {
-    justify-self: start;
+
+  .title {
+    font-size: clamp(46px, 14vw, 72px);
   }
+
   .device {
-    width: 220px;
+    width: min(72vw, 286px);
+    border-radius: 18px;
   }
 }

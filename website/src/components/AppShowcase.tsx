@@ -1,53 +1,23 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useRef } from 'react';
-import SectionIndex from './SectionIndex';
 import styles from './AppShowcase.module.css';
 
-const screens = Array.from({ length: 10 }, (_, i) => `/design-${i + 1}.jpg`);
+const screens = [
+  { src: '/design-1.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 1' },
+  { src: '/design-2.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 2' },
+  { src: '/design-3.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 3' },
+  { src: '/design-6.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 4' },
+  { src: '/design-9.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 5' },
+  { src: '/design-10.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 6' },
+];
 
-/* The rail renders the same ten screens three times and silently re-seats the
- * scroll position by one copy length whenever it drifts near a boundary, so
- * swiping/dragging never dead-ends and never visibly jumps - the copies are
- * pixel-identical. There are no arrow buttons: the rail is the only control. */
 const copies = [0, 1, 2];
 
 export default function AppShowcase() {
-  const ref = useRef<HTMLElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const items = root.querySelectorAll<HTMLElement>(`.${styles.reveal}`);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.05 }
-    );
-    items.forEach((item) => {
-      item.classList.add('lf-reveal');
-      observer.observe(item);
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  /* Seamless looping: keep the scroll position anchored to the middle copy.
-   * Re-anchoring is a plain (non-smooth) scrollLeft assignment offset by an
-   * exact number of cards, so scroll-snap positions stay aligned and the
-   * frame the user sees does not change.
-   *
-   * The anchor has to be recomputed on resize, not just on mount: a card is
-   * clamp(240px, 24vw, 330px), so the copy width is a function of the viewport.
-   * Without this the rail keeps a scrollLeft that belonged to the old width,
-   * which parks it between copies - the seam then shows a half card and the
-   * "endless" rail visibly stops being seamless the moment you resize. */
   useEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
@@ -62,12 +32,9 @@ export default function AppShowcase() {
     observer.observe(rail);
 
     const onScroll = () => {
-      const w = copyWidth();
-      if (rail.scrollLeft < w * 0.5) {
-        rail.scrollLeft += w;
-      } else if (rail.scrollLeft > w * 1.5) {
-        rail.scrollLeft -= w;
-      }
+      const width = copyWidth();
+      if (rail.scrollLeft < width * 0.5) rail.scrollLeft += width;
+      else if (rail.scrollLeft > width * 1.5) rail.scrollLeft -= width;
     };
 
     rail.addEventListener('scroll', onScroll, { passive: true });
@@ -77,7 +44,6 @@ export default function AppShowcase() {
     };
   }, []);
 
-  /* Drag-to-scroll with a mouse */
   useEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
@@ -86,17 +52,17 @@ export default function AppShowcase() {
     let startScroll = 0;
     let moved = false;
 
-    const onDown = (e: PointerEvent) => {
-      if (e.pointerType !== 'mouse') return;
+    const onDown = (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return;
       down = true;
       moved = false;
-      startX = e.clientX;
+      startX = event.clientX;
       startScroll = rail.scrollLeft;
       rail.classList.add(styles.dragging);
     };
-    const onMove = (e: PointerEvent) => {
+    const onMove = (event: PointerEvent) => {
       if (!down) return;
-      const dx = e.clientX - startX;
+      const dx = event.clientX - startX;
       if (Math.abs(dx) > 4) moved = true;
       rail.scrollLeft = startScroll - dx;
     };
@@ -104,60 +70,61 @@ export default function AppShowcase() {
       down = false;
       rail.classList.remove(styles.dragging);
     };
-    const onClickCapture = (e: MouseEvent) => {
-      if (moved) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    const onClick = (event: MouseEvent) => {
+      if (!moved) return;
+      event.preventDefault();
+      event.stopPropagation();
     };
 
     rail.addEventListener('pointerdown', onDown);
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-    rail.addEventListener('click', onClickCapture, true);
+    rail.addEventListener('click', onClick, true);
     return () => {
       rail.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      rail.removeEventListener('click', onClickCapture, true);
+      rail.removeEventListener('click', onClick, true);
     };
   }, []);
 
   return (
-    <section className={`lf-section ${styles.section}`} id="app" ref={ref}>
-      <div className={`lf-container ${styles.container}`}>
-        <header className={styles.head}>
-          <div>
-            <span className="lf-eyebrow">Застосунок</span>
-            <h2 className={styles.title}>
-              Один застосунок.
-              <br />
-              Усе паливо — в ньому.
-            </h2>
-          </div>
-          <div className={styles.headRight}>
-            <SectionIndex current={4} total={10} label="Застосунок" />
-          </div>
-        </header>
+    <section className={`lf-section ${styles.section}`} id="app">
+      <div className={`lf-container ${styles.head}`}>
+        <p className="lf-eyebrow">FuelFlow у роботі</p>
+        <h2 className={styles.title}>Пальне у русі. Від вибору до талона.</h2>
+        <p className={styles.intro}>
+          Каталог, замовлення й цифровий талон зібрані в одному зрозумілому потоці.
+        </p>
+      </div>
 
-        <div className={styles.railWrap}>
-          <div className={styles.rail} ref={railRef}>
-            {copies.map((copy) =>
-              screens.map((src, i) => (
-                <figure
-                  key={`${copy}-${src}`}
-                  className={`${styles.device} ${styles.reveal} lf-reveal--scale`} data-tilt data-glow
-                  style={{ transitionDelay: `${(i % 5) * 70}ms` }}
-                >
-                  <img src={src} alt={`FuelFlow — екран застосунку ${i + 1}`} loading="lazy" />
-                </figure>
-              ))
-            )}
-          </div>
-
-          <span className={styles.hint}>Гортай — стрічка без кінця</span>
+      <div className={styles.railWrap}>
+        <div
+          className={styles.rail}
+          ref={railRef}
+          role="region"
+          aria-label="Екрани застосунку FuelFlow"
+          tabIndex={0}
+        >
+          {copies.map((copy) =>
+            screens.map((screen) => (
+              <figure key={`${copy}-${screen.src}`} className={styles.device}>
+                <Image
+                  src={screen.src}
+                  alt={copy === 1 ? screen.alt : ''}
+                  aria-hidden={copy !== 1}
+                  width={588}
+                  height={1280}
+                  sizes="(max-width: 640px) 72vw, (max-width: 1100px) 220px, 22vw"
+                  draggable={false}
+                />
+              </figure>
+            )),
+          )}
         </div>
       </div>
+
+      <p className={`lf-container ${styles.hint}`}>Проведіть або перетягніть, щоб гортати</p>
     </section>
   );
 }
