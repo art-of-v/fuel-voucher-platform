@@ -25,6 +25,14 @@ export default function Hero() {
       <div className={styles.heroBrand}>
         <BrandLockup />
       </div>
+      <Image
+        className={styles.stationLogo}
+        src="/fuelflow-prototype-logo.webp"
+        alt=""
+        width={228}
+        height={84}
+        aria-hidden="true"
+      />
 
       <div className={`${styles.container} lf-container`}>
         <div className={styles.copy}>
