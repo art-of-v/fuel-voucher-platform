@@ -93,7 +93,7 @@ export default function Prices() {
             <div className={styles.grid}>
               {state.networks.map((offer, i) => (
                 <article
-                  key={offer.stationId}
+                  key={offer.brandSlug}
                   className={`${styles.card} ${styles.reveal}`}
                   data-glow
                   style={{ transitionDelay: `${i * 50}ms` }}
