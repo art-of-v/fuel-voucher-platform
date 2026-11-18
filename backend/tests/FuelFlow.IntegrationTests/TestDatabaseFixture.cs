@@ -142,6 +142,17 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     public string AppConnectionString { get; private set; } = string.Empty;
 
     /// <summary>
+    /// Connection string of the suite's one Redis container, set as a process variable in
+    /// <see cref="InitializeAsync"/> so <c>Program.cs</c> reads it before the host is built.
+    /// A test that needs the container directly (rather than through a request) builds its own
+    /// multiplexer from this.
+    /// </summary>
+    public string RedisConnectionString =>
+        Environment.GetEnvironmentVariable(RedisConnectionStringVariable)
+        ?? throw new InvalidOperationException(
+            $"{RedisConnectionStringVariable} is not set - the fixture sets it before any test runs.");
+
+    /// <summary>
     /// Connection string for THIS class's private clone, as <c>fuelflow_maintenance</c> - the
     /// role the retention purge runs on.
     /// </summary>

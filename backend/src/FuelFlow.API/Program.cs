@@ -144,18 +144,19 @@ try
         : Regex.Replace(redisConfig, "(?<=password=)[^,]+", "<redacted>", RegexOptions.IgnoreCase);
     Log.Information("Redis connection: {Redis}", redisSanitized);
 
-    // One multiplexer for the whole process. The cache consumes it via
-    // ConnectionMultiplexerFactory and /health pings the same instance, so the
-    // health check reports the state of the connection the app actually uses.
-    // AbortOnConnectFail=false keeps a Redis outage from killing the process at
-    // boot: the multiplexer retries in the background and commands fail per
-    // request instead, which is what the /health endpoint is meant to report.
+    // One multiplexer for the whole process. RedisCacheService stores every key through it, and
+    // /health pings the same instance, so the health check reports the state of the connection the
+    // app actually uses. AbortOnConnectFail=false keeps a Redis outage from killing the process at
+    // boot: the multiplexer retries in the background and commands fail per request instead, which
+    // is what the /health endpoint is meant to report.
+    //
+    // No IDistributedCache registration: it writes hashes, while GETDEL and SET ... NX are
+    // string commands, and mixing the two shapes is what made App Attest registration answer 503
+    // for every real device (see RedisCacheService).
     var redisOptions = ConfigurationOptions.Parse(redisConfig);
     redisOptions.AbortOnConnectFail = false;
     var redisMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
     builder.Services.AddSingleton<IConnectionMultiplexer>(redisMultiplexer);
-    builder.Services.AddStackExchangeRedisCache(options =>
-        options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(redisMultiplexer));
     builder.Services.AddResponseCaching();
 
     // The request-body ceiling, and the multipart one that goes with it. Both used to be 25 MB

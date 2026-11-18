@@ -135,15 +135,6 @@
           "Newtonsoft.Json": "13.0.4"
         }
       },
-      "Microsoft.Extensions.Caching.StackExchangeRedis": {
-        "type": "Direct",
-        "requested": "[10.0.12, )",
-        "resolved": "10.0.12",
-        "contentHash": "iQoMgbt02dl49cv7GLNeh771xstAbg9xKpuWosYmnOU0CJ9ni10F3+1IrgvbjyaV0JGulauGRrNir50QKWonKQ==",
-        "dependencies": {
-          "StackExchange.Redis": "2.7.27"
-        }
-      },
       "Microsoft.Extensions.Http.Resilience": {
         "type": "Direct",
         "requested": "[10.0.0, )",
@@ -319,6 +310,15 @@
         "requested": "[2.1.13, )",
         "resolved": "2.1.13",
         "contentHash": "zmVHZR13XE477TBAVXE71VcMhqhiv1PbzMWIfuIDytVdBPl3KZlvYYBkqcuQSDdszVY2XHanW98VmDffoNzSSw=="
+      },
+      "StackExchange.Redis": {
+        "type": "Direct",
+        "requested": "[2.7.27, )",
+        "resolved": "2.7.27",
+        "contentHash": "Uqc2OQHglqj9/FfGQ6RkKFkZfHySfZlfmbCl+hc+u2I/IqunfelQ7QJi7ZhvAJxUtu80pildVX6NPLdDaUffOw==",
+        "dependencies": {
+          "Pipelines.Sockets.Unofficial": "2.2.8"
+        }
       },
       "Swashbuckle.AspNetCore": {
         "type": "Direct",
@@ -844,14 +844,6 @@
         "type": "Transitive",
         "resolved": "1.0.0",
         "contentHash": "LFQsCZlV0xlUyXAOMUo5kkSl+8zAQXXbbdwWchtk0B4o7zotZhQsQOcJUELGHdfPfm/xDAsz6hONAuV25bJaAg=="
-      },
-      "StackExchange.Redis": {
-        "type": "Transitive",
-        "resolved": "2.7.27",
-        "contentHash": "Uqc2OQHglqj9/FfGQ6RkKFkZfHySfZlfmbCl+hc+u2I/IqunfelQ7QJi7ZhvAJxUtu80pildVX6NPLdDaUffOw==",
-        "dependencies": {
-          "Pipelines.Sockets.Unofficial": "2.2.8"
-        }
       },
       "Swashbuckle.AspNetCore.Swagger": {
         "type": "Transitive",
