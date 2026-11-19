@@ -4,6 +4,11 @@
  * icon, and the Android launcher foreground. Run `npm run brand` after changing
  * the lion; the output is committed.
  *
+ * The tab icon's 16 and 32 px frames are the exception: they are the small cut in
+ * lib/small-lion.mjs, drawn for the small end because the lion resampled is 96%
+ * mud at 16px (planning #852). Everything else is the lion, including the 48 and
+ * 256 px frames of the same icon.
+ *
  * It writes into admin/ and mobile/ as well as website/, which is why the check
  * that gates these bytes needs a full repository checkout and the whole CI diff.
  *
@@ -39,6 +44,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildBrandAssets, APPLE_ICON_SIZE, ICO_SIZES, MASK_SIZE, ADAPTIVE_CANVAS } from './lib/brand-assets.mjs';
+import { SMALL_ICO_SIZES } from './lib/small-lion.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = resolve(root, '..', 'mobile/assets/icon.png');
@@ -73,7 +79,7 @@ for (const { buf, file } of TARGETS) {
 const kb = (b) => `${Math.round((b.length / 1024) * 10) / 10}KB`;
 console.log(
   `[brand] lion at ${built.meta.lion} -> cropped ${built.meta.cropped}px, backdrop ${built.meta.backdrop}; ` +
-  `wrote favicon.ico x2 (${ICO_SIZES.join('/')}, ${kb(built.favicon)}), ` +
+  `wrote favicon.ico x2 (${ICO_SIZES.join('/')}, the ${SMALL_ICO_SIZES.join(' and ')} frames are the small cut, ${kb(built.favicon)}), ` +
   `apple-icon.png (${APPLE_ICON_SIZE}, ${kb(built.appleIcon)}), ` +
   `lion-mask.png x2 (${MASK_SIZE}, ${kb(built.mask)}), ` +
   `adaptive-icon.png (${ADAPTIVE_CANVAS}, ${kb(built.adaptiveIcon)})`,

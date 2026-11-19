@@ -113,6 +113,20 @@ npm run check:brand
 
 `scripts/generate-brand-assets.mjs` writes the website/admin tab icons, UI masks, Apple icon and Android launcher foreground. The App Store QR is generated from the canonical URL with `npm run qr`.
 
+The tab icon is the one surface with two artworks. Its 16 and 32 px frames are the cut in
+`scripts/lib/small-lion.mjs`, not the lion resampled: the artwork's median stroke is 0.78% of its
+own box, so at 16 px it arrives a tenth of a pixel wide and the tab showed a wash instead of a
+lion - 95.8% of its drawn pixels were neither the line nor the background, measured in planning
+#852. The cut is the same animal drawn for the small end: 7 mane locks, the ear, and the open jaw
+as a notch in the outer silhouette, where nothing has to survive but the outline. Its 48 and 256
+px frames stay the drawn artwork, where the glow still bridges the hairlines.
+
+That is measured, not asserted. `check:brand` reads the two small frames back out of the packed
+`favicon.ico` and fails if more than 55% (16 px) or 35% (32 px) of their drawn pixels are mud, or
+if the open jaw backs off by less than 3 px (16 px) or 5 px (32 px) at the muzzle. Today's frames
+measure 39.4% and 21.3% mud, with a 6 px and 10 px jaw; the lion resampled measures 86.9% and
+84.4% with no jaw at all at 16 px, which is what the floors are set to catch.
+
 The lockup is the one brand asset that is not generated: `public/fuelflow-logo.webp` is the lion
 followed by "Fuel Flow" with the lime "F" bolt as the first letter of each word. It is drawn from
 the approved artwork rather than retyped, because the F is the brand's own glyph: it carries no
@@ -138,7 +152,7 @@ never in register.
 - `check:header` — responsive navigation ladder and phone menu reachability
 - `check:hero` — settled/no-JavaScript hero visibility, CTA fit, overflow, one lockup in the header and a baked-copy/ baked-accent pixel scan of the photograph
 - `check:headers` — real nginx caching and 404 behavior
-- `check:brand` — byte/reference parity for every lion asset
+- `check:brand` — byte/reference parity for every lion asset, and the measured legibility (mud share and open jaw) of the two smallest tab frames
 - `check:taps` — 44px mobile controls or the WCAG spacing exception on all routes
 - `check:lead` — client validation and 202/400/429/5xx/offline B2B-form states plus payload shape
 - `check:site` — reviewed screenshot allowlist, legacy anchors and business-lead legal disclosures
