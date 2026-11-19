@@ -13,10 +13,10 @@ export default function Hero() {
       <picture className={styles.media}>
         <Image
           className={styles.bgImage}
-          src="/hero-station.jpg"
+          src="/hero-prototype-clean.webp"
           alt=""
-          width={1376}
-          height={768}
+          width={2000}
+          height={919}
           sizes="100vw"
           priority
         />
