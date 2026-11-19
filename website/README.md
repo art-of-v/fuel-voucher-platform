@@ -35,15 +35,27 @@ Public routes are `/`, `/support/`, `/privacy/` and `/terms/`.
 The homepage is composed in `src/app/page.tsx` from:
 
 1. B2B-first hero
-2. company fuel-pool operating model
-3. application screenshot rail
-4. live catalogue and partner-network ledger
-5. persisted business-lead form
-6. five-step consumer flow
-7. FAQ
-8. app/contact closing field
+2. services block - what FuelFlow does for a company, plus the business-document roadmap
+3. company fuel-pool operating model
+4. application screenshot rail
+5. live catalogue and partner-network ledger
+6. persisted business-lead form
+7. five-step consumer flow
+8. FAQ
+9. app/contact closing field
 
 The catalogue comes from `/api/packages`; `src/lib/catalogue.ts` filters test and non-traded fuels and shares one request between every display. The B2B form posts to `/api/business-leads`; support remains a separate `/api/support/messages` flow.
+
+## What the site claims
+
+**FuelFlow sells a service, not fuel** (planning repo `docs/SALES_MODEL.md`: "What the customer buys - the sale is an advertising service"). So no copy on this site may say the customer bought or paid for fuel: the app may name the nominal ("10 л А-95", "код на пально"), and the page may say a package, a code and a price - but the purchase is always the service.
+
+The service block and the business-document panel in `Services.tsx` carry a status chip per item, and the chip is a claim about the app, not about the marketing:
+
+- `працює` - the shipped code does this today (contracts and legal entities, the company pool, issuing/recalling/freezing a worker's code, the live catalogue).
+- `у планах` - the roadmap says it will (the business documents: acts of reconciliation, advance invoices, tax invoices, VAT closing; cross-border provider contracts; transfers between members).
+
+Before flipping a chip, prove the feature in the app, and record the evidence the way the planning repo does. A chip that lies is worse than a chip that is quiet.
 
 ## App screenshot assets
 

@@ -6,7 +6,8 @@ import BrandLockup from './BrandLockup';
 import styles from './Footer.module.css';
 
 const navLinks = [
-  { name: 'Для бізнесу', href: '#business' },
+  { name: 'Сервіси', href: '#services' },
+  { name: 'Паливний пул', href: '#business' },
   { name: 'Застосунок', href: '#app' },
   { name: 'Ціни', href: '#prices' },
   { name: 'Як це працює', href: '#how' },
@@ -26,7 +27,7 @@ export default function Footer() {
           <a href={homeAnchor(pathname, '#top')} className={styles.logo} aria-label="Fuel Flow — на головну">
             <BrandLockup />
           </a>
-          <p>Пальне під контролем — від оплати до колонки.</p>
+          <p>Сервіс для транспортного бізнесу: пул, розподіл, звірка, документи.</p>
         </div>
 
         <nav className={styles.nav} aria-label="Додаткова навігація">

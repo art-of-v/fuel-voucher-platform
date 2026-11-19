@@ -25,19 +25,20 @@ export default function Hero() {
       <div className={`${styles.container} lf-container`}>
         <div className={styles.copy}>
           <p className={`${styles.kicker} ${styles.reveal}`} style={delay(0)}>
-            Пальне для компаній і автопарків
+            Сервіс для транспортного бізнесу
           </p>
           <h1 className={styles.title}>
             <span className={`${styles.titleLine} ${styles.reveal}`} style={delay(1)}>
-              Пальне
+              Пально, звірка,
             </span>
             <span className={`${styles.titleLine} ${styles.reveal} ${styles.accent}`} style={delay(2)}>
-              під контролем.
+              документи.
             </span>
           </h1>
           <p className={`${styles.lead} ${styles.reveal}`} style={delay(3)}>
-            Купуйте літри в паливний пул, видавайте талони водіям і бачте рух
-            пального від оплати до колонки.
+            FuelFlow тримає весь контур пального: договори з провайдерами, пул і
+            розподіл між водіями, звірка та документи для бухгалтерії. Для
+            водія — код на пально з фіксованою ціною.
           </p>
           <div className={`${styles.actions} ${styles.reveal}`} style={delay(4)}>
             <a href="#business-lead" className="lf-btn lf-btn--primary">
@@ -53,12 +54,12 @@ export default function Hero() {
             <dd>OKKO · WOG · KLO · UPG</dd>
           </div>
           <div>
-            <dt>Контроль</dt>
-            <dd>Видача · відкликання · звірка</dd>
+            <dt>Контур</dt>
+            <dd>Договори · пул · розподіл · звірка</dd>
           </div>
           <div>
             <dt>Для водіїв</dt>
-            <dd>Талон у застосунку</dd>
+            <dd>Код на пально · ціна зафіксована</dd>
           </div>
         </dl>
       </div>
