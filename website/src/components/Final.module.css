@@ -94,19 +94,23 @@
   align-items: center;
 }
 
+/* The phone and the "scan to install" card are one column: the card used to be
+ * floated over the phone's lower half, where its own text landed on the phone's
+ * QR plate - a translucent card over white is unreadable, and the page showed two
+ * QR codes fighting in the same square. They stack now, and the card sits where a
+ * second QR cannot cover anything. */
 .product {
   grid-column: 9 / -1;
-  position: relative;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
 }
 
 .qr {
-  position: absolute;
-  right: -10px;
-  bottom: 46px;
-  background: rgba(3, 4, 3, 0.84);
-  backdrop-filter: blur(12px);
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
 @media (max-width: 1050px) {
@@ -118,6 +122,9 @@
     grid-column: 9 / -1;
   }
 
+  /* Below this the column is too narrow for the card beside the phone, and the
+   * visitor is most likely on a phone that already has a camera - the App Store
+   * badge above covers the same intent. */
   .qr {
     display: none;
   }
@@ -136,6 +143,7 @@
   .product {
     order: -1;
     margin-bottom: 48px;
+    gap: 20px;
   }
 }
 

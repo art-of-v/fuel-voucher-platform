@@ -70,6 +70,56 @@ try {
     }
   }
 
+  /* ── The "scan to install" card must never sit on the phone mock ── */
+  /* It used to be absolutely positioned over the phone's lower half, so its own
+   * copy landed on the mock's white QR plate and went unreadable, and the page
+   * showed two QR codes fighting in one square. Hiding it below 1050px did not
+   * work either: `.qr { display: none }` lost to StoreQrCard's own
+   * `.card { display: flex }` - one class each, and the card's module came
+   * later in the bundle - so the overlap survived at 750px as well. Neither
+   * failure is visible in the DOM; both are geometry, so geometry is asserted. */
+  const CARD_WIDTHS = [1920, 1440, 1100, 1000, 900, 820, 750, 390];
+  for (const width of CARD_WIDTHS) {
+    await page.setViewport({ width, height: 900 });
+    await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
+    const geometry = await page.evaluate(() => {
+      const section = document.getElementById('download');
+      if (!section) return { error: 'the download section is missing' };
+      /* The phone mock, not the first aria-hidden node: the section's own scrim
+       * carries that attribute too and covers everything. */
+      const phone = section.querySelector('[class*="PhoneMock"]');
+      if (!phone) return { error: 'the download section has no phone mock' };
+      const plate = section.querySelector('img[alt*="QR-код"]');
+      /* card > QR plate > image, so the card is the plate's parent - the class
+       * name is hashed per build and this check must not care. */
+      const card = plate ? plate.closest('div')?.parentElement : null;
+      /* An ancestor's `display: none` does not change this element's computed
+       * display, so "is it rendered" is asked of the box tree instead. */
+      if (!card || card.getClientRects().length === 0) return { visible: false, overlap: 0 };
+      const a = phone.getBoundingClientRect();
+      const b = card.getBoundingClientRect();
+      const overlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+        * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return {
+        visible: true,
+        overlap: Math.round(overlap),
+        card: [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)],
+      };
+    });
+    if (geometry.error) {
+      failures.push(`${width}px: ${geometry.error}`);
+    } else if (geometry.overlap > 0) {
+      failures.push(
+        `${width}px: the "scan to install" card overlaps the phone mock by ${geometry.overlap}px²` +
+        ` (card at ${geometry.card.join(',')}) - its copy is unreadable over the mock's own QR plate`,
+      );
+    }
+    console.log(
+      `  ${String(width).padStart(4)}px  install card ${geometry.visible ? 'visible' : 'hidden'}` +
+      `${geometry.overlap ? `  overlap=${geometry.overlap}px²` : ''}`,
+    );
+  }
+
   await page.close();
 } finally {
   await browser.close();

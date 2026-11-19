@@ -39,7 +39,9 @@ export default function Final() {
 
         <div className={styles.product}>
           <PhoneMock />
-          <StoreQrCard className={styles.qr} />
+          <div className={styles.qr}>
+            <StoreQrCard />
+          </div>
         </div>
       </div>
     </section>
