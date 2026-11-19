@@ -331,18 +331,37 @@ try {
    * stacked under another, and a sticker floating in front of the canopy. The
    * rule now: the header owns the lockup, and the hero paints no image over the
    * photograph. */
-  const branding = await page.evaluate(() => ({
-    headerLions: [...document.querySelectorAll('header span')]
-      .filter((element) => getComputedStyle(element).maskImage.includes('lion-mask')).length,
-    headerWordmarks: document.querySelectorAll('header img[src*="fuelflow-wordmark"]').length,
-    heroImages: [...document.querySelectorAll('#top img')]
-      .map((image) => (image.getAttribute('src') || '').split('/').pop()),
-  }));
-  if (branding.headerLions !== 1) {
-    failures.push(`the header paints ${branding.headerLions} lions instead of 1`);
+  const branding = await page.evaluate(() => {
+    const logos = [...document.querySelectorAll('header img[src*="fuelflow-logo"]')];
+    const box = logos[0] ? logos[0].getBoundingClientRect() : null;
+    return {
+      headerLogos: logos.length,
+      headerLions: [...document.querySelectorAll('header span')]
+        .filter((element) => getComputedStyle(element).maskImage.includes('lion-mask')).length,
+      logoBox: box ? { w: Math.round(box.width), h: Math.round(box.height) } : null,
+      heroImages: [...document.querySelectorAll('#top img')]
+        .map((image) => (image.getAttribute('src') || '').split('/').pop()),
+    };
+  });
+  if (branding.headerLogos !== 1) {
+    failures.push(`the header paints ${branding.headerLogos} Fuel Flow logos instead of 1`);
   }
-  if (branding.headerWordmarks !== 1) {
-    failures.push(`the header paints ${branding.headerWordmarks} Fuel Flow wordmarks instead of 1`);
+  /* The lockup is the prototype's own drawing - the bolt and the words in one
+   * asset. The lion is the product's mark and lives in the icons; pairing it with
+   * the words here is what this replaced. */
+  if (branding.headerLions !== 0) {
+    failures.push(
+      `the header still pairs the lockup with ${branding.headerLions} lion(s) -` +
+      ' the brand in the lockup is the prototype\'s own logo',
+    );
+  }
+  /* A lockup nobody can read is not branding either: the words are 41/81 of the
+   * asset, so anything under 30px of height puts them back under a 15px cap. */
+  if (!branding.logoBox || branding.logoBox.h < 30) {
+    failures.push(
+      `the header lockup is ${branding.logoBox ? `${branding.logoBox.w}x${branding.logoBox.h}px` : 'missing'}` +
+      ' - too small to carry the wordmark',
+    );
   }
   if (branding.heroImages.length !== 1) {
     failures.push(
