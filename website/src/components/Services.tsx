@@ -3,10 +3,10 @@ import styles from './Services.module.css';
 /**
  * The section that carries the product's actual premise: FuelFlow sells a
  * SERVICE, not fuel (planning `SALES_MODEL.md` — "What the customer buys —
- * the sale is an advertising service"). So the page stops describing a fuel
- * shop and starts describing the job a transport company actually has to do:
- * contracts, a pool, codes for the crew, and the paper that goes to the
- * accountant.
+ * the sale is an advertising service"). The substance is a set of tools for
+ * three audiences with the same problem — fuel suppliers, transport companies
+ * and drivers — and FuelFlow is not a competitor to any of them: it is the
+ * layer between the network and the people who fill up.
  *
  * Every status chip here is a claim about the app, not about the marketing:
  * `live` is something the shipped code does today, `planned` is something the
@@ -108,7 +108,11 @@ export default function Services() {
             <span className={styles.accent}>акта звірки</span>
           </h2>
           <p className={styles.intro}>
-            Керуйте пальним так, як керуєте автопарком
+            Комплексні рішення для тих, чия робота чи побут пов'язані з пальним
+          </p>
+          <p className={styles.note}>
+            Ми не конкуруємо з мережами й постачальниками. Ми робимо їхню роботу
+            зручнішою, а ваші процеси простішими
           </p>
         </div>
 

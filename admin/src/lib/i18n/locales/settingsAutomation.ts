@@ -96,7 +96,7 @@ export const settingsAutomation: Record<Language, Record<string, string>> = {
     "settings.voucherRenewalTitle": "Продовження талонів",
     "settings.voucherTermSaleTitle": "Продаж пального на короткий термін",
     "settings.voucherTermSaleWhat":
-      "Дозволяє клієнтам купити пально на коротший термін зі знижкою. Талон спливає на обраний термін, і коротший термін коштує дешевше.",
+      "Дозволяє клієнтам купити пальне на коротший термін зі знижкою. Талон спливає на обраний термін, і коротший термін коштує дешевше.",
     "settings.voucherTermSaleEnabledNote":
       "Клієнти можуть обрати термін під час оплати.",
     "settings.voucherTermSaleDisabledNote":
@@ -109,9 +109,9 @@ export const settingsAutomation: Record<Language, Record<string, string>> = {
       "Знижка віднімається від ціни за літр для кожного терміну, більша для коротшого терміну. Знижка, що опустила б ціну нижче собівартості, відхиляється під час оплати.",
     "settings.voucherTermSaleDiscountHeader": "грн/л",
     "settings.marginBlocked":
-      "Продається нижче собівартості на {0} з {1} пальнів — оплата їх відхилить. Найтонше: {2}",
+      "Продається нижче собівартості на {0} з {1} видів пального — оплата їх відхилить. Найтонше: {2}",
     "settings.marginThin":
-      "Лишає менше 0,50 грн/л на {0} з {1} пальнів — {2} виходить на {3} грн/л",
+      "Лишає менше 0,50 грн/л на {0} з {1} видів пального — {2} виходить на {3} грн/л",
     "settings.voucherTermSaleOffered": "Пропонується",
     "settings.voucherTermSaleNotOffered": "Не пропонується",
     "settings.voucherRenewalWhat":

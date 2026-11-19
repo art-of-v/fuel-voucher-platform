@@ -48,7 +48,9 @@ The catalogue comes from `/api/packages`; `src/lib/catalogue.ts` filters test an
 
 ## What the site claims
 
-**FuelFlow sells a service, not fuel** (planning repo `docs/SALES_MODEL.md`: "What the customer buys - the sale is an advertising service"). So no copy on this site may say the customer bought or paid for fuel: the app may name the nominal ("10 л А-95", "код на пально"), and the page may say a package, a code and a price - but the purchase is always the service.
+**FuelFlow sells a service, not fuel** (planning repo `docs/SALES_MODEL.md`: "What the customer buys - the sale is an advertising service"). The substance is a set of tools for three audiences with the same problem - fuel suppliers, transport companies and drivers - and the company is nobody's competitor: it is the layer between the network and the person filling up. So no copy on this site may say the customer bought or paid for fuel: the app may name the nominal ("10 л А-95", "код на пальне"), and the page may say a package, a code and a price - but the purchase is always the service.
+
+Two words carry a rule each, and `npm run check:copy` (`scripts/check-copy.mjs`) enforces both, because prose alone did not: **«пальне»** in every case, never «пально», and never **«пул»** - the business says закуплення, запас компанії or залишок. The check reads `src/`, so it covers headings, body copy, metadata and this repository's own notes.
 
 The service block and the business-document panel in `Services.tsx` carry a status chip per item, and the chip is a claim about the app, not about the marketing:
 

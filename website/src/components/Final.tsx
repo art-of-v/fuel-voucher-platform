@@ -19,7 +19,7 @@ export default function Final() {
       <div className={`lf-container ${styles.container}`}>
         <div className={styles.copy}>
           <p className="lf-eyebrow">Для особистих поїздок</p>
-          <h2 className={styles.title}>Ваше пально вже у телефоні</h2>
+          <h2 className={styles.title}>Ваше пальне вже у телефоні</h2>
           <p className={styles.lead}>
             Обирайте пакет за актуальною ціною зі знижкою, отримуйте код у
             гаманці FuelFlow і заправляйтеся в мережі-партнері, коли потрібно
