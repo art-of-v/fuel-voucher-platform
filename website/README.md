@@ -78,7 +78,7 @@ npm run check:brand
 
 `scripts/generate-brand-assets.mjs` writes the website/admin tab icons, UI masks, Apple icon and Android launcher foreground. The App Store QR is generated from the canonical URL with `npm run qr`.
 
-The wordmark is the one brand asset that is not generated: `public/fuelflow-wordmark.webp` is the prototype's own type, keyed out of its near-black plate so it is white alpha, the same recipe as the lion mask. `BrandLockup.tsx` is the single place that pairs it with the lion - the prototype's green "F" bolt is not shipped, because the lion stands in its place, and the lockup is painted once, in the header, never again over the hero photograph.
+The lockup is the one brand asset that is not generated: `public/fuelflow-logo.webp` is the prototype's own drawing - the lime "F" bolt and the words in one file - keyed out of its near-black plate so it is white-and-lime alpha, the same recipe as the lion mask. `BrandLockup.tsx` is the single place that paints it, once, in the header and the footer, never again over the hero photograph. The lion is the product's mark and stays in the tab icon, the admin and the launcher art; it is deliberately not part of the lockup.
 
 ## Checks
 

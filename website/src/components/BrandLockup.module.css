@@ -1,32 +1,21 @@
 .lockup {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
 }
 
-.lion {
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  background: var(--accent);
-  -webkit-mask: url('/lion-mask.png') center / contain no-repeat;
-  mask: url('/lion-mask.png') center / contain no-repeat;
-}
-
-/* The wordmark is the prototype's own type, keyed out of its plate. Its cap
- * height is the drawing's full height, so mirroring the lion's 30px keeps the
- * two marks optically equal - which is how the prototype pairs them. */
-.wordmark {
+/* The asset is cropped to the drawing (339x81), so its height IS the mark's
+ * height and the words are 41/81 of it. 40px puts the wordmark at a 20px cap -
+ * the prototype's own proportion, in a 104px bar. It scales down with the bar
+ * rather than being squeezed by the global `img { max-width: 100% }`, which
+ * distorts every lockup narrower than its container (`object-fit` keeps the
+ * aspect even if something else clamps the box first). */
+.logo {
   width: auto;
-  height: 30px;
+  height: clamp(24px, 4.6vw, 40px);
+  object-fit: contain;
   flex-shrink: 0;
 }
 
-.compact .lion {
-  width: 22px;
-  height: 22px;
-}
-
-.compact .wordmark {
-  height: 22px;
+.compact .logo {
+  height: 24px;
 }
