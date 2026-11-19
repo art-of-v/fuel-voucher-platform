@@ -60,9 +60,10 @@ Before flipping a chip, prove the feature in the app, and record the evidence th
 ## App screens
 
 The gallery in `AppShowcase.tsx` shows six screens rendered by `npm run screens`
-(`scripts/generate-app-screens.mjs`) into `public/app-*.jpg`: the network picker,
-a network's fuel list, the package ladder, the wallet, the map and the savings
-screen.
+into `public/app-*.jpg`: the network picker, a network's fuel list, the package
+ladder, the wallet, the map and the savings screen. What each screen says lives
+in `scripts/lib/app-screens.mjs`; `scripts/generate-app-screens.mjs` only drives
+the browser and writes the files.
 
 They used to be device captures, and they aged into a lie — purple accents that
 turned green, an unstyled map canvas printing "API KEY REQUIRED" over Kyiv, a
