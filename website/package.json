@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "qr": "node scripts/generate-store-qr.mjs",
+    "screens": "node scripts/generate-app-screens.mjs",
     "brand": "node scripts/generate-brand-assets.mjs",
     "check:header": "node scripts/check-header-layout.mjs",
     "check:hero": "node scripts/check-hero.mjs",
@@ -13,9 +14,9 @@
     "check:lead": "node scripts/check-business-lead.mjs",
     "check:site": "node scripts/check-site-contract.mjs",
     "check": "npm run check:header && npm run check:hero && npm run check:headers && npm run check:brand && npm run check:taps && npm run check:lead && npm run check:site",
-    "predev": "npm run qr && npm run brand",
+    "predev": "npm run qr && npm run brand && npm run screens",
     "dev": "next dev",
-    "prebuild": "npm run qr",
+    "prebuild": "npm run qr && npm run screens",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"

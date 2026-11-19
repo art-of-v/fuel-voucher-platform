@@ -5,12 +5,12 @@ import path from 'node:path';
 import { launchBrowser, report, requireBrowser, root, serveOut } from './lib/harness.mjs';
 
 const SAFE_SCREENS = [
-  'design-1.jpg',
-  'design-2.jpg',
-  'design-3.jpg',
-  'design-6.jpg',
-  'design-9.jpg',
-  'design-10.jpg',
+  'app-networks.jpg',
+  'app-packages.jpg',
+  'app-basket.jpg',
+  'app-codes.jpg',
+  'app-company.jpg',
+  'app-map.jpg',
 ];
 const FORBIDDEN_SCREENS = ['design-4.jpg', 'design-5.jpg', 'design-7.jpg', 'design-8.jpg'];
 const LEGACY_ANCHORS = ['numbers', 'prices', 'networks', 'contact'];
