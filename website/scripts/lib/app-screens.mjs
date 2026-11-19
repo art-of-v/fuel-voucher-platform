@@ -123,7 +123,7 @@ const baseCss = (fonts) => `
 `;
 
 const screens = {
-  'app-networks': ({ qrInline }) => shell({
+  'app-networks': () => shell({
     body: `
       <h1 class="screen-title" style="margin: 26px 0 34px; font-size: 46px">
         ОБЕРІТЬ<br><span style="color:${c.primary}">МЕРЕЖУ</span>
@@ -161,7 +161,7 @@ const screens = {
     `,
   }),
 
-  'app-fuels': ({ qrInline }) => shell({
+  'app-fuels': () => shell({
     body: `
       <div style="display:flex;align-items:center;gap:18px;margin:22px 0 30px">
         <span style="font-size:30px;color:${c.textMuted}">‹</span>
@@ -207,7 +207,7 @@ const screens = {
     `,
   }),
 
-  'app-packages': ({ qrInline }) => shell({
+  'app-packages': () => shell({
     body: `
       <div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 26px">
         <div style="display:flex;align-items:center;gap:18px">
@@ -307,7 +307,7 @@ const screens = {
     active: 'codes',
   }),
 
-  'app-map': ({ qrInline }) => shell({
+  'app-map': () => shell({
     status: '12:43',
     body: `
       <div style="position:absolute;inset:104px 0 330px;z-index:0">
@@ -395,7 +395,7 @@ const screens = {
     active: 'pin',
   }),
 
-  'app-economy': ({ qrInline }) => shell({
+  'app-economy': () => shell({
     status: '12:44',
     body: `
       <div style="display:flex;align-items:center;gap:16px;margin:20px 0 22px">
