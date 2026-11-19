@@ -123,14 +123,36 @@ public sealed class AppleAppAttestVerifier : IAppleAppAttestVerifier
         {
             throw;
         }
+        catch (Fido2VerificationException exception)
+        {
+            _logger.LogWarning(
+                "App Attest assertion refused by Fido2 ({Fido2Code}): {Reason} (key {KeyIdPrefix}, counter {Counter})",
+                exception.Code,
+                exception.Message,
+                Base64Prefix(keyId),
+                counter);
+
+            throw new AttestationVerificationException(
+                "APPLE_ASSERTION_INVALID",
+                "The App Attest assertion could not be verified.",
+                exception);
+        }
         catch (Exception exception)
         {
+            _logger.LogWarning(
+                exception,
+                "App Attest assertion verification failed unexpectedly for key {KeyIdPrefix}",
+                Base64Prefix(keyId));
+
             throw new AttestationVerificationException(
                 "APPLE_ASSERTION_INVALID",
                 "The App Attest assertion could not be verified.",
                 exception);
         }
     }
+
+    private static string Base64Prefix(string keyId) =>
+        keyId[..Math.Min(8, keyId.Length)];
 
     private AppAttest GetVerifier(AttestationOptions options, AppAttestEnvironment environment)
     {
