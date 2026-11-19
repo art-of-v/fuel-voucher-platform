@@ -293,8 +293,14 @@
     height: 68px;
   }
 
+  /* No `max-width` on the lockup: it used to cap the old 114px-wide crop at
+   * 128px, and a cap on the box while the height is fixed is what squashes the
+   * drawing. The lockup scales by its own height now (BrandLockup.module.css),
+   * and the bar has room for what that gives at every phone width (390px leaves
+   * 78px of slack, and the widest the lockup gets there is +39px over the cap
+   * that was here). */
   .logo {
-    max-width: 128px;
+    max-width: none;
   }
 }
 
