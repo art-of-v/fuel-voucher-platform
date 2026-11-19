@@ -29,16 +29,15 @@ export default function Hero() {
           </p>
           <h1 className={styles.title}>
             <span className={`${styles.titleLine} ${styles.reveal}`} style={delay(1)}>
-              Пально, звірка,
+              Пальне
             </span>
             <span className={`${styles.titleLine} ${styles.reveal} ${styles.accent}`} style={delay(2)}>
-              документи.
+              під контролем
             </span>
           </h1>
           <p className={`${styles.lead} ${styles.reveal}`} style={delay(3)}>
-            FuelFlow тримає весь контур пального: договори з провайдерами, пул і
-            розподіл між водіями, звірка та документи для бухгалтерії. Для
-            водія — код на пально з фіксованою ціною.
+            Договори з постачальниками, пул компанії, коди для водіїв та звірка
+            витрат в одному застосунку
           </p>
           <div className={`${styles.actions} ${styles.reveal}`} style={delay(4)}>
             <a href="#business-lead" className="lf-btn lf-btn--primary">
@@ -54,12 +53,12 @@ export default function Hero() {
             <dd>OKKO · WOG · KLO · UPG</dd>
           </div>
           <div>
-            <dt>Контур</dt>
-            <dd>Договори · пул · розподіл · звірка</dd>
+            <dt>Сервіс</dt>
+            <dd>Договори · пул · розподіл · документи</dd>
           </div>
           <div>
             <dt>Для водіїв</dt>
-            <dd>Код на пально · ціна зафіксована</dd>
+            <dd>Код на пальні · ціна зафіксована</dd>
           </div>
         </dl>
       </div>

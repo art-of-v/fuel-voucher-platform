@@ -1,21 +1,11 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { fetchCatalogue, pickReferencePackage } from '../lib/catalogue';
+import { VOUCHER_QR_SRC } from '../config/qr';
 import BrandLockup from './BrandLockup';
 import styles from './PhoneMock.module.css';
-
-const modules = [
-  [1, 1, 1, 0, 1, 0, 1, 1, 1],
-  [1, 0, 1, 0, 0, 1, 1, 0, 1],
-  [1, 1, 1, 0, 1, 0, 1, 1, 1],
-  [0, 0, 0, 1, 0, 1, 0, 0, 0],
-  [1, 0, 1, 0, 1, 0, 1, 0, 1],
-  [0, 1, 0, 1, 0, 1, 0, 1, 0],
-  [1, 1, 1, 0, 1, 1, 1, 0, 1],
-  [1, 0, 1, 1, 0, 0, 1, 1, 0],
-  [1, 1, 1, 0, 1, 0, 1, 0, 1],
-];
 
 const MOCK_LITERS = 20;
 
@@ -65,7 +55,7 @@ export default function PhoneMock({ className }: { className?: string }) {
               accumulate in a wallet. So this shows one voucher, and the money
               line is the multiplication back to a price: litres × the live
               reference rate. */}
-          <div className={styles.balanceLabel}>Твій ваучер</div>
+          <div className={styles.balanceLabel}>Твій код</div>
           <div className={styles.balanceValue}>
             <span className={styles.liters}>{MOCK_LITERS}</span>
             <span className={styles.unit}>літрів</span>
@@ -87,13 +77,13 @@ export default function PhoneMock({ className }: { className?: string }) {
         </div>
 
         <div className={styles.qrCard}>
-          <svg viewBox="0 0 9 9" className={styles.qrSvg} shapeRendering="crispEdges">
-            {modules.map((row, y) =>
-              row.map((on, x) =>
-                on ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} /> : null
-              )
-            )}
-          </svg>
+          <Image
+            src={VOUCHER_QR_SRC}
+            alt=""
+            width={220}
+            height={220}
+            className={styles.qrImg}
+          />
         </div>
 
         <div className={styles.ctaBtn}>Показати на колонці</div>
