@@ -22,7 +22,13 @@
  * invented — the station, the phone tail, the voucher id — and the QR is the
  * demo token from src/config/qr.json, which is non-routable on purpose.
  *
- * Runs before `dev` and `build` (see the predev/prebuild hooks).
+ * Runs before `dev` and `build` (see the predev/prebuild hooks), and the result
+ * is COMMITTED — the JPEGs are an artifact of this script the way the App Store
+ * QR is an artifact of `generate-store-qr.mjs`. That matters for the container:
+ * website/Dockerfile builds on node:20-alpine, which has no browser, so a build
+ * there must fall back to the committed renders instead of failing. `npm run
+ * check` is where a missing browser is a hard failure, because a gate that
+ * cannot run must not pass silently.
  */
 import { existsSync } from 'node:fs';
 import { readFile, mkdir, rm } from 'node:fs/promises';
@@ -54,8 +60,13 @@ const dataUrl = async (file) =>
 
 const chrome = findChrome();
 if (!chrome) {
-  console.error('[screens] no Chrome/Chromium found - set CHROME_PATH to render the gallery');
-  process.exit(1);
+  // Never fail the build over this: the renders are committed, and the image
+  // build has no browser by design (see the note at the top). Verified by
+  // building website/Dockerfile, not by assuming.
+  console.log(
+    '[screens] no Chrome/Chromium here - the committed renders in public/app-*.jpg are used as they are',
+  );
+  process.exit(0);
 }
 
 const fonts = {
