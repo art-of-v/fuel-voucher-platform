@@ -52,6 +52,16 @@ const SETTLE_TIMEOUT = 5000;
  */
 const COPY_ROW_PIXELS = 80;
 const COPY_MIN_ROWS = 8;
+/**
+ * The same measurement for the accent colour, because the copy that shipped
+ * baked was not only white: the prototype's own primary button is a solid lime
+ * pill, and a lime pill under a lime live button is invisible in review.
+ * Measured on the mockup: 289 lime pixels per row across a 51-row run; on the
+ * delivered photo: zero, because the only lime left is the canopy's own lights,
+ * which sit outside the band the copy occupies.
+ */
+const ACCENT_ROW_PIXELS = 40;
+const ACCENT_MIN_ROWS = 8;
 /** Only the left band is checked: that is where the live headline is painted. */
 const COPY_BAND = 0.55;
 
@@ -241,7 +251,7 @@ try {
   /* ── Phase 3: does the hero photo carry its own copy? ── */
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
-  const baked = await page.evaluate(async (band, rowPixels) => {
+  const baked = await page.evaluate(async (band, rowPixels, accentRowPixels) => {
     const heroImage = document.querySelector('#top [class*="Hero_bgImage"]');
     const backgroundUrl = heroImage
       ? /url\("?([^")]+)"?\)/.exec(getComputedStyle(heroImage).backgroundImage)?.[1]
@@ -261,8 +271,12 @@ try {
     let run = 0;
     let longest = 0;
     let at = -1;
+    let accentRun = 0;
+    let accentLongest = 0;
+    let accentAt = -1;
     for (let y = 0; y < H; y++) {
       let bright = 0;
+      let accent = 0;
       for (let x = 0; x < bandX; x++) {
         const i = (y * W + x) * 4;
         const r = data[i], g = data[i + 1], b = data[i + 2];
@@ -270,21 +284,28 @@ try {
         const sat = mx ? (mx - mn) / mx : 0;
         const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         if (L > 150 && sat < 0.16) bright++;
+        if (g > 110 && g - b > 45 && sat > 0.35) accent++;
       }
       run = bright >= rowPixels ? run + 1 : 0;
       if (run > longest) {
         longest = run;
         at = y - run + 1;
       }
+      accentRun = accent >= accentRowPixels ? accentRun + 1 : 0;
+      if (accentRun > accentLongest) {
+        accentLongest = accentRun;
+        accentAt = y - accentRun + 1;
+      }
     }
-    return { url, size: `${W}x${H}`, longest, at };
-  }, COPY_BAND, COPY_ROW_PIXELS);
+    return { url, size: `${W}x${H}`, longest, at, accentLongest, accentAt };
+  }, COPY_BAND, COPY_ROW_PIXELS, ACCENT_ROW_PIXELS);
 
   console.log('\n=== hero image asset ===');
   console.log(
     baked.error
       ? `  ${baked.error}`
-      : `  ${baked.url.split('/').pop()}  ${baked.size}  longest text-like run=${baked.longest} rows (fails at ${COPY_MIN_ROWS})`,
+      : `  ${baked.url.split('/').pop()}  ${baked.size}  longest text-like run=${baked.longest} rows` +
+        ` (fails at ${COPY_MIN_ROWS}), accent-coloured run=${baked.accentLongest} rows (fails at ${ACCENT_MIN_ROWS})`,
   );
 
   if (baked.error) {
@@ -295,17 +316,41 @@ try {
       ` pixels in the left ${Math.round(COPY_BAND * 100)}%, starting at y=${baked.at} of ${baked.size}.` +
       ' It is a finished advert, not a background - the live headline is painted on top of it.',
     );
+  } else if (baked.accentLongest >= ACCENT_MIN_ROWS) {
+    failures.push(
+      `the hero image (${baked.url}) has baked-in accent chrome: ${baked.accentLongest} consecutive rows of` +
+      ` lime in the left ${Math.round(COPY_BAND * 100)}%, starting at y=${baked.accentAt} of ${baked.size}.` +
+      ' That is the prototype\'s own button, and it sits under the live one.',
+    );
   }
 
+  /* ── Phase 3b: the brand in the hero's band is the header's, painted once ── */
+  /* The hero used to carry a second copy of the lockup under the header's own,
+   * and a third - a tilted crop of the canopy sign - rotated onto the photo.
+   * Both read as decoration in review and as a defect on the page: one lockup
+   * stacked under another, and a sticker floating in front of the canopy. The
+   * rule now: the header owns the lockup, and the hero paints no image over the
+   * photograph. */
   const branding = await page.evaluate(() => ({
-    logos: document.querySelectorAll('#top img[src*="fuelflow-prototype-logo"]').length,
-    lions: [...document.querySelectorAll('#top span')]
+    headerLions: [...document.querySelectorAll('header span')]
       .filter((element) => getComputedStyle(element).maskImage.includes('lion-mask')).length,
-    stationLogo: Boolean(document.querySelector('#top img[class*="stationLogo"]')),
+    headerWordmarks: document.querySelectorAll('header img[src*="fuelflow-wordmark"]').length,
+    heroImages: [...document.querySelectorAll('#top img')]
+      .map((image) => (image.getAttribute('src') || '').split('/').pop()),
   }));
-  if (branding.logos !== 2) failures.push(`hero has ${branding.logos} prototype logos instead of 2`);
-  if (branding.lions !== 1) failures.push(`hero has ${branding.lions} lions instead of 1`);
-  if (!branding.stationLogo) failures.push('hero has no logo on the AZK canopy');
+  if (branding.headerLions !== 1) {
+    failures.push(`the header paints ${branding.headerLions} lions instead of 1`);
+  }
+  if (branding.headerWordmarks !== 1) {
+    failures.push(`the header paints ${branding.headerWordmarks} Fuel Flow wordmarks instead of 1`);
+  }
+  if (branding.heroImages.length !== 1) {
+    failures.push(
+      `the hero paints ${branding.heroImages.length} images over the photograph` +
+      ` (${branding.heroImages.join(', ') || 'none'}): the lockup belongs to the header,` +
+      ' and a mark rotated onto the photo is a sticker, not branding',
+    );
+  }
 } finally {
   await browser.close();
   site.close();
