@@ -3,9 +3,11 @@
   align-items: center;
 }
 
-/* The asset is cropped to the drawing (339x81), so its height IS the mark's
- * height and the words are 41/81 of it. 40px puts the wordmark at a 20px cap -
- * the prototype's own proportion, in a 104px bar. It scales down with the bar
+/* The asset is cropped to the drawing (792x160 at 4x), so its height IS the
+ * lockup's height and the words are 133/160 of it. 40px puts the words at a
+ * 22px cap - the prototype's own proportion, in a 104px bar. The drawing is
+ * wider than the wordmark alone by the lion and its gap (it used to be 4.19:1,
+ * now 4.95:1), which is what check:header measures at 320px. It scales down with the bar
  * rather than being squeezed by the global `img { max-width: 100% }`, which
  * distorts every lockup narrower than its container (`object-fit` keeps the
  * aspect even if something else clamps the box first). The full 40px comes in at
@@ -16,7 +18,7 @@
  * the size the old lockup drew them, and now they carry the mark it lacked. */
 .logo {
   width: auto;
-  height: clamp(28px, 9.5vw, 40px);
+  height: clamp(24px, 8vw, 40px);
   object-fit: contain;
   flex-shrink: 0;
 }

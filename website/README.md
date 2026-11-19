@@ -111,7 +111,23 @@ npm run check:brand
 
 `scripts/generate-brand-assets.mjs` writes the website/admin tab icons, UI masks, Apple icon and Android launcher foreground. The App Store QR is generated from the canonical URL with `npm run qr`.
 
-The lockup is the one brand asset that is not generated: `public/fuelflow-logo.webp` is the prototype's own drawing - the lime "F" bolt and the words in one file - keyed out of its near-black plate so it is white-and-lime alpha, the same recipe as the lion mask. `BrandLockup.tsx` is the single place that paints it, once, in the header and the footer, never again over the hero photograph. The lion is the product's mark and stays in the tab icon, the admin and the launcher art; it is deliberately not part of the lockup.
+The lockup is the one brand asset that is not generated: `public/fuelflow-logo.webp` is the lion
+followed by "Fuel Flow" with the lime "F" bolt as the first letter of each word. It is drawn from
+the approved artwork rather than retyped, because the F is the brand's own glyph: it carries no
+sidebearing, its arms overhang its stem, and the letters are sheared 13.8 degrees to sit on the
+same axis as it. The numbers that hold it together are 13.8 degrees of shear, an F at 1.00 of the
+cap height and 0.85 of its own width, and a clearance of 0 paint - not a padding - between the F
+and the letter after it, resolved separately for `u` and `l`.
+
+`public/fuelflow-wordmark.webp` is the same drawing cut down to the words, for the one place the
+lion stops working: the phone mock's own header, where the lockup is 15px tall and the lion
+collapses into a green smudge. Both files carry white letters and a `#c5ff00` F, so neither can be
+recoloured by a CSS mask - if the accent changes, they are re-rendered, not tinted.
+
+`BrandLockup.tsx` is the single place that paints them: the lockup in the header, the hero and the
+footer, the wordmark alone in the mock. The separate lion mask stays for the tab icon, the admin
+and the launcher art, and is no longer layered next to the words - two lions from two sources were
+never in register.
 
 ## Checks
 

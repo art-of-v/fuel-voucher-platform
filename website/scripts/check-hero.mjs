@@ -346,17 +346,18 @@ try {
   if (branding.headerLogos !== 1) {
     failures.push(`the header paints ${branding.headerLogos} Fuel Flow logos instead of 1`);
   }
-  /* The lockup is the prototype's own drawing - the bolt and the words in one
-   * asset. The lion is the product's mark and lives in the icons; pairing it with
-   * the words here is what this replaced. */
+  /* The lockup is one drawing: the lion, then "Fuel Flow" with the brand bolt as
+   * the first letter of each word. The lion is inside the raster, not a second
+   * element - a span masked with lion-mask.png here would be a lion painted over
+   * a drawing that already carries one, and the two would not be in register. */
   if (branding.headerLions !== 0) {
     failures.push(
-      `the header still pairs the lockup with ${branding.headerLions} lion(s) -` +
-      ' the brand in the lockup is the prototype\'s own logo',
+      `the header paints ${branding.headerLions} separate lion(s) over the lockup -` +
+      ' the lion is part of the lockup drawing and must not be layered on top of it',
     );
   }
-  /* A lockup nobody can read is not branding either: the words are 41/81 of the
-   * asset, so anything under 30px of height puts them back under a 15px cap. */
+  /* A lockup nobody can read is not branding either: the words are 133/160 of the
+   * asset, so anything under 30px of height puts them back under a 25px cap. */
   if (!branding.logoBox || branding.logoBox.h < 30) {
     failures.push(
       `the header lockup is ${branding.logoBox ? `${branding.logoBox.w}x${branding.logoBox.h}px` : 'missing'}` +
