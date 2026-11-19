@@ -1,4 +1,9 @@
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text;
 using Fido2NetLib;
+using Fido2NetLib.Cbor;
+using Fido2NetLib.Objects;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -106,36 +111,11 @@ public sealed class AppleAppAttestVerifier : IAppleAppAttestVerifier
 
         try
         {
-            var key = new AppAttestKey
-            {
-                KeyId = AttestationEncoding.DecodeBase64(keyId),
-                PublicKey = AttestationEncoding.DecodeBase64(publicKey),
-                Counter = (uint)counter,
-                Environment = attestationEnvironment,
-            };
-
-            var result = GetVerifier(_options.CurrentValue, attestationEnvironment)
-                .VerifyAssertion(assertion, clientDataHash, key);
-
-            return new AppleAssertionData(result.Counter);
+            return VerifyAssertionCore(assertion, clientDataHash, publicKey, counter, keyId);
         }
         catch (AttestationVerificationException)
         {
             throw;
-        }
-        catch (Fido2VerificationException exception)
-        {
-            _logger.LogWarning(
-                "App Attest assertion refused by Fido2 ({Fido2Code}): {Reason} (key {KeyIdPrefix}, counter {Counter})",
-                exception.Code,
-                exception.Message,
-                Base64Prefix(keyId),
-                counter);
-
-            throw new AttestationVerificationException(
-                "APPLE_ASSERTION_INVALID",
-                "The App Attest assertion could not be verified.",
-                exception);
         }
         catch (Exception exception)
         {
@@ -149,6 +129,93 @@ public sealed class AppleAppAttestVerifier : IAppleAppAttestVerifier
                 "The App Attest assertion could not be verified.",
                 exception);
         }
+    }
+
+    /// <summary>
+    /// Apple's assertion is a CBOR map of a signature and the authenticator data that signature
+    /// covers. Since iOS 27 that data carries a WebAuthn-style extensions map after the counter
+    /// while leaving the ED flag clear, and Fido2's WebAuthn-shaped parser reads the extensions as
+    /// an attested credential and refuses every assertion. The fixed App Attest layout is parsed
+    /// here instead; the signature, the RP ID hash and the counter are still checked against the
+    /// stored key.
+    /// </summary>
+    private AppleAssertionData VerifyAssertionCore(
+        byte[] assertion,
+        byte[] clientDataHash,
+        string publicKey,
+        long storedCounter,
+        string keyId)
+    {
+        CborObject decoded;
+
+        try
+        {
+            decoded = CborObject.Decode(assertion);
+        }
+        catch (Exception exception)
+        {
+            throw Refuse(keyId, "assertion is not well-formed CBOR", exception);
+        }
+
+        if (decoded is not CborMap map)
+            throw Refuse(keyId, "assertion is not a CBOR map");
+
+        if (map["signature"] is not CborByteString { Length: > 0 } signature
+            || map["authenticatorData"] is not CborByteString { Length: > 0 } authenticatorData)
+            throw Refuse(keyId, "assertion has no signature or authenticator data");
+
+        var data = authenticatorData.Value;
+
+        if (data.Length < 37)
+            throw Refuse(keyId, $"authenticator data is {data.Length} bytes, shorter than App Attest's 37-byte layout");
+
+        if (data.Length > 37 && !IsSingleCborMap(data.AsMemory(37)))
+            throw Refuse(keyId, "bytes after the counter are not one CBOR extensions map");
+
+        var nonce = SHA256.HashData([.. data, .. clientDataHash]);
+        var key = new CredentialPublicKey(AttestationEncoding.DecodeBase64(publicKey));
+
+        if (!key.Verify(nonce, signature.Value))
+            throw Refuse(keyId, "signature does not verify under the stored key");
+
+        var appIdHash = SHA256.HashData(Encoding.UTF8.GetBytes(_options.CurrentValue.AppleAppId));
+
+        if (!data.AsSpan(0, 32).SequenceEqual(appIdHash))
+            throw Refuse(keyId, "assertion is for another app");
+
+        var counter = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(33, 4));
+
+        if (counter <= storedCounter)
+            throw Refuse(keyId, $"counter {counter} did not advance past {storedCounter}");
+
+        return new AppleAssertionData(counter);
+    }
+
+    private static bool IsSingleCborMap(ReadOnlyMemory<byte> value)
+    {
+        try
+        {
+            return CborObject.Decode(value, out var bytesRead) is CborMap
+                && bytesRead == value.Length;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private AttestationVerificationException Refuse(string keyId, string reason, Exception? inner = null)
+    {
+        _logger.LogWarning(
+            inner,
+            "App Attest assertion refused: {Reason} (key {KeyIdPrefix})",
+            reason,
+            Base64Prefix(keyId));
+
+        return new AttestationVerificationException(
+            "APPLE_ASSERTION_INVALID",
+            "The App Attest assertion could not be verified.",
+            inner);
     }
 
     private static string Base64Prefix(string keyId) =>
