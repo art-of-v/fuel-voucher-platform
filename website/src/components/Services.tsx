@@ -108,7 +108,7 @@ export default function Services() {
             <span className={styles.accent}>акта звірки</span>
           </h2>
           <p className={styles.intro}>
-            Комплексні рішення для тих, чия робота чи побут пов'язані з пальним
+            Комплексні рішення для тих, чия робота чи побут пов&apos;язані з пальним
           </p>
           <p className={styles.note}>
             Ми не конкуруємо з мережами й постачальниками. Ми робимо їхню роботу
