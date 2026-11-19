@@ -1,0 +1,11 @@
+Rajdhani — Copyright (c) 2014, Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The full licence text is at https://scripts.sil.org/OFL
+
+The two files in this directory — rajdhani-700-subset.ttf and
+rajdhani-600-subset.ttf — are subsets of Rajdhani Bold and Rajdhani SemiBold
+made for `scripts/generate-app-screens.mjs` only: Latin letters, digits and the
+punctuation a price needs. They are never served to a visitor; the app renders
+its numbers in Rajdhani and its Cyrillic in the system face (Rajdhani has no
+Cyrillic glyphs), and the marketing renders reproduce exactly that split.

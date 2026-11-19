@@ -6,11 +6,11 @@ import { launchBrowser, report, requireBrowser, root, serveOut } from './lib/har
 
 const SAFE_SCREENS = [
   'app-networks.jpg',
+  'app-fuels.jpg',
   'app-packages.jpg',
-  'app-basket.jpg',
-  'app-codes.jpg',
-  'app-company.jpg',
+  'app-wallet.jpg',
   'app-map.jpg',
+  'app-economy.jpg',
 ];
 const FORBIDDEN_SCREENS = ['design-4.jpg', 'design-5.jpg', 'design-7.jpg', 'design-8.jpg'];
 const LEGACY_ANCHORS = ['numbers', 'prices', 'networks', 'contact'];
