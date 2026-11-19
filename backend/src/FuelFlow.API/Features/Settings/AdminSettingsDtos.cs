@@ -15,6 +15,21 @@ public sealed class SettingsDto
     public VoucherRenewalSettingsDto VoucherRenewal { get; set; } = new();
     public VoucherTermSettingsDto VoucherTerm { get; set; } = new();
     public FeedbackBotSettingsDto FeedbackBot { get; set; } = new();
+    public AppearanceSettingsDto Appearance { get; set; } = new();
+}
+
+/// <summary>
+/// The app's appearance, installation-wide: the theme a phone opens in when its owner has never
+/// chosen one. Not to be confused with the admin panel's own theme, which is a per-browser choice
+/// and never travels to the server.
+/// </summary>
+public sealed class AppearanceSettingsDto
+{
+    /// <summary>Canonical theme id, e.g. <c>obsidian</c>. See <see cref="SharedModels.AppThemes"/>.</summary>
+    public string DefaultTheme { get; set; } = SharedModels.AppThemes.Default;
+
+    /// <summary>Read-only echo of every id a manager may choose. Ignored on write.</summary>
+    public List<string> Available { get; set; } = SharedModels.AppThemes.All.ToList();
 }
 
 public sealed class AutoRefundSettingsDto
@@ -135,4 +150,5 @@ public sealed class UpdateSettingsRequest
     public ExpiredVoucherLossSettingsDto? ExpiredVoucherLoss { get; set; }
     public VoucherRenewalSettingsDto? VoucherRenewal { get; set; }
     public FeedbackBotSettingsDto? FeedbackBot { get; set; }
+    public AppearanceSettingsDto? Appearance { get; set; }
 }

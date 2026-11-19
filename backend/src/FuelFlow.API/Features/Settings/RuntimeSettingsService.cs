@@ -144,6 +144,15 @@ public sealed class RuntimeSettingsService
     public async Task<bool> IsFeedbackBotEnabledAsync(CancellationToken cancellationToken = default)
         => await GetBoolAsync(AppSettingKeys.FeedbackBotEnabled, defaultValue: false, cancellationToken);
 
+    /// <summary>
+    /// The theme the app opens in for anyone who has not picked one. Always answers with an id the
+    /// client can paint: a missing row, a malformed one or an id retired since it was written all
+    /// resolve to <see cref="AppThemes.Default"/> (see <see cref="AppThemes.Normalize"/>), so this
+    /// never returns null and never returns something the phone would have to guess about.
+    /// </summary>
+    public async Task<string> GetDefaultAppThemeAsync(CancellationToken cancellationToken = default)
+        => AppThemes.Normalize(await GetValueAsync(AppSettingKeys.AppearanceDefaultTheme, cancellationToken));
+
     /// <summary>Whether the paid voucher renewal/replacement flow is live. Fail-safe: defaults to false,
     /// so nothing renews until a manager turns it on and configures tier prices.</summary>
     public async Task<bool> IsVoucherRenewalEnabledAsync(CancellationToken cancellationToken = default)

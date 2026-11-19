@@ -32,6 +32,7 @@ import {
 } from '../src/core/ui';
 import { useI18n } from '../src/core/i18n';
 import { useStore } from '../src/core/state/appStore';
+import { syncAppearanceTheme } from '../src/core/state/appearance';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 import { apiFetch } from '../src/core/api/apiClient';
@@ -99,6 +100,33 @@ export function AuthSync() {
   // pushes. Auth-independent: a tap can land anytime, and the route guard handles
   // a logged-out tap. See notificationResponse.ts.
   useNotificationTapRouting();
+
+  return null;
+}
+
+/**
+ * Paints the installation's default theme, once, before the first screen settles.
+ *
+ * <p>
+ * It sits beside <see cref="AuthSync"/> and for the same reason: it is not UI, it is a one-time
+ * reconciliation between the app's state and the server's. The admin panel's "default theme" is
+ * the installation's, so a phone that has never had one has to ask for it — and a phone whose
+ * owner HAS picked a theme gets a no-op, because the picker wins (see `applyServerTheme`).
+ * </p>
+ *
+ * <p>
+ * Re-run on sign-in as well as on mount: a handset can be re-imaged or reinstalled, and a worker
+ * signing in for the first time on one should not be the single person whose app ignores the
+ * setting. It never blocks: `syncAppearanceTheme` swallows every failure and the app keeps the
+ * palette it already had.
+ * </p>
+ */
+export function AppearanceSync() {
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    void syncAppearanceTheme();
+  }, [isAuthenticated]);
 
   return null;
 }
@@ -345,6 +373,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <View style={{ flex: 1, backgroundColor: tokens.colors.background }}>
             <AuthSync />
+            <AppearanceSync />
             <AppLockGuard tokens={tokens}>
               <ErrorBoundary>
                 <Stack

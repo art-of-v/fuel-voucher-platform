@@ -26,7 +26,8 @@ public sealed record UpdateAdminSettingsResult(
     ExpiredVoucherLossSettingsUpdate? ExpiredVoucherLoss,
     VoucherRenewalSettingsUpdate? VoucherRenewal,
     VoucherTermSettingsUpdate? VoucherTerm,
-    FeedbackBotSettingsUpdate? FeedbackBot)
+    FeedbackBotSettingsUpdate? FeedbackBot,
+    AppearanceSettingsUpdate? Appearance)
 {
     /// <summary>
     /// The stable machine code of the refusal, when there was one. The admin renders its own
@@ -36,11 +37,26 @@ public sealed record UpdateAdminSettingsResult(
 
     /// <summary>The refusal for a request that carries no section at all.</summary>
     public static UpdateAdminSettingsResult NoSettingsSupplied()
-        => new(false, "No settings supplied", null, null, null, null, null, null, null)
+        => new(false, "No settings supplied", null, null, null, null, null, null, null, null)
         {
             Code = "settings_none_supplied"
         };
+
+    /// <summary>
+    /// The refusal for an appearance write carrying an id that is not a theme. It is refused rather
+    /// than stored-and-ignored because a default that reads back as something other than what was
+    /// sent looks like the save did nothing, and the next person to look at the screen would not
+    /// know whether the value or the form was wrong.
+    /// </summary>
+    public static UpdateAdminSettingsResult UnknownTheme(string theme)
+        => new(false, $"Unknown theme '{theme}'", null, null, null, null, null, null, null, null)
+        {
+            Code = "settings_unknown_theme"
+        };
 }
+
+/// <summary>What the installation-wide app theme became.</summary>
+public sealed record AppearanceSettingsUpdate(string DefaultTheme);
 
 /// <summary>What the auto-refund switch became.</summary>
 public sealed record AutoRefundSettingsUpdate(bool Enabled, int DelayDays);

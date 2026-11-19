@@ -33,9 +33,17 @@ public sealed class UpdateAdminSettingsCommandHandler
             && request?.DataRetention is null && request?.ExpiredVoucherLoss is null
             && request?.VoucherRenewal is null
             && request?.VoucherTerm is null
-            && request?.FeedbackBot is null)
+            && request?.FeedbackBot is null
+            && request?.Appearance is null)
         {
             return UpdateAdminSettingsResult.NoSettingsSupplied();
+        }
+
+        // Refused before anything is written: the screen saves every section in one request, so a
+        // half-applied save would leave the appearance untouched while reporting the rest as done.
+        if (request.Appearance is not null && !AppThemes.IsKnown(request.Appearance.DefaultTheme))
+        {
+            return UpdateAdminSettingsResult.UnknownTheme(request.Appearance.DefaultTheme);
         }
 
         AutoRefundSettingsUpdate? autoRefundResult = null;
@@ -45,6 +53,21 @@ public sealed class UpdateAdminSettingsCommandHandler
         VoucherRenewalSettingsUpdate? voucherRenewalResult = null;
         VoucherTermSettingsUpdate? voucherTermResult = null;
         FeedbackBotSettingsUpdate? feedbackBotResult = null;
+        AppearanceSettingsUpdate? appearanceResult = null;
+
+        if (request.Appearance is not null)
+        {
+            var theme = AppThemes.Normalize(request.Appearance.DefaultTheme);
+
+            await _settings.UpsertAsync(
+                AppSettingKeys.AppearanceDefaultTheme,
+                theme,
+                actorUserId,
+                actorUserName,
+                cancellationToken);
+
+            appearanceResult = new AppearanceSettingsUpdate(theme);
+        }
 
         if (request.FeedbackBot is not null)
         {
@@ -259,7 +282,8 @@ public sealed class UpdateAdminSettingsCommandHandler
             expiredVoucherLossResult,
             voucherRenewalResult,
             voucherTermResult,
-            feedbackBotResult);
+            feedbackBotResult,
+            appearanceResult);
     }
 
     /// <summary>

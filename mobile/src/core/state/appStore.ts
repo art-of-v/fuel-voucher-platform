@@ -7,6 +7,37 @@ interface AppStore {
   theme: ThemeType;
   setTheme: (theme: ThemeType) => void;
 
+  /**
+   * Whether the theme in this store is the worker's own choice.
+   *
+   * <p>
+   * It exists to answer one question that `theme` alone cannot: "has this person picked a
+   * theme, or are they still on whatever the app defaulted to?". Without it the installation's
+   * default theme (the admin setting behind `GET /api/app/appearance`) could not be applied
+   * without either overwriting a deliberate choice or never applying at all.
+   * </p>
+   *
+   * <p>
+   * It is NOT a "user changed something" flag: it is set only by <see cref="setTheme"/>, which
+   * is the profile picker, and never by <see cref="applyServerTheme"/>. Persisted, so it survives
+   * a relaunch — and an install that predates this field has no value at all, which reads as
+   * "never chose" and takes the installation's default. That is the right answer for those
+   * installs: before this existed the default was obsidian and their stored theme is either that
+   * same obsidian or a choice the server should not have to guess about.
+   * </p>
+   */
+  themePinned: boolean;
+
+  /**
+   * Applies a theme that came from the server, unless the worker has chosen one themselves.
+   *
+   * <p>
+   * The admin setting is a DEFAULT, not a directive: the whole point of a per-worker picker is
+   * that the worker wins. So this is a no-op once <see cref="themePinned"/> is true.
+   * </p>
+   */
+  applyServerTheme: (theme: ThemeType) => void;
+
   isAuthenticated: boolean;
   isAppUnlocked: boolean;
 
@@ -49,7 +80,10 @@ export const useStore = create<AppStore>()(
       // Fresh-install default. `persist` rehydrates a saved choice over this, so
       // existing installs keep whatever theme they already picked.
       theme: 'obsidian',
-      setTheme: (theme) => set({ theme }),
+      themePinned: false,
+      setTheme: (theme) => set({ theme, themePinned: true }),
+      applyServerTheme: (theme) =>
+        set((state) => (state.themePinned ? state : { ...state, theme })),
 
       isAuthenticated: false,
       isAppUnlocked: false,

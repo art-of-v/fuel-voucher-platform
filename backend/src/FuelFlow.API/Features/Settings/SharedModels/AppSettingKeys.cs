@@ -47,6 +47,23 @@ public static class AppSettingKeys
     public const string FeedbackBotEnabled = "FeedbackBot:Enabled";
 
     /// <summary>
+    /// The colour theme the mobile app opens in for everyone who has not picked one themselves,
+    /// e.g. <c>obsidian</c>. One value for the whole installation, set by a manager, so the app has
+    /// an appearance in common rather than eight different ones across eight phones.
+    /// <para>
+    /// A value outside <see cref="AppThemes"/> is never written (the write handler refuses it) and a
+    /// value that stops being a theme — an id retired in a later release — reads as
+    /// <see cref="AppThemes.Default"/> rather than as that id, so an old row can never leave the app
+    /// without a palette.
+    /// </para>
+    /// <para>
+    /// It is a DEFAULT, not a ruling: a worker who switches theme in their profile keeps their
+    /// choice, and this setting only decides what someone who never chose sees.
+    /// </para>
+    /// </summary>
+    public const string AppearanceDefaultTheme = "Appearance:DefaultTheme";
+
+    /// <summary>
     /// Master switch for the nightly data-retention job (<c>DataRetentionService</c>), which prunes
     /// high-churn operational rows — spent OTPs, dead refresh tokens, processed outbox events, read
     /// notifications, aged error logs, stale push tokens — each past its own fixed window. It never
