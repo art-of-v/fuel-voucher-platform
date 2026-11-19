@@ -560,7 +560,7 @@ export const uk: Record<string, string> = {
   'company.hub.noWorkerMatches': 'Працівників не знайдено',
   'company.hub.noOrders': 'Замовлень ще немає',
   'company.hub.undistributedShort': 'НЕ РОЗДАНО',
-  'company.hub.companyFuel': 'ПАЛЬНО КОМПАНІЇ',
+  'company.hub.companyFuel': 'ПАЛЬНЕ КОМПАНІЇ',
   'company.members.empty': 'Працівників ще немає',
   'company.members.joined': 'Приєднався {0}',
   'company.members.giftedCount': 'видано: {0}',

@@ -25,7 +25,7 @@ export default function Hero() {
       <div className={`${styles.container} lf-container`}>
         <div className={styles.copy}>
           <p className={`${styles.kicker} ${styles.reveal}`} style={delay(0)}>
-            Сервіс для транспортного бізнесу
+            Сервіс навколо пального
           </p>
           <h1 className={styles.title}>
             <span className={`${styles.titleLine} ${styles.reveal}`} style={delay(1)}>
@@ -36,8 +36,8 @@ export default function Hero() {
             </span>
           </h1>
           <p className={`${styles.lead} ${styles.reveal}`} style={delay(3)}>
-            Договори з постачальниками, закуплене пальне, коди для водіїв та
-            звірка витрат в одному застосунку
+            Комплексні рішення для постачальників, автопарків і водіїв: від
+            договору й закуплення до коду в телефоні
           </p>
           <div className={`${styles.actions} ${styles.reveal}`} style={delay(4)}>
             <a href="#business-lead" className="lf-btn lf-btn--primary">
@@ -49,16 +49,16 @@ export default function Hero() {
 
         <dl className={styles.facts}>
           <div>
-            <dt>Мережі</dt>
-            <dd>OKKO · WOG · KLO · UPG</dd>
+            <dt>Для кого</dt>
+            <dd>Постачальники · автопарки · водії</dd>
           </div>
           <div>
             <dt>Сервіс</dt>
-            <dd>Договори · закуплення · розподіл · документи</dd>
+            <dd>Договори · коди · розподіл · документи</dd>
           </div>
           <div>
-            <dt>Для водіїв</dt>
-            <dd>Код на пальні · ціна зафіксована</dd>
+            <dt>Мережі</dt>
+            <dd>OKKO · WOG · KLO · UPG</dd>
           </div>
         </dl>
       </div>

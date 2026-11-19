@@ -33,6 +33,16 @@
   line-height: 1.55;
 }
 
+.note {
+  max-width: 60ch;
+  margin-top: 10px;
+  padding-left: 16px;
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
+  font-size: clamp(14px, 1vw, 17px);
+  line-height: 1.55;
+}
+
 .grid {
   grid-column: 1 / -1;
   display: grid;
