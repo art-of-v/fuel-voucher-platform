@@ -20,40 +20,25 @@
   overflow: hidden;
 }
 
+/* The photograph is the approved prototype's forecourt: the canopy, the car and
+ * the phone all sit right of centre, so the crop is anchored right — the band it
+ * drops when the viewport is narrower than the frame is the empty sky the copy
+ * occupies anyway. */
 .bgImage {
   width: 100%;
   height: 100%;
   max-width: none;
   object-fit: cover;
-  object-position: center 22%;
-  filter: saturate(0.72) contrast(1.08) brightness(0.82);
+  object-position: right center;
+  filter: saturate(0.86) contrast(1.06) brightness(0.86);
   animation: heroImageIn 1.35s var(--easing) both;
 }
 
 .scrim {
   z-index: -1;
   background:
-    linear-gradient(90deg, rgba(3, 4, 3, 0.92) 0%, rgba(3, 4, 3, 0.58) 48%, rgba(3, 4, 3, 0.06) 82%),
-    linear-gradient(180deg, rgba(3, 4, 3, 0.18) 0%, rgba(3, 4, 3, 0.05) 48%, rgba(3, 4, 3, 0.82) 100%);
-}
-
-.heroBrand {
-  position: absolute;
-  top: 132px;
-  left: var(--gutter);
-  z-index: 2;
-}
-
-.stationLogo {
-  position: absolute;
-  top: 32.5%;
-  right: 15.5%;
-  z-index: 1;
-  width: clamp(92px, 10vw, 152px);
-  height: auto;
-  object-fit: cover;
-  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
-  transform: rotate(-0.8deg);
+    linear-gradient(90deg, rgba(3, 4, 3, 0.94) 0%, rgba(3, 4, 3, 0.6) 46%, rgba(3, 4, 3, 0.04) 74%),
+    linear-gradient(180deg, rgba(3, 4, 3, 0.28) 0%, rgba(3, 4, 3, 0.04) 44%, rgba(3, 4, 3, 0.86) 100%);
 }
 
 .container {
@@ -65,11 +50,11 @@
 
 .copy {
   grid-column: 1 / span 8;
-  max-width: 1060px;
+  max-width: 760px;
 }
 
 .kicker {
-  margin-bottom: 32px;
+  margin-bottom: 26px;
   color: var(--ink-soft);
   font-size: 14px;
   font-weight: 550;
@@ -78,20 +63,25 @@
 .title {
   display: flex;
   flex-direction: column;
-  margin-bottom: 34px;
-  font-size: clamp(70px, 10vw, 168px);
+  margin-bottom: 30px;
+  font-size: clamp(46px, 6.4vw, 96px);
   font-weight: 570;
-  line-height: 0.83;
-  letter-spacing: -0.065em;
+  line-height: 0.9;
+  letter-spacing: -0.055em;
 }
 
 .titleLine {
   display: block;
 }
 
+/* One accent line, the way the prototype marks its last statement. */
+.accent {
+  color: var(--accent);
+}
+
 .lead {
-  max-width: 590px;
-  margin-bottom: 38px;
+  max-width: 560px;
+  margin-bottom: 34px;
   color: var(--ink-soft);
   font-size: clamp(17px, 1.3vw, 21px);
   line-height: 1.5;
@@ -105,19 +95,24 @@
 }
 
 .facts {
-  grid-column: 9 / -1;
-  display: flex;
-  flex-direction: column;
-  margin: 0;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 780px;
+  margin: 40px 0 0;
   border-top: 1px solid var(--line-strong);
 }
 
 .facts > div {
-  display: grid;
-  grid-template-columns: minmax(90px, 0.7fr) 1.3fr;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 24px 0 0;
+}
+
+.facts > div + div {
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
 }
 
 .facts dt,
@@ -173,25 +168,25 @@
   .copy {
     grid-column: 1 / span 9;
   }
-
-  .facts {
-    grid-column: 9 / -1;
-  }
 }
 
 @media (max-width: 900px) {
-  .stationLogo {
-    display: none;
-  }
-
   .hero {
     min-height: max(720px, 100svh);
     padding-top: 132px;
   }
 
+  /* Narrower than the frame means the crop picks the slice it keeps. Keep the
+   * canopy sign and the car: the phone's screen carries the prototype's own
+   * English copy, which is the one thing in this photograph the page cannot
+   * restate in the site's language. */
+  .bgImage {
+    object-position: 56% center;
+  }
+
   .container {
     grid-template-columns: 1fr;
-    gap: 48px;
+    gap: 0;
   }
 
   .copy,
@@ -200,7 +195,7 @@
   }
 
   .copy {
-    max-width: 760px;
+    max-width: 620px;
   }
 
   .facts {
@@ -209,10 +204,6 @@
 }
 
 @media (max-width: 640px) {
-  .heroBrand {
-    top: 88px;
-  }
-
   .hero {
     min-height: 100svh;
     align-items: flex-end;
@@ -220,27 +211,27 @@
   }
 
   .bgImage {
-    object-position: 66% center;
+    object-position: 62% center;
   }
 
   .scrim {
     background:
-      linear-gradient(90deg, rgba(3, 4, 3, 0.9), rgba(3, 4, 3, 0.34)),
-      linear-gradient(180deg, rgba(3, 4, 3, 0.2) 0%, rgba(3, 4, 3, 0.34) 46%, rgba(3, 4, 3, 0.94) 100%);
+      linear-gradient(90deg, rgba(3, 4, 3, 0.9), rgba(3, 4, 3, 0.36)),
+      linear-gradient(180deg, rgba(3, 4, 3, 0.24) 0%, rgba(3, 4, 3, 0.36) 42%, rgba(3, 4, 3, 0.94) 100%);
   }
 
   .title {
-    margin-bottom: 26px;
-    font-size: clamp(54px, 18vw, 92px);
-    line-height: 0.87;
+    margin-bottom: 24px;
+    font-size: clamp(42px, 13vw, 68px);
+    line-height: 0.94;
   }
 
   .kicker {
-    margin-bottom: 22px;
+    margin-bottom: 18px;
   }
 
   .lead {
-    margin-bottom: 28px;
+    margin-bottom: 26px;
     font-size: 16px;
   }
 
@@ -254,12 +245,21 @@
   }
 
   .facts {
-    gap: 0;
+    grid-template-columns: 1fr;
+    margin-top: 28px;
   }
 
   .facts > div {
-    grid-template-columns: 90px 1fr;
-    padding: 12px 0;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0 0;
+  }
+
+  .facts > div + div {
+    padding-left: 0;
+    border-left: 0;
   }
 }
 

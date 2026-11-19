@@ -1,7 +1,7 @@
 .lockup {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .lion {
@@ -13,10 +13,12 @@
   mask: url('/lion-mask.png') center / contain no-repeat;
 }
 
-.prototype {
-  width: 114px;
-  height: 42px;
-  object-fit: cover;
+/* The wordmark is the prototype's own type, keyed out of its plate. Its cap
+ * height is the drawing's full height, so mirroring the lion's 30px keeps the
+ * two marks optically equal - which is how the prototype pairs them. */
+.wordmark {
+  width: auto;
+  height: 30px;
   flex-shrink: 0;
 }
 
@@ -25,7 +27,6 @@
   height: 22px;
 }
 
-.compact .prototype {
-  width: 86px;
-  height: 32px;
+.compact .wordmark {
+  height: 22px;
 }

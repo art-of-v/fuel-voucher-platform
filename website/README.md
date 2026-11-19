@@ -49,6 +49,12 @@ The catalogue comes from `/api/packages`; `src/lib/catalogue.ts` filters test an
 
 `AppShowcase.tsx` owns an explicit curated manifest. Only reviewed, non-sensitive screenshots may be placed in `public/` and referenced there. Never publish captures containing customer names, phone numbers, email addresses, voucher ids or live QR material.
 
+## Hero photograph
+
+`public/hero-prototype-clean.webp` is the approved landing-page prototype's forecourt, cropped to its hero band with the prototype's own copy removed: its nav row, headline, lead, both CTAs and the "Download App" pill were masked and inpainted out of the pixels. The page paints all of that from HTML in Ukrainian, and the header owns the brand lockup - so the hero itself carries exactly one image.
+
+The photograph was not regenerated, only healed, and the repair lives in the asset. `check:hero` measures it: a run of text-like rows or of lime rows in the left band means a second, already-finished advert is sitting under the live copy. The phone on the right keeps the prototype's English screen; it is product imagery, and the narrow-width crops are anchored to keep the canopy sign and the car rather than that screen.
+
 ## Brand assets
 
 Every lion is derived from `../mobile/assets/icon.png`:
@@ -60,12 +66,14 @@ npm run check:brand
 
 `scripts/generate-brand-assets.mjs` writes the website/admin tab icons, UI masks, Apple icon and Android launcher foreground. The App Store QR is generated from the canonical URL with `npm run qr`.
 
+The wordmark is the one brand asset that is not generated: `public/fuelflow-wordmark.webp` is the prototype's own type, keyed out of its near-black plate so it is white alpha, the same recipe as the lion mask. `BrandLockup.tsx` is the single place that pairs it with the lion - the prototype's green "F" bolt is not shipped, because the lion stands in its place, and the lockup is painted once, in the header, never again over the hero photograph.
+
 ## Checks
 
 `npm run check` runs against the built export:
 
 - `check:header` — responsive navigation ladder and phone menu reachability
-- `check:hero` — settled/no-JavaScript hero visibility, CTA fit, overflow and baked-copy pixel scan
+- `check:hero` — settled/no-JavaScript hero visibility, CTA fit, overflow, one lockup in the header and a baked-copy/ baked-accent pixel scan of the photograph
 - `check:headers` — real nginx caching and 404 behavior
 - `check:brand` — byte/reference parity for every lion asset
 - `check:taps` — 44px mobile controls or the WCAG spacing exception on all routes

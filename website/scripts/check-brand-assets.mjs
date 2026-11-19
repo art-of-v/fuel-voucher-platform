@@ -93,13 +93,13 @@ if (!existsSync(SOURCE)) {
 
 const failures = [];
 const rows = [];
-const marketingMark = resolve(root, 'public/fuelflow-prototype-logo.webp');
+const marketingMark = resolve(root, 'public/fuelflow-wordmark.webp');
 const marketingLockup = resolve(root, 'src/components/BrandLockup.tsx');
 if (!existsSync(marketingMark)) {
-  failures.push(`the marketing Fuel Flow mark is not committed (${marketingMark})`);
+  failures.push(`the marketing Fuel Flow wordmark is not committed (${marketingMark})`);
 } else if (!existsSync(marketingLockup)
-  || !readFileSync(marketingLockup, 'utf8').includes('/fuelflow-prototype-logo.webp')) {
-  failures.push(`the marketing Fuel Flow mark is committed but the brand lockup does not load it`);
+  || !readFileSync(marketingLockup, 'utf8').includes('/fuelflow-wordmark.webp')) {
+  failures.push(`the marketing Fuel Flow wordmark is committed but the brand lockup does not load it`);
 }
 let built;
 

@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import AppStoreBadge from './AppStoreBadge';
-import BrandLockup from './BrandLockup';
 import styles from './Hero.module.css';
 
 const STEP = 90;
@@ -15,24 +14,13 @@ export default function Hero() {
           className={styles.bgImage}
           src="/hero-prototype-clean.webp"
           alt=""
-          width={2000}
-          height={919}
+          width={1212}
+          height={565}
           sizes="100vw"
           priority
         />
       </picture>
       <div className={styles.scrim} aria-hidden="true" />
-      <div className={styles.heroBrand}>
-        <BrandLockup />
-      </div>
-      <Image
-        className={styles.stationLogo}
-        src="/fuelflow-prototype-logo.webp"
-        alt=""
-        width={228}
-        height={84}
-        aria-hidden="true"
-      />
 
       <div className={`${styles.container} lf-container`}>
         <div className={styles.copy}>
@@ -43,7 +31,7 @@ export default function Hero() {
             <span className={`${styles.titleLine} ${styles.reveal}`} style={delay(1)}>
               Пальне
             </span>
-            <span className={`${styles.titleLine} ${styles.reveal}`} style={delay(2)}>
+            <span className={`${styles.titleLine} ${styles.reveal} ${styles.accent}`} style={delay(2)}>
               під контролем.
             </span>
           </h1>
