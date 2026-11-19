@@ -57,9 +57,28 @@ The service block and the business-document panel in `Services.tsx` carry a stat
 
 Before flipping a chip, prove the feature in the app, and record the evidence the way the planning repo does. A chip that lies is worse than a chip that is quiet.
 
-## App screenshot assets
+## App screens
 
-`AppShowcase.tsx` owns an explicit curated manifest. Only reviewed, non-sensitive screenshots may be placed in `public/` and referenced there. Never publish captures containing customer names, phone numbers, email addresses, voucher ids or live QR material.
+The gallery in `AppShowcase.tsx` shows six screens rendered by `npm run screens`
+(`scripts/generate-app-screens.mjs`) into `public/app-*.jpg`: the network list, the
+package ladder, the basket, the wallet, the company hub and the map.
+
+They used to be device captures, and they aged into a lie — purple accents that the
+app no longer has, an unstyled map canvas printing "API KEY REQUIRED" over Kyiv, a
+basket whose price did not multiply out. The renders now take their colours from
+`mobile/src/core/design/themes.ts` (the `lemberg` theme) and their copy from
+`mobile/src/core/i18n/translations/uk.ts`, so regenerating them is one command, and
+the prebuild hook keeps them from drifting again.
+
+These are marketing renders, not device captures. Everything personal in them is
+invented: the worker names, the phone tails, the station address. The QR is the
+demo token from `src/config/qr.json` and is non-routable on purpose. Only reviewed,
+non-sensitive images may be placed in `public/` — never a capture containing
+customer names, phone numbers, email addresses, voucher ids or a live QR payload.
+
+`AppShowcase.tsx` owns the manifest and `scripts/check-site-contract.mjs` pins the
+set: a screenshot added to `public/` without a manifest entry, or a sensitive file
+that reappears, fails `npm run check`.
 
 ## Hero photograph
 

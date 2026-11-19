@@ -5,12 +5,12 @@ import { useEffect, useRef } from 'react';
 import styles from './AppShowcase.module.css';
 
 const screens = [
-  { src: '/design-1.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 1' },
-  { src: '/design-2.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 2' },
-  { src: '/design-3.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 3' },
-  { src: '/design-6.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 4' },
-  { src: '/design-9.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 5' },
-  { src: '/design-10.jpg', alt: 'Інтерфейс застосунку FuelFlow — екран 6' },
+  { src: '/app-networks.jpg', alt: 'Карта мережі: OKKO, WOG, UPG, KLO з ціною від 55 ₴ за літр' },
+  { src: '/app-packages.jpg', alt: 'Пакети пального в OKKO: 10, 20 і 50 літрів із ціною за літр' },
+  { src: '/app-basket.jpg', alt: 'Кошик: обраний пакет, промокод і сума до сплати' },
+  { src: '/app-codes.jpg', alt: 'Мої талони: активний код на 20 літрів із QR-кодом' },
+  { src: '/app-company.jpg', alt: 'Компанія: учасники, видані коди й працівники' },
+  { src: '/app-map.jpg', alt: 'Карта АЗК із цінами та кнопкою маршруту' },
 ];
 
 const copies = [0, 1, 2];

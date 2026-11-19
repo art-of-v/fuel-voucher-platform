@@ -36,8 +36,8 @@ export default function Hero() {
             </span>
           </h1>
           <p className={`${styles.lead} ${styles.reveal}`} style={delay(3)}>
-            Договори з постачальниками, пул компанії, коди для водіїв та звірка
-            витрат в одному застосунку
+            Договори з постачальниками, закуплене пальне, коди для водіїв та
+            звірка витрат в одному застосунку
           </p>
           <div className={`${styles.actions} ${styles.reveal}`} style={delay(4)}>
             <a href="#business-lead" className="lf-btn lf-btn--primary">
@@ -54,7 +54,7 @@ export default function Hero() {
           </div>
           <div>
             <dt>Сервіс</dt>
-            <dd>Договори · пул · розподіл · документи</dd>
+            <dd>Договори · закуплення · розподіл · документи</dd>
           </div>
           <div>
             <dt>Для водіїв</dt>
