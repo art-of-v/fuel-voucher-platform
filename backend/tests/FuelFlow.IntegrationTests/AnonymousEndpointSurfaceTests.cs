@@ -118,6 +118,13 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "GET /api/brand-stations",
         "GET /api/brand-stations/{brandid}",
 
+        // The installation's default colour theme. Anonymous because the splash, the sign-in form
+        // and the app lock paint before the app knows who is holding it, and asking a signed-in
+        // client would make those screens paint `obsidian` and then swap to the configured palette.
+        // It answers with a palette id out of a fixed catalogue and nothing else - the shape is
+        // AppAppearanceDto, so a column added to app_settings cannot leak through it.
+        "GET /api/app/appearance",
+
         // Public contact form behind the /support page on fuelflowmarketplace.com: a visitor with no account
         // must be able to reach support. Anonymous by design and spam-hardened at the endpoint
         // (per-IP named rate limit + global limiter + a "website" honeypot answered 204), see
