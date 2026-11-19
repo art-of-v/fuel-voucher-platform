@@ -8,10 +8,15 @@
  * the prototype's own proportion, in a 104px bar. It scales down with the bar
  * rather than being squeezed by the global `img { max-width: 100% }`, which
  * distorts every lockup narrower than its container (`object-fit` keeps the
- * aspect even if something else clamps the box first). */
+ * aspect even if something else clamps the box first). The full 40px comes in at
+ * 421px of viewport and holds above it. Below that the bar is also carrying the
+ * CTA pill and the menu button, and this is the curve that keeps the burger
+ * inside a 320px viewport: 27px too wide at 320 pushes it off the screen by 6px
+ * (check:header measured it). On phones the words land within a pixel or two of
+ * the size the old lockup drew them, and now they carry the mark it lacked. */
 .logo {
   width: auto;
-  height: clamp(24px, 4.6vw, 40px);
+  height: clamp(28px, 9.5vw, 40px);
   object-fit: contain;
   flex-shrink: 0;
 }
