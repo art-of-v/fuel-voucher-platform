@@ -88,7 +88,9 @@ export function AppDefaultThemeCard({
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-medium text-sm">{t("appearance.defaultTheme")}</p>
+            <p className="font-medium text-sm">
+              {t("appearance.defaultTheme")}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               {t("appearance.appThemeHint")}
             </p>
