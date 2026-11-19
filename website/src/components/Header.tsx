@@ -8,7 +8,7 @@ import BrandLockup from './BrandLockup';
 import styles from './Header.module.css';
 
 const navLinks = [
-  { name: 'Бізнес', href: '#business' },
+  { name: 'Сервіси', href: '#services' },
   { name: 'Застосунок', href: '#app' },
   { name: 'Ціни', href: '#prices' },
   { name: 'Процес', href: '#how' },

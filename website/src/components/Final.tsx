@@ -19,10 +19,10 @@ export default function Final() {
       <div className={`lf-container ${styles.container}`}>
         <div className={styles.copy}>
           <p className="lf-eyebrow">Для особистих поїздок</p>
-          <h2 className={styles.title}>Ваше пальне вже у телефоні.</h2>
+          <h2 className={styles.title}>Ваше пально вже у телефоні.</h2>
           <p className={styles.lead}>
-            Купуйте пакет за актуальною ціною, зберігайте талон у FuelFlow і
-            заправляйтеся у мережі-партнері, коли потрібно.
+            Обирайте пакет за актуальною ціною зі знижкою, отримуйте код у
+            гаманці FuelFlow і заправляйтеся у мережі-партнері, коли потрібно.
           </p>
           <div className={styles.actions}>
             <AppStoreBadge />
