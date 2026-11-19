@@ -60,25 +60,33 @@ Before flipping a chip, prove the feature in the app, and record the evidence th
 ## App screens
 
 The gallery in `AppShowcase.tsx` shows six screens rendered by `npm run screens`
-(`scripts/generate-app-screens.mjs`) into `public/app-*.jpg`: the network list, the
-package ladder, the basket, the wallet, the company hub and the map.
+(`scripts/generate-app-screens.mjs`) into `public/app-*.jpg`: the network picker,
+a network's fuel list, the package ladder, the wallet, the map and the savings
+screen.
 
-They used to be device captures, and they aged into a lie — purple accents that the
-app no longer has, an unstyled map canvas printing "API KEY REQUIRED" over Kyiv, a
-basket whose price did not multiply out. The renders now take their colours from
-`mobile/src/core/design/themes.ts` (the `lemberg` theme) and their copy from
-`mobile/src/core/i18n/translations/uk.ts`, so regenerating them is one command, and
-the prebuild hook keeps them from drifting again.
+They used to be device captures, and they aged into a lie — purple accents that
+turned green, an unstyled map canvas printing "API KEY REQUIRED" over Kyiv, a
+basket whose price did not multiply out. A visitor reads a stale capture as the
+product, so the gallery is now generated from what the app ships:
 
-These are marketing renders, not device captures. Everything personal in them is
-invented: the worker names, the phone tails, the station address. The QR is the
-demo token from `src/config/qr.json` and is non-routable on purpose. Only reviewed,
-non-sensitive images may be placed in `public/` — never a capture containing
+- colours come from the `obsidian` theme in `mobile/src/core/design/themes.ts` —
+  the violet the screenshots show, not the `lemberg` green of the default;
+- the backdrop is `GridBackground` (a 40px grid at ~3% primary plus two radial
+  glows);
+- numbers are Rajdhani and Cyrillic is not, because Rajdhani has no Cyrillic
+  glyphs: on a device every Ukrainian word falls back to the system face and the
+  digits keep the display face. The renders reproduce that split with a 14 KB
+  subset in `scripts/assets/` (SIL OFL, see the notice there).
+
+These are marketing renders, not device captures. Everything personal is
+invented — the station, the phone tail, the voucher id — and the QR is the demo
+token from `src/config/qr.json`, which is non-routable on purpose. Only reviewed,
+non-sensitive images may be placed in `public/`: never a capture containing
 customer names, phone numbers, email addresses, voucher ids or a live QR payload.
 
 `AppShowcase.tsx` owns the manifest and `scripts/check-site-contract.mjs` pins the
-set: a screenshot added to `public/` without a manifest entry, or a sensitive file
-that reappears, fails `npm run check`.
+set, so a screenshot added to `public/` without a manifest entry — or a sensitive
+file that reappears — fails `npm run check`.
 
 ## Hero photograph
 

@@ -5,12 +5,12 @@ import { useEffect, useRef } from 'react';
 import styles from './AppShowcase.module.css';
 
 const screens = [
-  { src: '/app-networks.jpg', alt: 'Карта мережі: OKKO, WOG, UPG, KLO з ціною від 55 ₴ за літр' },
-  { src: '/app-packages.jpg', alt: 'Пакети пального в OKKO: 10, 20 і 50 літрів із ціною за літр' },
-  { src: '/app-basket.jpg', alt: 'Кошик: обраний пакет, промокод і сума до сплати' },
-  { src: '/app-codes.jpg', alt: 'Мої талони: активний код на 20 літрів із QR-кодом' },
-  { src: '/app-company.jpg', alt: 'Компанія: учасники, видані коди й працівники' },
-  { src: '/app-map.jpg', alt: 'Карта АЗК із цінами та кнопкою маршруту' },
+  { src: '/app-networks.jpg', alt: 'Вибір мережі: OKKO, WOG, UPG і KLO зі статусом онлайн' },
+  { src: '/app-fuels.jpg', alt: 'Пальне мережі OKKO з ціною за літр' },
+  { src: '/app-packages.jpg', alt: 'Пакети пального: 10 і 20 літрів із ціною' },
+  { src: '/app-wallet.jpg', alt: 'Мої талони: талон A-95 на 10 літрів із QR-кодом' },
+  { src: '/app-map.jpg', alt: 'Карта мережі з АЗК і ціною ваучера на станції' },
+  { src: '/app-economy.jpg', alt: 'Моя економія: сплачено, заощаджено, залишок літрів' },
 ];
 
 const copies = [0, 1, 2];

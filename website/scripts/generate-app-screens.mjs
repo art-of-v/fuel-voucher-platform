@@ -3,20 +3,28 @@
  * Renders the app screenshots the marketing site shows into public/app-*.jpg.
  *
  * Why this exists: the gallery used to ship device captures of an app that no
- * longer exists — purple accents, an unstyled map canvas printing "API KEY
- * REQUIRED" over Kyiv, a basket whose price did not multiply out. A visitor
- * reads a stale capture as the product, so the gallery is now generated from
- * the same design tokens and the same Ukrainian copy the app ships today
- * (`mobile/src/core/design/themes.ts`, `mobile/src/core/i18n/.../uk.ts`), and
- * regenerating it is one command instead of a screenshot ritual nobody repeats.
+ * longer exists — purple accents on one screen, a basket whose price did not
+ * multiply out, an unstyled map canvas printing "API KEY REQUIRED" over Kyiv.
+ * A visitor reads a stale capture as the product. The gallery is now generated
+ * from the shipped design instead of remembered, and regenerating it is one
+ * command.
  *
- * These are marketing renders, not device captures — say so where it matters,
- * and never put real customer data in one: the avatar, the station and the
- * voucher code are invented, and the QR is the demo token from
- * src/config/qr.json (non-routable on purpose).
+ * The reference is the app as it looks on a device, not the design documents:
  *
- * Runs before `dev` and `build` (see the predev/prebuild hooks) so the gallery
- * cannot drift from the tokens the app reads.
+ *   - colours come from the `obsidian` theme (mobile/src/core/design/themes.ts)
+ *     — the violet the screenshots show, not the `lemberg` green of the default;
+ *   - the backdrop is GridBackground: a 40px grid at ~3% primary plus two
+ *     radial glows;
+ *   - numbers are Rajdhani, and Cyrillic is NOT: Rajdhani has no Cyrillic
+ *     glyphs, so the device falls back to the system face for every Ukrainian
+ *     word and keeps Rajdhani for digits. These renders reproduce that split
+ *     with a 14 KB subset (scripts/assets/, OFL) so a price looks like a price.
+ *
+ * These are marketing renders, not device captures. Everything personal is
+ * invented — the worker, the station, the phone tail — and the QR is the demo
+ * token from src/config/qr.json, which is non-routable on purpose.
+ *
+ * Runs before `dev` and `build` (see the predev/prebuild hooks).
  */
 import { existsSync } from 'node:fs';
 import { readFile, mkdir, rm } from 'node:fs/promises';
@@ -26,22 +34,24 @@ import puppeteer from 'puppeteer-core';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The `lemberg` theme in mobile/src/core/design/themes.ts. */
-const t = {
-  background: '#000000',
-  surface: '#0C0C0C',
-  surfaceElevated: '#161616',
-  surfaceSunken: '#050505',
-  text: '#FFFFFF',
-  textSecondary: 'rgba(255,255,255,0.72)',
-  textMuted: 'rgba(255,255,255,0.56)',
-  textDim: 'rgba(255,255,255,0.4)',
-  border: 'rgba(255,255,255,0.14)',
-  borderSubtle: 'rgba(255,255,255,0.08)',
-  primary: '#00E85F',
-  primarySubtle: 'rgba(0,232,95,0.14)',
-  onPrimary: '#04170B',
-  error: '#FF5D5D',
+/** mobile/src/core/design/themes.ts → themes.obsidian. */
+const c = {
+  background: '#020203',
+  surface: '#0D0D10',
+  surfaceElevated: '#17171C',
+  text: '#F8FAFC',
+  textSecondary: 'rgba(248,250,252,0.72)',
+  textMuted: 'rgba(248,250,252,0.55)',
+  textDim: 'rgba(248,250,252,0.35)',
+  border: 'rgba(255,255,255,0.12)',
+  borderSubtle: 'rgba(255,255,255,0.07)',
+  primary: '#8B5CF6',
+  primarySubtle: 'rgba(139,92,246,0.16)',
+  primaryBorder: 'rgba(139,92,246,0.48)',
+  onPrimary: '#FFFFFF',
+  success: '#34D399',
+  warning: '#FBBF24',
+  danger: '#FF5D5D',
 };
 
 /** mobile/src/core/design/palette.ts → BRAND_COLORS. */
@@ -63,133 +73,170 @@ const findChrome = () => {
   return candidates.find((p) => existsSync(p));
 };
 
+const font = async (file) =>
+  `data:font/ttf;base64,${(await readFile(resolve(root, 'scripts/assets', file))).toString('base64')}`;
+
+const [rajdhani700, rajdhani600] = await Promise.all([
+  font('rajdhani-700-subset.ttf'),
+  font('rajdhani-600-subset.ttf'),
+]);
+
 const QR = await readFile(resolve(root, 'public/voucher-qr.svg'), 'utf8');
 const qrInline = `data:image/svg+xml;base64,${Buffer.from(QR, 'utf8').toString('base64')}`;
 
 const icons = {
-  home: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
-  map: '<path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.6" fill="#000"/>',
-  cart: '<path d="M4 5h2l2.4 10.2A2 2 0 0 0 10.4 17h7.2a2 2 0 0 0 2-1.6L21 8H7"/><circle cx="10" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/>',
-  user: '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 21c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/>',
+  home: '<path d="M3 10.5 12 3.2l9 7.3V21h-6.2v-6.1H9.2V21H3z"/>',
+  pin: '<path d="M12 21s6.6-6.1 6.6-10.4A6.6 6.6 0 1 0 5.4 10.6C5.4 14.9 12 21 12 21z"/><circle cx="12" cy="10.2" r="2.4" fill="#020203"/>',
+  cart: '<path d="M3.5 4.5h2l2.3 10a2 2 0 0 0 2 1.6h7a2 2 0 0 0 1.9-1.5L20.5 7.6H6.6"/><circle cx="10" cy="19.6" r="1.4"/><circle cx="17.6" cy="19.6" r="1.4"/>',
+  codes:
+    '<rect x="3.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.4"/><rect x="14.5" y="14.5" width="2.6" height="2.6"/><rect x="18.4" y="18.4" width="2.1" height="2.1"/>',
+  chat: '<path d="M4 5.5h16v10.2H9.4L4 20z"/>',
+  user: '<circle cx="12" cy="8" r="3.5"/><path d="M4.8 20.5c1.1-3.7 3.8-5.6 7.2-5.6s6.1 1.9 7.2 5.6"/>',
 };
 
 const tabBar = (active) => `
   <nav class="tabs">
-    ${['home', 'map', 'cart', 'user']
+    ${['home', 'pin', 'cart', 'codes', 'chat', 'user']
       .map(
         (key) => `<span class="tab ${key === active ? 'on' : ''}">
           <svg viewBox="0 0 24 24" fill="currentColor">${icons[key]}</svg>
-          ${key === 'cart' ? '<i class="dot">2</i>' : ''}
+          ${key === 'cart' ? '' : ''}
         </span>`,
       )
       .join('')}
   </nav>`;
 
-const shell = ({ status = '18:14', body, active = 'home' }) => `
+const shell = ({ status = '12:42', body, active = 'home' }) => `
 <section class="screen">
   <header class="statusbar">
-    <span>${status}</span>
+    <span class="clock">${status}</span>
     <span class="sb-icons">
-      <svg viewBox="0 0 18 12" width="18"><path d="M1 9h2v3H1zm4-3h2v6H5zm4-3h2v9H9zm4-4h2v13h-2z" fill="#fff"/></svg>
-      <svg viewBox="0 0 16 12" width="16"><path d="M8 11.2 1 4.2A10 10 0 0 1 15 4.2z" fill="#fff"/></svg>
-      <svg viewBox="0 0 26 12" width="26"><rect x="1" y="1.5" width="20" height="9" rx="2.6" fill="none" stroke="#fff" stroke-opacity=".5"/><rect x="3" y="3.5" width="14" height="5" rx="1.4" fill="#fff"/><path d="M23 5v3a2 2 0 0 0 0-3z" fill="#fff" fill-opacity=".5"/></svg>
+      <svg viewBox="0 0 18 12" width="19"><path d="M1 9h2v3H1zm4-3h2v6H5zm4-3h2v9H9zm4-4h2v13h-2z" fill="#fff"/></svg>
+      <svg viewBox="0 0 16 12" width="17"><path d="M8 11.2 1 4.2A10 10 0 0 1 15 4.2z" fill="#fff"/></svg>
+      <span class="battery"><i></i></span>
     </span>
   </header>
   <div class="body">${body}</div>
   ${tabBar(active)}
 </section>`;
 
+const G = (v) => `<span class="hryvnia">${v}</span>`;
+
 const baseCss = `
-  @font-face {
-    font-family: 'Inter';
-    src: url('file://${resolve(root, 'public/fonts/Inter-cyrillic.woff2').replace(/\\/g, '/')}') format('woff2');
-    font-weight: 100 900;
-    font-display: block;
-  }
+  @font-face { font-family: 'Rajdhani'; font-weight: 700; src: url('${rajdhani700}') format('truetype'); font-display: block; }
+  @font-face { font-family: 'Rajdhani'; font-weight: 600; src: url('${rajdhani600}') format('truetype'); font-display: block; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: ${WIDTH}px; height: ${HEIGHT}px; background: ${t.background}; }
+  html, body { width: ${WIDTH}px; height: ${HEIGHT}px; background: ${c.background}; }
   body {
-    font-family: 'Inter', system-ui, sans-serif;
-    color: ${t.text};
+    font-family: -apple-system, 'Segoe UI', Inter, system-ui, sans-serif;
+    color: ${c.text};
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: 'cv11', 'ss01';
   }
   .screen {
-    position: relative;
-    width: ${WIDTH}px;
-    height: ${HEIGHT}px;
-    display: flex;
-    flex-direction: column;
+    position: relative; width: ${WIDTH}px; height: ${HEIGHT}px;
+    display: flex; flex-direction: column; overflow: hidden;
     background:
-      radial-gradient(120% 55% at 50% -10%, rgba(0,232,95,0.10), transparent 60%),
-      ${t.background};
+      linear-gradient(to right, rgba(139,92,246,0.05) 1px, transparent 1px) 0 0 / 40px 40px,
+      linear-gradient(to bottom, rgba(139,92,246,0.05) 1px, transparent 1px) 0 0 / 40px 40px,
+      radial-gradient(120% 45% at 50% -6%, rgba(139,92,246,0.10), transparent 62%),
+      radial-gradient(110% 40% at 50% 104%, rgba(139,92,246,0.12), transparent 60%),
+      ${c.background};
   }
-  .statusbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 22px 32px 8px; font-size: 22px; font-weight: 650;
-  }
-  .sb-icons { display: flex; align-items: center; gap: 9px; }
-  .body { flex: 1; padding: 10px 26px 0; display: flex; flex-direction: column; min-height: 0; }
+  .num { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .statusbar { display: flex; align-items: center; justify-content: space-between; padding: 24px 32px 6px; }
+  .clock { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 26px; letter-spacing: 0.01em; }
+  .sb-icons { display: flex; align-items: center; gap: 8px; }
+  .battery { position: relative; width: 27px; height: 13px; border: 1.5px solid rgba(255,255,255,0.6); border-radius: 4px; display: inline-block; }
+  .battery::after { content: ''; position: absolute; right: -4px; top: 3.5px; width: 2.5px; height: 5px; border-radius: 0 2px 2px 0; background: rgba(255,255,255,0.6); }
+  .battery i { position: absolute; inset: 2px 7px 2px 2px; background: #fff; border-radius: 2px; }
+  .body { flex: 1; padding: 16px 26px 0; display: flex; flex-direction: column; min-height: 0; }
   .tabs {
-    height: 96px; display: flex; align-items: center; justify-content: space-around;
-    border-top: 1px solid ${t.borderSubtle}; background: rgba(0,0,0,0.72);
-    padding-bottom: 12px;
+    height: 100px; display: flex; align-items: center; justify-content: space-around;
+    border-top: 1px solid ${c.borderSubtle}; background: rgba(2,2,3,0.86); padding-bottom: 10px;
   }
-  .tab { position: relative; width: 44px; height: 44px; color: ${t.textDim}; }
-  .tab svg { width: 26px; height: 26px; margin: auto; }
-  .tab.on { color: ${t.primary}; }
-  .tab .dot {
-    position: absolute; top: -4px; right: -6px; width: 18px; height: 18px; border-radius: 9px;
-    background: ${t.primary}; color: ${t.onPrimary}; font-size: 11px; font-weight: 800;
-    display: grid; place-items: center; font-style: normal;
-  }
-  .eyebrow { font-size: 15px; font-weight: 700; letter-spacing: 0.10em; color: ${t.textMuted}; }
-  .title { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
-  .sub { font-size: 17px; color: ${t.textMuted}; }
-  .card {
-    background: ${t.surface}; border: 1px solid ${t.borderSubtle}; border-radius: 22px;
-  }
-  .row { display: flex; align-items: center; }
-  .pill {
-    display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px;
-    border-radius: 999px; font-size: 14px; font-weight: 700;
-  }
-  .cta {
-    height: 84px; border-radius: 20px; background: ${t.primary}; color: ${t.onPrimary};
-    display: grid; place-items: center; font-size: 19px; font-weight: 800; letter-spacing: 0.03em;
-  }
+  .tab { width: 44px; height: 44px; color: ${c.textMuted}; display: grid; place-items: center; }
+  .tab svg { width: 27px; height: 27px; }
+  .tab.on { color: ${c.primary}; }
+  .screen-title { font-size: 40px; font-weight: 800; letter-spacing: -0.01em; }
+  .label { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: ${c.textMuted}; text-transform: uppercase; }
+  .hryvnia { color: ${c.primary}; font-family: -apple-system, 'Segoe UI', Inter, system-ui, sans-serif; font-weight: 700; }
+  .card { background: ${c.surface}; border: 1px solid ${c.borderSubtle}; border-radius: 26px; }
+  .cta { height: 86px; border-radius: 22px; background: ${c.primary}; color: ${c.onPrimary}; display: grid; place-items: center;
+         font-size: 20px; font-weight: 800; letter-spacing: 0.02em; }
+  .ghost { height: 92px; border-radius: 6px; border: 1px solid ${c.border}; display: grid; place-items: center;
+           font-size: 19px; font-weight: 800; letter-spacing: 0.06em; background: transparent; color: ${c.text}; }
 `;
 
 const screens = {
   'app-networks': shell({
     body: `
-      <p class="eyebrow">4 МЕРЕЖІ ПОБЛИЗУ</p>
-      <h1 class="title" style="margin: 10px 0 6px">Карта мережі</h1>
-      <p class="sub" style="margin-bottom: 22px">Знайдено 4 станції на відстані до 5 км</p>
-      <div class="card" style="height: 84px; display:flex; align-items:center; gap:14px; padding: 0 24px; margin-bottom: 26px">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${t.textMuted}" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-        <span style="font-size:19px; color:${t.textMuted}">Пошук АЗС…</span>
-      </div>
+      <h1 class="screen-title" style="margin: 26px 0 34px; font-size: 46px">
+        ОБЕРІТЬ<br><span style="color:${c.primary}">МЕРЕЖУ</span>
+      </h1>
       ${[
-        { slug: 'okko', name: 'OKKO', addr: 'вул. Городоцька, 128а', d: '0,8 км', from: '55,00' },
-        { slug: 'wog', name: 'WOG', addr: 'просп. Свободи, 21', d: '1,9 км', from: '56,40' },
-        { slug: 'upg', name: 'UPG', addr: 'вул. Кульпарківська, 93', d: '3,4 км', from: '54,80' },
-        { slug: 'klo', name: 'KLO', addr: 'вул. Шевченка, 44', d: '4,1 км', from: '56,00' },
+        { slug: 'okko', name: 'OKKO', bolt: c.success },
+        { slug: 'wog', name: 'WOG', bolt: c.success },
+        { slug: 'upg', name: 'UPG', bolt: c.success },
+        { slug: 'klo', name: 'KLO', bolt: c.warning },
       ]
         .map(
-          (s) => `
-        <div class="card" style="padding: 24px; margin-bottom: 18px; display:flex; align-items:center; gap:20px">
-          <span style="width:72px;height:72px;border-radius:20px;background:${brand[s.slug]};color:#000;
-            display:grid;place-items:center;font-weight:900;font-size:14px;letter-spacing:-0.02em">${s.name}</span>
-          <div style="flex:1">
-            <div style="font-size:25px;font-weight:750;letter-spacing:-0.01em">${s.name}</div>
-            <div style="font-size:16px;color:${t.textMuted};margin-top:5px">${s.addr} · ${s.d}</div>
+          (n) => `
+        <div class="card" style="position:relative;display:flex;align-items:center;justify-content:space-between;
+          padding: 34px 30px; margin-bottom: 26px; overflow:hidden">
+          <span style="position:absolute;left:0;top:14px;bottom:14px;width:5px;border-radius:0 4px 4px 0;background:${brand[n.slug]}"></span>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="num" style="font-size:38px;letter-spacing:0.01em">${n.name}</span>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="${n.bolt}"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+              <span style="width:7px;height:7px;border-radius:4px;background:${n.bolt}"></span>
+              <span class="label" style="letter-spacing:0.12em">ONLINE · READY</span>
+            </div>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:14px;color:${t.textDim}">від</div>
-            <div style="font-size:24px;font-weight:800">${s.from} ₴</div>
-            <div style="font-size:13px;color:${t.textDim}">грн/л</div>
+          <span style="width:66px;height:66px;border-radius:18px;border:1px solid ${c.primaryBorder};
+            background:${c.primarySubtle};display:grid;place-items:center">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${c.primary}" stroke-width="2.2" stroke-linecap="round">
+              <path d="M4 12h15"/><path d="m13 6 6 6-6 6"/>
+            </svg>
+          </span>
+        </div>`,
+        )
+        .join('')}
+    `,
+  }),
+
+  'app-fuels': shell({
+    body: `
+      <div style="display:flex;align-items:center;gap:18px;margin:22px 0 30px">
+        <span style="font-size:30px;color:${c.textMuted}">‹</span>
+        <span class="num" style="font-size:34px">OKKO</span>
+      </div>
+      ${[
+        { name: 'ДП', price: '103,90' },
+        { name: 'пульс ДП', price: '106,90' },
+        { name: 'А-95', price: '90,90' },
+        { name: 'ПРОПАН', price: '64,90' },
+        { name: 'пульс 95', price: '93,90' },
+      ]
+        .map(
+          (f) => `
+        <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:26px 26px;margin-bottom:22px">
+          <div style="display:flex;align-items:center;gap:20px">
+            <span style="width:62px;height:62px;border-radius:16px;background:${c.surfaceElevated};display:grid;place-items:center">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${c.textMuted}" stroke-width="1.8">
+                <path d="M7 3h7v17H7z"/><path d="M14 8h3l3 4v6a2 2 0 0 1-4 0"/>
+              </svg>
+            </span>
+            <div>
+              <div class="label" style="letter-spacing:0.1em">${f.name}</div>
+              <div class="num" style="font-size:34px;margin-top:2px">${f.price}${G('₴')}</div>
+            </div>
           </div>
+          <span style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,0.05);
+            border:1px solid ${c.borderSubtle};font-size:12px;font-weight:700;letter-spacing:0.08em;color:${c.textMuted}">
+            НЕМАЄ НА СКЛАДІ
+          </span>
         </div>`,
         )
         .join('')}
@@ -197,48 +244,57 @@ const screens = {
   }),
 
   'app-packages': shell({
-    status: '18:15',
     body: `
-      <div class="row" style="gap:16px; margin-bottom: 20px">
-        <span style="width:44px;height:44px;border-radius:14px;background:${t.surface};display:grid;place-items:center;font-size:22px">‹</span>
-        <div>
-          <div class="eyebrow">OKKO · КУЛЬПАРКІВСЬКА 93</div>
-          <h1 class="title" style="font-size:34px;margin-top:4px">Оберіть пакет</h1>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 26px">
+        <div style="display:flex;align-items:center;gap:18px">
+          <span style="font-size:30px;color:${c.textMuted}">‹</span>
+          <div>
+            <div class="screen-title" style="font-size:38px">ДП</div>
+            <div class="label" style="margin-top:4px">ОБЕРІТЬ ТАЛОНИ</div>
+          </div>
         </div>
-      </div>
-      <div class="row" style="gap:12px; margin-bottom: 24px">
-        ${['ДП ЄВРО', 'А-95', 'PULLS 95']
-          .map(
-            (f, i) => `<span class="pill" style="height:44px;font-size:15px;
-              background:${i === 0 ? t.primarySubtle : t.surface};
-              border:1px solid ${i === 0 ? 'rgba(0,232,95,0.45)' : t.border};
-              color:${i === 0 ? t.primary : t.textSecondary}">${f}</span>`,
-          )
-          .join('')}
+        <span style="width:74px;height:74px;border-radius:20px;border:1px solid ${c.border};display:grid;place-items:center">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="${c.text}" stroke-width="1.9">
+            <path d="M3.5 4.5h2l2.3 10a2 2 0 0 0 2 1.6h7a2 2 0 0 0 1.9-1.5L20.5 7.6H6.6"/>
+            <circle cx="10" cy="19.6" r="1.3"/><circle cx="17.6" cy="19.6" r="1.3"/>
+          </svg>
+        </span>
       </div>
       ${[
-        { l: '10', price: '580,00', per: '58,00', save: '−3,00' },
-        { l: '20', price: '1 100,00', per: '55,00', save: '−6,00' },
-        { l: '50', price: '2 650,00', per: '53,00', save: '−8,00' },
+        { l: '10', price: '1039' },
+        { l: '20', price: '2078' },
       ]
         .map(
           (p) => `
-        <div class="card" style="padding: 26px; margin-bottom: 18px; border-color:${p.l === '20' ? 'rgba(0,232,95,0.45)' : t.borderSubtle}">
-          <div class="row" style="justify-content:space-between;align-items:flex-start">
-            <div class="row" style="gap:16px">
-              <span style="width:72px;height:72px;border-radius:20px;background:${t.surfaceElevated};
-                display:grid;place-items:center;font-size:26px;font-weight:800">${p.l}</span>
-              <div>
-                <div style="font-size:15px;color:${t.textMuted};letter-spacing:0.08em">ЛІТРІВ</div>
-                <div style="font-size:27px;font-weight:800;margin-top:4px">${p.price} ₴</div>
-                <div style="font-size:15px;color:${t.textMuted};margin-top:3px">${p.per} ₴ за літр</div>
-              </div>
-            </div>
-            <span class="pill" style="background:${t.primarySubtle};color:${t.primary};border:1px solid rgba(0,232,95,0.4)">
-              ЗНИЖКА ${p.save} ₴/л
+        <div class="card" style="padding:24px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:24px">
+            <span style="width:104px;height:104px;border-radius:22px;border:1px solid ${c.primaryBorder};
+              background:${c.primarySubtle};display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <span class="num" style="font-size:40px;line-height:1">${p.l}</span>
+              <span style="font-size:11px;font-weight:700;letter-spacing:0.1em;color:${c.textSecondary};margin-top:2px">ЛІТРІВ</span>
+            </span>
+            <span class="num" style="font-size:40px">${p.price}${G('₴')}</span>
+          </div>
+          <span style="display:inline-flex;align-items:center;gap:9px;margin-top:18px;padding:11px 18px;border-radius:999px;
+            background:rgba(255,255,255,0.05);border:1px solid ${c.borderSubtle};
+            font-size:12px;font-weight:700;letter-spacing:0.08em;color:${c.textMuted}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="${c.textMuted}" stroke-width="1.8">
+              <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21 3.5 16.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>
+            </svg>
+            НЕДОСТУПНО НА СКЛАДІ
+          </span>
+          <div style="border-top:1px solid ${c.borderSubtle};margin-top:20px;padding-top:16px;text-align:right">
+            <span class="label">РАЗОМ</span>
+            <div class="num" style="font-size:44px;margin-top:2px">${p.price}${G('₴')}</div>
+          </div>
+          <div class="ghost" style="margin-top:18px;height:76px;color:${c.textMuted};border-color:${c.primaryBorder}">
+            <span style="display:flex;align-items:center;gap:12px">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${c.textMuted}" stroke-width="1.8">
+                <path d="M3.5 4.5h2l2.3 10a2 2 0 0 0 2 1.6h7a2 2 0 0 0 1.9-1.5L20.5 7.6H6.6"/>
+              </svg>
+              НЕДОСТУПНО НА СКЛАДІ
             </span>
           </div>
-          <div class="cta" style="height:66px;margin-top:22px;font-size:17px">ДОДАТИ В КОШИК</div>
         </div>`,
         )
         .join('')}
@@ -246,180 +302,203 @@ const screens = {
     active: 'cart',
   }),
 
-  'app-basket': shell({
-    status: '18:16',
+  'app-wallet': shell({
     body: `
-      <p class="eyebrow">1 ПОЗИЦІЯ</p>
-      <h1 class="title" style="margin: 10px 0 24px">Ваш кошик</h1>
-      <div class="card" style="padding: 26px; margin-bottom: 20px">
-        <div class="row" style="justify-content:space-between;align-items:flex-start">
-          <div class="row" style="gap:16px">
-            <span style="width:60px;height:60px;border-radius:16px;background:${brand.okko};color:#000;display:grid;place-items:center;font-weight:900">OK</span>
-            <div>
-              <div style="font-size:22px;font-weight:750">ОККО · ДП ЄВРО</div>
-              <div style="font-size:16px;color:${t.textMuted};margin-top:6px">20 літрів · 55,00 ₴ за літр</div>
-            </div>
-          </div>
-          <div style="font-size:22px;font-weight:800">1 100,00 ₴</div>
-        </div>
-      </div>
-      <div class="card" style="height:82px;display:flex;align-items:center;gap:14px;padding:0 22px;margin-bottom:auto">
-        <span style="font-size:14px;font-weight:700;color:${t.textMuted};letter-spacing:0.06em">ПРОМОКОД</span>
-        <span style="flex:1;font-size:18px;color:${t.textDim}">Введіть код</span>
-        <span class="pill" style="background:${t.surfaceElevated};color:${t.textSecondary};border:1px solid ${t.border}">ЗАСТОСУВАТИ</span>
-      </div>
-      <div style="padding: 26px 0 10px">
-        <div class="row" style="justify-content:space-between;font-size:17px;color:${t.textMuted}">
-          <span>Підсумок</span><span>1 100,00 ₴</span>
-        </div>
-        <div class="row" style="justify-content:space-between;align-items:baseline;margin-top:14px">
-          <span style="font-size:16px;letter-spacing:0.06em;color:${t.textSecondary};font-weight:700">ДО СПЛАТИ</span>
-          <span style="font-size:38px;font-weight:850;letter-spacing:-0.02em">1 100,00 ₴</span>
-        </div>
-        <div class="cta" style="margin-top:24px">ОФОРМИТИ ЗАМОВЛЕННЯ</div>
-      </div>
-    `,
-    active: 'cart',
-  }),
-
-  'app-codes': shell({
-    status: '18:17',
-    body: `
-      <p class="eyebrow">АКТИВНІ ТАЛОНИ · 1</p>
-      <h1 class="title" style="margin: 10px 0 22px">Мої талони</h1>
-      <div class="card" style="padding: 26px; border-color: rgba(0,232,95,0.4); background: linear-gradient(180deg, rgba(0,232,95,0.08), ${t.surface} 55%)">
-        <div class="row" style="justify-content:space-between">
-          <div class="row" style="gap:14px">
-            <span style="width:52px;height:52px;border-radius:14px;background:${brand.okko};color:#000;display:grid;place-items:center;font-weight:900;font-size:15px">OK</span>
-            <div>
-              <div style="font-size:23px;font-weight:780">ДП ЄВРО · 20 л</div>
-              <div style="font-size:15px;color:${t.textMuted};margin-top:4px">ОККО · Городоцька, 128а</div>
-            </div>
-          </div>
-          <span class="pill" style="background:${t.primarySubtle};color:${t.primary};border:1px solid rgba(0,232,95,0.4)">АКТИВНИЙ</span>
-        </div>
-        <div style="margin: 22px auto 0; width: 320px; padding: 16px; background:#fff; border-radius: 20px">
-          <img src="${qrInline}" style="width:100%;display:block" alt="">
-        </div>
-        <div class="cta" style="margin-top: 22px; height: 74px; font-size: 18px">ПОКАЗАТИ НА КОЛОНЦІ</div>
-      </div>
-      <div class="row" style="justify-content:space-between;padding: 24px 4px 0;font-size:16px;color:${t.textMuted}">
-        <span>Дійсний до 14.12.2026</span>
-        <span>Залишок 2 650,00 ₴</span>
-      </div>
-    `,
-    active: 'user',
-  }),
-
-  'app-company': shell({
-    status: '18:18',
-    body: `
-      <p class="eyebrow">КОМПАНІЯ</p>
-      <h1 class="title" style="margin: 10px 0 22px">Автопарк «Захід»</h1>
-      <div class="row" style="gap: 14px; margin-bottom: 26px">
+      <h1 class="screen-title" style="margin: 20px 0 24px">МОЇ ТАЛОНИ</h1>
+      <div style="display:flex;gap:14px;margin-bottom:26px">
         ${[
-          { k: 'Учасники', v: '12' },
-          { k: 'Видано', v: '34' },
-          { k: 'Очікують', v: '2' },
+          { v: '3', k: 'ЗАМОВЛЕННЯ', color: c.text },
+          { v: '3', k: 'ВИКОНАНО', color: c.primary },
+          { v: '0', k: 'В ОБРОБЦІ', color: c.warning },
         ]
           .map(
-            (s) => `<div class="card" style="flex:1;padding: 20px">
-              <div style="font-size:34px;font-weight:850;letter-spacing:-0.02em">${s.v}</div>
-              <div style="font-size:14px;color:${t.textMuted};margin-top:4px">${s.k}</div>
+            (s) => `<div class="card" style="flex:1;padding:20px 10px;text-align:center">
+              <div class="num" style="font-size:34px;color:${s.color}">${s.v}</div>
+              <div class="label" style="font-size:11px;margin-top:6px">${s.k}</div>
             </div>`,
           )
           .join('')}
       </div>
-      <div class="row" style="justify-content:space-between;margin-bottom:14px">
-        <span class="eyebrow">ПРАЦІВНИКИ</span>
-        <span style="font-size:15px;color:${t.primary}">Запросити</span>
+      <div class="card" style="padding:24px;background:linear-gradient(180deg, rgba(0,232,95,0.05), ${c.surface} 45%)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="label" style="letter-spacing:0.12em;color:${c.textSecondary}">OKKO</div>
+            <div class="screen-title" style="font-size:40px;margin-top:6px">A-95</div>
+            <div class="num" style="font-size:26px;color:${c.textSecondary};margin-top:6px">10 <span style="font-size:18px">л</span></div>
+            <div style="font-size:14px;color:${c.textDim};margin-top:14px">Термін: 07.11.2026</div>
+          </div>
+          <span style="padding:9px 16px;border-radius:999px;background:rgba(255,255,255,0.06);
+            border:1px solid ${c.borderSubtle};font-size:12px;font-weight:700;letter-spacing:0.1em;color:${c.textMuted}">
+            ● REDEEMED
+          </span>
+        </div>
+        <div style="width:270px;margin:20px auto 0;padding:14px;background:rgba(255,255,255,0.9);border-radius:4px">
+          <img src="${qrInline}" style="width:100%;display:block" alt="">
+        </div>
+        <div class="ghost" style="margin-top:22px;height:80px;font-size:18px">ВІДНОВИТИ ТАЛОН</div>
+        <div class="ghost" style="margin-top:16px;height:80px;color:${c.textSecondary}">
+          <span style="display:flex;align-items:center;gap:12px">
+            <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="${c.textMuted}" stroke-width="1.8">
+              <circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.4 2"/>
+            </svg>
+            ІСТОРІЯ
+            <span style="color:${c.textDim};font-size:16px">›</span>
+          </span>
+        </div>
+        <div style="margin-top:18px;font-size:14px;color:${c.textDim}">ID: 99999600000024588842</div>
       </div>
-      ${[
-        { n: 'Іван Петренко', p: '+380 67 ••• 41 12', g: 'видано 6', s: t.primary },
-        { n: 'Олег Гриценко', p: '+380 63 ••• 09 87', g: 'видано 4', s: t.primary },
-        { n: 'Марія Дзюба', p: '+380 50 ••• 77 20', g: 'на паузі', s: 'rgba(251,191,36,0.9)' },
-        { n: 'Тарас Білий', p: '+380 93 ••• 12 04', g: 'видано 2', s: t.primary },
-      ]
-        .map(
-          (w) => `<div class="card" style="padding: 20px 22px;margin-bottom:12px;display:flex;align-items:center;gap:16px">
-            <span style="width:48px;height:48px;border-radius:24px;background:${t.surfaceElevated};display:grid;place-items:center;font-weight:800">${w.n[0]}</span>
-            <div style="flex:1">
-              <div style="font-size:19px;font-weight:700">${w.n}</div>
-              <div style="font-size:14px;color:${t.textDim};margin-top:3px">${w.p}</div>
-            </div>
-            <span style="font-size:14px;font-weight:700;color:${w.s}">${w.g}</span>
-          </div>`,
-        )
-        .join('')}
     `,
-    active: 'user',
+    active: 'codes',
   }),
 
   'app-map': shell({
-    status: '18:19',
+    status: '12:43',
     body: `
-      <div style="position:absolute;inset:0;background:
-        radial-gradient(70% 40% at 30% 30%, rgba(0,232,95,0.06), transparent 60%),
-        linear-gradient(180deg, #06090A, #04060A 60%, #000);
-        z-index:-1"></div>
-      <div style="position:absolute;inset:150px -140px 260px;z-index:0;opacity:.85;pointer-events:none">
-        <svg viewBox="0 0 600 800" width="100%" height="100%" fill="none">
-          <g stroke="rgba(255,255,255,0.22)" stroke-width="18" stroke-linecap="round">
-            <path d="M-40 250 C 140 200, 240 320, 420 260 S 620 300, 700 240"/>
-            <path d="M-40 470 C 160 430, 260 520, 430 470 S 640 520, 700 460"/>
-            <path d="M120 -40 C 160 180, 90 340, 150 520 S 200 720, 170 840"/>
-            <path d="M380 -40 C 350 160, 430 320, 380 520 S 330 720, 360 840"/>
+      <div style="position:absolute;inset:104px 0 330px;z-index:0">
+        <svg viewBox="0 0 600 700" width="100%" height="100%" fill="none">
+          <g stroke="rgba(255,255,255,0.16)" stroke-width="9" stroke-linecap="round">
+            <path d="M-30 190 C 150 150, 250 240, 420 200 S 640 230, 700 190"/>
+            <path d="M-30 420 C 160 390, 270 470, 430 430 S 640 470, 700 420"/>
+            <path d="M150 -30 C 190 150, 120 330, 180 520 S 220 680, 200 760"/>
+            <path d="M400 -30 C 370 160, 450 320, 400 530 S 350 690, 380 760"/>
           </g>
-          <g stroke="rgba(255,255,255,0.12)" stroke-width="8" stroke-linecap="round">
-            <path d="M-40 360 H 700"/><path d="M-40 600 H 700"/><path d="M260 -40 V 840"/><path d="M520 -40 V 840"/>
+          <g stroke="rgba(255,255,255,0.07)" stroke-width="5">
+            <path d="M-30 300 H 700"/><path d="M-30 560 H 700"/><path d="M280 -30 V 760"/><path d="M540 -30 V 760"/>
           </g>
         </svg>
       </div>
-      <div class="row" style="gap:14px;margin-bottom:18px">
-        <div class="card" style="flex:1;height:80px;display:flex;align-items:center;gap:14px;padding:0 22px;background:rgba(12,12,12,0.92)">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${t.textMuted}" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-          <span style="font-size:19px;color:${t.textMuted}">Пошук АЗС…</span>
+      <div style="position:relative;z-index:1">
+        <h1 class="screen-title" style="font-size:40px">Карта мережі</h1>
+        <div style="font-size:15px;color:${c.textDim};margin-top:6px">1322 АЗК</div>
+        <div style="margin-top:22px;border-radius:22px;background:rgba(20,20,26,0.94);border:1px solid ${c.borderSubtle};
+          padding:22px 24px;display:flex;align-items:center;gap:16px">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${c.textMuted}" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+          </svg>
+          <span style="font-size:21px;color:${c.textMuted}">Пошук АЗС…</span>
         </div>
-        <span class="card" style="width:80px;height:80px;display:grid;place-items:center;background:${t.surfaceElevated};font-size:22px">◎</span>
+        <div style="display:flex;gap:10px;margin-top:14px;overflow:hidden">
+          ${['А92', 'А95', 'А95 преміум', '100', '100 преміум', 'ДП']
+            .map(
+              (f, i) => `<span style="padding:9px 15px;border-radius:12px;white-space:nowrap;font-size:16px;font-weight:600;
+                color:${i === 1 ? c.text : c.textMuted};background:rgba(20,20,26,0.9);border:1px solid ${c.borderSubtle}">${f}</span>`,
+            )
+            .join('')}
+        </div>
       </div>
 
-      <div style="position:relative;height:600px;margin:0 -26px">
+      <div style="position:relative;flex:1;min-height:220px">
         ${[
-          { x: 26, y: 20, s: 'okko', n: 'OKKO', p: '55,00' },
-          { x: 62, y: 34, s: 'wog', n: 'WOG', p: '56,40' },
-          { x: 40, y: 56, s: 'upg', n: 'UPG', p: '54,80' },
-          { x: 68, y: 68, s: 'klo', n: 'KLO', p: '56,00' },
+          { x: 24, y: 22, s: 'okko', n: 'OKKO' },
+          { x: 62, y: 30, s: 'wog', n: 'WOG' },
+          { x: 48, y: 52, s: 'okko', n: 'OKKO' },
+          { x: 22, y: 74, s: 'upg', n: 'UPG' },
+          { x: 68, y: 78, s: 'wog', n: 'WOG' },
         ]
           .map(
-            (pin) => `<div style="position:absolute;left:${pin.x}%;top:${pin.y}%;transform:translate(-50%,-100%);
-              display:flex;flex-direction:column;align-items:center;gap:6px">
-              <span style="padding:6px 10px;border-radius:10px;background:${t.surfaceElevated};
-                border:1px solid ${t.border};font-size:14px;font-weight:800;white-space:nowrap">${pin.p} ₴</span>
-              <span style="width:52px;height:52px;border-radius:26px;background:${brand[pin.s]};color:#000;
-                display:grid;place-items:center;font-weight:900;font-size:12px;letter-spacing:-0.02em;
-                box-shadow:0 0 0 10px rgba(0,232,95,0.10)">${pin.n}</span>
+            (p) => `<div style="position:absolute;left:${p.x}%;top:${p.y}%;transform:translate(-50%,-100%)">
+              <span style="width:60px;height:60px;border-radius:30px;background:#fff;color:#000;display:grid;place-items:center;
+                font-weight:900;font-size:12px;box-shadow:0 0 0 6px rgba(139,92,246,0.16)">${p.n}</span>
             </div>`,
           )
           .join('')}
-        <span style="position:absolute;left:48%;top:44%;width:20px;height:20px;border-radius:10px;
-          background:${t.primary};box-shadow:0 0 0 12px rgba(0,232,95,0.18)"></span>
+        <span style="position:absolute;left:46%;top:60%;width:26px;height:26px;border-radius:14px;background:${c.primary};
+          box-shadow:0 0 0 8px rgba(139,92,246,0.25)"></span>
       </div>
 
-      <div class="card" style="padding:22px;background:rgba(12,12,12,0.96)">
-        <div class="row" style="justify-content:space-between;align-items:flex-start">
-          <div class="row" style="gap:14px">
-            <span style="width:52px;height:52px;border-radius:14px;background:${brand.okko};color:#000;display:grid;place-items:center;font-weight:900;font-size:15px">OK</span>
-            <div>
-              <div style="font-size:22px;font-weight:780">OKKO</div>
-              <div style="font-size:15px;color:${t.textMuted};margin-top:4px">вул. Городоцька, 128а · 0,8 км</div>
-            </div>
+      <div style="position:relative;z-index:2;background:rgba(16,16,22,0.97);border:1px solid ${c.borderSubtle};
+        border-radius:26px;padding:26px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="width:56px;height:56px;border-radius:28px;background:#fff;display:grid;place-items:center;
+            font-weight:900;font-size:13px;color:#000">UPG</span>
+          <div style="flex:1">
+            <div style="font-size:22px;font-weight:800">UPG №142</div>
+            <div style="font-size:15px;color:${c.textMuted};margin-top:5px">Сокільники, вул. Зубрівська, 8</div>
           </div>
-          <span style="font-size:15px;font-weight:700;color:${t.primary}">від 55,00 ₴</span>
+          <span style="font-size:22px;color:${c.textDim}">×</span>
         </div>
-        <div class="cta" style="height:64px;margin-top:20px;font-size:17px">ПРОКЛАСТИ МАРШРУТ</div>
+        <div style="margin-top:22px;border-radius:18px;background:${c.background};border:1px solid ${c.borderSubtle};padding:20px 22px">
+          <div class="label" style="letter-spacing:0.12em">ЦІНА ВАУЧЕРА · А95</div>
+          <div style="display:flex;align-items:baseline;gap:12px;margin-top:6px">
+            <span class="num" style="font-size:52px;color:${c.primary}">86,90</span>
+            <span class="num" style="font-size:30px;color:${c.primary}">₴</span>
+            <span style="font-size:19px;color:${c.textMuted}">/ літр</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px">
+          <span style="font-size:15px;color:${c.textDim}">Від вас · 2,4 км</span>
+        </div>
+        <div class="cta" style="margin-top:16px">
+          <span style="display:flex;align-items:center;gap:14px">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="${c.onPrimary}"><path d="M21 3 3 10.6l7.4 2.6L13 21z"/></svg>
+            ПРОКЛАСТИ МАРШРУТ
+          </span>
+        </div>
       </div>
     `,
-    active: 'map',
+    active: 'pin',
+  }),
+
+  'app-economy': shell({
+    status: '12:44',
+    body: `
+      <div style="display:flex;align-items:center;gap:16px;margin:20px 0 22px">
+        <span style="font-size:30px;color:${c.textMuted}">‹</span>
+        <h1 class="screen-title" style="font-size:38px">МОЯ ЕКОНОМІЯ</h1>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:26px">
+        ${['ЗА ВЕСЬ ЧАС', 'РІК', '3 МІСЯЦІ', 'МІСЯЦЬ']
+          .map(
+            (f, i) => `<span style="padding:14px 22px;border-radius:16px;font-size:15px;font-weight:700;letter-spacing:0.06em;
+              ${i === 0
+                ? `background:${c.primarySubtle};border:1px solid ${c.primaryBorder};color:${c.primary}`
+                : `border:1px solid ${c.border};color:${c.textSecondary}`}">${f}</span>`,
+          )
+          .join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        ${[
+          { icon: '<rect x="2.5" y="6" width="19" height="12" rx="3"/><circle cx="12" cy="12" r="3"/>', v: '5172', u: '₴', k: 'СПЛАЧЕНО', color: c.primary },
+          { icon: '<path d="M4 17 10 11l4 4 6-7"/><path d="M20 8h-5m5 0v5"/>', v: '402', u: '₴', k: 'ЗАОЩАДЖЕНО VS КОЛОНКА', color: c.success },
+          { icon: '<path d="M7 3h7v17H7z"/><path d="M14 8h3l3 4v6a2 2 0 0 1-4 0"/>', v: '0', u: 'л', k: 'ЗАЛИШОК ЛІТРІВ', color: c.textSecondary },
+          { icon: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 14h6"/>', v: '0', u: '', k: 'ЗАЛИШОК КОДІВ', color: c.textSecondary },
+        ]
+          .map(
+            (t) => `<div class="card" style="padding:24px 18px;text-align:center">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="${t.color}" stroke-width="1.8" stroke-linecap="round">${t.icon}</svg>
+              <div class="num" style="font-size:40px;margin-top:8px">${t.v}<span style="font-size:22px">${t.u}</span></div>
+              <div class="label" style="font-size:11px;margin-top:8px;line-height:1.5">${t.k}</div>
+            </div>`,
+          )
+          .join('')}
+      </div>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-between;padding:26px;margin-top:18px">
+        <span class="label" style="letter-spacing:0.14em">ПРИДБАНО ЛІТРІВ</span>
+        <span class="num" style="font-size:32px">60<span style="font-size:20px">л</span></span>
+      </div>
+      <div style="margin-top:18px;border-radius:20px;border:1px solid ${c.borderSubtle};background:${c.surface};padding:24px">
+        <div class="label" style="color:${c.primary};letter-spacing:0.2em">ЕКОНОМІЯ ПО МІСЯЦЯХ</div>
+        ${[
+          { m: '2026-10', plus: '+268 ₴', spent: '3448 ₴', l: '40л' },
+          { m: '2026-11', plus: '+134 ₴', spent: '1724 ₴', l: '20л' },
+        ]
+          .map(
+            (r) => `<div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px">
+              <span class="num" style="font-size:22px">${r.m}</span>
+              <span style="display:flex;align-items:center;gap:16px">
+                <span class="num" style="font-size:24px;color:${c.success}">${r.plus}</span>
+                <span class="num" style="font-size:20px;color:${c.textMuted}">${r.spent}</span>
+                <span class="num" style="font-size:20px;color:${c.primary}">${r.l}</span>
+              </span>
+            </div>`,
+          )
+          .join('')}
+      </div>
+      <p style="margin-top:22px;font-size:14px;line-height:1.6;color:${c.textDim}">
+        Заощадження рахуються відносно ціни на колонці на момент покупки
+      </p>
+    `,
+    active: 'codes',
   }),
 };
 
@@ -429,14 +508,14 @@ if (!chrome) {
   process.exit(1);
 }
 
-const siteTmp = resolve(root, 'out/.screens');
-await rm(siteTmp, { recursive: true, force: true });
-await mkdir(siteTmp, { recursive: true });
+const tmp = resolve(root, 'out/.screens');
+await rm(tmp, { recursive: true, force: true });
+await mkdir(tmp, { recursive: true });
 
 const browser = await puppeteer.launch({
   executablePath: chrome,
   headless: 'new',
-  args: ['--no-sandbox', '--disable-dev-shm-usage', '--allow-file-access-from-files'],
+  args: ['--no-sandbox', '--disable-dev-shm-usage'],
 });
 
 try {
@@ -451,11 +530,11 @@ try {
     await page.screenshot({
       path: resolve(root, `public/${name}.jpg`),
       type: 'jpeg',
-      quality: 88,
+      quality: 90,
     });
     console.log(`[screens] public/${name}.jpg`);
   }
 } finally {
   await browser.close();
-  await rm(siteTmp, { recursive: true, force: true });
+  await rm(tmp, { recursive: true, force: true });
 }
