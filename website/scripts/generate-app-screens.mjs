@@ -74,9 +74,15 @@ const fonts = {
   rajdhani600: await dataUrl('rajdhani-600-subset.ttf'),
 };
 
-const qrInline = `data:image/svg+xml;base64,${(
-  await readFile(resolve(root, 'public/voucher-qr.svg'), 'utf8')
-).toString('base64')}`;
+const qrSvg = await readFile(resolve(root, 'public/voucher-qr.svg'), 'utf8');
+// Buffer.from, not `qrSvg.toString('base64')`: a string ignores the argument and
+// hands back the SVG itself, whose first quote ends the src attribute and paints
+// the wallet with a broken image and the rest of the tag as text. Cost one
+// shipped gallery to learn; the guard below is the receipt.
+const qrInline = `data:image/svg+xml;base64,${Buffer.from(qrSvg, 'utf8').toString('base64')}`;
+if (!/^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(qrInline)) {
+  throw new Error('[screens] the QR is not base64 - see the comment above qrInline');
+}
 
 /* The export is a static directory; a scratch folder inside it is deleted two
  * lines later either way, and keeping it under out/ means `next build` owns the
