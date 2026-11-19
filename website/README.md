@@ -89,6 +89,11 @@ customer names, phone numbers, email addresses, voucher ids or a live QR payload
 set, so a screenshot added to `public/` without a manifest entry — or a sensitive
 file that reappears — fails `npm run check`.
 
+The rendered JPEGs are **committed**, like `public/app-store-qr.svg`: the container
+builds on `node:20-alpine`, which has no browser, so `npm run screens` falls back
+to the committed files there and says so. `npm run check` is where a missing
+browser is a hard failure, because a gate that cannot run must not pass silently.
+
 ## Hero photograph
 
 `public/hero-prototype-clean.webp` is the approved landing-page prototype's forecourt, cropped to its hero band with the prototype's own copy removed: its nav row, headline, lead, both CTAs and the "Download App" pill were masked and inpainted out of the pixels. The page paints all of that from HTML in Ukrainian, and the header owns the brand lockup - so the hero itself carries exactly one image.
