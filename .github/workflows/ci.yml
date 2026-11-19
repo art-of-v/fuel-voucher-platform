@@ -1533,7 +1533,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, local-stack, npm-audit, code-size, dryrun-dump, dryrun-migrate, dryrun-staging-migrate, fromzero-schema]
+    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, local-stack, npm-audit, code-size, dryrun-dump, dryrun-migrate, dryrun-staging-migrate, fromzero-schema, image-pr]
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed
@@ -1692,6 +1692,59 @@ jobs:
             -t "$IMG:${{ github.sha }}" -t "$IMG:main" website
           docker push "$IMG:${{ github.sha }}"
           docker push "$IMG:main"
+
+  # THE IMAGE IS THE ONE ARTEFACT A PULL REQUEST USED TO PROVE NOTHING ABOUT, and that is
+  # exactly how main broke (planning #924). Every image-* job above is main-only, so the
+  # first moment anybody learned the truth about `docker build` was after the merge.
+  #
+  # The failure was not a flake, it was structural: website/Dockerfile builds with
+  # `website/` as the build CONTEXT, so nothing outside that directory exists inside the
+  # image. The gallery merge moved screen rendering into the site's `prebuild`, the
+  # container is node:20-alpine with no browser, and `npm run build` died - after a merge
+  # whose PR was green, because the PR ran the scripts with the whole repository checked
+  # out and the image never ran them at all. Same class for the other two: a COPY of a
+  # file that moved, a publish that only fails for the RID in the Dockerfile.
+  #
+  # So the same three Dockerfiles are built here, WITH NO PUSH, on the pull request, when
+  # the component each one packages changed. No `docker login` and no `packages: write`:
+  # proving the build needs neither, and the only thing that writes to GHCR is still the
+  # main-only image-* jobs above. The backend stage restores NuGet inside the build with no
+  # cache, so the three steps stay sequential in one job rather than a matrix of cold
+  # builds on three runners.
+  #
+  # It is a required gate: `ci-required` needs it, so a PR that cannot produce its own
+  # deployable image cannot merge. A component the diff did not touch builds nothing.
+  image-pr:
+    name: Build deployable images (no push)
+    needs: changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The website image, for the reason above: its context is website/ alone, so this is
+      # the only place a build can discover that the site reaches outside it.
+      - name: Build website image (no push)
+        if: needs.changes.outputs.website == 'true'
+        run: docker build -f website/Dockerfile -t fuelflow-website:pr website
+
+      # The backend image compiles the API for its own RID and asserts that Docnet's pdfium
+      # is in the publish output, neither of which any test does.
+      - name: Build backend image (no push)
+        if: needs.changes.outputs.backend == 'true'
+        run: docker build -f backend/src/FuelFlow.API/Dockerfile -t fuelflow-backend:pr backend
+
+      # The admin image is a static build too, and VITE_SENTRY_DSN is its one build ARG; an
+      # empty value is what an unset repository variable produces in production as well.
+      - name: Build admin image (no push)
+        if: needs.changes.outputs.admin == 'true'
+        run: |
+          docker build -f admin/Dockerfile \
+            --build-arg VITE_SENTRY_DSN="${{ vars.ADMIN_SENTRY_DSN }}" \
+            -t fuelflow-admin:pr admin
 
   # Pre-prod gate: deploys the STAGING stack (docker-compose.staging.yml) on the same box
   # and smoke-tests it over localhost BEFORE prod. The prod `deploy` job `needs` this one,
