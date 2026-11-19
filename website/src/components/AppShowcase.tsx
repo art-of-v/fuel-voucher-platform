@@ -92,7 +92,7 @@ export default function AppShowcase() {
     <section className={`lf-section ${styles.section}`} id="app">
       <div className={`lf-container ${styles.head}`}>
         <p className="lf-eyebrow">FuelFlow у роботі</p>
-        <h2 className={styles.title}>Пальне у русі. Від вибору до талона.</h2>
+        <h2 className={styles.title}>Від вибору пакета до заправки</h2>
         <p className={styles.intro}>
           Каталог, замовлення й цифровий талон зібрані в одному зрозумілому потоці.
         </p>

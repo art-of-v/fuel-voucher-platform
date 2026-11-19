@@ -4,9 +4,9 @@ import styles from './Services.module.css';
  * The section that carries the product's actual premise: FuelFlow sells a
  * SERVICE, not fuel (planning `SALES_MODEL.md` — "What the customer buys —
  * the sale is an advertising service"). So the page stops describing a fuel
- * shop and starts describing the operating perimeter a transport company
- * actually runs on: contracts, a pool, distribution, suspension, and the
- * paper that goes to the accountant.
+ * shop and starts describing the job a transport company actually has to do:
+ * contracts, a pool, codes for the crew, and the paper that goes to the
+ * accountant.
  *
  * Every status chip here is a claim about the app, not about the marketing:
  * `live` is something the shipped code does today, `planned` is something the
@@ -27,29 +27,29 @@ type Item = {
 const capabilities: Item[] = [
   {
     number: '01',
-    title: 'Договори з паливними провайдерами',
-    body: 'Юридичні особи, версії контрактів і підписання — у застосунку, поруч із закупленнями й обліком.',
+    title: 'Договори з постачальниками',
+    body: 'Юридичні особи, версії контрактів і підписання в застосунку.',
     status: 'live',
     statusLabel: 'працює',
   },
   {
     number: '02',
     title: 'Пул і закуплення',
-    body: 'Пально потрібне в будь-який момент: ціна фіксується в момент оплати, а пул лишається на балансі компанії.',
+    body: 'Пальне для компанії в будь-який момент. Ціна фіксується в момент оплати.',
     status: 'live',
     statusLabel: 'працює',
   },
   {
     number: '03',
-    title: 'Видача, повернення, розподіл',
-    body: 'Видавайте коди працівникам, повертайте невикористане в пул — і рух пального видно без таблиць.',
+    title: 'Видача кодів',
+    body: 'Код у гаманці конкретної людини. Невикористане повертається в пул.',
     status: 'live',
     statusLabel: 'працює',
   },
   {
     number: '04',
-    title: 'Призупинення без звільнення',
-    body: 'Заморозте використання на час відпустки чи відрядження: людина лишається в компанії, літра — під контролем.',
+    title: 'Призупинення',
+    body: 'Водій у відпустці або в дорозі: код на паузі, літри лишаються в компанії.',
     status: 'live',
     statusLabel: 'працює',
   },
@@ -59,28 +59,28 @@ const documents: Item[] = [
   {
     number: '01',
     title: 'Акт звірки',
-    body: 'Отримано, видано, використано й повернено — у формі документа, а не у звірці в Excel.',
+    body: 'Отримано, видано, використано, повернено.',
     status: 'planned',
     statusLabel: 'у планах',
   },
   {
     number: '02',
     title: 'Авансовий рахунок',
-    body: 'Рахунок на пально для юридичної особи — з обсягами, сумами й реквізитами.',
+    body: 'Обсяги, суми, реквізити.',
     status: 'planned',
     statusLabel: 'у планах',
   },
   {
     number: '03',
     title: 'Податкова накладна',
-    body: 'Фіскальний документ замість паперової накладної на пально.',
+    body: 'Фіскальний документ замість паперової.',
     status: 'planned',
     statusLabel: 'у планах',
   },
   {
     number: '04',
     title: 'Закриття ПДВ',
-    body: 'Період, підсумки й декларація — з даних, які сервіс збирає вже сьогодні.',
+    body: 'Період, підсумки, декларація.',
     status: 'planned',
     statusLabel: 'у планах',
   },
@@ -102,16 +102,14 @@ export default function Services() {
     <section className={`lf-section ${styles.section}`} id="services">
       <div className={`lf-container ${styles.container}`}>
         <div className={styles.manifest}>
-          <p className="lf-eyebrow">Сервіс, а не крамниця пального</p>
+          <p className="lf-eyebrow">Що входить у сервіс</p>
           <h2 className={styles.title}>
-            Ми не продаємо пальне.
-            <br />
-            Ми тримаємо контур, у якому ваша компанія купує, розподіляє і
-            звіряє пально.
+            Постачальники. Пул. Водії.{' '}
+            <span className={styles.accent}>Документи.</span>
           </h2>
           <p className={styles.intro}>
-            FuelFlow — це інструмент для транспортного бізнесу. Він знає біль
-            вашого контуру: хто, скільки, за якою ціною і з яким документом.
+            Керуйте пальним так, як керуєте автопарком: договори, закуплення,
+            видача кодів, призупинення та звірка в одному застосунку
           </p>
         </div>
 
@@ -130,11 +128,11 @@ export default function Services() {
 
         <div className={styles.docs} id="documents">
           <div className={styles.docsHead}>
-            <p className="lf-eyebrow">Документація бізнесу</p>
-            <h3>Папір, який тримає бухгалтерію</h3>
+            <p className="lf-eyebrow">Документація</p>
+            <h3>Документи, які закривають період</h3>
             <p>
-              Документи — окремий напрямок продукту: кожен із них відповідає на
-              запитання бухгалтера, а не повторює дані з екрана.
+              Кожен документ звірений із даними застосунку й готовий до
+              бухгалтерії
             </p>
           </div>
 

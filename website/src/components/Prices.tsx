@@ -50,7 +50,7 @@ export default function Prices() {
         <header className={styles.head}>
           <div>
             <p className="lf-eyebrow">Живий каталог</p>
-            <h2 className={styles.title}>Ціна фіксується в момент оплати.</h2>
+            <h2 className={styles.title}>Ціна фіксується в момент оплати</h2>
           </div>
           <p className={styles.intro}>
             Тут немає вручну набраних тарифів. Сторінка читає той самий каталог,
@@ -133,7 +133,7 @@ export default function Prices() {
             <p className={styles.note}>
               Ціна вказана за літр у найдешевшому доступному пакеті мережі.
               Знижка показується лише там, де каталог має актуальну ціну АЗС для
-              порівняння.
+              порівняння
             </p>
           </div>
         </div>
@@ -141,11 +141,11 @@ export default function Prices() {
         <div className={styles.phoneBand}>
           <div>
             <p className="lf-eyebrow">Для водія</p>
-            <h3>Код, ціна й мережа — в одному місці.</h3>
+            <h3>Код, ціна й мережа в одному місці</h3>
             <p>
-              Оберіть пакет у каталозі, оплатіть через Monobank і відкрийте код
-              на пально у своєму гаманці FuelFlow. Ціна, за якою ви оплатили, не
-              зміниться до заправки.
+              Оберіть пакет у каталозі, оплатіть через Monobank і відкрийте код на
+              пальні у своєму гаманці FuelFlow. Ціна, за якою ви оплатили, не
+              зміниться до заправки
             </p>
           </div>
           <PhoneMock />

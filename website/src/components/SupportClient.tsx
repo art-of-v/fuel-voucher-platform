@@ -73,11 +73,11 @@ export default function SupportClient() {
             <header className={styles.head}>
               <span className="lf-eyebrow">Підтримка</span>
               <h1 className={styles.title}>
-                Напишіть нам.
+                Напишіть нам
               </h1>
               <p className={styles.lead}>
-                Питання щодо оплати, талонів або застосунку? Опишіть ситуацію —
-                відповімо на вказаний email протягом робочого дня.
+                Питання щодо оплати, кодів або застосунку? Опишіть ситуацію,
+                відповімо на вказаний email протягом робочого дня
               </p>
             </header>
 
