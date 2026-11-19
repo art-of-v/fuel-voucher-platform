@@ -81,6 +81,10 @@ public sealed class GetAdminSettingsQueryHandler
                 Webhook = await FeedbackWebhookStatusReader.ReadAsync(
                     _feedbackBot, _feedbackOptions, cancellationToken)
             },
+            Appearance = new AppearanceSettingsDto
+            {
+                DefaultTheme = await _settings.GetDefaultAppThemeAsync(cancellationToken)
+            },
             VoucherRenewal = new VoucherRenewalSettingsDto
             {
                 Enabled = renewal.Enabled,

@@ -6,7 +6,6 @@ import {
   Loader2,
   AlertTriangle,
   ShieldCheck,
-  Palette,
   Trash2,
   Database,
   RefreshCw,
@@ -22,7 +21,10 @@ import {
 } from "@/lib/coded-error-message";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import {
+  AppDefaultThemeCard,
+  AppearanceCard,
+} from "@/components/settings/AppearanceCard";
 import { DecimalSettingInput } from "@/components/DecimalSettingInput";
 
 /**
@@ -32,6 +34,7 @@ import { DecimalSettingInput } from "@/components/DecimalSettingInput";
  */
 const SETTINGS_REFUSALS: Record<string, CodedSentence> = {
   settings_none_supplied: (_error, t) => t("settings.error.noneSupplied"),
+  settings_unknown_theme: (_error, t) => t("settings.error.unknownTheme"),
   qa_test_access_no_value: (_error, t) => t("settings.error.qaNoValue"),
 };
 import {
@@ -111,6 +114,17 @@ interface SettingsDto {
   voucherRenewal: VoucherRenewalDto;
   voucherTerm: VoucherTermDto;
   feedbackBot: FeedbackBotDto;
+  appearance: AppearanceDto;
+}
+
+/**
+ * The installation's appearance, as opposed to the operator's own: one theme every employee's app
+ * opens in until that employee picks one. `available` is echoed by the server so the picker cannot
+ * offer an id the server would refuse.
+ */
+interface AppearanceDto {
+  defaultTheme: string;
+  available: string[];
 }
 
 /**
@@ -147,6 +161,8 @@ export default function SettingsTab() {
   });
   const [dataRetention, setDataRetention] = useState(false);
   const [expiredVoucherLoss, setExpiredVoucherLoss] = useState(false);
+  const [appDefaultTheme, setAppDefaultTheme] = useState("obsidian");
+  const [appThemes, setAppThemes] = useState<string[]>([]);
   const [feedbackBot, setFeedbackBot] = useState({
     enabled: false,
     telegramConfigured: false,
@@ -188,6 +204,8 @@ export default function SettingsTab() {
     });
     setDataRetention(data.dataRetention.enabled);
     setExpiredVoucherLoss(data.expiredVoucherLoss.enabled);
+    setAppDefaultTheme(data.appearance.defaultTheme);
+    setAppThemes(data.appearance.available ?? []);
     setFeedbackBot({
       enabled: data.feedbackBot.enabled,
       telegramConfigured: data.feedbackBot.telegramConfigured,
@@ -218,6 +236,7 @@ export default function SettingsTab() {
       renewal,
       termSale,
       feedbackBot,
+      appDefaultTheme,
     });
 
   const saveMutation = useMutation({
@@ -240,6 +259,7 @@ export default function SettingsTab() {
         dataRetention: { enabled: dataRetention },
         expiredVoucherLoss: { enabled: expiredVoucherLoss },
         feedbackBot: { enabled: feedbackBot.enabled },
+        appearance: { defaultTheme: appDefaultTheme },
         voucherRenewal: {
           enabled: renewal.enabled,
           triggerThresholdDays: Math.max(
@@ -374,6 +394,13 @@ export default function SettingsTab() {
       <div className="grid gap-6 xl:grid-cols-2 items-start">
         <QaTestAccessCard />
         <AppearanceCard />
+        {/* The installation's theme sits beside the operator's own, so the two are read as two
+            answers to one question rather than one control in the middle of the switches. */}
+        <AppDefaultThemeCard
+          theme={appDefaultTheme}
+          available={appThemes}
+          onChange={setAppDefaultTheme}
+        />
       </div>
     </div>
   );
@@ -391,6 +418,7 @@ type LocalSettings = {
   };
   termSale: { enabled: boolean; tiers: VoucherTermTierDto[] };
   feedbackBot: { enabled: boolean };
+  appDefaultTheme: string;
 };
 
 function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
@@ -410,6 +438,7 @@ function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
   if (server.expiredVoucherLoss.enabled !== local.expiredVoucherLoss)
     return true;
   if (server.feedbackBot.enabled !== local.feedbackBot.enabled) return true;
+  if (server.appearance.defaultTheme !== local.appDefaultTheme) return true;
   if (server.voucherRenewal.enabled !== local.renewal.enabled) return true;
   if (
     server.voucherRenewal.triggerThresholdDays !== local.renewal.thresholdDays
@@ -508,37 +537,6 @@ function StateBanner({
     >
       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
       <span>{children}</span>
-    </div>
-  );
-}
-
-/**
- * Appearance / colour-theme picker. Persists to localStorage only (theme-store.ts);
- * there is no per-account preference on the server, so the choice is per-browser and
- * shared by every staff viewer on that machine. Offers all 8 themes (5 dark, 3 light);
- * per-user server-side persistence is deferred (CurrentUser has no prefs field yet).
- */
-function AppearanceCard() {
-  const { t } = useI18n();
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Palette className="w-5 h-5 text-primary" />
-        <h2 className="text-xl font-bold">{t("appearance.title")}</h2>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="font-medium text-sm">{t("appearance.theme")}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t("appearance.themeHint")}
-            </p>
-          </div>
-          <ThemeSwitcher />
-        </div>
-      </div>
     </div>
   );
 }

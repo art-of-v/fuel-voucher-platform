@@ -70,6 +70,11 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Color theme",
     "appearance.themeHint":
       "Applies to this browser only. Saved on this device.",
+    "appearance.appTheme": "App appearance",
+    "appearance.defaultTheme": "Default theme",
+    "appearance.appThemeHint":
+      "What FuelFlow opens in for employees who have not chosen a theme themselves. Saved for the whole installation. This is a default, not a lock: anyone who picks a theme in their profile keeps it.",
+    "settings.error.unknownTheme": "That theme does not exist.",
     "settings.error.noneSupplied": "There was nothing to save.",
     "settings.error.qaNoValue": "The switch did not say which way to move.",
   },
@@ -143,6 +148,11 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Кольорова тема",
     "appearance.themeHint":
       "Застосовується лише в цьому браузері. Збережено на цьому пристрої.",
+    "appearance.appTheme": "Вигляд застосунку",
+    "appearance.defaultTheme": "Тема за замовчуванням",
+    "appearance.appThemeHint":
+      "Те, в чому FuelFlow відкривається у працівників, які самі не обирали тему. Зберігається для всієї інсталяції. Це типове значення, а не покарання: хто обрав тему в профілі — лишається при своїй.",
+    "settings.error.unknownTheme": "Такої теми не існує.",
     "settings.error.noneSupplied": "Не було що зберігати.",
     "settings.error.qaNoValue": "Перемикач не вказав, у який бік змінюватися.",
   },
@@ -217,6 +227,11 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Farbthema",
     "appearance.themeHint":
       "Gilt nur für diesen Browser. Auf diesem Gerät gespeichert.",
+    "appearance.appTheme": "Erscheinungsbild der App",
+    "appearance.defaultTheme": "Standarddesign",
+    "appearance.appThemeHint":
+      "Womit FuelFlow bei Mitarbeitern startet, die selbst kein Design gewählt haben. Gilt für die gesamte Installation. Ein Standard, keine Vorgabe: wer im Profil ein Design wählt, behält es.",
+    "settings.error.unknownTheme": "Dieses Design gibt es nicht.",
     "settings.error.noneSupplied": "Es gab nichts zu speichern.",
     "settings.error.qaNoValue":
       "Der Schalter hat nicht angegeben, in welche Richtung er wechseln soll.",
@@ -290,6 +305,11 @@ export const settings: Record<Language, Record<string, string>> = {
     "appearance.theme": "Tema de color",
     "appearance.themeHint":
       "Se aplica solo a este navegador. Guardado en este dispositivo.",
+    "appearance.appTheme": "Aspecto de la app",
+    "appearance.defaultTheme": "Tema predeterminado",
+    "appearance.appThemeHint":
+      "Con qué abre FuelFlow para los empleados que no han elegido un tema. Se guarda para toda la instalación. Es un valor predeterminado, no una imposición: quien elige un tema en su perfil lo conserva.",
+    "settings.error.unknownTheme": "Ese tema no existe.",
     "settings.error.noneSupplied": "No había nada que guardar.",
     "settings.error.qaNoValue":
       "El interruptor no indicó en qué dirección cambiar.",

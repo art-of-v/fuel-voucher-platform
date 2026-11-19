@@ -56,7 +56,8 @@ public sealed class AdminSettingsController : ControllerBase
             expiredVoucherLoss = result.ExpiredVoucherLoss,
             voucherRenewal = result.VoucherRenewal,
             voucherTerm = result.VoucherTerm,
-            feedbackBot = result.FeedbackBot
+            feedbackBot = result.FeedbackBot,
+            appearance = result.Appearance
         });
     }
 
