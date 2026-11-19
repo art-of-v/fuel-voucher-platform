@@ -171,7 +171,7 @@ const screens = {
         { name: 'ДП', price: '103,90' },
         { name: 'пульс ДП', price: '106,90' },
         { name: 'А-95', price: '90,90' },
-        { name: 'ПРОПАН', price: '64,90' },
+        { name: 'ПРОПАН', price: '64,90', out: true },
         { name: 'пульс 95', price: '93,90' },
       ]
         .map(
@@ -188,10 +188,19 @@ const screens = {
               <div class="num" style="font-size:34px;margin-top:2px">${f.price}${G('₴')}</div>
             </div>
           </div>
-          <span style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,0.05);
-            border:1px solid ${c.borderSubtle};font-size:12px;font-weight:700;letter-spacing:0.08em;color:${c.textMuted}">
-            НЕМАЄ НА СКЛАДІ
-          </span>
+          ${
+            f.out
+              ? `<span style="padding:11px 16px;border-radius:999px;background:rgba(255,255,255,0.05);
+                  border:1px solid ${c.borderSubtle};font-size:12px;font-weight:700;letter-spacing:0.08em;color:${c.textMuted}">
+                  НЕМАЄ НА СКЛАДІ
+                </span>`
+              : `<span style="width:58px;height:58px;border-radius:16px;border:1px solid ${c.primaryBorder};
+                  background:${c.primarySubtle};display:grid;place-items:center">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${c.primary}" stroke-width="2.2" stroke-linecap="round">
+                    <path d="m9 5 7 7-7 7"/>
+                  </svg>
+                </span>`
+          }
         </div>`,
         )
         .join('')}
@@ -230,24 +239,16 @@ const screens = {
             </span>
             <span class="num" style="font-size:40px">${p.price}${G('₴')}</span>
           </div>
-          <span style="display:inline-flex;align-items:center;gap:9px;margin-top:18px;padding:11px 18px;border-radius:999px;
-            background:rgba(255,255,255,0.05);border:1px solid ${c.borderSubtle};
-            font-size:12px;font-weight:700;letter-spacing:0.08em;color:${c.textMuted}">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="${c.textMuted}" stroke-width="1.8">
-              <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21 3.5 16.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>
-            </svg>
-            НЕДОСТУПНО НА СКЛАДІ
-          </span>
-          <div style="border-top:1px solid ${c.borderSubtle};margin-top:20px;padding-top:16px;text-align:right">
+          <div style="border-top:1px solid ${c.borderSubtle};margin-top:22px;padding-top:16px;text-align:right">
             <span class="label">РАЗОМ</span>
             <div class="num" style="font-size:44px;margin-top:2px">${p.price}${G('₴')}</div>
           </div>
-          <div class="ghost" style="margin-top:18px;height:76px;color:${c.textMuted};border-color:${c.primaryBorder}">
+          <div class="cta" style="margin-top:18px">
             <span style="display:flex;align-items:center;gap:12px">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${c.textMuted}" stroke-width="1.8">
+              <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="${c.onPrimary}" stroke-width="2" stroke-linecap="round">
                 <path d="M3.5 4.5h2l2.3 10a2 2 0 0 0 2 1.6h7a2 2 0 0 0 1.9-1.5L20.5 7.6H6.6"/>
               </svg>
-              НЕДОСТУПНО НА СКЛАДІ
+              ДОДАТИ В КОШИК
             </span>
           </div>
         </div>`,
@@ -274,7 +275,7 @@ const screens = {
           )
           .join('')}
       </div>
-      <div class="card" style="padding:24px;background:linear-gradient(180deg, rgba(0,232,95,0.05), ${c.surface} 45%)">
+      <div class="card" style="padding:24px;background:linear-gradient(180deg, rgba(139,92,246,0.07), ${c.surface} 45%)">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
             <div class="label" style="letter-spacing:0.12em;color:${c.textSecondary}">OKKO</div>
