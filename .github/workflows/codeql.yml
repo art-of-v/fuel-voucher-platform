@@ -1,12 +1,33 @@
 name: CodeQL
 
-# Static security analysis (SAST) - a REQUIRED gate, not a manual run.
+# Static security analysis (SAST) - WAS a required gate on every pull request.
 #
-# **The repository is public until it is not.** It goes PRIVATE on 2026-11-01. That date is
-# the reason CodeQL was made manual-only in October (planning #37/#39): on a personal-account
-# private repository a SARIF upload cannot reach the Security tab (it needs org-level GHAS)
-# and hosted minutes are billed. While the repository is PUBLIC the analysis is free, the
-# upload works, and the scan can gate a pull request - so it does.
+# **It stopped on 2026-11-20, when the repository went private, and it stopped in two layers.**
+# The first was a missing scope: the analyze action reads its own workflow run to stamp the finding
+# baseline, and on a PUBLIC repository that GET needs no token scope, so nobody had ever noticed
+# `actions: read` was absent. On a private repository `permissions:` grants what it names and sets
+# everything else to `none`, and every analysis died at "Adding fingerprints" with "Resource not
+# accessible by integration". That is why `actions: read` is now named below.
+#
+# The second layer is not fixable from here: with the scope added, the analyze step fails with
+# "Code scanning is not enabled for this repository" - code scanning on a private repository needs
+# GHAS, which a personal account on a free plan does not have. Both layers were measured on
+# 2026-11-20 (PR #1827); they are not a guess.
+#
+# So the pull_request/push triggers are off, exactly as docs/RUNBOOK_CODEQL_LOCAL.md (planning repo)
+# says they must be, and the job structure is left intact so restoring the gate is deleting the
+# `workflow_dispatch`-only line below. **The compensating control is the weekly local scan in that
+# runbook, and it is run by a human - as of today nothing automated replaces this gate.** That is
+# the honest state, and it is written here rather than left to be discovered by the next person who
+# wonders why a required-looking context went quiet.
+#
+# The rest of this comment describes the gate as it was designed, and as it resumes.
+#
+# **The repository is public until it is not.** It was planned to go PRIVATE on 2026-11-01 and did
+# on 2026-11-20. While it was PUBLIC the analysis was free, the upload worked, and the scan gated
+# every pull request - so it did. On a personal-account private repository the SARIF upload cannot
+# reach the Security tab (it needs GHAS) and hosted minutes are billed, which is the reason CodeQL
+# was made manual-only in October (planning #37/#39) and manual-only again now.
 #
 # The gate, in three pieces:
 #   1. `changes` decides which languages this change can affect from the diff alone. A PR that
@@ -27,14 +48,23 @@ name: CodeQL
 # runs the same two languages through the CodeQL CLI off GitHub. Do not "fix" the upload by
 # removing `security-events: write`; that silently turns the gate into a green no-op.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  # A deliberate one-off only - see the header. A manual run still needs code scanning enabled to
+  # upload; it is useful for the day that becomes true, not before.
   workflow_dispatch:
+  # RESTORE THESE when code scanning is enabled for the repository (organisation/paid plan):
+  # pull_request:
+  # push:
+  #   branches: [main]
 
 permissions:
   contents: read
   security-events: write
+  # The analyze action reads its own workflow run to stamp the finding baseline, and on a PUBLIC
+  # repository that GET needs no scope at all - which is why this was invisible until the
+  # repository went private on 2026-11-20 and every analysis died at "Adding fingerprints" with
+  # "Resource not accessible by integration". On a private repository every scope listed here
+  # is granted and every scope left out is `none`, so the read has to be named.
+  actions: read
 
 concurrency:
   group: codeql-${{ github.ref }}
