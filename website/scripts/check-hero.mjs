@@ -57,8 +57,16 @@ const COPY_MIN_ROWS = 8;
  * baked was not only white: the prototype's own primary button is a solid lime
  * pill, and a lime pill under a lime live button is invisible in review.
  * Measured on the mockup: 289 lime pixels per row across a 51-row run; on the
- * delivered photo: zero, because the only lime left is the canopy's own lights,
- * which sit outside the band the copy occupies.
+ * delivered photo: zero, because the accent lights in it (the canopy edge, the
+ * mock phone's own chrome) are either outside the band the copy occupies or
+ * recoloured with the palette — they are violet now, not lime.
+ *
+ * Both hues are therefore counted: the file's accent has been lime and is violet
+ * today, and a guard that only knows the old one stops guarding the moment the
+ * palette changes. "Accent-family" here means a saturated pixel whose hue is
+ * lime/green (the old brand) or violet/magenta (the current one) — 80°-160° and
+ * 250°-300° — so a future palette has to extend this list rather than quietly
+ * sail past it.
  */
 const ACCENT_ROW_PIXELS = 40;
 const ACCENT_MIN_ROWS = 8;
@@ -252,6 +260,21 @@ try {
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(`${site.origin}/`, { waitUntil: 'networkidle0' });
   const baked = await page.evaluate(async (band, rowPixels, accentRowPixels) => {
+    // Rebuilt here rather than captured: a function passed by reference would be serialised
+    // without its body for any helper it calls.
+    const isAccentFamily = (r, g, b) => {
+      const mx = Math.max(r, g, b);
+      const mn = Math.min(r, g, b);
+      const d = mx - mn;
+      if (!d) return false;
+      let hue;
+      if (mx === r) hue = ((g - b) / d) % 6;
+      else if (mx === g) hue = (b - r) / d + 2;
+      else hue = (r - g) / d + 4;
+      hue *= 60;
+      if (hue < 0) hue += 360;
+      return (hue >= 80 && hue <= 160) || (hue >= 250 && hue <= 300);
+    };
     const heroImage = document.querySelector('#top [class*="Hero_bgImage"]');
     const backgroundUrl = heroImage
       ? /url\("?([^")]+)"?\)/.exec(getComputedStyle(heroImage).backgroundImage)?.[1]
@@ -284,7 +307,7 @@ try {
         const sat = mx ? (mx - mn) / mx : 0;
         const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         if (L > 150 && sat < 0.16) bright++;
-        if (g > 110 && g - b > 45 && sat > 0.35) accent++;
+        if (sat > 0.35 && isAccentFamily(r, g, b)) accent++;
       }
       run = bright >= rowPixels ? run + 1 : 0;
       if (run > longest) {
@@ -319,7 +342,7 @@ try {
   } else if (baked.accentLongest >= ACCENT_MIN_ROWS) {
     failures.push(
       `the hero image (${baked.url}) has baked-in accent chrome: ${baked.accentLongest} consecutive rows of` +
-      ` lime in the left ${Math.round(COPY_BAND * 100)}%, starting at y=${baked.accentAt} of ${baked.size}.` +
+      ` accent-coloured pixels in the left ${Math.round(COPY_BAND * 100)}%, starting at y=${baked.accentAt} of ${baked.size}.` +
       ' That is the prototype\'s own button, and it sits under the live one.',
     );
   }

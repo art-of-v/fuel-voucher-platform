@@ -100,7 +100,9 @@ browser is a hard failure, because a gate that cannot run must not pass silently
 
 `public/hero-prototype-clean.webp` is the approved landing-page prototype's forecourt, cropped to its hero band with the prototype's own copy removed: its nav row, headline, lead, both CTAs and the "Download App" pill were masked and inpainted out of the pixels. The page paints all of that from HTML in Ukrainian, and the header owns the brand lockup - so the hero itself carries exactly one image.
 
-The photograph was not regenerated, only healed, and the repair lives in the asset. `check:hero` measures it: a run of text-like rows or of lime rows in the left band means a second, already-finished advert is sitting under the live copy. The phone on the right keeps the prototype's English screen; it is product imagery, and the narrow-width crops are anchored to keep the canopy sign and the car rather than that screen.
+The photograph was not regenerated, only healed, and the repair lives in the asset. `check:hero` measures it: a run of text-like rows or of accent-coloured rows in the left band means a second, already-finished advert is sitting under the live copy. The accent test recognises both hues the file has carried - the lime it was drawn for and the violet the palette uses now - because a guard that only knows the old accent stops guarding on the day the accent changes.
+
+**The photograph's accent is recoloured with the palette.** Its canopy edge light, the mock phone's own chrome and the green lights in `app-economy`, `app-networks`, `driver-phone` and `fuel-nozzle` were shifted from the lime hue to the violet one (a hue rotation in HSV over the saturated lime pixels only; nothing was repainted by hand and no pixel without lime in it was touched). Without it the page is purple around a green-lit forecourt, which reads as two brands. If the palette ever goes back to lime, those files go back too - they are the same images, and the shift is a one-way edit with no script in the repository, so the originals come from the prototype rather than from a re-run. The phone on the right keeps the prototype's English screen; it is product imagery, and the narrow-width crops are anchored to keep the canopy sign and the car rather than that screen.
 
 ## Brand assets
 
@@ -128,7 +130,7 @@ measure 39.4% and 21.3% mud, with a 6 px and 10 px jaw; the lion resampled measu
 84.4% with no jaw at all at 16 px, which is what the floors are set to catch.
 
 The lockup is the one brand asset that is not generated: `public/fuelflow-logo.webp` is the lion
-followed by "Fuel Flow" with the lime "F" bolt as the first letter of each word. It is drawn from
+followed by "Fuel Flow" with the accent "F" bolt as the first letter of each word. It is drawn from
 the approved artwork rather than retyped, because the F is the brand's own glyph: it carries no
 sidebearing, its arms overhang its stem, and the letters are sheared 13.8 degrees to sit on the
 same axis as it. The numbers that hold it together are 13.8 degrees of shear, an F at 1.00 of the
@@ -137,8 +139,9 @@ and the letter after it, resolved separately for `u` and `l`.
 
 `public/fuelflow-wordmark.webp` is the same drawing cut down to the words, for the one place the
 lion stops working: the phone mock's own header, where the lockup is 15px tall and the lion
-collapses into a green smudge. Both files carry white letters and a `#c5ff00` F, so neither can be
-recoloured by a CSS mask - if the accent changes, they are re-rendered, not tinted.
+collapses into a smudge. Both files carry white letters and an accent F in `#a78bfa` (the violet
+`--accent-2` the palette uses), so neither can be recoloured by a CSS mask - if the accent changes,
+they are re-rendered, not tinted.
 
 `BrandLockup.tsx` is the single place that paints them: the lockup in the header, the hero and the
 footer, the wordmark alone in the mock. The separate lion mask stays for the tab icon, the admin
