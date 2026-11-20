@@ -5,17 +5,10 @@
  * the check has to reproduce these bytes exactly, and a second implementation
  * would quietly stop doing that.
  *
- *   favicon.ico        16/32 PNG frames of the SMALL CUT, 48/256 of the lion
+ *   favicon.ico        16/32/48/256 PNG frames, rounded corners
  *   apple-icon.png     180px, square - iOS applies its own mask
  *   lion-mask.png      the UI mark: white, alpha = the drawing's own luminance
  *   adaptive-icon.png  the Android launcher foreground, inside the safe zone
- *
- * The two smallest frames are not the lion resampled - they are the cut in
- * scripts/lib/small-lion.mjs, drawn for slots at or below 32px. Planning #852
- * measured the resampled lion at 16px as 95.8% mud: the artwork's median stroke
- * is 0.78% of its box, so at 16px it arrives a tenth of a pixel wide and the tab
- * shows a wash rather than a lion. 48 and 256 stay the drawn artwork, where its
- * glow still bridges the hairline gaps and the detail is worth having.
  *
  * The tab icon and the mask are each rendered once and written to both web
  * surfaces, because two renders of one lion are two chances for one of them to
@@ -79,8 +72,6 @@
  */
 
 import sharp from 'sharp';
-
-import { SMALL_ICO_SIZES, renderSmallCut } from './small-lion.mjs';
 
 /** Tab strips ask for these; 256 covers high-DPI and the Windows tile. */
 export const ICO_SIZES = [16, 32, 48, 256];
@@ -180,37 +171,6 @@ function packIco(frames) {
 }
 
 /**
- * Rounds the corners so the tab background shows through. Tab icons only:
- * browsers do not mask favicons, so a hard dark square reads as unfinished. The
- * home-screen icon is deliberately NOT rounded - iOS applies its own squircle
- * mask, and rounding here as well would show its background through the corners
- * it cuts.
- */
-const roundCorners = async (png, size) => {
-  const r = Math.round(size * 0.22);
-  return sharp(png).composite([
-    {
-      input: Buffer.from(
-        `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" fill="#fff"/></svg>`,
-      ),
-      blend: 'dest-in',
-    },
-  ]);
-};
-
-/**
- * The smallest tab frames: the cut, drawn at the target size rather than
- * downsampled from anything, so its strokes land on whole device pixels. The
- * pixels come from `renderSmallCut` rather than from an SVG handed to sharp -
- * see the header of small-lion.mjs for the CI failure that taught us the
- * difference between "renders" and "renders the same bytes everywhere".
- */
-const renderSmallFrame = async (backdrop, size) =>
-  sharp(renderSmallCut(size, backdrop), { raw: { width: size, height: size, channels: 4 } })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-
-/**
  * @param rounded rounds the corners and lets the tab background through. Tab icon
  *   only: browsers do not mask favicons, so a hard black square reads as
  *   unfinished. The home-screen icon is deliberately NOT rounded - iOS applies
@@ -226,7 +186,15 @@ const renderIcon = async (source, crop, backdrop, size, { palette = false, round
     .resize(size, size, { fit: 'fill', kernel: 'lanczos3' });
 
   if (rounded) {
-    pipe = await roundCorners(await pipe.png().toBuffer(), size);
+    const r = Math.round(size * 0.22);
+    pipe = sharp(await pipe.png().toBuffer()).composite([
+      {
+        input: Buffer.from(
+          `<svg width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" fill="#fff"/></svg>`,
+        ),
+        blend: 'dest-in',
+      },
+    ]);
   }
 
   return pipe
@@ -294,23 +262,6 @@ async function renderAdaptiveIcon(source, crop, backdrop) {
 }
 
 /**
- * One frame out of the packed ICO, by size. The check measures the frames it
- * will actually ship, so it reads them back out of the packed file rather than
- * asking the builder for them again.
- */
-export function icoFrame(ico, size) {
-  const count = ico.readUInt16LE(4);
-  for (let i = 0; i < count; i++) {
-    const o = 6 + i * 16;
-    const frameSize = ico[o] === 0 ? 256 : ico[o];
-    if (frameSize !== size) continue;
-    const offset = ico.readUInt32LE(o + 12);
-    return ico.subarray(offset, offset + ico.readUInt32LE(o + 8));
-  }
-  return null;
-}
-
-/**
  * Build every brand surface from the lion. Pure: it reads one file and returns
  * buffers, and touches nothing on disk. That is what lets the CI check compare
  * its output against the committed assets byte for byte.
@@ -324,10 +275,7 @@ export async function buildBrandAssets(source) {
 
   const frames = [];
   for (const size of ICO_SIZES) {
-    const data = SMALL_ICO_SIZES.includes(size)
-      ? await renderSmallFrame(backdrop, size)
-      : await renderIcon(source, crop, backdrop, size, { palette: true, rounded: true });
-    frames.push({ size, data });
+    frames.push({ size, data: await renderIcon(source, crop, backdrop, size, { palette: size >= 48, rounded: true }) });
   }
 
   return {
