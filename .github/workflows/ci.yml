@@ -785,6 +785,15 @@ jobs:
       # had chmod-ed the file by hand there.
       - name: Check the deploy scripts' executable bits
         run: bash deploy/check-script-modes.test.sh
+
+      # The attestation verdict reader, which is the one thing standing between "the box says
+      # Enforce would deny nothing" and "the box says nothing at all". The metric's series only
+      # exists for the protected routes and only once a sign-in or a purchase has been served, so
+      # an empty result is the normal state of a quiet box - and it looks exactly like a clean
+      # one to anyone reading it by hand. The fake Prometheus in the test is what proves the two
+      # are told apart, including the dangerous case: a nonzero total with no eligible traffic.
+      - name: Test the attestation verdict reader
+        run: bash deploy/read-attestation-verdicts.test.sh
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with

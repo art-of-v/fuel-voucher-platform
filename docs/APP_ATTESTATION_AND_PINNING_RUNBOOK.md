@@ -197,6 +197,27 @@ were never loaded, and this session did not ask the running Grafana whether the 
 Read the panel before deciding on the number, and if it is absent the first question is provisioning, not
 attestation.
 
+**Read it with the script, not by hand.** `deploy/read-attestation-verdicts.sh` runs the three queries
+above and names the answer in its exit code:
+
+```bash
+deploy/read-attestation-verdicts.sh --prometheus http://127.0.0.1:9090        # on the box
+PROMETHEUS_USER=… PROMETHEUS_PASSWORD=… deploy/read-attestation-verdicts.sh \
+    --prometheus https://… --window 15m                                     # from outside
+```
+
+`0` = measured, and Enforce would deny nothing. `1` = measured, and the flip **would** deny eligible
+live traffic (the rate is printed). `2` = it could not answer: unreachable, an HTTP or parse failure,
+an **empty series**, no eligible traffic at all, or a `NaN` rate. That third code is the point of the
+script. Empty is the normal state of a quiet box - the series exists only for the protected routes and
+only from the deploy that carries this code - and by hand an empty result table looks exactly like a
+table of zeros, which is the reading that flips a switch onto a population nobody has measured. The
+script also refuses to call "protected traffic exists but none of it is eligible" a green light, because
+that is the installed fleet: counted, and not the population the flip changes.
+
+Its own test (`deploy/read-attestation-verdicts.test.sh`) drives all five cases through a fake
+Prometheus, so the distinction is checked on every pull request rather than believed.
+
 ### The registration 503: measured 2026-11-19, fixed in the cache
 
 The first store build that actually attests was build 238 (`FuelFlow/238 …` in the request log). It issued
