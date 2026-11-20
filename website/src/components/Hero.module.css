@@ -30,15 +30,33 @@
   max-width: none;
   object-fit: cover;
   object-position: right center;
-  filter: saturate(0.86) contrast(1.06) brightness(0.86);
+  /* No brightness drop: the photograph is the argument on this screen, so it keeps its own
+   * exposure and the scrim does the work of separating the copy from it. */
+  filter: saturate(0.96) contrast(1.04);
   animation: heroImageIn 1.35s var(--easing) both;
 }
 
+/* A veil over the whole frame is the lazy version: it dims the half nobody is reading to
+ * protect the half somebody is. This one is two shapes that end - an ellipse that pools under
+ * the copy and a left-to-right fade that is gone by 62% of the width - plus the two thin bands
+ * the header and the facts row actually need. Right of centre the photograph is untouched. */
 .scrim {
   z-index: -1;
   background:
-    linear-gradient(90deg, rgba(3, 4, 3, 0.94) 0%, rgba(3, 4, 3, 0.6) 46%, rgba(3, 4, 3, 0.04) 74%),
-    linear-gradient(180deg, rgba(3, 4, 3, 0.28) 0%, rgba(3, 4, 3, 0.04) 44%, rgba(3, 4, 3, 0.86) 100%);
+    radial-gradient(
+      120% 92% at 16% 60%,
+      rgba(3, 4, 3, 0.94) 0%,
+      rgba(3, 4, 3, 0.8) 32%,
+      rgba(3, 4, 3, 0.24) 54%,
+      rgba(3, 4, 3, 0) 70%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(3, 4, 3, 0.7) 0%,
+      rgba(3, 4, 3, 0.24) 38%,
+      rgba(3, 4, 3, 0) 62%
+    ),
+    linear-gradient(180deg, rgba(3, 4, 3, 0.32) 0%, rgba(3, 4, 3, 0) 26%, rgba(3, 4, 3, 0.5) 100%);
 }
 
 .container {

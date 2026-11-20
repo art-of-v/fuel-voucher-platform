@@ -284,7 +284,9 @@ try {
         const sat = mx ? (mx - mn) / mx : 0;
         const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         if (L > 150 && sat < 0.16) bright++;
-        if (g > 110 && g - b > 45 && sat > 0.35) accent++;
+        /* Lime keeps green at or above red (#c5ff00 is 197/255/0); a sunset is the other way
+         * round, and its warm sky used to be counted as brand chrome. */
+        if (g > 130 && g - b > 45 && g >= r - 12 && sat > 0.35) accent++;
       }
       run = bright >= rowPixels ? run + 1 : 0;
       if (run > longest) {

@@ -10,12 +10,18 @@ export default function Hero() {
   return (
     <section className={styles.hero} id="top">
       <picture className={styles.media}>
+        {/* Two crops of one photograph, not one squeezed to fit. The wide frame carries the skyline
+            and the whole canopy; a phone sees a 2:1 frame as a letterbox, so it gets a 9:16 slice
+            cut around the car and the sign instead - the same pixels, at the aspect the screen
+            actually has, which is why nothing important is cropped away on either. No third crop
+            for tablets: `object-position: right` already spends that range on the interesting half. */}
+        <source media="(max-width: 640px)" srcSet="/hero-forecourt-phone.webp" />
         <Image
           className={styles.bgImage}
-          src="/hero-prototype-clean.webp"
+          src="/hero-forecourt.webp"
           alt=""
-          width={1212}
-          height={565}
+          width={1774}
+          height={887}
           sizes="100vw"
           priority
         />
