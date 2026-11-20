@@ -289,24 +289,107 @@ This is the one-time bootstrap that must exist before an Android proof can be `V
 
 ## Smoke test on a real device
 
-1. Start the app against the production API (or a preview API that has report-only enabled).
-2. Complete login. Confirm the request succeeds.
-3. Watch the logs for:
-   - `[SslPinning]` — should not log an error in a production build.
-   - Apple: a registered key id is present in SecureStore, and subsequent protected requests carry
-     `X-Attestation-Provider: apple`.
-   - Android: protected requests carry `X-Attestation-Provider: google`; no proof is sent if the
-     project number is absent.
-4. On the server, in report-only, look for `Attestation` result logs grouped by OS and app version.
-   A healthy build should be `Valid`; `Missing` is an old build or an Android build without a project
-   number. A bad current build is a bug, not a reason to enforce.
-5. Force a replay (repeat a captured challenge) and confirm `ATTESTATION_CHALLENGE_INVALID`; the
-   app should not clear the session for an attestation-coded 401.
-6. To test key recovery, mark the key revoked in the database
-   (`UPDATE attestation_keys SET revoked_at = now() WHERE device_id = '<id>'`) and make a protected
-   request. The client should see `ATTESTATION_KEY_REVOKED`, clear the stored key, register a new
-   one, and retry successfully. Logout is not this test: it deliberately leaves the device-bound
-   key in place.
+This is the pass #690 is waiting on, written so it can be done without re-deriving it. It is a
+**device** test: the Simulator cannot do App Attest (`AppIntegrity is not supported`), no jest test
+touches a native module, and a sideloaded Android APK cannot return `PLAY_RECOGNIZED`.
+
+### 0. The server has to be ready, and it can be checked from anywhere
+
+Two read-only probes, no device involved. Measured against production on 2026-11-20 11:11 UTC:
+
+```console
+$ curl -sS https://api.palne.shop/api/attestation/challenge     -H 'Content-Type: application/json' -H 'X-Device-Id: probe' -d '{"action":"apple-attest"}'
+{"challenge":"JIn9CBJiHrT9GiTtjn9iT1seuQIM28b0VMR6wzalzcQ","expiresAt":"2026-11-20T11:17:43Z"}
+
+$ curl -sS https://api.palne.shop/api/attestation/apple/register     -H 'Content-Type: application/json' -H 'X-Device-Id: probe'     -d '{"challenge":"<the one above>","keyId":"AAAA…","attestationObject":"Z2FyYmFnZQ=="}'
+{"…","detail":"The App Attest key or attestation object has the wrong length.","code":"ATTESTATION_INVALID"}   HTTP 400
+```
+
+A challenge with a real value and a **400 about the attestation object** means the challenge store
+works and the request reached Apple's path: this is the pair that proves #1806's cache fix is live
+(the failure mode before it was 503 `ATTESTATION_UNAVAILABLE` for every registration). Run them
+before blaming the phone.
+
+### 1. Install the build that can prove anything
+
+- iOS: **build 238 / version 1.2.0 from the App Store** (or the same build through TestFlight). It is
+  the first store build that attests; anything older sends no proof, and a Simulator build cannot.
+- Android: the build installed **from a Play track**, with `EXPO_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER`
+  baked in at build time. An `adb install`ed APK has no Play Integrity verdict, by design.
+
+Confirm the phone is the build you think it is: the API logs the client as `FuelFlow/<build>` on
+every protected request, and the app sends `X-App-Version`.
+
+### 2. Do the two things the middleware watches
+
+1. Open the app and **sign in**: phone number → `POST /api/auth/send-code`, then the code →
+   `POST /api/auth/verify`. This is the first protected pair, and on a fresh install it is also what
+   makes the client register its App Attest key (`POST /api/attestation/apple/register`).
+2. **Buy something, or open a voucher and mark it used.** `/api/purchases` and
+   `/api/vouchers/*/mark-used` are the other protected paths; without one of them a session proves
+   only half the story.
+
+Nothing else is needed. Browsing (`/api/brands`, `/api/app-version`, `/api/auth/user/me`) is
+deliberately unprotected and produces no verdict at all.
+
+### 3. Read the server, not the phone
+
+```bash
+# On the droplet, from deploy/:
+grep -E 'Attestation (Valid|Missing|Invalid)' <(docker compose --env-file .env.production   -f docker-compose.prod.yml logs --since 15m fuelflow-backend)
+
+# The same verdicts, with the rollout dimension the log lacks:
+deploy/read-attestation-verdicts.sh --prometheus http://127.0.0.1:9090 --window 15m
+
+# The key the device registered:
+docker exec fuelflow-postgres psql -U fuelflow -d fuelflow   -c "select id, platform, created_at, revoked_at from attestation_keys order by created_at desc limit 5"
+```
+
+What "the device pass succeeded" looks like, exactly:
+
+| Read | Pass | What a failure looks like instead |
+|---|---|---|
+| log line | `Attestation Valid … "POST" "/api/auth/verify"` from that device | `Missing` = the build sent nothing; `Invalid` + `code` = it sent something the verifiers rejected |
+| metric | `fuelflow_attestation_verdict_requests_total{verdict="valid",enforce_eligible="true"}` is non-zero | only `missing` — the state the metric was in for every day before #1806 |
+| table | one row for the device, `platform = apple`, `revoked_at` null | empty table = registration never succeeded |
+
+Under `ReportOnly` all three can be read without risking the fleet: nothing is refused either way,
+which is why this pass goes first.
+
+### 4. Prove pinning, in both directions
+
+Pinning has a positive and a negative half, and only the positive half happens by itself.
+
+- **Positive:** normal traffic reaches `api.palne.shop` and the device logs **no** `[SslPinning]`
+  line. `[SslPinning] native module unavailable; pinning is not active` means the binary predates the
+  module — a 1.2.0 build must not print it. `[SslPinning] initialization failed` means the pin set
+  did not load and nothing is being checked.
+- **Negative:** stand up a proxy with its own CA (mitmproxy on a laptop, phone proxy pointed at it,
+  CA installed **and trusted** on the device) and open the app. Correct behaviour is a refused
+  request with `[SslPinning] request blocked: api.palne.shop …`, not a successful session and not a
+  generic TLS error from the OS. Without this half, "pinning works" is untested: a build that
+  silently skipped pinning passes the positive half perfectly.
+
+If the negative half is not run, record it as **not run** rather than as passed — the distinction is
+the whole reason this list exists.
+
+### 5. Record the result where #690 can read it
+
+Fill this in and paste it into the issue; an unrecorded pass is indistinguishable from a pass that
+never happened:
+
+```
+device            : iPhone <model>, iOS <version>
+build             : FuelFlow/<build> (version <x.y.z>), <App Store | TestFlight | Play track>
+sign-in           : ok / failed (<code>)
+purchase          : ok / failed (<code>)
+verdict (log)     : Valid / Invalid(<code>) / Missing
+metric            : verdict=valid enforce_eligible=true rate = <n>/s
+attestation_keys  : row present / absent, platform=<apple|google>
+pinning positive  : clean / [SslPinning] <line>
+pinning negative  : blocked / not run
+date, UTC         : <yyyy-mm-dd hh:mm>
+```
 
 ## Troubleshooting
 
@@ -405,8 +488,9 @@ removes the safety net for installs that cannot update.
 
 - Backend targeted test output (attestation + startup validator).
 - Mobile typecheck, targeted Jest output, lint output.
-- A real iOS device log showing a successful registration/assertion, or a note that the device
-  test is pending.
+- The filled-in result block from "Smoke test on a real device" §5 — the device, the build, the
+  verdict line, the metric rate, the `attestation_keys` row, and both halves of pinning. A note that
+  the device test is still pending is a valid entry; a pass with no block above is not evidence.
 - A Play-installed Android result, or a note that Android enforcement is blocked on Play/Google
   Cloud setup.
 - The report-only log sample from the deployed backend.
