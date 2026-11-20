@@ -23,14 +23,21 @@
   max-width: none;
   object-fit: cover;
   object-position: center;
-  filter: saturate(0.6) contrast(1.1) brightness(0.58);
+  /* The frame stays visible; the veil is a shape that ends at 58% instead of a flat dim. */
+  filter: saturate(0.92) contrast(1.05);
 }
 
 .scrim {
   z-index: -1;
   background:
-    linear-gradient(90deg, rgba(3, 4, 3, 0.92), rgba(3, 4, 3, 0.52) 56%, rgba(3, 4, 3, 0.1)),
-    linear-gradient(180deg, rgba(3, 4, 3, 0.2), rgba(3, 4, 3, 0.78));
+    radial-gradient(
+      130% 94% at 12% 58%,
+      rgba(3, 4, 3, 0.94) 0%,
+      rgba(3, 4, 3, 0.78) 34%,
+      rgba(3, 4, 3, 0.2) 58%,
+      rgba(3, 4, 3, 0) 76%
+    ),
+    linear-gradient(180deg, rgba(3, 4, 3, 0.34) 0%, rgba(3, 4, 3, 0) 32%, rgba(3, 4, 3, 0.62) 100%);
 }
 
 .container {

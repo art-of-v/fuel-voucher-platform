@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import PhoneMock from './PhoneMock';
 import styles from './Prices.module.css';
 import {
   fetchCatalogue,
@@ -138,8 +137,20 @@ export default function Prices() {
           </div>
         </div>
 
+        {/* The phone here is a photograph, not a mockup: the code, the price and the network are
+            already the subject of a real frame, so drawing a second one beside the copy competed
+            with it. The copy keeps the left, the frame keeps the right. */}
         <div className={styles.phoneBand}>
-          <div>
+          <Image
+            className={styles.phoneBandPhoto}
+            src="/driver-band.webp"
+            alt="Водій показує код FuelFlow на екрані телефона біля заправки"
+            width={1212}
+            height={565}
+            sizes="(max-width: 1050px) 100vw, 60vw"
+          />
+          <div className={styles.phoneBandVeil} aria-hidden="true" />
+          <div className={styles.phoneBandCopy}>
             <p className="lf-eyebrow">Для водія</p>
             <h3>Код, ціна й мережа в одному місці</h3>
             <p>
@@ -148,7 +159,6 @@ export default function Prices() {
               зміниться до заправки
             </p>
           </div>
-          <PhoneMock />
         </div>
       </div>
     </section>

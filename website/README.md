@@ -98,9 +98,20 @@ browser is a hard failure, because a gate that cannot run must not pass silently
 
 ## Hero photograph
 
-`public/hero-prototype-clean.webp` is the approved landing-page prototype's forecourt, cropped to its hero band with the prototype's own copy removed: its nav row, headline, lead, both CTAs and the "Download App" pill were masked and inpainted out of the pixels. The page paints all of that from HTML in Ukrainian, and the header owns the brand lockup - so the hero itself carries exactly one image.
+Two assets, one scene. `public/hero-forecourt.webp` (1774x887) is the wide frame the hero uses from
+640px up: the canopy, the station and the car under the last of the sunset. `public/hero-forecourt-phone.webp`
+is a 9:16 slice cut from the same pixels around the car and the sign, and `Hero.tsx` serves it below
+640px - a phone sees a 2:1 frame as a letterbox, so it gets the crop its screen actually has instead
+of a squeezed wide one. Nothing important leaves either crop.
 
-The photograph was not regenerated, only healed, and the repair lives in the asset. `check:hero` measures it: a run of text-like rows or of lime rows in the left band means a second, already-finished advert is sitting under the live copy. The phone on the right keeps the prototype's English screen; it is product imagery, and the narrow-width crops are anchored to keep the canopy sign and the car rather than that screen.
+The copy is HTML in Ukrainian and the header owns the brand lockup, so the hero carries exactly one
+image. `check:hero` measures the asset: a run of text-like rows, or of lime rows, in the left band
+means a second, already-finished advert is sitting under the live copy. Lime is counted as green at
+or above red - the sunset's own warm sky is not brand chrome.
+
+`public/driver-band.webp` is the approved prototype frame that still contains its phone. It backs the
+"для водія" band inside the price section, where the phone is the subject rather than decoration;
+the copy takes the dark left half and the frame is untouched right of centre.
 
 ## Brand assets
 
