@@ -58,7 +58,9 @@
   min-height: inherit;
   object-fit: cover;
   object-position: center 35%;
-  filter: saturate(0.72) contrast(1.08) brightness(0.75);
+  /* The photograph keeps its own exposure; the section is a photo beside a list, not a
+   * photo behind one, so nothing here needs a veil to be readable. */
+  filter: saturate(0.94) contrast(1.05);
 }
 
 .steps {
