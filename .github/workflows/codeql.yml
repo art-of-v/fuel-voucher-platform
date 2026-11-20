@@ -37,10 +37,18 @@ name: CodeQL
 #      touches. Dependabot PRs and PRs from forks are skipped: their token cannot upload SARIF,
 #      and a dependency bump does not change source CodeQL can see anyway.
 #   3. `codeql-required` always runs, collapses the two analyses into ONE status context, and
-#      fails on any open code-scanning alert for the ref. It is the context the main ruleset
-#      requires (alongside `CI required`), so a finding blocks the merge instead of appearing
-#      in the Security tab a day later. Newline-forging is baselined in
+#      fails on any open code-scanning alert for the ref, so a finding blocks the merge instead of
+#      appearing in the Security tab a day later. Newline-forging is baselined in
 #      `.github/codeql/codeql-config.yml` with its reason; everything else is live.
+#
+#      This comment used to add "it is the context the main ruleset requires, alongside `CI
+#      required`". It never was. Ruleset 11965464 has required three contexts since 2026-10-23
+#      (`CI required`, `Secret scan (gitleaks)`, `Injected-payload scan`) and has never listed
+#      CodeQL, which is why a pull request with these triggers off shows `CodeQL required: Expected -
+#      Waiting for status to be reported` and still merges: a pending check nobody requires blocks
+#      nothing. The scan gated because it ran and reported red, not because a rule asked it to. That
+#      is a weaker gate than the sentence claimed - it disappears the moment the scan stops, as it
+#      did today - and the correction belongs here rather than in a commit nobody re-reads.
 #
 # **When the repository goes private on 2026-11-01, this workflow stops being a gate** - the
 # upload will fail on a personal account and the minutes are billed. At that point disable the
@@ -176,12 +184,13 @@ jobs:
           # The alert query below must not race the SARIF processing.
           wait-for-processing: true
 
-  # The single context the main ruleset requires. Same shape as `CI required` in ci.yml: it
-  # runs even when the analyses were skipped, so a language-gated PR never leaves the required
-  # context unreported. It fails when an analysis failed or was cancelled, and when the scan
-  # left an OPEN alert on this pull request (or on the branch, for a push) - the second half is
-  # what makes the scan a gate rather than a report. The `pr=` filter is diff-scoped: it returns
-  # the alerts this pull request's analysis raised, not the branch's whole backlog. Dismissed
+  # The aggregator: one context for both languages. Same shape as `CI required` in ci.yml - it runs
+  # even when the analyses were skipped, so a language-gated PR never leaves a context unreported. It
+  # is NOT a required status check in the ruleset (see the header); it gated by being red, so its
+  # absence is silence rather than a block. It fails when an analysis failed or was cancelled, and
+  # when the scan left an OPEN alert on this pull request (or on the branch, for a push) - the second
+  # half is what makes the scan a gate rather than a report. The `pr=` filter is diff-scoped: it
+  # returns the alerts this pull request's analysis raised, not the branch's whole backlog. Dismissed
   # alerts (the documented baselines) do not count.
   codeql-required:
     name: CodeQL required
