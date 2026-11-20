@@ -107,6 +107,43 @@ internal static partial class SecurityConfigurationValidator
                     + "Attestation:GoogleCredentialsJson is not set. Play Integrity verification "
                     + "needs the service-account JSON from Attestation__GoogleCredentialsJson.");
             }
+
+            // The version gate decides WHICH clients enforcement applies to, so a wrong value here is
+            // invisible: the mode says Enforce, the middleware is armed, and the only thing that has
+            // changed is who gets held to a proof. Both wrong values fail quietly in opposite
+            // directions, which is why they are refused rather than logged.
+            //
+            // Unparsable: IsEnforceEligible compares with AppVersionOptions.Compare, which returns
+            // null for anything Version.TryParse rejects and therefore answers "not eligible" for
+            // every request. Enforce would be on, the config would read as enforcing, and nothing
+            // would ever be refused - a control that reports itself active while doing nothing.
+            //
+            // 0.0.0: the other direction, and the one that takes the site down. Every installed build
+            // compares at or above it, including the 1.1.0 fleet that cannot send a proof at all, so
+            // flipping the mode would refuse sign-in and checkout for everyone on it. That is the
+            // rollout gate's whole purpose inverted, and 0.0.0 is not a version any build has ever
+            // shipped as - it is the value left behind when nobody chose one.
+            var minimumEnforced = configuration["Attestation:MinimumEnforcedAppVersion"];
+
+            if (AppVersionOptions.Compare(minimumEnforced, "0.0.0") is null)
+            {
+                throw new InvalidOperationException(
+                    "Refusing to start: Attestation:Mode is Enforce but "
+                    + $"Attestation:MinimumEnforcedAppVersion is '{minimumEnforced}', which is not a "
+                    + "version. Nothing can ever be at or above it, so no request would be enforced "
+                    + "while the configuration reports that it is. Set it to the build that actually "
+                    + "sends a proof, or set Mode=ReportOnly.");
+            }
+
+            if (AppVersionOptions.Compare(minimumEnforced, "0.0.0") == 0)
+            {
+                throw new InvalidOperationException(
+                    "Refusing to start: Attestation:Mode is Enforce with "
+                    + "Attestation:MinimumEnforcedAppVersion=0.0.0, which makes every installed build "
+                    + "eligible for enforcement - including the builds that cannot send a proof. "
+                    + "Sign-in and checkout would be refused for the whole fleet. Set it to the version "
+                    + "that contains App Attest and is live in the store, or set Mode=ReportOnly.");
+            }
         }
     }
 }

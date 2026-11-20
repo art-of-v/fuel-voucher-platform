@@ -519,9 +519,47 @@ public sealed class SecurityConfigurationValidatorTests
         settings["Attestation:Mode"] = "Enforce";
         settings["Attestation:EnforcePlatforms:0"] = "ios";
         settings["Attestation:AppleAppId"] = "TB929MCW58.com.fuelflowmarketplace.www";
+        settings["Attestation:MinimumEnforcedAppVersion"] = "1.2.0";
 
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
         act.Should().NotThrow();
+    }
+
+    // The two direction-of-error cases for the version gate. Both are invisible in production:
+    // the mode reads Enforce and the middleware is armed either way, so the only thing that changes
+    // is who gets held to a proof. One silently enforces nothing, the other locks the fleet out.
+    [Fact]
+    public void Validate_Throws_WhenEnforcingWithAnUnparsableMinimumVersion()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Enabled"] = "true";
+        settings["Attestation:Mode"] = "Enforce";
+        settings["Attestation:EnforcePlatforms:0"] = "ios";
+        settings["Attestation:AppleAppId"] = "TB929MCW58.com.fuelflowmarketplace.www";
+        settings["Attestation:MinimumEnforcedAppVersion"] = "one point two";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*MinimumEnforcedAppVersion is 'one point two'*");
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenEnforcingAtVersionZeroZeroZero()
+    {
+        // 0.0.0 is every build, including the fleet that cannot send a proof - the lockout the
+        // rollout gate exists to prevent, reached by never choosing a value.
+        var settings = ValidProductionBaseline();
+        settings["Attestation:Enabled"] = "true";
+        settings["Attestation:Mode"] = "Enforce";
+        settings["Attestation:EnforcePlatforms:0"] = "ios";
+        settings["Attestation:AppleAppId"] = "TB929MCW58.com.fuelflowmarketplace.www";
+        settings["Attestation:MinimumEnforcedAppVersion"] = "0.0.0";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*MinimumEnforcedAppVersion=0.0.0*");
     }
 
     [Fact]
