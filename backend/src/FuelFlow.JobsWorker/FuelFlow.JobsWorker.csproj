@@ -23,7 +23,7 @@
          one, a circuit breaker on every one, and a retry with backoff on the ones that only
          read. The policy itself lives in the API project, which this worker references -
          see SharedKernel/Resilience/OutboundHttpClient.cs. -->
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="11.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.18.0-rc.1" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
