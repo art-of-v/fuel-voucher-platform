@@ -35,7 +35,7 @@
     <!-- Direct: RedisCacheService talks to it, and the atomic index operations (GETDEL,
          SET ... NX) are the reason. This used to arrive transitively through the distributed
          cache package, whose hash layout was the one thing these commands cannot read. -->
-    <PackageReference Include="StackExchange.Redis" Version="2.7.27" />
+    <PackageReference Include="StackExchange.Redis" Version="3.4.35" />
     <!-- The outbound HTTP clients: a timeout on every one, a circuit breaker on every one, and a
          retry with backoff on the ones that only read. The package is the official home of the
          resilience pipeline (Polly) for IHttpClientFactory - see
